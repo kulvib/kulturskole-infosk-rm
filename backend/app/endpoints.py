@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from app.auth import authenticate_user, create_access_token, get_current_user, fake_users_db, pwd_context
 
 router = APIRouter()
+
+class PasswordTest(BaseModel):
+    password: str
 
 @router.post("/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -22,7 +26,7 @@ def protected_route(current_user: dict = Depends(get_current_user)):
     return {"msg": f"Du er logget ind som {current_user['username']}"}
 
 @router.post("/testhash")
-def test_hash(password: str):
+def test_hash(payload: PasswordTest):
     hashed = fake_users_db["admin"]["hashed_password"]
-    result = pwd_context.verify(password, hashed)
-    return {"password": password, "hashed": hashed, "result": result}
+    result = pwd_context.verify(payload.password, hashed)
+    return {"password": payload.password, "hashed": hashed, "result": result}
