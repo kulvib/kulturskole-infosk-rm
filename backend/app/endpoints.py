@@ -4,10 +4,6 @@ from app.auth import authenticate_user, create_access_token, get_current_user
 
 router = APIRouter()
 
-@router.get("/ping")
-def ping():
-    return {"msg": "pong"}
-
 @router.post("/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = authenticate_user(form_data.username, form_data.password)
@@ -16,9 +12,9 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Forkert brugernavn eller adgangskode"
         )
-    token = create_access_token({"username": user["username"]})
-    return {"access_token": token, "token_type": "bearer"}
+    access_token = create_access_token(data={"username": user["username"]})
+    return {"access_token": access_token, "token_type": "bearer"}
 
-@router.get("/me")
-def read_users_me(current_user: dict = Depends(get_current_user)):
-    return current_user
+@router.get("/protected")
+def protected_route(current_user: dict = Depends(get_current_user)):
+    return {"msg": f"Du er logget ind som {current_user['username']}"}
