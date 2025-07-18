@@ -11,7 +11,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
 
-# Demo-bruger
 fake_user = {
     "username": "admin",
     "hashed_password": "$2b$12$v0dLx1ZL4xQ7.7sJxQb8UuvZzV6rCGZ5iN4VgZJ9CPlv.7g/SmTVy",  # hash af 'admin123'
