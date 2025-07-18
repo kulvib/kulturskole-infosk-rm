@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from app.auth import authenticate_user, create_access_token, get_current_user
+from app.auth import authenticate_user, create_access_token, get_current_user, fake_users_db, pwd_context
 
 router = APIRouter()
 
 @router.post("/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    # Debug: print modtaget data til logs
     print("FORM_DATA USERNAME:", form_data.username)
     print("FORM_DATA PASSWORD:", form_data.password)
     user = authenticate_user(form_data.username, form_data.password)
@@ -21,3 +20,9 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @router.get("/protected")
 def protected_route(current_user: dict = Depends(get_current_user)):
     return {"msg": f"Du er logget ind som {current_user['username']}"}
+
+@router.post("/testhash")
+def test_hash(password: str):
+    hashed = fake_users_db["admin"]["hashed_password"]
+    result = pwd_context.verify(password, hashed)
+    return {"password": password, "hashed": hashed, "result": result}
