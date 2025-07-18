@@ -1,10 +1,7 @@
-from flask import Flask
+from fastapi import FastAPI
 
-app = Flask(__name__)
+app = FastAPI()
 
-@app.route("/")
-def hello():
-    return "Hello from backend!"
-
-if __name__ == "__main__":
-    app.run()
+@app.get("/")
+async def root():
+    return {"message": "Kulturskole Infoskaerm backend kører!"}
