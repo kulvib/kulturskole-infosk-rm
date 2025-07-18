@@ -17,4 +17,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def root():
+    return {"msg": "Backend is running"}
+
 app.include_router(router, prefix="/api")
