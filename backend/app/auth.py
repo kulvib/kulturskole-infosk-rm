@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-# Brug samme secret i både token creation og verify
 SECRET_KEY = "supersecretkey"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -12,11 +11,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
 
-# Hash genereret for password: admin123
+# Hash for admin123
 fake_users_db = {
     "admin": {
         "username": "admin",
-        "hashed_password": "$2b$12$U6wD8gkDkB1A1KcKnP7rIuozH0kEg0z5e4xHPmD7QYw9zVwQwQxLG"  # <-- denne hash matcher admin123!
+        "hashed_password": "$2b$12$U6wD8gkDkB1A1KcKnP7rIuozH0kEg0z5e4xHPmD7QYw9zVwQwQxLG"
     }
 }
 
