@@ -30,3 +30,8 @@ def test_hash(payload: PasswordTest):
     hashed = fake_users_db["admin"]["hashed_password"]
     result = pwd_context.verify(payload.password, hashed)
     return {"password": payload.password, "hashed": hashed, "result": result}
+
+@router.post("/genhash")
+def gen_hash(payload: PasswordTest):
+    hashval = pwd_context.hash(payload.password)
+    return {"password": payload.password, "hash": hashval}
