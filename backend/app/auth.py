@@ -11,7 +11,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
 
-# Hash for admin123
+# Opdater denne hash med den du får fra /genhash endpointet!
 fake_users_db = {
     "admin": {
         "username": "admin",
