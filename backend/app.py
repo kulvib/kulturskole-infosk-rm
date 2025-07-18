@@ -1,12 +1,11 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, status, Request
+from fastapi import FastAPI, HTTPException, Depends, status, Query
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from datetime import datetime, timedelta
-import uuid
+from datetime import datetime, timedelta, date
 import json
 
 # --- Settings ---
@@ -128,6 +127,66 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
     return user
 
+# --- Påske og ferie-logik ---
+def get_easter_sunday(year):
+    "Returnerer datoen for påskesøndag (Western/Protestant/Catholic)"
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    return date(year, month, day)
+
+def get_easter_related_dates(year):
+    """Returnerer liste af påskedage (skærtorsdag, langfredag, påskedag, 2. påskedag, Kristi Himmelfart, pinsedag, 2. pinsedag)"""
+    easter = get_easter_sunday(year)
+    return [
+        easter - timedelta(days=3),  # Skærtorsdag
+        easter - timedelta(days=2),  # Langfredag
+        easter,                      # Påskedag
+        easter + timedelta(days=1),  # 2. påskedag
+        easter + timedelta(days=39), # Kristi Himmelfart
+        easter + timedelta(days=49), # Pinsedag
+        easter + timedelta(days=50), # 2. pinsedag
+    ]
+
+def is_holiday_or_closed(check_date: date, holidays: list) -> bool:
+    year = check_date.year
+    if year > 2050:
+        return False
+
+    # Helligdage fra API
+    if any(h['date'] == check_date.isoformat() for h in holidays):
+        return True
+
+    # Påskedage (ekstra sikring)
+    if check_date in get_easter_related_dates(year):
+        return True
+
+    # Uge 7 og 42 (mandag-søndag)
+    week = check_date.isocalendar().week
+    if week in [7, 42]:
+        return True
+
+    # Hele juli måned
+    if check_date.month == 7:
+        return True
+
+    # Mellem jul og nytår (24. dec - 1. jan)
+    if (check_date.month == 12 and check_date.day >= 24) or (check_date.month == 1 and check_date.day == 1):
+        return True
+
+    return False
+
 # --- Endpoints ---
 @app.post("/token")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -204,6 +263,18 @@ async def set_web_url(client_id: str, web_url: str, current_user: User = Depends
         raise HTTPException(status_code=404, detail="Klient ikke fundet")
     clients[client_id].web_url = web_url
     return {"status": "updated", "web_url": web_url}
+
+@app.get("/is_closed")
+async def is_closed(date_str: str = Query(...), client_id: str = Query("")):
+    """
+    Returnerer true/false om klienten bør være slukket på given dato
+    """
+    try:
+        check_date = date.fromisoformat(date_str)
+    except Exception:
+        return {"error": "Forkert datoformat. Brug YYYY-MM-DD"}
+    closed = is_holiday_or_closed(check_date, holidays)
+    return {"date": date_str, "closed": closed}
 
 @app.get("/")
 async def root():
