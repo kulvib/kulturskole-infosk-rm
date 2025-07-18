@@ -10,7 +10,7 @@ def fetch_holidays(year, country="DK"):
 
 if __name__ == "__main__":
     holidays = []
-    for year in range(datetime.now().year, 2031):
+    for year in range(datetime.now().year, 2051):
         holidays.extend(fetch_holidays(year))
     with open("holidays.json", "w") as f:
         json.dump(holidays, f, indent=2, ensure_ascii=False)
