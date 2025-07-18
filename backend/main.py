@@ -1,10 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app import endpoints
+from app.endpoints import router
 
 app = FastAPI()
 
-# CORS: Tillad Vercel-frontend og lokal udvikling
 origins = [
     "http://localhost:5173",
     "https://kulturskole-infoskaerm-frontend.vercel.app"
@@ -18,4 +17,4 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(endpoints.router, prefix="/api")
+app.include_router(router, prefix="/api")
