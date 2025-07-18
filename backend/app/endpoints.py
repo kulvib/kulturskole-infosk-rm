@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Form
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from app.auth import authenticate_user, create_access_token, get_current_user
 
@@ -16,7 +16,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Forkert brugernavn eller kodeord"
         )
-    token = create_access_token({"sub": user["username"]})
+    token = create_access_token({"username": user["username"]})
     return {"access_token": token, "token_type": "bearer"}
 
 @router.get("/me")
