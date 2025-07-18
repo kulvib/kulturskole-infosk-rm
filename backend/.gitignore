@@ -1,6 +1,30 @@
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.env
 .env
-*.sqlite3
-*.db
-*.log
+.venv
+venv/
+ENV/
+env/
+build/
+dist/
+*.egg-info/
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PyCharm
+.idea/
+
+# Test/coverage
+.coverage
+htmlcov/
+.tox/
+.pytest_cache/
