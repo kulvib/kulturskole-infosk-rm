@@ -15,7 +15,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
 fake_users_db = {
     "admin": {
         "username": "admin",
-        "hashed_password": "$2b$12$U6wD8gkDkB1A1KcKnP7rIuozH0kEg0z5e4xHPmD7QYw9zVwQwQxLG"
+        "hashed_password": "$2b$12$hvXoD2twKkVXZDWotGK7leKB7xiujjTdNIKrj2TXtZnqEKGCMrpd6"
     }
 }
 
