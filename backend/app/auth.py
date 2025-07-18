@@ -5,12 +5,10 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-# SECRET_KEY bør være hemmelig og lang i produktion
 SECRET_KEY = "supersecretkey"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-# FastAPI OAuth2 password flow
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
 
 # Brugerdatabase (dummy til demo). Hash er for 'admin123'
