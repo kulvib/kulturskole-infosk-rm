@@ -1,3 +1,3 @@
 # Frontend
 
-Her placeres dashboard-koden (f.eks. React eller Vue).
+Her placeres dashboard-koden (React eller Vue).
