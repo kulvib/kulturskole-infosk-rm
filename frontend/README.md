@@ -4,9 +4,10 @@ Web-dashboard til Kulturskolens infoskærm, bygget i React (Vite).
 
 ## Opsætning
 
-1. **Backend-URL er allerede sat til**  
-   https://kulturskole-infoskaerm-backend.onrender.com  
-   i alle relevante filer.
+1. **Tilføj miljøvariabel i Vercel:**
+   - Gå til projekt > Settings > Environment Variables
+   - Key: `VITE_API_BASE`
+   - Value: `https://kulturskole-infoskaerm-backend.onrender.com/api`
 
 2. **Installer og start lokalt:**
    ```bash
@@ -15,7 +16,7 @@ Web-dashboard til Kulturskolens infoskærm, bygget i React (Vite).
    ```
    Dashboardet vil køre på [http://localhost:5173](http://localhost:5173)
 
-3. **Deploy til fx Vercel eller Netlify for gratis hosting.**
+3. **Deploy til Vercel for gratis hosting.**
 
 ## Funktioner
 
