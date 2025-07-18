@@ -7,4 +7,3 @@ venv/
 ENV/
 .venv/
 .Python
-holidays.json
