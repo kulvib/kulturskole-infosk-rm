@@ -7,9 +7,12 @@ export default function Terminal({ clientId, token }) {
 
   function connect() {
     if (wsRef.current) return;
-    const ws = new window.WebSocket(
-      `wss://kulturskole-infoskaerm-backend.onrender.com/ws/shell/${clientId}?token=${token}`
-    );
+    // Brug server-url fra VITE_API_BASE, men skift til wss og fjern evt. /api
+    let apiBase = import.meta.env.VITE_API_BASE;
+    let wsUrl = apiBase.replace(/^http/, "ws").replace(/\/api$/, "");
+    wsUrl += `/ws/shell/${clientId}?token=${token}`;
+
+    const ws = new window.WebSocket(wsUrl);
     ws.onmessage = e => setLog(log => [...log, e.data]);
     wsRef.current = ws;
   }
