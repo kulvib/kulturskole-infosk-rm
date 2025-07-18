@@ -1,5 +1,4 @@
-// Backend-URL er indsat korrekt herunder!
-const BASE_URL = "https://kulturskole-infoskaerm-backend.onrender.com/api";
+const BASE_URL = import.meta.env.VITE_API_BASE;
 
 export async function login(username, password) {
   const res = await fetch(`${BASE_URL}/token`, {
