@@ -6,6 +6,9 @@ router = APIRouter()
 
 @router.post("/token")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    # Debug: print modtaget data til logs
+    print("FORM_DATA USERNAME:", form_data.username)
+    print("FORM_DATA PASSWORD:", form_data.password)
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
