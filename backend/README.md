@@ -1,6 +1,11 @@
 # Kulturskole Infoskaerm Backend
 
-FastAPI-backend til infoskærm-projektet.
+FastAPI-backend med login til infoskærm-projektet.
+
+## Brugernavn og kodeord
+
+- **Brugernavn:** `admin`
+- **Kodeord:** `admin123`
 
 ## Sådan starter du lokalt
 
@@ -16,18 +21,19 @@ API root: http://localhost:8000/api/ping
 
 ## Deploy på Render
 
-- Deploy hele denne mappe som web service
+- Deploy hele denne mappe som web service.
 - Start-kommando:  
   `uvicorn main:app --host 0.0.0.0 --port 10000`
 - Husk: Vercel-frontend-URL er sat i CORS i main.py
 
-## Struktur
+## Endpoints
 
-- `main.py` – starter app, sætter CORS, router
-- `app/` – kode (models, schemas, endpoints osv.)
+- POST `/api/token` – login (brug form-data: username, password)
+- GET `/api/me` – hent bruger (kræver token)
+- GET `/api/ping` – test
 
-## Dummy login/token
+## Dependencies
 
-- For demo: brug token `secrettoken` for /api/secure-data
+- Se requirements.txt – alle nødvendige pakker er med.
 
-Udbyg CRUD, models og auth efter behov!
+---
