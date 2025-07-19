@@ -36,4 +36,4 @@ class ClientApprove(BaseModel):
 
 class ClientOut(ClientBase):
     class Config:
-        from_attributes = True  # Pydantic v2
+        from_attributes = True  # For Pydantic v2
