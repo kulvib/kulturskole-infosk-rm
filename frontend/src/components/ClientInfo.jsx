@@ -65,6 +65,9 @@ export default function ClientInfo() {
   if (error) return <div className="error">{error}</div>;
   if (!client) return <div>Indlæser klientdata...</div>;
 
+  // For debugging: se objektet i browserens konsol
+  console.log("client-data", client);
+
   return (
     <div className="client-info">
       <button onClick={() => navigate(-1)} style={{marginBottom:12}}>← Tilbage</button>
@@ -108,10 +111,10 @@ export default function ClientInfo() {
       <div style={{marginTop:24}}>
         <b>Klientdata:</b>
         <ul>
-          <li>IP: {client.ip}</li>
-          <li>Version: {client.version}</li>
-          <li>Sidst set: {client.last_seen}</li>
-          <li>Uptime: {client.uptime}</li>
+          <li>IP: {client.ip || <i>ukendt</i>}</li>
+          <li>Version: {client.version || <i>ukendt</i>}</li>
+          <li>Sidst set: {client.last_seen || <i>ukendt</i>}</li>
+          <li>Uptime: {client.uptime || <i>ukendt</i>}</li>
         </ul>
       </div>
       <ClientActions clientId={clientId} />
