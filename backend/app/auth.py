@@ -5,7 +5,6 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from typing import Optional
 
-# SECRET til JWT - SKIFT DETTE I PRODUKTION!
 SECRET_KEY = "supersecretkey123"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -13,7 +12,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Dummy users (replace with real DB in production)
 fake_users_db = {
     "admin": {
         "username": "admin",
