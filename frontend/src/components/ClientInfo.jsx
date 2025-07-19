@@ -52,7 +52,7 @@ export default function ClientInfo() {
     setApproving(true);
     setApproveError("");
     try {
-      await approveClient(clientId);
+      await approveClient(clientId, displayName);
       // Genhent for at opdatere visning
       const updated = await fetchClient(clientId);
       setClient(updated);
