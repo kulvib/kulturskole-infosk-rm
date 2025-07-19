@@ -21,32 +21,6 @@ fake_users_db = {
     }
 }
 
-# Dummy klienter (skift til database i produktion)
-fake_clients_db = [
-    {
-        "id": "client1",
-        "name": "client1",
-        "display_name": "Storskærm 1",
-        "web_addr": "https://example.com",
-        "ip": "192.168.1.10",
-        "version": "1.0.0",
-        "last_seen": "2025-07-19 10:00:00",
-        "uptime": "2 dage, 3 timer",
-        "online": True
-    },
-    {
-        "id": "client2",
-        "name": "client2",
-        "display_name": "Storskærm 2",
-        "web_addr": "https://example.org",
-        "ip": "192.168.1.11",
-        "version": "1.0.1",
-        "last_seen": "2025-07-19 09:50:00",
-        "uptime": "1 dag, 22 timer",
-        "online": False
-    }
-]
-
 # ---------- Pydantic models ----------
 class Token(BaseModel):
     access_token: str
@@ -80,6 +54,25 @@ class ClientUpdate(BaseModel):
 
 class ClientAction(BaseModel):
     action: str
+
+# ---------- Generér 15 klienter ----------
+def generate_clients(n=15):
+    return [
+        {
+            "id": f"client{i+1}",
+            "name": f"client{i+1}",
+            "display_name": f"Storskærm {i+1}",
+            "web_addr": f"https://example.com/client{i+1}",
+            "ip": f"192.168.1.{10+i}",
+            "version": f"1.0.{i}",
+            "last_seen": "2025-07-19 10:00:00",
+            "uptime": f"{i+1} dage, {i*2} timer",
+            "online": i % 2 == 0
+        }
+        for i in range(n)
+    ]
+
+fake_clients_db = generate_clients(15)
 
 # ---------- Auth helpers ----------
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
