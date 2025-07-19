@@ -1,10 +1,13 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+
+# ----------- FAST API-NØGLE TIL KLIENT-AUTOMATION -----------
+API_KEY = "DIN_FASTE_API_NØGLE"  # Sæt din egen nøgle!
 
 # SECRET til JWT - SKIFT DETTE I PRODUKTION!
 SECRET_KEY = "supersecretkey123"
@@ -47,16 +50,27 @@ class Client(BaseModel):
     last_seen: Optional[str]
     uptime: Optional[str]
     online: bool
+    status: Optional[str] = "pending"  # 'pending' eller 'approved'
 
 class ClientUpdate(BaseModel):
     display_name: Optional[str] = None
     web_addr: Optional[str] = None
 
+class ClientStatus(BaseModel):
+    ip: Optional[str]
+    version: Optional[str]
+    last_seen: Optional[str]
+    uptime: Optional[str]
+    online: Optional[bool]
+
+class ClientApprove(BaseModel):
+    display_name: Optional[str]
+
 class ClientAction(BaseModel):
     action: str
 
-# ---------- Generér 15 klienter ----------
-def generate_clients(n=15):
+# ---------- Generér 15 klienter (kan være tom til start) ----------
+def generate_clients(n=0):
     return [
         {
             "id": f"client{i+1}",
@@ -67,18 +81,18 @@ def generate_clients(n=15):
             "version": f"1.0.{i}",
             "last_seen": "2025-07-19 10:00:00",
             "uptime": f"{i+1} dage, {i*2} timer",
-            "online": i % 2 == 0
+            "online": i % 2 == 0,
+            "status": "approved"
         }
         for i in range(n)
     ]
 
-fake_clients_db = generate_clients(15)
+fake_clients_db = generate_clients(0)  # Starter tom!
 
 # ---------- Auth helpers ----------
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
 
 def verify_password(plain_password, hashed_password):
-    # Dummy check -- i produktion: brug hashing!
     return plain_password == hashed_password
 
 def get_user(db, username: str):
@@ -130,7 +144,6 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 # ---------- FastAPI app ----------
 app = FastAPI()
 
-# Cross-origin (så du kan tilgå fra din frontend)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # I produktion: Sæt din frontend-url her!
@@ -155,7 +168,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-# ---------- Klient endpoints ----------
+# ---------- KLIENT-ENDPOINTS: JWT (ADMIN/FRONTEND) ----------
 @app.get("/api/clients", response_model=List[Client])
 async def get_clients(current_user: User = Depends(get_current_active_user)):
     return fake_clients_db
@@ -186,7 +199,52 @@ async def client_action(client_id: str, action: ClientAction, current_user: User
     # Her kan du sætte rigtig handling ind
     return {"msg": f"Action '{action.action}' executed for client {client_id}"}
 
-# ---------- Dummy endpoints fra din gamle /docs ----------
+# ---------- KLIENT-ENDPOINTS: FAST API-NØGLE TIL AUTO-REGISTRERING (ingen JWT) ----------
+@app.post("/api/clients", response_model=Client)
+async def client_auto_register(client: Client, x_api_key: str = Header(None)):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    # Tjek om klienten allerede findes
+    exists = next((c for c in fake_clients_db if c["id"] == client.id), None)
+    if exists:
+        return exists
+    # Opret ny klient med status 'pending'
+    client_dict = client.dict()
+    client_dict["status"] = "pending"
+    fake_clients_db.append(client_dict)
+    return client_dict
+
+@app.patch("/api/clients/{client_id}/status", response_model=Client)
+async def client_update_status(client_id: str, status: ClientStatus, x_api_key: str = Header(None)):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    client = next((c for c in fake_clients_db if c["id"] == client_id), None)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    for field, value in status.dict(exclude_unset=True).items():
+        client[field] = value
+    return client
+
+@app.get("/api/clients/{client_id}/status", response_model=Client)
+async def client_get_status(client_id: str, x_api_key: str = Header(None)):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    client = next((c for c in fake_clients_db if c["id"] == client_id), None)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return client
+
+@app.patch("/api/clients/{client_id}/approve", response_model=Client)
+async def approve_client(client_id: str, approval: ClientApprove, current_user: User = Depends(get_current_active_user)):
+    client = next((c for c in fake_clients_db if c["id"] == client_id), None)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    client["status"] = "approved"
+    if approval.display_name is not None:
+        client["display_name"] = approval.display_name
+    return client
+
+# ---------- Dummy endpoints ----------
 @app.get("/api/protected")
 async def protected_route(current_user: User = Depends(get_current_active_user)):
     return {"msg": f"Hello, {current_user.username}!"}
@@ -199,7 +257,6 @@ async def test_hash(password: str):
 async def gen_hash(password: str):
     return {"hash": password + "_genhashed"}
 
-# ---------- Root endpoint ----------
 @app.get("/")
 def read_root():
     return {"msg": "Infoskærm backend kører!"}
