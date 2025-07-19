@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { fetchClient, updateClient } from "../api/clientApi";
+import { fetchClient, updateClient, approveClient } from "../api/clientApi";
 import ClientActions from "./ClientActions";
 import LiveStream from "./LiveStream";
 import Terminal from "./Terminal";
@@ -12,8 +12,11 @@ export default function ClientInfo() {
   const [webAddr, setWebAddr] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [approving, setApproving] = useState(false);
+  const [approveError, setApproveError] = useState("");
   const navigate = useNavigate();
 
+  // Hent klientdata
   useEffect(() => {
     fetchClient(clientId)
       .then(data => {
@@ -22,8 +25,10 @@ export default function ClientInfo() {
         setWebAddr(data.web_addr || "");
       })
       .catch(() => setError("Kunne ikke hente klientdata"));
+    // eslint-disable-next-line
   }, [clientId]);
 
+  // Gem ændringer
   async function handleSave(e) {
     e.preventDefault();
     setSaving(true);
@@ -42,6 +47,21 @@ export default function ClientInfo() {
     setSaving(false);
   }
 
+  // Godkend klient
+  async function handleApprove() {
+    setApproving(true);
+    setApproveError("");
+    try {
+      await approveClient(clientId);
+      // Genhent for at opdatere visning
+      const updated = await fetchClient(clientId);
+      setClient(updated);
+    } catch {
+      setApproveError("Kunne ikke godkende klienten");
+    }
+    setApproving(false);
+  }
+
   if (error) return <div className="error">{error}</div>;
   if (!client) return <div>Indlæser klientdata...</div>;
 
@@ -49,6 +69,20 @@ export default function ClientInfo() {
     <div className="client-info">
       <button onClick={() => navigate(-1)} style={{marginBottom:12}}>← Tilbage</button>
       <h2>Klient: {client.name}</h2>
+      {/* Godkend-knap hvis pending */}
+      {client.status === "pending" && (
+        <div style={{marginBottom:16}}>
+          <button 
+            onClick={handleApprove} 
+            disabled={approving}
+            style={{background:"orange", color:"black", fontWeight:600, marginRight:8}}
+          >
+            {approving ? "Godkender..." : "Godkend klient"}
+          </button>
+          {approveError && <span style={{color:"red"}}>{approveError}</span>}
+        </div>
+      )}
+
       <form onSubmit={handleSave} className="client-edit-form">
         <label>
           Visningsnavn:
