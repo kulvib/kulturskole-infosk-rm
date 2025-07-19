@@ -27,7 +27,6 @@ def get_db():
     finally:
         db.close()
 
-# ---------- AUTH ENDPOINTS ----------
 @app.post("/api/token", response_model=schemas.Token)
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     user = auth.authenticate_user(form_data.username, form_data.password)
@@ -42,13 +41,19 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-# ---------- KLIENT-ENDPOINTS: JWT (ADMIN/FRONTEND) ----------
 @app.get("/api/clients", response_model=List[schemas.ClientOut])
 def get_clients(
     db: Session = Depends(get_db),
     current_user: dict = Depends(auth.get_current_user)
 ):
     return db.query(models.Client).all()
+
+@app.get("/api/clients/pending", response_model=List[schemas.ClientOut])
+def get_pending_clients(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user)
+):
+    return db.query(models.Client).filter(models.Client.status == "pending").all()
 
 @app.get("/api/clients/{client_id}", response_model=schemas.ClientOut)
 def get_client(
@@ -92,7 +97,6 @@ def delete_client(
     db.commit()
     return {"ok": True}
 
-# ---------- KLIENT-ENDPOINTS: FAST API-NØGLE TIL AUTO-REGISTRERING (ingen JWT) ----------
 @app.post("/api/clients", response_model=schemas.ClientOut)
 def client_auto_register(
     client: schemas.ClientCreate,
@@ -159,21 +163,6 @@ def approve_client(
     db.commit()
     db.refresh(client)
     return client
-
-# ---------- Dummy endpoints ----------
-@app.get("/api/protected")
-def protected_route(current_user: dict = Depends(auth.get_current_user)):
-    return {"msg": f"Hello, {current_user['username']}!"}
-
-@app.post("/api/testhash")
-def test_hash(password: str):
-    from app.auth import pwd_context
-    return {"hash": pwd_context.hash(password)}
-
-@app.post("/api/genhash")
-def gen_hash(password: str):
-    from app.auth import pwd_context
-    return {"hash": pwd_context.hash(password)}
 
 @app.get("/")
 def read_root():
