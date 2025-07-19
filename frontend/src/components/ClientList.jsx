@@ -8,12 +8,17 @@ export default function ClientList() {
 
   useEffect(() => {
     fetchClients()
-      .then(setClients)
+      .then(data => {
+        console.log("clients-list", data);
+        // Hvis data er et objekt med en clients-array, brug data.clients
+        setClients(Array.isArray(data) ? data : data.clients || []);
+      })
       .catch(() => setError("Kunne ikke hente klientliste"));
   }, []);
 
   if (error) return <div className="error">{error}</div>;
-  if (!clients.length) return <div>Indlæser klienter...</div>;
+  if (!clients.length && !error) return <div>Indlæser klienter...</div>;
+  if (clients.length === 0 && !error) return <div>Ingen klienter fundet.</div>;
 
   return (
     <table className="client-table">
