@@ -239,6 +239,8 @@ async def approve_client(client_id: str, approval: ClientApprove, current_user: 
     client = next((c for c in fake_clients_db if c["id"] == client_id), None)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+    if client["status"] == "approved":
+        raise HTTPException(status_code=400, detail="Client is already approved")
     client["status"] = "approved"
     if approval.display_name is not None:
         client["display_name"] = approval.display_name
