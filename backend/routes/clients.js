@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from models import Client  # Din SQLAlchemy-model
-from database import get_db  # Din dependency til DB-session
+from models import Client  # Importér din Client-model
+from database import get_db  # Importér din database dependency
 
 router = APIRouter(
     prefix="/api/clients",
