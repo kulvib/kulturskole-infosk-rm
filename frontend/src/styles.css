@@ -1,0 +1,82 @@
+body {
+  background: #f4f6fa;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+.login-container, .dashboard, .client-info {
+  background: #fff;
+  margin: 48px auto;
+  padding: 32px 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px #0002;
+  max-width: 520px;
+}
+.login-form input, .client-edit-form input {
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 10px;
+  font-size: 1em;
+  border-radius: 4px;
+  border: 1px solid #bbb;
+}
+button {
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 14px;
+  font-size: 1em;
+  cursor: pointer;
+  margin-right: 8px;
+}
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.logout-btn {
+  float: right;
+  background: #b71c1c;
+}
+h1, h2, h3 {
+  margin-top: 0;
+}
+.error {
+  color: #b71c1c;
+  margin-top: 12px;
+}
+.client-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.client-table th, .client-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #eee;
+}
+.status-green {
+  color: #388e3c;
+  font-weight: bold;
+}
+.status-red {
+  color: #b71c1c;
+  font-weight: bold;
+}
+.client-actions {
+  margin: 16px 0;
+}
+.action-msg {
+  color: #1976d2;
+  margin-top: 6px;
+}
+.terminal-container {
+  margin-top: 12px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #111;
+}
+pre {
+  background: #f4f4f4;
+  padding: 10px;
+  border-radius: 4px;
+}
