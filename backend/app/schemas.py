@@ -1,6 +1,10 @@
 from pydantic import BaseModel
 from typing import Optional
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
 class ClientBase(BaseModel):
     id: str
     name: str
@@ -30,9 +34,6 @@ class ClientStatus(BaseModel):
 class ClientApprove(BaseModel):
     display_name: Optional[str]
 
-class ClientAction(BaseModel):
-    action: str
-
 class ClientOut(ClientBase):
     class Config:
-        orm_mode = True
+        from_attributes = True  # Pydantic v2
