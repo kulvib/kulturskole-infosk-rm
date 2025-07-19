@@ -57,6 +57,16 @@ export async function updateClient(clientId, data) {
   return await res.json();
 }
 
+// NYT: Godkend klient (PATCH /clients/:id/approve)
+export async function approveClient(clientId) {
+  const res = await fetch(`${API_BASE}/clients/${clientId}/approve`, {
+    method: "PATCH",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Godkendelse fejlede");
+  return await res.json();
+}
+
 // Handlinger: start, stop, restart, shutdown, browser shutdown
 export async function clientAction(clientId, action) {
   const res = await fetch(`${API_BASE}/clients/${clientId}/action`, {
