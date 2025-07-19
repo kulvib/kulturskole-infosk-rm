@@ -1,30 +1,30 @@
-# Infoskaerm Dashboard
+# Dashboard-frontend
 
-Web-dashboard til Kulturskolens infoskærm, bygget i React (Vite).
+Dette er et simpelt React-dashboard, der taler sammen med din FastAPI-backend (JWT auth, klientstyring, livestream, terminal mm).
 
-## Opsætning
+### Features
 
-1. **Tilføj miljøvariabel i Vercel:**
-   - Gå til projekt > Settings > Environment Variables
-   - Key: `VITE_API_BASE`
-   - Value: `https://kulturskole-infoskaerm-backend.onrender.com/api`
+- Login med JWT token (modtager fra backend)
+- Forside: Liste over klienter (status, info-knap)
+- Info-side: Klientoplysninger, redigerbart visningsnavn og webadresse, handlinger (start/stop/genstart/shutdown), browserstyring
+- Live stream fra klient (MJPEG eller WebRTC)
+- WebSocket terminal til klient
 
-2. **Installer og start lokalt:**
+### Opsætning
+
+1. Kopiér alle filer til et nyt GitHub repository.
+2. Kør:
    ```bash
    npm install
-   npm run dev
+   npm start
    ```
-   Dashboardet vil køre på [http://localhost:5173](http://localhost:5173)
+3. Tilret evt. `API_BASE` i `src/api/clientApi.js` så det peger på din backend (fx `https://dit-backend.onrender.com/api`).
 
-3. **Deploy til Vercel for gratis hosting.**
+### Backend krav
 
-## Funktioner
+- FastAPI backend med JWT-token-auth (som beskrevet ovenfor)
+- Klient-endpoints som matcher frontendens API-kald (se `src/api/clientApi.js`)
 
-- JWT-login (admin/admin123)
-- Klientoversigt (status, sidst set, web-url mm.)
-- Info-side med redigering og handlinger
-- Websocket-terminal og livestream
+### Udvidelse
 
-## Tilpasning
-
-Udbyg gerne dashboardet med flere features – spørg hvis du vil have kodeeksempler!
+Du kan style videre i `src/styles.css` og tilføje flere features efter behov.
