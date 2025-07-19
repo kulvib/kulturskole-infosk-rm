@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 
 # ----------- FAST API-NØGLE TIL KLIENT-AUTOMATION -----------
-API_KEY = "DIN_FASTE_API_NØGLE"  # Sæt din egen nøgle!
+API_KEY = "API_KEY = "KulVib2025info"  # Sæt din egen nøgle!
 
 # SECRET til JWT - SKIFT DETTE I PRODUKTION!
 SECRET_KEY = "supersecretkey123"
@@ -19,7 +19,7 @@ fake_users_db = {
     "admin": {
         "username": "admin",
         "full_name": "Admin User",
-        "hashed_password": "admin",  # IKKE sikkert! Brug hash i produktion!
+        "hashed_password": "KulVib2025info",  # IKKE sikkert! Brug hash i produktion!
         "disabled": False,
     }
 }
