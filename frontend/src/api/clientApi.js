@@ -4,6 +4,7 @@ const API_BASE = "https://kulturskole-infoskaerm-backend.onrender.com/api"; // R
 
 // Helper: get JWT token from storage
 function getToken() {
+  // Bruger "access_token" for at matche login-komponenten
   return localStorage.getItem("access_token");
 }
 
@@ -37,6 +38,15 @@ export async function fetchClients() {
   return await res.json();
 }
 
+// Hent kun pending clients (NYT)
+export async function fetchPendingClients() {
+  const res = await fetch(`${API_BASE}/clients/pending`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Fejl ved hentning af pending klienter");
+  return await res.json();
+}
+
 // Hent én klient (info-side)
 export async function fetchClient(clientId) {
   const res = await fetch(`${API_BASE}/clients/${clientId}`, {
@@ -57,11 +67,14 @@ export async function updateClient(clientId, data) {
   return await res.json();
 }
 
-// NYT: Godkend klient (PATCH /clients/:id/approve)
-export async function approveClient(clientId) {
+// Godkend klient (PATCH /clients/:id/approve)
+export async function approveClient(clientId, display_name) {
+  // Tilføj display_name hvis det skal ændres ved godkendelse
+  const body = display_name ? JSON.stringify({ display_name }) : undefined;
   const res = await fetch(`${API_BASE}/clients/${clientId}/approve`, {
     method: "PATCH",
     headers: authHeaders(),
+    body: body,
   });
   if (!res.ok) throw new Error("Godkendelse fejlede");
   return await res.json();
@@ -81,7 +94,7 @@ export async function clientAction(clientId, action) {
 // WebSocket URL for terminal
 export function getTerminalWsUrl(clientId) {
   // Ret evt. til wss hvis din backend kræver det!
-  return `wss://dit-backend.onrender.com/api/clients/${clientId}/terminal/ws?token=${getToken()}`;
+  return `wss://kulturskole-infoskaerm-backend.onrender.com/api/clients/${clientId}/terminal/ws?token=${getToken()}`;
 }
 
 // MJPEG/stream URL
