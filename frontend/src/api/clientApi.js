@@ -1,6 +1,6 @@
 // Wrapper for all API calls to the backend, using JWT token from localStorage
 
-const API_BASE = "const API_BASE = "https://kulturskole-infoskaerm-backend.onrender.com/api"; // Ret hvis din backend har anden base
+const API_BASE = "https://kulturskole-infoskaerm-backend.onrender.com/api"; // Ret hvis din backend har anden base
 
 // Helper: get JWT token from storage
 function getToken() {
