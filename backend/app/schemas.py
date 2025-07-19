@@ -36,4 +36,22 @@ class ClientApprove(BaseModel):
 
 class ClientOut(ClientBase):
     class Config:
-        from_attributes = True  # For Pydantic v2
+        from_attributes = True
+
+class ActionCreate(BaseModel):
+    action: str
+    parameters: Optional[str] = None
+
+class ActionOut(BaseModel):
+    id: int
+    action: str
+    parameters: Optional[str]
+    created_at: str
+    executed: bool
+    executed_at: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class ActionAck(BaseModel):
+    action_id: int
