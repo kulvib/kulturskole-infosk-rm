@@ -1,5 +1,9 @@
-from routers import clients, holidays, auth
 from fastapi import FastAPI
+from backend.routers import auth, clients, holidays
+from backend.database import init_db
+
+# Init DB on app startup
+init_db()
 
 app = FastAPI(
     title="Kulturskole Infoskaerm Backend",
