@@ -21,6 +21,7 @@ def login(
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
+# MIDLOERTIDIGT ENDPOINT TIL ADMIN OPRETTELSE (slet når admin er oprettet)
 @router.post("/create-admin")
 def create_admin(
     username: str = Form(...),
