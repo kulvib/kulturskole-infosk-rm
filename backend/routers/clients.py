@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
-from models import Client
-from database import get_db
-from auth import get_current_admin_user
+from backend.models import Client
+from backend.database import get_db
+from backend.auth import get_current_admin_user
 import datetime
 
 router = APIRouter(
@@ -16,10 +16,10 @@ def list_clients(db: Session = Depends(get_db), user=Depends(get_current_admin_u
 
 @router.post("/register")
 def register_client(
-    unique_id: str = Body(...), 
-    sw_version: str = Body(...), 
-    ip: str = Body(...), 
-    mac: str = Body(...), 
+    unique_id: str = Body(...),
+    sw_version: str = Body(...),
+    ip: str = Body(...),
+    mac: str = Body(...),
     db: Session = Depends(get_db)
 ):
     client = db.query(Client).filter(Client.unique_id == unique_id).first()
@@ -44,8 +44,8 @@ def register_client(
 
 @router.post("/{client_id}/heartbeat")
 def client_heartbeat(
-    client_id: int, 
-    method: str = Body(...), 
+    client_id: int,
+    method: str = Body(...),
     db: Session = Depends(get_db)
 ):
     client = db.query(Client).filter(Client.id == client_id).first()
