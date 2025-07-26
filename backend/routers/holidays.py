@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
-from models import Holiday
-from database import get_db
-from auth import get_current_admin_user
+from backend.models import Holiday
+from backend.database import get_db
+from backend.auth import get_current_admin_user
 import datetime
 
 router = APIRouter(
@@ -16,8 +16,8 @@ def list_holidays(db: Session = Depends(get_db), user=Depends(get_current_admin_
 
 @router.post("/")
 def add_holiday(
-    date: str = Body(...), 
-    description: str = Body(...), 
+    date: str = Body(...),
+    description: str = Body(...),
     db: Session = Depends(get_db),
     user=Depends(get_current_admin_user)
 ):
