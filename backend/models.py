@@ -16,7 +16,7 @@ class Client(Base):
     unique_id = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, default="")
     location = Column(String, default="")
-    status = Column(String, default="pending")  # pending/approved/removed
+    status = Column(String, default="pending")
     last_seen = Column(DateTime)
     ip_address = Column(String, default="")
     sw_version = Column(String, default="")
@@ -30,7 +30,7 @@ class Heartbeat(Base):
     id = Column(Integer, primary_key=True)
     client_id = Column(Integer, ForeignKey('clients.id'))
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
-    method = Column(String)  # "ws" eller "http"
+    method = Column(String)
 
 class Holiday(Base):
     __tablename__ = 'holidays'
