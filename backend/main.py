@@ -1,5 +1,5 @@
-from fastapi import FastAPI
 from routers import clients, holidays, auth
+from fastapi import FastAPI
 
 app = FastAPI(
     title="Kulturskole Infoskaerm Backend",
@@ -9,6 +9,3 @@ app = FastAPI(
 app.include_router(auth.router)
 app.include_router(clients.router)
 app.include_router(holidays.router)
-
-from database import init_db
-init_db()
