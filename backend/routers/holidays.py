@@ -6,7 +6,7 @@ from auth import get_current_admin_user
 import datetime
 
 router = APIRouter(
-    prefix="/holidays",
+    prefix="/api/holidays",
     tags=["holidays"],
 )
 
