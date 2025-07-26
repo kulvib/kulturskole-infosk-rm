@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status, APIRouter, Form
+from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import jwt, JWTError
@@ -32,15 +32,15 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 
 def get_current_admin_user(token: str = Depends(lambda: None), db: Session = Depends(get_db)):
     from fastapi.security import OAuth2PasswordBearer
-    oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
-    token = token or Depends(oauth2_scheme)
+    oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
+    real_token = token or Depends(oauth2_scheme)
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(real_token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -50,13 +50,3 @@ def get_current_admin_user(token: str = Depends(lambda: None), db: Session = Dep
     if user is None:
         raise credentials_exception
     return user
-
-router = APIRouter(tags=["auth"])
-
-@router.post("/login")
-def login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    user = authenticate_user(db, username, password)
-    if not user:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
