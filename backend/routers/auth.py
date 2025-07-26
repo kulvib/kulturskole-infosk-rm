@@ -11,8 +11,8 @@ router = APIRouter(
 
 @router.post("/login")
 def login(
-    username: str = Form(...), 
-    password: str = Form(...), 
+    username: str = Form(...),
+    password: str = Form(...),
     db: Session = Depends(get_db)
 ):
     user = authenticate_user(db, username, password)
@@ -21,11 +21,10 @@ def login(
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
-# ----- MIDLOERTIDIGT ENDPOINT TIL ADMIN OPRETTELSE -----
 @router.post("/create-admin")
 def create_admin(
-    username: str = Form(...), 
-    password: str = Form(...), 
+    username: str = Form(...),
+    password: str = Form(...),
     db: Session = Depends(get_db)
 ):
     if db.query(AdminUser).filter(AdminUser.username == username).first():
@@ -34,4 +33,3 @@ def create_admin(
     db.add(user)
     db.commit()
     return {"msg": "Admin user created"}
-# -------------------------------------------------------
