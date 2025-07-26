@@ -34,9 +34,9 @@ with next(get_db()) as db:
 
 ## API
 
-- `/login` (POST): Login for admin (returnerer JWT-token)
-- `/clients`: Klient management
-- `/holidays`: Helligdagsstyring
+- `/api/login` (POST): Login for admin (returnerer JWT-token)
+- `/api/clients`: Klient management
+- `/api/holidays`: Helligdagsstyring
 
 ## Bemærk
 
