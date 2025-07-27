@@ -1,33 +1,26 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { setAuthToken } from "../api/api";
+import React, { createContext, useContext, useState } from "react";
+import { login as apiLogin } from "../api/login";
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    // Prøv at hente bruger fra localStorage ved reload
+    const saved = localStorage.getItem("user");
+    return saved ? JSON.parse(saved) : null;
+  });
 
-  // Ved mount: Hent token fra localStorage og sæt axios-header
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      setAuthToken(token);
-      setUser({ token });
-    }
-  }, []);
+  async function login(username, password) {
+    const token = await apiLogin(username, password);
+    const userData = { username, token }; // Gem evt. mere info
+    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
+  }
 
-  // Login: Gem token og sæt header
-  const login = (token) => {
-    localStorage.setItem("token", token);
-    setAuthToken(token);
-    setUser({ token });
-  };
-
-  // Logout: Slet token og header
-  const logout = () => {
-    localStorage.removeItem("token");
-    setAuthToken(null);
+  function logout() {
     setUser(null);
-  };
+    localStorage.removeItem("user");
+  }
 
   return (
     <AuthContext.Provider value={{ user, login, logout }}>
