@@ -1,12 +1,16 @@
 import axios from "axios";
 
-const API_URL = "https://kulturskole-infosk-rm.onrender.com/api";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000/api";
 
+// Opretter en axios-instans med baseURL fra miljøvariabel
 export const api = axios.create({
-  baseURL: API_URL,
-  headers: { "Content-Type": "application/json" },
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
+// Tilføj Authorization-header, hvis token findes
 export function setAuthToken(token) {
   if (token) {
     api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
