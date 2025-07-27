@@ -1,26 +1,36 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { setAuthToken } from "../api/api";
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(localStorage.getItem("token"));
-  const [isAuthenticated, setIsAuthenticated] = useState(!!token);
+  const [user, setUser] = useState(null);
 
+  // Ved mount: Hent token fra localStorage og sæt axios-header
   useEffect(() => {
+    const token = localStorage.getItem("token");
     if (token) {
-      localStorage.setItem("token", token);
-      setIsAuthenticated(true);
-    } else {
-      localStorage.removeItem("token");
-      setIsAuthenticated(false);
+      setAuthToken(token);
+      setUser({ token });
     }
-  }, [token]);
+  }, []);
 
-  const login = (token) => setToken(token);
-  const logout = () => setToken(null);
+  // Login: Gem token og sæt header
+  const login = (token) => {
+    localStorage.setItem("token", token);
+    setAuthToken(token);
+    setUser({ token });
+  };
+
+  // Logout: Slet token og header
+  const logout = () => {
+    localStorage.removeItem("token");
+    setAuthToken(null);
+    setUser(null);
+  };
 
   return (
-    <AuthContext.Provider value={{ token, isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
