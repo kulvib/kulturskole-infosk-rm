@@ -10,6 +10,8 @@ import {
   Paper,
   Grid,
   Tooltip,
+  IconButton,
+  CircularProgress,
 } from "@mui/material";
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
@@ -18,6 +20,7 @@ import TerminalIcon from '@mui/icons-material/Terminal';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import BrowserUpdatedIcon from '@mui/icons-material/BrowserUpdated';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { useNavigate } from "react-router-dom";
 
 const CLIENTS = [
@@ -51,12 +54,33 @@ const CLIENTS = [
   },
 ];
 
+function getRefreshedClientData(clientId) {
+  // Simulerer et API kald og returnerer opdaterede data
+  // Her ville du lave et rigtigt API kald i praksis.
+  // For demo: vi opdaterer tid og oppetid
+  const now = new Date();
+  const refreshed = CLIENTS.find(c => String(c.id) === String(clientId));
+  if (!refreshed) return null;
+  return {
+    ...refreshed,
+    lastSeen: now.toISOString().replace("T", " ").slice(0, 16),
+    uptime: refreshed.uptime.endsWith("timer")
+      ? refreshed.uptime
+      : "5 dage, 3 timer",
+    chromeRunning: refreshed.chromeRunning,
+    chromeUrl: refreshed.chromeRunning ? refreshed.chromeUrl : "",
+  };
+}
+
 export default function ClientDetailsPage({ clientId }) {
-  const client = CLIENTS.find((c) => String(c.id) === String(clientId));
+  const navigate = useNavigate();
+
+  const [client, setClient] = useState(
+    CLIENTS.find((c) => String(c.id) === String(clientId))
+  );
   const [kioskUrl, setKioskUrl] = useState(client?.kioskWebAddress ?? "");
   const [isPushing, setIsPushing] = useState(false);
-
-  const navigate = useNavigate();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handlePushKioskUrl = () => {
     setIsPushing(true);
@@ -74,6 +98,16 @@ export default function ClientDetailsPage({ clientId }) {
   const handleTerminalOpen = () => alert("Åbner terminal (WebSocket shell proxy).");
   const handleLiveStream = () => alert("Åbner live stream fra klienten.");
 
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      const updatedClient = getRefreshedClientData(clientId);
+      setClient(updatedClient);
+      setIsRefreshing(false);
+      // evt. setKioskUrl(updatedClient.kioskWebAddress);
+    }, 1200); // simulerer netværksforsinkelse
+  };
+
   if (!client) {
     return <Typography>Klient ikke fundet.</Typography>;
   }
@@ -81,14 +115,23 @@ export default function ClientDetailsPage({ clientId }) {
   return (
     <Box sx={{ maxWidth: 650, mx: "auto", mt: 4 }}>
       <Paper sx={{ p: 3 }}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate("/clients")}
-          variant="text"
-          sx={{ mb: 2 }}
-        >
-          Tilbage til klientoversigt
-        </Button>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate("/clients")}
+            variant="text"
+          >
+            Tilbage til klientoversigt
+          </Button>
+          <Box sx={{ flexGrow: 1 }} />
+          <Tooltip title="Opdater data fra klienten">
+            <span>
+              <IconButton color="primary" onClick={handleRefresh} disabled={isRefreshing}>
+                {isRefreshing ? <CircularProgress size={24} /> : <RefreshIcon />}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
         <Typography variant="h5" gutterBottom>
           {client.name}
         </Typography>
