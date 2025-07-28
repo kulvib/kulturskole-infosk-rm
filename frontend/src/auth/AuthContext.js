@@ -1,29 +1,14 @@
-import React, { createContext, useContext, useState } from "react";
-import { login as apiLogin } from "../api/login";
+import { createContext, useContext, useState } from "react";
+
+// Midlertidigt hardcoded token til integration uden login
+const FAKE_TOKEN = "PASTE_YOUR_JWT_TOKEN_HERE";
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    // Prøv at hente bruger fra localStorage ved reload
-    const saved = localStorage.getItem("user");
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  async function login(username, password) {
-    const token = await apiLogin(username, password);
-    const userData = { username, token }; // Gem evt. mere info
-    setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData));
-  }
-
-  function logout() {
-    setUser(null);
-    localStorage.removeItem("user");
-  }
-
+  const [token] = useState(FAKE_TOKEN);
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ token }}>
       {children}
     </AuthContext.Provider>
   );
