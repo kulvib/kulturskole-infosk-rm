@@ -18,10 +18,8 @@ import {
   TableBody,
   TableCell,
   TableRow,
-  Fab,
   Stack,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
 import ClientInfoPage from "./ClientInfoPage";
 import HolidaysPage from "./HolidaysPage";
 import ClientDetailsPageWrapper from "./ClientDetailsPageWrapper";
@@ -40,10 +38,6 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [clients, setClients] = useState(initialClients);
   const [openDialog, setOpenDialog] = useState(false);
-
-  const handleAddClient = () => {
-    setOpenDialog(true);
-  };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
@@ -76,7 +70,7 @@ export default function Dashboard() {
           >
             Kulturskolen Viborg - infoskærme administration
           </Typography>
-          <Button color="inherit" disabled>
+          <Button color="inherit" sx={{ color: "#fff" }}>
             Log ud
           </Button>
         </Toolbar>
@@ -126,51 +120,12 @@ export default function Dashboard() {
           <Route
             path="clients"
             element={
-              <>
+              <Box sx={{ position: "relative", minHeight: "100vh" }}>
                 <ClientInfoPage
                   clients={clients.filter((c) => c.apiStatus === "approved")}
                   onRemoveClient={handleRemoveClient}
                   setClients={setClients}
                 />
-                {/* Floating prominent green button, bottom right with icon and text */}
-                <Box
-                  sx={{
-                    position: "fixed",
-                    bottom: 32,
-                    right: 32,
-                    zIndex: 1200,
-                  }}
-                >
-                  <Fab
-                    aria-label="Tilføj klient"
-                    onClick={handleAddClient}
-                    sx={{
-                      px: 3,
-                      bgcolor: "success.main",
-                      color: "white",
-                      boxShadow: "0px 6px 20px 2px rgba(76,175,80,0.3)",
-                      border: "3px solid #388e3c",
-                      transform: "scale(1.2)",
-                      "&:hover": {
-                        bgcolor: "success.dark",
-                        border: "3px solid #2e7031",
-                        boxShadow: "0px 8px 28px 4px rgba(56,142,60,0.4)",
-                      },
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" spacing={1} sx={{ pr: 1 }}>
-                      <AddIcon sx={{ fontSize: 32 }} />
-                      <span style={{
-                        fontWeight: "bold",
-                        fontSize: "1.2rem",
-                        letterSpacing: "0.04em",
-                        textTransform: "uppercase"
-                      }}>
-                        Tilføj klient
-                      </span>
-                    </Stack>
-                  </Fab>
-                </Box>
                 {/* Modal: Godkend nye klienter */}
                 <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
                   <DialogTitle>Godkend nye klienter</DialogTitle>
@@ -206,7 +161,7 @@ export default function Dashboard() {
                     <Button onClick={handleCloseDialog}>Luk</Button>
                   </DialogActions>
                 </Dialog>
-              </>
+              </Box>
             }
           />
           <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
