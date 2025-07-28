@@ -18,17 +18,19 @@ import {
   TableBody,
   TableCell,
   TableRow,
-  Fab
+  Fab,
+  Stack,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ClientInfoPage from "./ClientInfoPage";
 import HolidaysPage from "./HolidaysPage";
+import ClientDetailsPageWrapper from "./ClientDetailsPageWrapper";
 
 const initialClients = [
   { id: 1, name: "Klient A", locality: "Lokale 1", status: "online", apiStatus: "approved" },
   { id: 2, name: "Klient B", locality: "Lokale 2", status: "offline", apiStatus: "approved" },
   { id: 3, name: "Klient C", locality: "Lokale 3", status: "online", apiStatus: "pending" },
-  { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", apiStatus: "pending" }
+  { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", apiStatus: "pending" },
 ];
 
 const drawerWidth = 200;
@@ -48,13 +50,13 @@ export default function Dashboard() {
   };
 
   const handleApproveClient = (id) => {
-    setClients(prev =>
-      prev.map(c => c.id === id ? { ...c, apiStatus: "approved" } : c)
+    setClients((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, apiStatus: "approved" } : c))
     );
   };
 
   const handleRemoveClient = (id) => {
-    setClients(prev => prev.filter(c => c.id !== id));
+    setClients((prev) => prev.filter((c) => c.id !== id));
   };
 
   const menuItems = [
@@ -88,7 +90,7 @@ export default function Dashboard() {
       >
         <Toolbar />
         <List>
-          {menuItems.map(item => (
+          {menuItems.map((item) => (
             <ListItem
               button
               key={item.to}
@@ -101,7 +103,7 @@ export default function Dashboard() {
                   backgroundColor: "primary.light",
                   color: "black",
                   fontWeight: "bold",
-                }
+                },
               }}
             >
               <ListItemText primary={item.text} />
@@ -109,7 +111,16 @@ export default function Dashboard() {
           ))}
         </List>
       </Drawer>
-      <Box component="main" sx={{ flexGrow: 1, p: 3, ml: `${drawerWidth}px`, position: "relative", minHeight: "100vh" }}>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          ml: `${drawerWidth}px`,
+          position: "relative",
+          minHeight: "100vh",
+        }}
+      >
         <Toolbar />
         <Routes>
           <Route
@@ -117,11 +128,11 @@ export default function Dashboard() {
             element={
               <>
                 <ClientInfoPage
-                  clients={clients.filter(c => c.apiStatus === "approved")}
+                  clients={clients.filter((c) => c.apiStatus === "approved")}
                   onRemoveClient={handleRemoveClient}
                   setClients={setClients}
                 />
-                {/* Floating green button, bottom right */}
+                {/* Floating green button, bottom right with icon and text */}
                 <Box
                   sx={{
                     position: "fixed",
@@ -130,8 +141,16 @@ export default function Dashboard() {
                     zIndex: 1200,
                   }}
                 >
-                  <Fab color="success" aria-label="Tilføj klient" onClick={handleAddClient}>
-                    <AddIcon />
+                  <Fab
+                    color="success"
+                    aria-label="Tilføj klient"
+                    onClick={handleAddClient}
+                    sx={{ px: 3 }}
+                  >
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <AddIcon />
+                      <span style={{ fontWeight: "bold", fontSize: "1rem" }}>Tilføj klient</span>
+                    </Stack>
                   </Fab>
                 </Box>
                 {/* Modal: Godkend nye klienter */}
@@ -140,27 +159,27 @@ export default function Dashboard() {
                   <DialogContent>
                     <Table>
                       <TableBody>
-                        {clients.filter(c => c.apiStatus !== "approved").length === 0 ? (
+                        {clients.filter((c) => c.apiStatus !== "approved").length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={2}>Ingen ikke-godkendte klienter.</TableCell>
                           </TableRow>
                         ) : (
-                          clients.filter(c => c.apiStatus !== "approved").map(client => (
-                            <TableRow key={client.id}>
-                              <TableCell>
-                                {client.name}
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="contained"
-                                  color="success"
-                                  onClick={() => handleApproveClient(client.id)}
-                                >
-                                  Godkend
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))
+                          clients
+                            .filter((c) => c.apiStatus !== "approved")
+                            .map((client) => (
+                              <TableRow key={client.id}>
+                                <TableCell>{client.name}</TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="contained"
+                                    color="success"
+                                    onClick={() => handleApproveClient(client.id)}
+                                  >
+                                    Godkend
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
                         )}
                       </TableBody>
                     </Table>
@@ -172,14 +191,11 @@ export default function Dashboard() {
               </>
             }
           />
+          <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
           <Route path="holidays" element={<HolidaysPage />} />
           <Route
             path="*"
-            element={
-              <Typography variant="h5">
-                Velkommen til adminpanelet.
-              </Typography>
-            }
+            element={<Typography variant="h5">Velkommen til adminpanelet.</Typography>}
           />
         </Routes>
       </Box>
