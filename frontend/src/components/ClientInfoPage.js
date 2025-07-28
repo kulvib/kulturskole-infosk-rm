@@ -25,10 +25,10 @@ import { useNavigate } from "react-router-dom";
 
 // Simuleret klientdata
 const CLIENTS = [
-  { id: 1, name: "Klient A", locality: "Lokale 1", status: "online", ip: "192.168.1.101", apiStatus: "approved" },
-  { id: 2, name: "Klient B", locality: "Lokale 2", status: "offline", ip: "192.168.1.102", apiStatus: "approved" },
-  { id: 3, name: "Klient C", locality: "Lokale 3", status: "online", ip: "192.168.1.103", apiStatus: "pending" },
-  { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", ip: "192.168.1.104", apiStatus: "pending" },
+  { id: 1, name: "Klient A", locality: "Lokale 1", status: "online", ip: "192.168.1.101", macAddress: "00:1A:2B:3C:4D:5E", apiStatus: "approved" },
+  { id: 2, name: "Klient B", locality: "Lokale 2", status: "offline", ip: "192.168.1.102", macAddress: "00:1A:2B:3C:4D:5F", apiStatus: "approved" },
+  { id: 3, name: "Klient C", locality: "Lokale 3", status: "online", ip: "192.168.1.103", macAddress: "00:1A:2B:3C:4D:60", apiStatus: "pending" },
+  { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", ip: "192.168.1.104", macAddress: "00:1A:2B:3C:4D:61", apiStatus: "pending" },
 ];
 
 // Funktion til at simulere opdatering af heartbeat/status
@@ -183,18 +183,22 @@ export default function ClientInfoPage({ clients, onRemoveClient, setClients }) 
         <TableHead>
           <TableRow>
             <TableCell>Navn</TableCell>
+            <TableCell>IP</TableCell>
+            <TableCell>MAC adresse</TableCell>
             <TableCell align="center">Godkend</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {pendingClients.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={2}>Ingen ikke-godkendte klienter.</TableCell>
+              <TableCell colSpan={4}>Ingen ikke-godkendte klienter.</TableCell>
             </TableRow>
           ) : (
             pendingClients.map((client) => (
               <TableRow key={client.id} hover>
                 <TableCell>{client.name}</TableCell>
+                <TableCell>{client.ip}</TableCell>
+                <TableCell>{client.macAddress}</TableCell>
                 <TableCell align="center">
                   <Button
                     variant="contained"
