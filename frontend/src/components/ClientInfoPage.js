@@ -98,7 +98,8 @@ export default function ClientInfoPage({ clients, onRemoveClient, setClients }) 
             <TableCell>Lokalitet</TableCell>
             <TableCell>Status</TableCell>
             <TableCell>Info</TableCell>
-            <TableCell align="center">Fjern</TableCell>
+            <TableCell align="center">Godkend/Fjern</TableCell>
+            <TableCell align="center">Godkendt</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -153,6 +154,13 @@ export default function ClientInfoPage({ clients, onRemoveClient, setClients }) 
                       <DeleteIcon />
                     </IconButton>
                   </Tooltip>
+                )}
+              </TableCell>
+              <TableCell align="center">
+                {client.apiStatus === "approved" ? (
+                  <Chip label="Godkendt" color="success" size="small" />
+                ) : (
+                  <Chip label="Ikke godkendt" color="warning" size="small" />
                 )}
               </TableCell>
             </TableRow>
