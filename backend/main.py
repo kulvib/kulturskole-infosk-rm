@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from backend.routers import auth, clients, holidays
 from backend.database import init_db
 
@@ -8,6 +9,15 @@ init_db()
 app = FastAPI(
     title="Kulturskole Infoskaerm Backend",
     version="1.0.0"
+)
+
+# CORS: Tillad frontend fra alle origins (tilpas evt. til din frontend)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Sæt evt. til ["http://localhost:3000"] for kun din frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(auth.router)
