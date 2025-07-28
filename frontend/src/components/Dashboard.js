@@ -126,21 +126,16 @@ export default function Dashboard() {
           <Route
             path="clients"
             element={
-              <>
-                <ClientInfoPage
-                  clients={clients.filter((c) => c.apiStatus === "approved")}
-                  onRemoveClient={handleRemoveClient}
-                  setClients={setClients}
-                />
-                {/* Floating prominent green button, bottom right with icon and text */}
-                <Box
-                  sx={{
-                    position: "fixed",
-                    bottom: 32,
-                    right: 32,
-                    zIndex: 1200,
-                  }}
-                >
+              <Box sx={{ position: "relative", minHeight: "100vh" }}>
+                {/* Prominent green Add Client button, placed at top right */}
+                <Box sx={{
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  mt: 2,
+                  mr: 2,
+                  zIndex: 1201
+                }}>
                   <Fab
                     aria-label="Tilføj klient"
                     onClick={handleAddClient}
@@ -171,6 +166,11 @@ export default function Dashboard() {
                     </Stack>
                   </Fab>
                 </Box>
+                <ClientInfoPage
+                  clients={clients.filter((c) => c.apiStatus === "approved")}
+                  onRemoveClient={handleRemoveClient}
+                  setClients={setClients}
+                />
                 {/* Modal: Godkend nye klienter */}
                 <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
                   <DialogTitle>Godkend nye klienter</DialogTitle>
@@ -206,7 +206,7 @@ export default function Dashboard() {
                     <Button onClick={handleCloseDialog}>Luk</Button>
                   </DialogActions>
                 </Dialog>
-              </>
+              </Box>
             }
           />
           <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
