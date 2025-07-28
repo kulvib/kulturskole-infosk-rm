@@ -142,10 +142,16 @@ export default function Dashboard() {
                   }}
                 >
                   <Fab
-                    color="success"
                     aria-label="Tilføj klient"
                     onClick={handleAddClient}
-                    sx={{ px: 3 }}
+                    sx={{
+                      px: 3,
+                      bgcolor: "success.main",
+                      color: "white",
+                      "&:hover": {
+                        bgcolor: "success.dark",
+                      },
+                    }}
                   >
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <AddIcon />
