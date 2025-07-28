@@ -132,7 +132,7 @@ export default function Dashboard() {
                   onRemoveClient={handleRemoveClient}
                   setClients={setClients}
                 />
-                {/* Floating green button, bottom right with icon and text */}
+                {/* Floating prominent green button, bottom right with icon and text */}
                 <Box
                   sx={{
                     position: "fixed",
@@ -148,14 +148,26 @@ export default function Dashboard() {
                       px: 3,
                       bgcolor: "success.main",
                       color: "white",
+                      boxShadow: "0px 6px 20px 2px rgba(76,175,80,0.3)",
+                      border: "3px solid #388e3c",
+                      transform: "scale(1.2)",
                       "&:hover": {
                         bgcolor: "success.dark",
+                        border: "3px solid #2e7031",
+                        boxShadow: "0px 8px 28px 4px rgba(56,142,60,0.4)",
                       },
                     }}
                   >
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <AddIcon />
-                      <span style={{ fontWeight: "bold", fontSize: "1rem" }}>Tilføj klient</span>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ pr: 1 }}>
+                      <AddIcon sx={{ fontSize: 32 }} />
+                      <span style={{
+                        fontWeight: "bold",
+                        fontSize: "1.2rem",
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase"
+                      }}>
+                        Tilføj klient
+                      </span>
                     </Stack>
                   </Fab>
                 </Box>
