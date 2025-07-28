@@ -2,7 +2,7 @@ import React from "react";
 import { useParams } from "react-router-dom";
 import ClientDetailsPage from "./ClientDetailsPage";
 
-export default function ClientDetailsPageWrapper() {
+export default function ClientDetailsPageWrapper({ clients }) {
   const { clientId } = useParams();
-  return <ClientDetailsPage clientId={clientId} />;
+  return <ClientDetailsPage clientId={clientId} clients={clients} />;
 }
