@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Routes, Route, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   AppBar,
@@ -10,26 +10,57 @@ import {
   List,
   ListItem,
   ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+  Fab
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import ClientInfoPage from "./ClientInfoPage";
 import HolidaysPage from "./HolidaysPage";
+
+const initialClients = [
+  { id: 1, name: "Klient A", locality: "Lokale 1", status: "online", apiStatus: "approved" },
+  { id: 2, name: "Klient B", locality: "Lokale 2", status: "offline", apiStatus: "approved" },
+  { id: 3, name: "Klient C", locality: "Lokale 3", status: "online", apiStatus: "pending" },
+  { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", apiStatus: "pending" }
+];
 
 const drawerWidth = 200;
 
 export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [clients, setClients] = useState(initialClients);
+  const [openDialog, setOpenDialog] = useState(false);
+
+  const handleAddClient = () => {
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+  };
+
+  const handleApproveClient = (id) => {
+    setClients(prev =>
+      prev.map(c => c.id === id ? { ...c, apiStatus: "approved" } : c)
+    );
+  };
+
+  const handleRemoveClient = (id) => {
+    setClients(prev => prev.filter(c => c.id !== id));
+  };
 
   const menuItems = [
     { text: "Klienter", to: "/clients" },
     { text: "Helligdage", to: "/holidays" },
   ];
-
-  // Funktion: Håndter klik på "Tilføj klient"
-  const handleAddClient = () => {
-    alert("Her kan du tilføje en klient!");
-    // navigate("/clients/add");
-  };
 
   return (
     <Box sx={{ display: "flex" }}>
@@ -78,22 +109,69 @@ export default function Dashboard() {
           ))}
         </List>
       </Drawer>
-      <Box component="main" sx={{ flexGrow: 1, p: 3, ml: `${drawerWidth}px` }}>
+      <Box component="main" sx={{ flexGrow: 1, p: 3, ml: `${drawerWidth}px`, position: "relative", minHeight: "100vh" }}>
         <Toolbar />
-        {/* "Tilføj klient" knap vises kun på /clients */}
-        {location.pathname === "/clients" && (
-          <Box sx={{ mb: 2 }}>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleAddClient}
-            >
-              Tilføj klient
-            </Button>
-          </Box>
-        )}
         <Routes>
-          <Route path="clients" element={<ClientInfoPage />} />
+          <Route
+            path="clients"
+            element={
+              <>
+                <ClientInfoPage
+                  clients={clients.filter(c => c.apiStatus === "approved")}
+                  onRemoveClient={handleRemoveClient}
+                  setClients={setClients}
+                />
+                {/* Floating green button, bottom right */}
+                <Box
+                  sx={{
+                    position: "fixed",
+                    bottom: 32,
+                    right: 32,
+                    zIndex: 1200,
+                  }}
+                >
+                  <Fab color="success" aria-label="Tilføj klient" onClick={handleAddClient}>
+                    <AddIcon />
+                  </Fab>
+                </Box>
+                {/* Modal: Godkend nye klienter */}
+                <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+                  <DialogTitle>Godkend nye klienter</DialogTitle>
+                  <DialogContent>
+                    <Table>
+                      <TableBody>
+                        {clients.filter(c => c.apiStatus !== "approved").length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={2}>Ingen ikke-godkendte klienter.</TableCell>
+                          </TableRow>
+                        ) : (
+                          clients.filter(c => c.apiStatus !== "approved").map(client => (
+                            <TableRow key={client.id}>
+                              <TableCell>
+                                {client.name}
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="contained"
+                                  color="success"
+                                  onClick={() => handleApproveClient(client.id)}
+                                >
+                                  Godkend
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </DialogContent>
+                  <DialogActions>
+                    <Button onClick={handleCloseDialog}>Luk</Button>
+                  </DialogActions>
+                </Dialog>
+              </>
+            }
+          />
           <Route path="holidays" element={<HolidaysPage />} />
           <Route
             path="*"
