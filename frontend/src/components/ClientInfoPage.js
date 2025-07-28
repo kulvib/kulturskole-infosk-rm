@@ -1,7 +1,7 @@
 import React from "react";
 import {
   Typography, Table, TableBody, TableCell, TableHead, TableRow, TextField,
-  IconButton, Chip, Button, CircularProgress, Tooltip, Paper, Stack, Box
+  IconButton, Chip, Button, CircularProgress, Tooltip, Paper, Stack
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -123,22 +123,22 @@ export default function ClientInfoPage({
         {pendingClients.length === 0 ? (
           <Typography>Ingen ikke-godkendte klienter.</Typography>
         ) : (
-          <Box component="table" sx={{ width: "100%", borderCollapse: "collapse" }}>
-            <Box component="thead" sx={{ background: "#f0f5f9" }}>
-              <Box component="tr">
-                <Box component="th" sx={{ fontWeight: "bold", p: 1 }}>Navn</Box>
-                <Box component="th" sx={{ fontWeight: "bold", p: 1 }}>IP</Box>
-                <Box component="th" sx={{ fontWeight: "bold", p: 1 }}>MAC</Box>
-                <Box component="th" sx={{ fontWeight: "bold", p: 1 }}>Godkend</Box>
-              </Box>
-            </Box>
-            <Box component="tbody">
+          <Table>
+            <TableHead>
+              <TableRow sx={{ background: "#f0f5f9" }}>
+                <TableCell sx={{ fontWeight: "bold" }}>Navn</TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>IP</TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>MAC adresse</TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>Godkend</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {pendingClients.map((client) => (
-                <Box key={client.id} component="tr" sx={{ ":hover": { background: "#f8f9fb" } }}>
-                  <Box component="td" sx={{ p: 1 }}>{client.name || client.unique_id}</Box>
-                  <Box component="td" sx={{ p: 1 }}>{client.ip || client.ip_address}</Box>
-                  <Box component="td" sx={{ p: 1 }}>{client.macAddress || client.mac_address}</Box>
-                  <Box component="td" sx={{ p: 1 }}>
+                <TableRow key={client.id} sx={{ ":hover": { background: "#f8f9fb" } }}>
+                  <TableCell>{client.name || client.unique_id}</TableCell>
+                  <TableCell>{client.ip || client.ip_address}</TableCell>
+                  <TableCell>{client.macAddress || client.mac_address}</TableCell>
+                  <TableCell>
                     <Button
                       variant="contained"
                       color="success"
@@ -147,11 +147,11 @@ export default function ClientInfoPage({
                     >
                       Godkend
                     </Button>
-                  </Box>
-                </Box>
+                  </TableCell>
+                </TableRow>
               ))}
-            </Box>
-          </Box>
+            </TableBody>
+          </Table>
         )}
       </Paper>
     </Paper>
