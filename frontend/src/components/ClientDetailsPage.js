@@ -23,7 +23,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useNavigate, useParams } from "react-router-dom";
 
-// Dummydata fallback
+// Udvidet dummydata med flere klienter
 const CLIENTS = [
   {
     id: 1,
@@ -49,6 +49,90 @@ const CLIENTS = [
     lastSeen: "2025-07-28 13:39:10",
     uptime: "2 dage, 7 timer",
     kioskWebAddress: "https://kulturskolen-viborg.dk/plan",
+    status: "offline",
+    chromeRunning: false,
+    chromeUrl: ""
+  },
+  {
+    id: 3,
+    name: "Klient C",
+    locality: "Lokale 3",
+    ip: "192.168.1.103",
+    softwareVersion: "1.4.2",
+    macAddress: "00:1A:2B:3C:4D:60",
+    lastSeen: "2025-07-28 12:15:00",
+    uptime: "1 dag, 9 timer",
+    kioskWebAddress: "https://kulturskolen-viborg.dk/sal",
+    status: "online",
+    chromeRunning: true,
+    chromeUrl: "https://kulturskolen-viborg.dk/sal"
+  },
+  {
+    id: 4,
+    name: "Klient D",
+    locality: "Lokale 4",
+    ip: "192.168.1.104",
+    softwareVersion: "1.4.2",
+    macAddress: "00:1A:2B:3C:4D:61",
+    lastSeen: "2025-07-28 11:48:10",
+    uptime: "3 timer",
+    kioskWebAddress: "https://kulturskolen-viborg.dk/undervisning",
+    status: "offline",
+    chromeRunning: false,
+    chromeUrl: ""
+  },
+  {
+    id: 5,
+    name: "Klient E",
+    locality: "Lokale 5",
+    ip: "192.168.1.105",
+    softwareVersion: "1.4.2",
+    macAddress: "00:1A:2B:3C:4D:62",
+    lastSeen: "2025-07-28 13:25:00",
+    uptime: "3 dage, 4 timer",
+    kioskWebAddress: "https://kulturskolen-viborg.dk/elev",
+    status: "online",
+    chromeRunning: true,
+    chromeUrl: "https://kulturskolen-viborg.dk/elev"
+  },
+  {
+    id: 6,
+    name: "Klient F",
+    locality: "Lokale 6",
+    ip: "192.168.1.106",
+    softwareVersion: "1.4.2",
+    macAddress: "00:1A:2B:3C:4D:63",
+    lastSeen: "2025-07-28 09:41:00",
+    uptime: "6 timer",
+    kioskWebAddress: "https://kulturskolen-viborg.dk/kalender",
+    status: "offline",
+    chromeRunning: false,
+    chromeUrl: ""
+  },
+  {
+    id: 7,
+    name: "Klient G",
+    locality: "Lokale 7",
+    ip: "192.168.1.107",
+    softwareVersion: "1.4.2",
+    macAddress: "00:1A:2B:3C:4D:64",
+    lastSeen: "2025-07-28 08:55:00",
+    uptime: "2 dage, 12 timer",
+    kioskWebAddress: "https://kulturskolen-viborg.dk/info2",
+    status: "online",
+    chromeRunning: true,
+    chromeUrl: "https://kulturskolen-viborg.dk/info2"
+  },
+  {
+    id: 8,
+    name: "Klient H",
+    locality: "Lokale 8",
+    ip: "192.168.1.108",
+    softwareVersion: "1.4.2",
+    macAddress: "00:1A:2B:3C:4D:65",
+    lastSeen: "2025-07-28 07:32:00",
+    uptime: "8 timer",
+    kioskWebAddress: "https://kulturskolen-viborg.dk/oversigt",
     status: "offline",
     chromeRunning: false,
     chromeUrl: ""
