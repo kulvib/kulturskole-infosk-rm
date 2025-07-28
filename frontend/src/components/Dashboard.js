@@ -19,6 +19,7 @@ import {
   DialogContent,
   DialogActions,
   Fab,
+  Paper,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ClientInfoPage from "./ClientInfoPage";
@@ -130,45 +131,47 @@ export default function Dashboard() {
             path="clients"
             element={
               <Box sx={{ position: "relative", minHeight: "100vh" }}>
-                {/* Mindre grøn "Tilføj klient" knap, vises kun hvis der er pending klienter */}
-                {pendingClients.length > 0 && (
-                  <Box sx={{
-                    position: "absolute",
-                    top: 0,
-                    right: 0,
-                    mt: 2,
-                    mr: 2,
-                    zIndex: 1201
-                  }}>
-                    <Fab
-                      variant="extended"
-                      color="success"
-                      onClick={handleOpenApproveDialog}
-                      size="small"
+                <Paper sx={{ position: "relative", p: 0, pb: 6, boxShadow: "none" }}>
+                  <ClientInfoPage
+                    clients={clients}
+                    onRemoveClient={handleRemoveClient}
+                    setClients={setClients}
+                  />
+                  {/* Mindre grøn "Tilføj klient" knap, placeret under listen i højre hjørne */}
+                  {pendingClients.length > 0 && (
+                    <Box
                       sx={{
-                        fontWeight: "bold",
-                        fontSize: "0.9rem",
-                        letterSpacing: "0.04em",
-                        textTransform: "uppercase",
-                        boxShadow: "0px 3px 10px 1px rgba(76,175,80,0.11)",
-                        color: "#fff",
-                        height: 32,
-                        minHeight: 32,
-                        paddingLeft: 1.2,
-                        paddingRight: 1.2,
-                        '& svg': { fontSize: 18 }
+                        position: "absolute",
+                        right: 24,
+                        bottom: 16,
+                        zIndex: 1201,
                       }}
                     >
-                      <AddIcon sx={{ mr: 1 }} />
-                      Tilføj klient
-                    </Fab>
-                  </Box>
-                )}
-                <ClientInfoPage
-                  clients={clients}
-                  onRemoveClient={handleRemoveClient}
-                  setClients={setClients}
-                />
+                      <Fab
+                        variant="extended"
+                        color="success"
+                        onClick={handleOpenApproveDialog}
+                        size="small"
+                        sx={{
+                          fontWeight: "bold",
+                          fontSize: "0.9rem",
+                          letterSpacing: "0.04em",
+                          textTransform: "uppercase",
+                          boxShadow: "0px 3px 10px 1px rgba(76,175,80,0.11)",
+                          color: "#fff",
+                          height: 32,
+                          minHeight: 32,
+                          paddingLeft: 1.2,
+                          paddingRight: 1.2,
+                          '& svg': { fontSize: 18 }
+                        }}
+                      >
+                        <AddIcon sx={{ mr: 1 }} />
+                        Tilføj klient
+                      </Fab>
+                    </Box>
+                  )}
+                </Paper>
                 {/* Modal: Godkend nye klienter */}
                 <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
                   <DialogTitle>Godkend nye klienter</DialogTitle>
