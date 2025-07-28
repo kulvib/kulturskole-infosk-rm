@@ -18,7 +18,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Stack,
   Fab,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -166,7 +165,7 @@ export default function Dashboard() {
                   </Box>
                 )}
                 <ClientInfoPage
-                  clients={clients.filter((c) => c.apiStatus === "approved" || c.apiStatus === "pending")}
+                  clients={clients} // VIGTIGT: Send ALLE klienter
                   onRemoveClient={handleRemoveClient}
                   setClients={setClients}
                 />
@@ -206,7 +205,7 @@ export default function Dashboard() {
               </Box>
             }
           />
-          <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
+          <Route path="clients/:clientId" element={<ClientDetailsPageWrapper clients={clients} />} />
           <Route path="holidays" element={<HolidaysPage />} />
           <Route
             path="*"
