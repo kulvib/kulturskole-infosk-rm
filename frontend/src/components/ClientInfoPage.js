@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Box,
   Typography,
   Table,
   TableBody,
@@ -23,12 +22,16 @@ import InfoIcon from "@mui/icons-material/Info";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useNavigate } from "react-router-dom";
 
-// Simuleret klientdata
+// Udvidet dummydata
 const CLIENTS = [
   { id: 1, name: "Klient A", locality: "Lokale 1", status: "online", ip: "192.168.1.101", macAddress: "00:1A:2B:3C:4D:5E", apiStatus: "approved" },
   { id: 2, name: "Klient B", locality: "Lokale 2", status: "offline", ip: "192.168.1.102", macAddress: "00:1A:2B:3C:4D:5F", apiStatus: "approved" },
   { id: 3, name: "Klient C", locality: "Lokale 3", status: "online", ip: "192.168.1.103", macAddress: "00:1A:2B:3C:4D:60", apiStatus: "pending" },
   { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", ip: "192.168.1.104", macAddress: "00:1A:2B:3C:4D:61", apiStatus: "pending" },
+  { id: 5, name: "Klient E", locality: "Lokale 5", status: "online", ip: "192.168.1.105", macAddress: "00:1A:2B:3C:4D:62", apiStatus: "approved" },
+  { id: 6, name: "Klient F", locality: "Lokale 6", status: "offline", ip: "192.168.1.106", macAddress: "00:1A:2B:3C:4D:63", apiStatus: "pending" },
+  { id: 7, name: "Klient G", locality: "Lokale 7", status: "online", ip: "192.168.1.107", macAddress: "00:1A:2B:3C:4D:64", apiStatus: "approved" },
+  { id: 8, name: "Klient H", locality: "Lokale 8", status: "offline", ip: "192.168.1.108", macAddress: "00:1A:2B:3C:4D:65", apiStatus: "pending" },
 ];
 
 // Funktion til at simulere opdatering af heartbeat/status
@@ -39,7 +42,7 @@ function getRefreshedClientsData(clients) {
   }));
 }
 
-export default function ClientInfoPage({ clients, onRemoveClient, setClients }) {
+export default function ClientInfoPage({ clients = CLIENTS, onRemoveClient, setClients }) {
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [localities, setLocalities] = useState(() => {
@@ -158,7 +161,7 @@ export default function ClientInfoPage({ clients, onRemoveClient, setClients }) 
                   <Tooltip title="Fjern klient">
                     <IconButton
                       color="error"
-                      onClick={() => onRemoveClient(client.id)}
+                      onClick={() => onRemoveClient && onRemoveClient(client.id)}
                     >
                       <DeleteIcon />
                     </IconButton>
