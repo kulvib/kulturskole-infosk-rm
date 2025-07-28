@@ -18,10 +18,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Fab,
   Paper,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
 import ClientInfoPage from "./ClientInfoPage";
 import HolidaysPage from "./HolidaysPage";
 import ClientDetailsPageWrapper from "./ClientDetailsPageWrapper";
@@ -126,42 +124,7 @@ export default function Dashboard() {
             element={
               <Box sx={{ position: "relative", minHeight: "100vh" }}>
                 <Paper sx={{ position: "relative", p: 0, pb: 6, boxShadow: "none" }}>
-                  {/* Tilføj klient-knap placeret over listen, i højre hjørne */}
-                  {pendingClients.length > 0 && (
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        top: 0,
-                        right: 24,
-                        zIndex: 1201,
-                      }}
-                    >
-                      <Fab
-                        variant="extended"
-                        color="success"
-                        onClick={handleOpenApproveDialog}
-                        size="small"
-                        sx={{
-                          fontWeight: "bold",
-                          fontSize: "0.9rem",
-                          letterSpacing: "0.04em",
-                          textTransform: "uppercase",
-                          boxShadow: "0px 3px 10px 1px rgba(76,175,80,0.11)",
-                          color: "#fff",
-                          height: 32,
-                          minHeight: 32,
-                          paddingLeft: 1.2,
-                          paddingRight: 1.2,
-                          mt: 2,
-                          '& svg': { fontSize: 18 }
-                        }}
-                      >
-                        <AddIcon sx={{ mr: 1 }} />
-                        Tilføj klient
-                      </Fab>
-                    </Box>
-                  )}
-                  <Box sx={{ pt: pendingClients.length > 0 ? 7 : 0 }}>
+                  <Box>
                     <ClientInfoPage
                       clients={clients}
                       onRemoveClient={handleRemoveClient}
