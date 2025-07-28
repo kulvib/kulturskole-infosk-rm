@@ -1,7 +1,113 @@
 import React, { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  Box,
+  Tabs,
+  Tab,
+  Paper,
+  Stack,
+  CircularProgress,
+  Snackbar,
+  Alert,
+} from "@mui/material";
+import ClientInfoPage from "./components/ClientInfoPage";
+import HolidaysPage from "./components/HolidaysPage";
+import ClientDetailsPageWrapper from "./components/ClientDetailsPageWrapper";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 const token = "PASTE_YOUR_JWT_TOKEN_HERE"; // Sæt din gyldige admin JWT-token her
+
+function DashboardView({
+  clients,
+  setClients,
+  holidays,
+  setHolidays,
+  holidayDate,
+  setHolidayDate,
+  holidayDesc,
+  setHolidayDesc,
+  error,
+  setError,
+  loading,
+  setLoading,
+  fetchClients,
+  fetchHolidays,
+  handleAddHoliday,
+  handleDeleteHoliday,
+  approveClient,
+  removeClient,
+}) {
+  const [tab, setTab] = useState(0);
+  const navigate = useNavigate();
+
+  return (
+    <Box sx={{ bgcolor: "#f5f7fa", minHeight: "100vh" }}>
+      <AppBar position="static" sx={{ bgcolor: "#1976d2" }}>
+        <Toolbar>
+          <Typography variant="h5" sx={{ flexGrow: 1 }}>
+            Kulturskolen Viborg – Infoskærm Admin
+          </Typography>
+          <Button
+            color="inherit"
+            variant="outlined"
+            sx={{ ml: 2, bgcolor: "#fff", color: "#1976d2", borderRadius: 2 }}
+            onClick={() => window.location.reload()}
+          >
+            Log ud
+          </Button>
+        </Toolbar>
+      </AppBar>
+      <Box sx={{ maxWidth: 1100, mx: "auto", mt: 5, bgcolor: "#fff", p: 3, borderRadius: 3, boxShadow: 2 }}>
+        {error && (
+          <Snackbar open autoHideDuration={4000} onClose={() => setError("")}>
+            <Alert severity="error" sx={{ width: "100%" }}>
+              {error}
+            </Alert>
+          </Snackbar>
+        )}
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          textColor="primary"
+          indicatorColor="primary"
+          sx={{ mb: 3 }}
+        >
+          <Tab label="Klienter" sx={{ fontWeight: "bold", fontSize: 18 }} />
+          <Tab label="Helligdage" sx={{ fontWeight: "bold", fontSize: 18 }} />
+        </Tabs>
+        {tab === 0 && (
+          <ClientInfoPage
+            clients={clients}
+            setClients={setClients}
+            loading={loading}
+            approveClient={approveClient}
+            removeClient={removeClient}
+            fetchClients={fetchClients}
+            navigate={navigate}
+          />
+        )}
+        {tab === 1 && (
+          <HolidaysPage
+            holidays={holidays}
+            holidayDate={holidayDate}
+            setHolidayDate={setHolidayDate}
+            holidayDesc={holidayDesc}
+            setHolidayDesc={setHolidayDesc}
+            setHolidays={setHolidays}
+            loading={loading}
+            handleAddHoliday={handleAddHoliday}
+            handleDeleteHoliday={handleDeleteHoliday}
+            fetchHolidays={fetchHolidays}
+          />
+        )}
+      </Box>
+    </Box>
+  );
+}
 
 function App() {
   const [clients, setClients] = useState([]);
@@ -149,104 +255,36 @@ function App() {
   }, []);
 
   return (
-    <div style={{ maxWidth: 800, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h2>Infoskærm Admin</h2>
-      {error && <div style={{ color: "red", marginBottom: 12 }}>{error}</div>}
-      {loading && <div>Indlæser...</div>}
-      <div>
-        <h3>Klienter</h3>
-        <table border="1" cellPadding="6" style={{ width: "100%", borderCollapse: "collapse", marginBottom: 32 }}>
-          <thead style={{ background: "#eee" }}>
-            <tr>
-              <th>ID</th>
-              <th>Navn</th>
-              <th>Lokalitet</th>
-              <th>Status</th>
-              <th>IP</th>
-              <th>MAC</th>
-              <th>Godkend</th>
-              <th>Fjern</th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.length === 0 ? (
-              <tr>
-                <td colSpan={8} style={{ textAlign: "center" }}>Ingen klienter fundet</td>
-              </tr>
-            ) : (
-              clients.map(client => (
-                <tr key={client.id}>
-                  <td>{client.id}</td>
-                  <td>{client.name || client.unique_id}</td>
-                  <td>{client.locality || ""}</td>
-                  <td>{client.status}</td>
-                  <td>{client.ip_address || client.ip}</td>
-                  <td>{client.mac_address || client.mac}</td>
-                  <td>
-                    {client.status !== "approved" && (
-                      <button onClick={() => approveClient(client.id)} disabled={loading}>
-                        Godkend
-                      </button>
-                    )}
-                  </td>
-                  <td>
-                    <button onClick={() => removeClient(client.id)} disabled={loading}>
-                      Fjern
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-        <h3>Fridage</h3>
-        <form onSubmit={handleAddHoliday} style={{ marginBottom: 20 }}>
-          <input
-            type="date"
-            value={holidayDate}
-            onChange={e => setHolidayDate(e.target.value)}
-            required
-            style={{ marginRight: 10 }}
-          />
-          <input
-            placeholder="Beskrivelse"
-            value={holidayDesc}
-            onChange={e => setHolidayDesc(e.target.value)}
-            required
-            style={{ marginRight: 10 }}
-          />
-          <button type="submit" disabled={loading}>Tilføj fridag</button>
-        </form>
-        <table border="1" cellPadding="6" style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead style={{ background: "#eee" }}>
-            <tr>
-              <th>Dato</th>
-              <th>Beskrivelse</th>
-              <th>Slet</th>
-            </tr>
-          </thead>
-          <tbody>
-            {holidays.length === 0 ? (
-              <tr>
-                <td colSpan={3} style={{ textAlign: "center" }}>Ingen fridage registreret</td>
-              </tr>
-            ) : (
-              holidays.map(h => (
-                <tr key={h.id}>
-                  <td>{h.date ? h.date.slice(0, 10) : ""}</td>
-                  <td>{h.description}</td>
-                  <td>
-                    <button onClick={() => handleDeleteHoliday(h.id)} disabled={loading}>
-                      Slet
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <DashboardView
+              clients={clients}
+              setClients={setClients}
+              holidays={holidays}
+              setHolidays={setHolidays}
+              holidayDate={holidayDate}
+              setHolidayDate={setHolidayDate}
+              holidayDesc={holidayDesc}
+              setHolidayDesc={setHolidayDesc}
+              error={error}
+              setError={setError}
+              loading={loading}
+              setLoading={setLoading}
+              fetchClients={fetchClients}
+              fetchHolidays={fetchHolidays}
+              handleAddHoliday={handleAddHoliday}
+              handleDeleteHoliday={handleDeleteHoliday}
+              approveClient={approveClient}
+              removeClient={removeClient}
+            />
+          }
+        />
+        <Route path="/clients/:clientId" element={<ClientDetailsPageWrapper clients={clients} />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
