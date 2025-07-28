@@ -26,10 +26,10 @@ import HolidaysPage from "./HolidaysPage";
 import ClientDetailsPageWrapper from "./ClientDetailsPageWrapper";
 
 const initialClients = [
-  { id: 1, name: "Klient A", locality: "Lokale 1", status: "online", apiStatus: "approved" },
-  { id: 2, name: "Klient B", locality: "Lokale 2", status: "offline", apiStatus: "approved" },
-  { id: 3, name: "Klient C", locality: "Lokale 3", status: "online", apiStatus: "pending" },
-  { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", apiStatus: "pending" },
+  { id: 1, name: "Klient A", locality: "Lokale 1", status: "online", apiStatus: "approved", ip: "192.168.1.101", softwareVersion: "1.4.2", macAddress: "00:1A:2B:3C:4D:5E", lastSeen: "2025-07-28 13:35:00", uptime: "4 dage, 2 timer", kioskWebAddress: "https://kulturskolen-viborg.dk/info", chromeRunning: true, chromeUrl: "https://kulturskolen-viborg.dk/info" },
+  { id: 2, name: "Klient B", locality: "Lokale 2", status: "offline", apiStatus: "approved", ip: "192.168.1.102", softwareVersion: "1.4.2", macAddress: "00:1A:2B:3C:4D:5F", lastSeen: "2025-07-28 13:39:10", uptime: "2 dage, 7 timer", kioskWebAddress: "https://kulturskolen-viborg.dk/plan", chromeRunning: false, chromeUrl: "" },
+  { id: 3, name: "Klient C", locality: "Lokale 3", status: "online", apiStatus: "pending", ip: "192.168.1.103", softwareVersion: "1.4.2", macAddress: "00:1A:2B:3C:4D:60", lastSeen: "2025-07-28 13:45:02", uptime: "1 dag, 6 timer", kioskWebAddress: "https://kulturskolen-viborg.dk/sal", chromeRunning: false, chromeUrl: "" },
+  { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", apiStatus: "pending", ip: "192.168.1.104", softwareVersion: "1.4.2", macAddress: "00:1A:2B:3C:4D:61", lastSeen: "2025-07-28 13:48:10", uptime: "3 timer", kioskWebAddress: "https://kulturskolen-viborg.dk/undervisning", chromeRunning: false, chromeUrl: "" },
 ];
 
 const drawerWidth = 200;
@@ -144,27 +144,28 @@ export default function Dashboard() {
                       variant="extended"
                       color="success"
                       onClick={handleOpenApproveDialog}
+                      size="small"
                       sx={{
                         fontWeight: "bold",
                         fontSize: "0.9rem",
                         letterSpacing: "0.04em",
                         textTransform: "uppercase",
                         boxShadow: "0px 3px 10px 1px rgba(76,175,80,0.11)",
-    color: "#fff",
-    height: 32,
-    minHeight: 32,
-    paddingLeft: 1.2,
-    paddingRight: 1.2,
-    '& svg': { fontSize: 18 }
-  }}
->
-  <AddIcon sx={{ mr: 1 }} />
-  Tilføj klient
-</Fab>
+                        color: "#fff",
+                        height: 32,
+                        minHeight: 32,
+                        paddingLeft: 1.2,
+                        paddingRight: 1.2,
+                        '& svg': { fontSize: 18 }
+                      }}
+                    >
+                      <AddIcon sx={{ mr: 1 }} />
+                      Tilføj klient
+                    </Fab>
                   </Box>
                 )}
                 <ClientInfoPage
-                  clients={clients} // VIGTIGT: Send ALLE klienter
+                  clients={clients}
                   onRemoveClient={handleRemoveClient}
                   setClients={setClients}
                 />
