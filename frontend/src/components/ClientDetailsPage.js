@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -21,8 +21,9 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import BrowserUpdatedIcon from '@mui/icons-material/BrowserUpdated';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
+// CLIENTS hentes som prop fra Dashboard, så denne array bruges kun som fallback/demo
 const CLIENTS = [
   {
     id: 1,
@@ -54,33 +55,42 @@ const CLIENTS = [
   },
 ];
 
-function getRefreshedClientData(clientId) {
+function getRefreshedClientData(client) {
   // Simulerer et API kald og returnerer opdaterede data
-  // Her ville du lave et rigtigt API kald i praksis.
-  // For demo: vi opdaterer tid og oppetid
   const now = new Date();
-  const refreshed = CLIENTS.find(c => String(c.id) === String(clientId));
-  if (!refreshed) return null;
+  if (!client) return null;
   return {
-    ...refreshed,
+    ...client,
     lastSeen: now.toISOString().replace("T", " ").slice(0, 16),
-    uptime: refreshed.uptime.endsWith("timer")
-      ? refreshed.uptime
+    uptime: client.uptime.endsWith("timer")
+      ? client.uptime
       : "5 dage, 3 timer",
-    chromeRunning: refreshed.chromeRunning,
-    chromeUrl: refreshed.chromeRunning ? refreshed.chromeUrl : "",
+    chromeRunning: client.chromeRunning,
+    chromeUrl: client.chromeRunning ? client.chromeUrl : "",
   };
 }
 
-export default function ClientDetailsPage({ clientId }) {
+export default function ClientDetailsPage({ clients }) {
+  const { clientId } = useParams();
   const navigate = useNavigate();
 
-  const [client, setClient] = useState(
-    CLIENTS.find((c) => String(c.id) === String(clientId))
-  );
+  // Find klient fra props eller demo-data
+  const clientObj = clients
+    ? clients.find((c) => String(c.id) === String(clientId))
+    : CLIENTS.find((c) => String(c.id) === String(clientId));
+  const [client, setClient] = useState(clientObj);
   const [kioskUrl, setKioskUrl] = useState(client?.kioskWebAddress ?? "");
   const [isPushing, setIsPushing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    // Opdater client hvis clients-listen ændrer sig (fx ved godkendelse)
+    const updatedClient = clients
+      ? clients.find((c) => String(c.id) === String(clientId))
+      : CLIENTS.find((c) => String(c.id) === String(clientId));
+    setClient(updatedClient);
+    setKioskUrl(updatedClient?.kioskWebAddress ?? "");
+  }, [clients, clientId]);
 
   const handlePushKioskUrl = () => {
     setIsPushing(true);
@@ -101,7 +111,7 @@ export default function ClientDetailsPage({ clientId }) {
   const handleRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
-      const updatedClient = getRefreshedClientData(clientId);
+      const updatedClient = getRefreshedClientData(client);
       setClient(updatedClient);
       setIsRefreshing(false);
       // evt. setKioskUrl(updatedClient.kioskWebAddress);
