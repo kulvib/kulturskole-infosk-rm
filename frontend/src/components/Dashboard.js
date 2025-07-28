@@ -18,7 +18,6 @@ import {
   TableBody,
   TableCell,
   TableRow,
-  Fab,
   Stack,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -41,6 +40,7 @@ export default function Dashboard() {
   const [clients, setClients] = useState(initialClients);
   const [openDialog, setOpenDialog] = useState(false);
 
+  // Show dialog for approving clients
   const handleAddClient = () => {
     setOpenDialog(true);
   };
@@ -76,7 +76,7 @@ export default function Dashboard() {
           >
             Kulturskolen Viborg - infoskærme administration
           </Typography>
-          <Button color="inherit" disabled>
+          <Button color="inherit" sx={{ color: "#fff" }}>
             Log ud
           </Button>
         </Toolbar>
@@ -127,7 +127,7 @@ export default function Dashboard() {
             path="clients"
             element={
               <Box sx={{ position: "relative", minHeight: "100vh" }}>
-                {/* Prominent green Add Client button, placed at top right */}
+                {/* Tilføj klient / Godkend nye klienter knap i øverste højre hjørne */}
                 <Box sx={{
                   position: "absolute",
                   top: 0,
@@ -136,35 +136,21 @@ export default function Dashboard() {
                   mr: 2,
                   zIndex: 1201
                 }}>
-                  <Fab
-                    aria-label="Tilføj klient"
+                  <Button
+                    variant="contained"
+                    color="success"
+                    startIcon={<AddIcon />}
                     onClick={handleAddClient}
                     sx={{
-                      px: 3,
-                      bgcolor: "success.main",
-                      color: "white",
-                      boxShadow: "0px 6px 20px 2px rgba(76,175,80,0.3)",
-                      border: "3px solid #388e3c",
-                      transform: "scale(1.2)",
-                      "&:hover": {
-                        bgcolor: "success.dark",
-                        border: "3px solid #2e7031",
-                        boxShadow: "0px 8px 28px 4px rgba(56,142,60,0.4)",
-                      },
+                      fontWeight: "bold",
+                      fontSize: "1.1rem",
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      boxShadow: "0px 6px 20px 2px rgba(76,175,80,0.18)",
                     }}
                   >
-                    <Stack direction="row" alignItems="center" spacing={1} sx={{ pr: 1 }}>
-                      <AddIcon sx={{ fontSize: 32 }} />
-                      <span style={{
-                        fontWeight: "bold",
-                        fontSize: "1.2rem",
-                        letterSpacing: "0.04em",
-                        textTransform: "uppercase"
-                      }}>
-                        Tilføj klient
-                      </span>
-                    </Stack>
-                  </Fab>
+                    Godkend nye klienter
+                  </Button>
                 </Box>
                 <ClientInfoPage
                   clients={clients.filter((c) => c.apiStatus === "approved")}
