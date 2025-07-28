@@ -22,7 +22,7 @@ export default function Dashboard() {
       <AppBar position="fixed" sx={{ zIndex: 1201 }}>
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Kulturskole Admin
+            Kulturskolen Viborg - infoskærme administration
           </Typography>
           <Button color="inherit" disabled>
             Log ud
