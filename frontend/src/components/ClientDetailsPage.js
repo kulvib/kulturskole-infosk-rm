@@ -33,6 +33,7 @@ const CLIENTS = [
     kioskWebAddress: "https://kulturskolen-viborg.dk/info",
     status: "online",
     chromeRunning: true,
+    chromeUrl: "https://kulturskolen-viborg.dk/info"
   },
   {
     id: 2,
@@ -46,6 +47,7 @@ const CLIENTS = [
     kioskWebAddress: "https://kulturskolen-viborg.dk/plan",
     status: "offline",
     chromeRunning: false,
+    chromeUrl: ""
   },
 ];
 
@@ -130,20 +132,37 @@ export default function ClientDetailsPage({ clientId }) {
           </Box>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Status:</Typography>
-            <Chip
-              label={client.status === "online" ? "Online" : "Offline"}
-              color={client.status === "online" ? "success" : "error"}
-              sx={{ mr: 1 }}
-            />
-            <Chip
-              label={client.chromeRunning ? "Chrome kører" : "Chrome lukket"}
-              color={client.chromeRunning ? "primary" : "default"}
-            />
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Chip
+                label={client.status === "online" ? "Online" : "Offline"}
+                color={client.status === "online" ? "success" : "error"}
+              />
+              {client.chromeRunning ? (
+                <Chip
+                  label={
+                    <>
+                      Chrome kører
+                      <span style={{ marginLeft: 6, fontWeight: 400, fontSize: "0.9em" }}>
+                        {client.chromeUrl}
+                      </span>
+                    </>
+                  }
+                  color="primary"
+                  sx={{ ml: 1, maxWidth: 320 }}
+                />
+              ) : (
+                <Chip
+                  label="Chrome lukket"
+                  color="default"
+                  sx={{ ml: 1 }}
+                />
+              )}
+            </Stack>
           </Box>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Handlinger:</Typography>
             <Grid container spacing={2} sx={{ mt: 1 }}>
-              {/* Chrome: start */}
+              {/* Chrome start */}
               <Grid item xs={12} sm={6} md={4}>
                 <Tooltip title="Start Chrome-browseren">
                   <Button
@@ -157,7 +176,7 @@ export default function ClientDetailsPage({ clientId }) {
                   </Button>
                 </Tooltip>
               </Grid>
-              {/* Chrome: luk */}
+              {/* Chrome luk */}
               <Grid item xs={12} sm={6} md={4}>
                 <Tooltip title="Luk Chrome-browseren">
                   <Button
@@ -175,20 +194,6 @@ export default function ClientDetailsPage({ clientId }) {
               <Grid item xs={12}>
                 <Divider sx={{ my: 1 }} />
               </Grid>
-              {/* Terminal */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Tooltip title="Åbn terminal (WebSocket shell)">
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    color="secondary"
-                    startIcon={<TerminalIcon />}
-                    onClick={handleTerminalOpen}
-                  >
-                    Terminal
-                  </Button>
-                </Tooltip>
-              </Grid>
               {/* Live Stream */}
               <Grid item xs={12} sm={6} md={4}>
                 <Tooltip title="Live stream fra klienten">
@@ -203,26 +208,40 @@ export default function ClientDetailsPage({ clientId }) {
                   </Button>
                 </Tooltip>
               </Grid>
+              {/* Start klient terminal */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title="Start klient terminal">
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    color="secondary"
+                    startIcon={<TerminalIcon />}
+                    onClick={handleTerminalOpen}
+                  >
+                    Start Klient Terminal
+                  </Button>
+                </Tooltip>
+              </Grid>
               {/* Divider */}
               <Grid item xs={12}>
                 <Divider sx={{ my: 1 }} />
               </Grid>
-              {/* Genstart klient */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Tooltip title="Genstart klienten">
+              {/* Start klient */}
+              <Grid item xs={12} sm={4} md={4}>
+                <Tooltip title="Start klienten">
                   <Button
                     fullWidth
                     variant="outlined"
-                    color="warning"
-                    startIcon={<RestartAltIcon />}
-                    onClick={handleClientRestart}
+                    color="success"
+                    startIcon={<PlayArrowIcon />}
+                    onClick={handleClientStart}
                   >
-                    Genstart klient
+                    Start klient
                   </Button>
                 </Tooltip>
               </Grid>
               {/* Luk klient */}
-              <Grid item xs={12} sm={6} md={4}>
+              <Grid item xs={12} sm={4} md={4}>
                 <Tooltip title="Luk klienten">
                   <Button
                     fullWidth
@@ -235,17 +254,17 @@ export default function ClientDetailsPage({ clientId }) {
                   </Button>
                 </Tooltip>
               </Grid>
-              {/* Start klient */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Tooltip title="Start klienten">
+              {/* Genstart klient */}
+              <Grid item xs={12} sm={4} md={4}>
+                <Tooltip title="Genstart klienten">
                   <Button
                     fullWidth
                     variant="outlined"
-                    color="success"
-                    startIcon={<PlayArrowIcon />}
-                    onClick={handleClientStart}
+                    color="warning"
+                    startIcon={<RestartAltIcon />}
+                    onClick={handleClientRestart}
                   >
-                    Start klient
+                    Genstart klient
                   </Button>
                 </Tooltip>
               </Grid>
