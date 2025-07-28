@@ -10,16 +10,18 @@ import {
   List,
   ListItem,
   ListItemText,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Table,
   TableBody,
   TableCell,
   TableRow,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Stack,
+  Fab,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import ClientInfoPage from "./ClientInfoPage";
 import HolidaysPage from "./HolidaysPage";
 import ClientDetailsPageWrapper from "./ClientDetailsPageWrapper";
@@ -39,6 +41,11 @@ export default function Dashboard() {
   const [clients, setClients] = useState(initialClients);
   const [openDialog, setOpenDialog] = useState(false);
 
+  // Open approve dialog
+  const handleOpenApproveDialog = () => {
+    setOpenDialog(true);
+  };
+
   const handleCloseDialog = () => {
     setOpenDialog(false);
   };
@@ -57,6 +64,9 @@ export default function Dashboard() {
     { text: "Klienter", to: "/clients" },
     { text: "Helligdage", to: "/holidays" },
   ];
+
+  // Find if there are pending clients
+  const pendingClients = clients.filter(c => c.apiStatus === "pending");
 
   return (
     <Box sx={{ display: "flex" }}>
@@ -121,8 +131,36 @@ export default function Dashboard() {
             path="clients"
             element={
               <Box sx={{ position: "relative", minHeight: "100vh" }}>
+                {/* Grøn "Tilføj klient" knap, vises kun hvis der er pending klienter */}
+                {pendingClients.length > 0 && (
+                  <Box sx={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    mt: 2,
+                    mr: 2,
+                    zIndex: 1201
+                  }}>
+                    <Fab
+                      variant="extended"
+                      color="success"
+                      onClick={handleOpenApproveDialog}
+                      sx={{
+                        fontWeight: "bold",
+                        fontSize: "1.1rem",
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase",
+                        boxShadow: "0px 6px 20px 2px rgba(76,175,80,0.18)",
+                        color: "#fff"
+                      }}
+                    >
+                      <AddIcon sx={{ mr: 1 }} />
+                      Tilføj klient
+                    </Fab>
+                  </Box>
+                )}
                 <ClientInfoPage
-                  clients={clients.filter((c) => c.apiStatus === "approved")}
+                  clients={clients.filter((c) => c.apiStatus === "approved" || c.apiStatus === "pending")}
                   onRemoveClient={handleRemoveClient}
                   setClients={setClients}
                 />
@@ -132,27 +170,25 @@ export default function Dashboard() {
                   <DialogContent>
                     <Table>
                       <TableBody>
-                        {clients.filter((c) => c.apiStatus !== "approved").length === 0 ? (
+                        {pendingClients.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={2}>Ingen ikke-godkendte klienter.</TableCell>
                           </TableRow>
                         ) : (
-                          clients
-                            .filter((c) => c.apiStatus !== "approved")
-                            .map((client) => (
-                              <TableRow key={client.id}>
-                                <TableCell>{client.name}</TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="contained"
-                                    color="success"
-                                    onClick={() => handleApproveClient(client.id)}
-                                  >
-                                    Godkend
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))
+                          pendingClients.map((client) => (
+                            <TableRow key={client.id}>
+                              <TableCell>{client.name}</TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="contained"
+                                  color="success"
+                                  onClick={() => handleApproveClient(client.id)}
+                                >
+                                  Godkend
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
                         )}
                       </TableBody>
                     </Table>
