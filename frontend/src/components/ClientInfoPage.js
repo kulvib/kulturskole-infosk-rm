@@ -22,75 +22,91 @@ import InfoIcon from "@mui/icons-material/Info";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useNavigate } from "react-router-dom";
 
-// Udvidet dummydata
-const CLIENTS = [
-  { id: 1, name: "Klient A", locality: "Lokale 1", status: "online", ip: "192.168.1.101", macAddress: "00:1A:2B:3C:4D:5E", apiStatus: "approved" },
-  { id: 2, name: "Klient B", locality: "Lokale 2", status: "offline", ip: "192.168.1.102", macAddress: "00:1A:2B:3C:4D:5F", apiStatus: "approved" },
-  { id: 3, name: "Klient C", locality: "Lokale 3", status: "online", ip: "192.168.1.103", macAddress: "00:1A:2B:3C:4D:60", apiStatus: "pending" },
-  { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", ip: "192.168.1.104", macAddress: "00:1A:2B:3C:4D:61", apiStatus: "pending" },
-  { id: 5, name: "Klient E", locality: "Lokale 5", status: "online", ip: "192.168.1.105", macAddress: "00:1A:2B:3C:4D:62", apiStatus: "approved" },
-  { id: 6, name: "Klient F", locality: "Lokale 6", status: "offline", ip: "192.168.1.106", macAddress: "00:1A:2B:3C:4D:63", apiStatus: "pending" },
-  { id: 7, name: "Klient G", locality: "Lokale 7", status: "online", ip: "192.168.1.107", macAddress: "00:1A:2B:3C:4D:64", apiStatus: "approved" },
-  { id: 8, name: "Klient H", locality: "Lokale 8", status: "offline", ip: "192.168.1.108", macAddress: "00:1A:2B:3C:4D:65", apiStatus: "pending" },
-  { id: 9, name: "Klient I", locality: "Lokale 9", status: "online", ip: "192.168.1.109", macAddress: "00:1A:2B:3C:4D:66", apiStatus: "approved" },
-  { id: 10, name: "Klient J", locality: "Lokale 10", status: "offline", ip: "192.168.1.110", macAddress: "00:1A:2B:3C:4D:67", apiStatus: "pending" },
-  { id: 11, name: "Klient K", locality: "Lokale 11", status: "online", ip: "192.168.1.111", macAddress: "00:1A:2B:3C:4D:68", apiStatus: "approved" },
-  { id: 12, name: "Klient L", locality: "Lokale 12", status: "offline", ip: "192.168.1.112", macAddress: "00:1A:2B:3C:4D:69", apiStatus: "pending" },
-  { id: 13, name: "Klient M", locality: "Lokale 13", status: "online", ip: "192.168.1.113", macAddress: "00:1A:2B:3C:4D:6A", apiStatus: "approved" },
-  { id: 14, name: "Klient N", locality: "Lokale 14", status: "offline", ip: "192.168.1.114", macAddress: "00:1A:2B:3C:4D:6B", apiStatus: "pending" },
-  { id: 15, name: "Klient O", locality: "Lokale 15", status: "online", ip: "192.168.1.115", macAddress: "00:1A:2B:3C:4D:6C", apiStatus: "approved" },
-];
+const API_URL = "https://kulturskole-infosk-rm.onrender.com";
+const token = "PASTE_YOUR_JWT_TOKEN_HERE"; // Indsæt din gyldige admin JWT-token her
 
-// Funktion til at simulere opdatering af heartbeat/status
-function getRefreshedClientsData(clients) {
-  return clients.map(client => ({
-    ...client,
-    status: Math.random() > 0.5 ? "online" : "offline"
-  }));
-}
-
-export default function ClientInfoPage({ clients = CLIENTS, onRemoveClient, setClients }) {
+export default function ClientInfoPage({
+  clients,
+  onRemoveClient,
+  onApproveClient,
+  setClients,
+  loading = false,
+}) {
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [localities, setLocalities] = useState(() => {
     const obj = {};
-    clients.forEach(c => { obj[c.id] = c.locality; });
+    clients.forEach((c) => {
+      obj[c.id] = c.locality || "";
+    });
     return obj;
   });
 
-  // Heartbeat: opdater status hvert 30. sekund
+  // Heartbeat: opdater status hvert 30. sekund (fra backend)
   useEffect(() => {
     const interval = setInterval(() => {
-      setClients(prevClients => getRefreshedClientsData(prevClients));
+      fetchClients();
     }, 30000);
     return () => clearInterval(interval);
-  }, [setClients]);
+    // eslint-disable-next-line
+  }, []);
+
+  // Fetch clients fra backend
+  const fetchClients = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/clients/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClients(data);
+        // Opdater lokaliteter hvis ændring
+        const obj = {};
+        data.forEach((c) => {
+          obj[c.id] = c.locality || "";
+        });
+        setLocalities(obj);
+      }
+    } catch {
+      // Håndter evt. fejl
+    }
+  };
 
   // Refresh-knap: manuel opdatering
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setClients(prevClients => getRefreshedClientsData(prevClients));
-      setIsRefreshing(false);
-    }, 1200);
+    await fetchClients();
+    setIsRefreshing(false);
   };
 
   // Lokalitet redigeres inline
-  const handleLocalityChange = (id, value) => {
-    setLocalities(prev => ({
+  const handleLocalityChange = async (id, value) => {
+    setLocalities((prev) => ({
       ...prev,
-      [id]: value
+      [id]: value,
     }));
-    setClients(prevClients =>
-      prevClients.map(c =>
-        c.id === id ? { ...c, locality: value } : c
-      )
-    );
+    // Opdater backend
+    try {
+      await fetch(`${API_URL}/api/clients/${id}/update`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ locality: value }),
+      });
+      // Opdater lokal klientliste
+      setClients((prevClients) =>
+        prevClients.map((c) => (c.id === id ? { ...c, locality: value } : c))
+      );
+    } catch {
+      // Håndter evt. fejl
+    }
   };
 
   // Split klienter op
-  const approvedClients = clients.filter(c => c.apiStatus === "approved");
-  const pendingClients = clients.filter(c => c.apiStatus === "pending");
+  const approvedClients = clients.filter((c) => c.status === "approved" || c.apiStatus === "approved");
+  const pendingClients = clients.filter((c) => c.status === "pending" || c.apiStatus === "pending");
 
   return (
     <Paper sx={{ p: 3, mt: 2 }}>
@@ -100,8 +116,8 @@ export default function ClientInfoPage({ clients = CLIENTS, onRemoveClient, setC
         </Typography>
         <Tooltip title="Opdater data for alle klienter">
           <span>
-            <IconButton color="primary" onClick={handleRefresh} disabled={isRefreshing}>
-              {isRefreshing ? <CircularProgress size={24} /> : <RefreshIcon />}
+            <IconButton color="primary" onClick={handleRefresh} disabled={isRefreshing || loading}>
+              {isRefreshing || loading ? <CircularProgress size={24} /> : <RefreshIcon />}
             </IconButton>
           </span>
         </Tooltip>
@@ -125,11 +141,11 @@ export default function ClientInfoPage({ clients = CLIENTS, onRemoveClient, setC
           ) : (
             approvedClients.map((client) => (
               <TableRow key={client.id} hover>
-                <TableCell>{client.name}</TableCell>
+                <TableCell>{client.name || client.unique_id}</TableCell>
                 <TableCell>
                   <TextField
                     value={localities[client.id]}
-                    onChange={e => handleLocalityChange(client.id, e.target.value)}
+                    onChange={(e) => handleLocalityChange(client.id, e.target.value)}
                     size="small"
                     variant="outlined"
                     sx={{ minWidth: 120 }}
@@ -143,23 +159,20 @@ export default function ClientInfoPage({ clients = CLIENTS, onRemoveClient, setC
                     icon={
                       <CheckCircleIcon
                         sx={{
-                          color: client.status === "online" ? "green" : "red"
+                          color: client.status === "online" ? "green" : "red",
                         }}
                       />
                     }
                     sx={{
                       fontWeight: "bold",
                       bgcolor: client.status === "online" ? "#d4edda" : "#f8d7da",
-                      color: client.status === "online" ? "green" : "red"
+                      color: client.status === "online" ? "green" : "red",
                     }}
                   />
                 </TableCell>
                 <TableCell>
                   <Tooltip title="Vis klient-info">
-                    <IconButton
-                      color="primary"
-                      onClick={() => navigate(`/clients/${client.id}`)}
-                    >
+                    <IconButton color="primary" onClick={() => navigate(`/clients/${client.id}`)}>
                       <InfoIcon />
                     </IconButton>
                   </Tooltip>
@@ -206,18 +219,15 @@ export default function ClientInfoPage({ clients = CLIENTS, onRemoveClient, setC
           ) : (
             pendingClients.map((client) => (
               <TableRow key={client.id} hover>
-                <TableCell>{client.name}</TableCell>
-                <TableCell>{client.ip}</TableCell>
-                <TableCell>{client.macAddress}</TableCell>
+                <TableCell>{client.name || client.unique_id}</TableCell>
+                <TableCell>{client.ip || client.ip_address}</TableCell>
+                <TableCell>{client.macAddress || client.mac_address}</TableCell>
                 <TableCell align="center">
                   <Button
                     variant="contained"
                     color="success"
-                    onClick={() => setClients(prev =>
-                      prev.map(c =>
-                        c.id === client.id ? { ...c, apiStatus: "approved" } : c
-                      )
-                    )}
+                    onClick={() => onApproveClient && onApproveClient(client.id)}
+                    disabled={loading}
                   >
                     Godkend
                   </Button>
