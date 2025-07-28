@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Routes, Route, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   AppBar,
@@ -24,41 +24,95 @@ import ClientInfoPage from "./ClientInfoPage";
 import HolidaysPage from "./HolidaysPage";
 import ClientDetailsPageWrapper from "./ClientDetailsPageWrapper";
 
-const initialClients = [
-  { id: 1, name: "Klient A", locality: "Lokale 1", status: "online", apiStatus: "approved", ip: "192.168.1.101", softwareVersion: "1.4.2", macAddress: "00:1A:2B:3C:4D:5E", lastSeen: "2025-07-28 13:35:00", uptime: "4 dage, 2 timer", kioskWebAddress: "https://kulturskolen-viborg.dk/info", chromeRunning: true, chromeUrl: "https://kulturskolen-viborg.dk/info" },
-  { id: 2, name: "Klient B", locality: "Lokale 2", status: "offline", apiStatus: "approved", ip: "192.168.1.102", softwareVersion: "1.4.2", macAddress: "00:1A:2B:3C:4D:5F", lastSeen: "2025-07-28 13:39:10", uptime: "2 dage, 7 timer", kioskWebAddress: "https://kulturskolen-viborg.dk/plan", chromeRunning: false, chromeUrl: "" },
-  { id: 3, name: "Klient C", locality: "Lokale 3", status: "online", apiStatus: "pending", ip: "192.168.1.103", softwareVersion: "1.4.2", macAddress: "00:1A:2B:3C:4D:60", lastSeen: "2025-07-28 13:45:02", uptime: "1 dag, 6 timer", kioskWebAddress: "https://kulturskolen-viborg.dk/sal", chromeRunning: false, chromeUrl: "" },
-  { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", apiStatus: "pending", ip: "192.168.1.104", softwareVersion: "1.4.2", macAddress: "00:1A:2B:3C:4D:61", lastSeen: "2025-07-28 13:48:10", uptime: "3 timer", kioskWebAddress: "https://kulturskolen-viborg.dk/undervisning", chromeRunning: false, chromeUrl: "" },
-];
-
+const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 const drawerWidth = 200;
 
 export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [clients, setClients] = useState(initialClients);
+  const [clients, setClients] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Open approve dialog
-  const handleOpenApproveDialog = () => setOpenDialog(true);
-  const handleCloseDialog = () => setOpenDialog(false);
-
-  const handleApproveClient = (id) => {
-    setClients((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, apiStatus: "approved" } : c))
-    );
+  // Hent klienter fra backend
+  const fetchClients = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = "PASTE_YOUR_JWT_TOKEN_HERE"; // Sæt din gyldige admin JWT-token her
+      const res = await fetch(`${API_URL}/api/clients/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClients(data);
+      } else {
+        setError("Kunne ikke hente klienter");
+      }
+    } catch {
+      setError("Kunne ikke hente klienter");
+    }
+    setLoading(false);
   };
 
-  const handleRemoveClient = (id) => {
-    setClients((prev) => prev.filter((c) => c.id !== id));
+  // Godkend klient via backend
+  const handleApproveClient = async (id) => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = "PASTE_YOUR_JWT_TOKEN_HERE";
+      const res = await fetch(`${API_URL}/api/clients/${id}/approve`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        fetchClients();
+      } else {
+        setError("Kunne ikke godkende klient");
+      }
+    } catch {
+      setError("Kunne ikke godkende klient");
+    }
+    setLoading(false);
   };
+
+  // Fjern klient via backend
+  const handleRemoveClient = async (id) => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = "PASTE_YOUR_JWT_TOKEN_HERE";
+      const res = await fetch(`${API_URL}/api/clients/${id}/remove`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        fetchClients();
+      } else {
+        setError("Kunne ikke fjerne klient");
+      }
+    } catch {
+      setError("Kunne ikke fjerne klient");
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchClients();
+    // eslint-disable-next-line
+  }, []);
 
   const menuItems = [
     { text: "Klienter", to: "/clients" },
     { text: "Helligdage", to: "/holidays" },
   ];
 
-  const pendingClients = clients.filter(c => c.apiStatus === "pending");
+  const pendingClients = clients.filter(c => c.status === "pending" || c.apiStatus === "pending");
+
+  // Dialog handlers
+  const handleOpenApproveDialog = () => setOpenDialog(true);
+  const handleCloseDialog = () => setOpenDialog(false);
 
   return (
     <Box sx={{ display: "flex" }}>
@@ -118,6 +172,8 @@ export default function Dashboard() {
         }}
       >
         <Toolbar />
+        {error && <Typography color="error">{error}</Typography>}
+        {loading && <Typography>Indlæser...</Typography>}
         <Routes>
           <Route
             path="clients"
@@ -128,7 +184,9 @@ export default function Dashboard() {
                     <ClientInfoPage
                       clients={clients}
                       onRemoveClient={handleRemoveClient}
+                      onApproveClient={handleApproveClient}
                       setClients={setClients}
+                      loading={loading}
                     />
                   </Box>
                 </Paper>
@@ -145,12 +203,13 @@ export default function Dashboard() {
                         ) : (
                           pendingClients.map((client) => (
                             <TableRow key={client.id}>
-                              <TableCell>{client.name}</TableCell>
+                              <TableCell>{client.name || client.unique_id}</TableCell>
                               <TableCell>
                                 <Button
                                   variant="contained"
                                   color="success"
                                   onClick={() => handleApproveClient(client.id)}
+                                  disabled={loading}
                                 >
                                   Godkend
                                 </Button>
