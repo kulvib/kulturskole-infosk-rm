@@ -42,13 +42,8 @@ export default function Dashboard() {
   const [openDialog, setOpenDialog] = useState(false);
 
   // Open approve dialog
-  const handleOpenApproveDialog = () => {
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-  };
+  const handleOpenApproveDialog = () => setOpenDialog(true);
+  const handleCloseDialog = () => setOpenDialog(false);
 
   const handleApproveClient = (id) => {
     setClients((prev) =>
@@ -65,7 +60,6 @@ export default function Dashboard() {
     { text: "Helligdage", to: "/holidays" },
   ];
 
-  // Find if there are pending clients
   const pendingClients = clients.filter(c => c.apiStatus === "pending");
 
   return (
@@ -132,18 +126,13 @@ export default function Dashboard() {
             element={
               <Box sx={{ position: "relative", minHeight: "100vh" }}>
                 <Paper sx={{ position: "relative", p: 0, pb: 6, boxShadow: "none" }}>
-                  <ClientInfoPage
-                    clients={clients}
-                    onRemoveClient={handleRemoveClient}
-                    setClients={setClients}
-                  />
-                  {/* Mindre grøn "Tilføj klient" knap, placeret under listen i højre hjørne */}
+                  {/* Tilføj klient-knap placeret over listen, i højre hjørne */}
                   {pendingClients.length > 0 && (
                     <Box
                       sx={{
                         position: "absolute",
+                        top: 0,
                         right: 24,
-                        bottom: 16,
                         zIndex: 1201,
                       }}
                     >
@@ -163,6 +152,7 @@ export default function Dashboard() {
                           minHeight: 32,
                           paddingLeft: 1.2,
                           paddingRight: 1.2,
+                          mt: 2,
                           '& svg': { fontSize: 18 }
                         }}
                       >
@@ -171,6 +161,13 @@ export default function Dashboard() {
                       </Fab>
                     </Box>
                   )}
+                  <Box sx={{ pt: pendingClients.length > 0 ? 7 : 0 }}>
+                    <ClientInfoPage
+                      clients={clients}
+                      onRemoveClient={handleRemoveClient}
+                      setClients={setClients}
+                    />
+                  </Box>
                 </Paper>
                 {/* Modal: Godkend nye klienter */}
                 <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
