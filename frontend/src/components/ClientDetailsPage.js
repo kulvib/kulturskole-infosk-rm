@@ -1,103 +1,88 @@
 import React, { useEffect, useState } from "react";
 import {
-  Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Chip,
-  Paper,
-  Divider,
-  Stack,
-  Box,
-  Button,
+  Typography, Table, TableBody, TableRow, TableCell, TextField,
+  Button, Chip, Stack, Divider, Box, Paper
 } from "@mui/material";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import TerminalIcon from "@mui/icons-material/Terminal";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import InfoIcon from "@mui/icons-material/Info";
 
-// Backend integration
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
-const token = "PASTE_YOUR_JWT_TOKEN_HERE"; // Indsæt din gyldige admin JWT-token her
+const token = "PASTE_YOUR_JWT_TOKEN_HERE";
 
-export default function ClientDetailsPage({ clients }) {
-  const { clientId } = useParams();
-  const navigate = useNavigate();
+export default function ClientDetailsPage({ clientId, clients }) {
   const [client, setClient] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [kioskWebAddress, setKioskWebAddress] = useState("");
+  const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
 
-  // Fetch klient-data fra backend
   useEffect(() => {
-    const fetchClient = async () => {
-      setLoading(true);
-      try {
-        // Hvis clients prop er givet og matcher, brug den
-        const localClient =
-          clients &&
-          clients.find(
-            (c) => String(c.id) === String(clientId) || String(c.unique_id) === String(clientId)
-          );
-        if (localClient) {
-          setClient(localClient);
-        } else {
-          // Ellers hent fra backend
-          const res = await fetch(`${API_URL}/api/clients/`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) {
-            const data = await res.json();
-            const found =
-              data.find(
-                (c) => String(c.id) === String(clientId) || String(c.unique_id) === String(clientId)
-              ) || null;
-            setClient(found);
-          } else {
-            setClient(null);
-          }
-        }
-      } catch {
-        setClient(null);
+    const localClient =
+      clients &&
+      clients.find(
+        (c) => String(c.id) === String(clientId) || String(c.unique_id) === String(clientId)
+      );
+    if (localClient) {
+      setClient(localClient);
+      setKioskWebAddress(localClient.kioskWebAddress || "");
+    } else {
+      fetchClient();
+    }
+    async function fetchClient() {
+      const res = await fetch(`${API_URL}/api/clients/${clientId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClient(data);
+        setKioskWebAddress(data.kioskWebAddress || "");
       }
-      setLoading(false);
-    };
-    fetchClient();
+    }
   }, [clientId, clients]);
 
-  if (loading) {
-    return (
-      <Box sx={{ p: 3, mt: 2 }}>
-        <Typography>Indlæser klientdata...</Typography>
-      </Box>
-    );
-  }
+  // Gem ny kiosk webadresse
+  const handleSaveKioskAddress = async () => {
+    setSaving(true);
+    await fetch(`${API_URL}/api/clients/${clientId}/update`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ kioskWebAddress }),
+    });
+    setSaving(false);
+  };
 
-  if (!client) {
-    return (
-      <Box sx={{ p: 3, mt: 2 }}>
-        <Typography>Klient ikke fundet.</Typography>
-        <Button variant="contained" sx={{ mt: 2 }} onClick={() => navigate("/clients")}>
-          Tilbage til klienter
-        </Button>
-      </Box>
-    );
-  }
+  // Actions (placeholder)
+  const handleChromeShutdown = () => alert("Chrome shutdown trigget!");
+  const handleClientAction = (action) => alert(`Client ${action} trigget!`);
+  const handleOpenTerminal = () => alert("Åbner terminal (WebSocket proxy)");
+  const handleOpenLiveStream = () => alert("Live stream åbnes (MJPEG/WebRTC)");
+
+  if (!client) return <Typography sx={{ mt: 3 }}>Indlæser...</Typography>;
 
   return (
-    <Paper sx={{ p: 3, mt: 2 }}>
-      <Typography variant="h5" sx={{ mb: 2 }}>
-        Klient: {client.name || client.unique_id}
+    <Paper sx={{ p: 3, maxWidth: 700, mx: "auto", mt: 5, boxShadow: 3 }}>
+      <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
+        Klientinfo: {client.name || client.unique_id}
       </Typography>
-      <Divider sx={{ mb: 2 }} />
       <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
         <Chip
           label={client.status === "online" ? "Online" : "Offline"}
           color={client.status === "online" ? "success" : "error"}
+          sx={{ fontWeight: "bold" }}
         />
         <Chip
-          label={client.apiStatus === "approved" || client.status === "approved" ? "Godkendt" : "Ikke godkendt"}
-          color={client.apiStatus === "approved" || client.status === "approved" ? "success" : "warning"}
+          label={client.apiStatus === "approved" ? "Godkendt" : "Ikke godkendt"}
+          color={client.apiStatus === "approved" ? "success" : "warning"}
+          sx={{ fontWeight: "bold" }}
         />
       </Stack>
-      <Table>
+      <Table sx={{ mb: 3 }}>
         <TableBody>
           <TableRow>
             <TableCell variant="head">Navn</TableCell>
@@ -105,7 +90,7 @@ export default function ClientDetailsPage({ clients }) {
           </TableRow>
           <TableRow>
             <TableCell variant="head">Lokalitet</TableCell>
-            <TableCell>{client.locality || ""}</TableCell>
+            <TableCell>{client.locality}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell variant="head">IP-adresse</TableCell>
@@ -116,39 +101,91 @@ export default function ClientDetailsPage({ clients }) {
             <TableCell>{client.macAddress || client.mac_address}</TableCell>
           </TableRow>
           <TableRow>
-            <TableCell variant="head">Software Version</TableCell>
-            <TableCell>{client.softwareVersion || client.sw_version || ""}</TableCell>
+            <TableCell variant="head">Software version</TableCell>
+            <TableCell>{client.softwareVersion || client.sw_version}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell variant="head">Sidst set</TableCell>
-            <TableCell>{client.lastSeen || client.last_seen || ""}</TableCell>
+            <TableCell>{client.lastSeen || client.last_seen}</TableCell>
           </TableRow>
           <TableRow>
-            <TableCell variant="head">Uptime</TableCell>
-            <TableCell>{client.uptime || ""}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell variant="head">Kiosk Webadresse</TableCell>
-            <TableCell>{client.kioskWebAddress || client.kiosk_url || ""}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell variant="head">Chrome kører</TableCell>
-            <TableCell>
-              {typeof client.chromeRunning === "boolean"
-                ? client.chromeRunning
-                  ? "Ja"
-                  : "Nej"
-                : ""}
-            </TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell variant="head">Chrome URL</TableCell>
-            <TableCell>{client.chromeUrl || ""}</TableCell>
+            <TableCell variant="head">Oppetid</TableCell>
+            <TableCell>{client.uptime}</TableCell>
           </TableRow>
         </TableBody>
       </Table>
-      <Button variant="contained" sx={{ mt: 3 }} onClick={() => navigate("/clients")}>
-        Tilbage til klienter
+      <Divider sx={{ my: 3 }} />
+      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: "bold" }}>Kiosk webadresse</Typography>
+      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+        <TextField
+          label="Kiosk webadresse"
+          value={kioskWebAddress}
+          onChange={e => setKioskWebAddress(e.target.value)}
+          size="small"
+          sx={{ minWidth: 300 }}
+        />
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSaveKioskAddress}
+          disabled={saving}
+        >
+          Gem ny webadresse
+        </Button>
+      </Stack>
+      <Divider sx={{ my: 3 }} />
+      <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Handlinger</Typography>
+      <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+        <Button
+          onClick={handleChromeShutdown}
+          variant="outlined"
+          color="error"
+          startIcon={<PowerSettingsNewIcon />}
+        >
+          Chrome shutdown
+        </Button>
+        <Button
+          onClick={() => handleClientAction("start")}
+          variant="outlined"
+          color="primary"
+          startIcon={<InfoIcon />}
+        >
+          Start klient
+        </Button>
+        <Button
+          onClick={() => handleClientAction("restart")}
+          variant="outlined"
+          color="warning"
+          startIcon={<RestartAltIcon />}
+        >
+          Genstart klient
+        </Button>
+        <Button
+          onClick={() => handleClientAction("shutdown")}
+          variant="outlined"
+          color="error"
+          startIcon={<PowerSettingsNewIcon />}
+        >
+          Shutdown klient
+        </Button>
+        <Button
+          onClick={handleOpenTerminal}
+          variant="contained"
+          startIcon={<TerminalIcon />}
+        >
+          Åbn terminal
+        </Button>
+        <Button
+          onClick={handleOpenLiveStream}
+          variant="contained"
+          color="success"
+          startIcon={<VideocamIcon />}
+        >
+          Live stream
+        </Button>
+      </Stack>
+      <Button sx={{ mt: 4 }} variant="text" onClick={() => navigate("/clients")}>
+        Tilbage til klientliste
       </Button>
     </Paper>
   );
