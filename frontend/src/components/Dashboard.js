@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Routes, Route, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   AppBar,
@@ -10,105 +10,59 @@ import {
   List,
   ListItem,
   ListItemText,
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
+  Paper,
   Dialog,
   DialogTitle,
   DialogContent,
+  Table,
+  TableBody,
+  TableRow,
+  TableCell,
   DialogActions,
-  Paper,
+  Tabs,
+  Tab,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import ClientInfoPage from "./ClientInfoPage";
 import HolidaysPage from "./HolidaysPage";
 import ClientDetailsPageWrapper from "./ClientDetailsPageWrapper";
 
-const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 const drawerWidth = 200;
 
-export default function Dashboard() {
+export default function Dashboard(props) {
+  const {
+    clients,
+    setClients,
+    loading,
+    error,
+    onApproveClient,
+    onRemoveClient,
+    holidays,
+    holidayDate,
+    setHolidayDate,
+    holidayDesc,
+    setHolidayDesc,
+    setHolidays,
+    handleAddHoliday,
+    handleDeleteHoliday,
+    fetchClients,
+    fetchHolidays,
+  } = props;
+
   const location = useLocation();
   const navigate = useNavigate();
-  const [clients, setClients] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  // Hent klienter fra backend
-  const fetchClients = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const token = "PASTE_YOUR_JWT_TOKEN_HERE"; // Sæt din gyldige admin JWT-token her
-      const res = await fetch(`${API_URL}/api/clients/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setClients(data);
-      } else {
-        setError("Kunne ikke hente klienter");
-      }
-    } catch {
-      setError("Kunne ikke hente klienter");
-    }
-    setLoading(false);
-  };
-
-  // Godkend klient via backend
-  const handleApproveClient = async (id) => {
-    setLoading(true);
-    setError("");
-    try {
-      const token = "PASTE_YOUR_JWT_TOKEN_HERE";
-      const res = await fetch(`${API_URL}/api/clients/${id}/approve`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        fetchClients();
-      } else {
-        setError("Kunne ikke godkende klient");
-      }
-    } catch {
-      setError("Kunne ikke godkende klient");
-    }
-    setLoading(false);
-  };
-
-  // Fjern klient via backend
-  const handleRemoveClient = async (id) => {
-    setLoading(true);
-    setError("");
-    try {
-      const token = "PASTE_YOUR_JWT_TOKEN_HERE";
-      const res = await fetch(`${API_URL}/api/clients/${id}/remove`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        fetchClients();
-      } else {
-        setError("Kunne ikke fjerne klient");
-      }
-    } catch {
-      setError("Kunne ikke fjerne klient");
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchClients();
-    // eslint-disable-next-line
-  }, []);
+  const [tab, setTab] = useState(location.pathname === "/holidays" ? 1 : 0);
 
   const menuItems = [
     { text: "Klienter", to: "/clients" },
     { text: "Helligdage", to: "/holidays" },
   ];
 
-  const pendingClients = clients.filter(c => c.status === "pending" || c.apiStatus === "pending");
+  const pendingClients = clients.filter(
+    (c) => c.status === "pending" || c.apiStatus === "pending"
+  );
 
   // Dialog handlers
   const handleOpenApproveDialog = () => setOpenDialog(true);
@@ -126,7 +80,7 @@ export default function Dashboard() {
           >
             Kulturskolen Viborg - infoskærme administration
           </Typography>
-          <Button color="inherit" sx={{ color: "#fff" }}>
+          <Button color="inherit" sx={{ color: "#fff" }} onClick={() => window.location.reload()}>
             Log ud
           </Button>
         </Toolbar>
@@ -140,13 +94,13 @@ export default function Dashboard() {
       >
         <Toolbar />
         <List>
-          {menuItems.map((item) => (
+          {menuItems.map((item, idx) => (
             <ListItem
               button
               key={item.to}
               component={NavLink}
               to={item.to}
-              selected={location.pathname === item.to}
+              selected={tab === idx}
               sx={{
                 color: "black",
                 "&.Mui-selected": {
@@ -155,6 +109,7 @@ export default function Dashboard() {
                   fontWeight: "bold",
                 },
               }}
+              onClick={() => setTab(idx)}
             >
               <ListItemText primary={item.text} />
             </ListItem>
@@ -172,63 +127,94 @@ export default function Dashboard() {
         }}
       >
         <Toolbar />
-        {error && <Typography color="error">{error}</Typography>}
+        {error && (
+          <Snackbar open autoHideDuration={3000} onClose={() => {}}>
+            <Alert severity="error">{error}</Alert>
+          </Snackbar>
+        )}
         {loading && <Typography>Indlæser...</Typography>}
-        <Routes>
-          <Route
-            path="clients"
-            element={
-              <Box sx={{ position: "relative", minHeight: "100vh" }}>
-                <Paper sx={{ position: "relative", p: 0, pb: 6, boxShadow: "none" }}>
-                  <Box>
-                    <ClientInfoPage
-                      clients={clients}
-                      onRemoveClient={handleRemoveClient}
-                      onApproveClient={handleApproveClient}
-                      setClients={setClients}
-                      loading={loading}
-                    />
-                  </Box>
-                </Paper>
-                {/* Modal: Godkend nye klienter */}
-                <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-                  <DialogTitle>Godkend nye klienter</DialogTitle>
-                  <DialogContent>
-                    <Table>
-                      <TableBody>
-                        {pendingClients.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={2}>Ingen ikke-godkendte klienter.</TableCell>
-                          </TableRow>
-                        ) : (
-                          pendingClients.map((client) => (
-                            <TableRow key={client.id}>
-                              <TableCell>{client.name || client.unique_id}</TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="contained"
-                                  color="success"
-                                  onClick={() => handleApproveClient(client.id)}
-                                  disabled={loading}
-                                >
-                                  Godkend
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </DialogContent>
-                  <DialogActions>
-                    <Button onClick={handleCloseDialog}>Luk</Button>
-                  </DialogActions>
-                </Dialog>
-              </Box>
-            }
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          textColor="primary"
+          indicatorColor="primary"
+          sx={{ mb: 3 }}
+        >
+          <Tab label="Klienter" />
+          <Tab label="Helligdage" />
+        </Tabs>
+        {tab === 0 && (
+          <ClientInfoPage
+            clients={clients}
+            onRemoveClient={onRemoveClient}
+            onApproveClient={onApproveClient}
+            setClients={setClients}
+            loading={loading}
+            fetchClients={fetchClients}
+            navigate={navigate}
           />
+        )}
+        {tab === 1 && (
+          <HolidaysPage
+            holidays={holidays}
+            holidayDate={holidayDate}
+            setHolidayDate={setHolidayDate}
+            holidayDesc={holidayDesc}
+            setHolidayDesc={setHolidayDesc}
+            setHolidays={setHolidays}
+            loading={loading}
+            handleAddHoliday={handleAddHoliday}
+            handleDeleteHoliday={handleDeleteHoliday}
+            fetchHolidays={fetchHolidays}
+          />
+        )}
+        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+          <DialogTitle>Godkend nye klienter</DialogTitle>
+          <DialogContent>
+            <Table>
+              <TableBody>
+                {pendingClients.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={2}>Ingen ikke-godkendte klienter.</TableCell>
+                  </TableRow>
+                ) : (
+                  pendingClients.map((client) => (
+                    <TableRow key={client.id}>
+                      <TableCell>{client.name || client.unique_id}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          onClick={() => onApproveClient(client.id)}
+                          disabled={loading}
+                        >
+                          Godkend
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog}>Luk</Button>
+          </DialogActions>
+        </Dialog>
+        <Routes>
           <Route path="clients/:clientId" element={<ClientDetailsPageWrapper clients={clients} />} />
-          <Route path="holidays" element={<HolidaysPage />} />
+          <Route path="holidays" element={<HolidaysPage
+            holidays={holidays}
+            holidayDate={holidayDate}
+            setHolidayDate={setHolidayDate}
+            holidayDesc={holidayDesc}
+            setHolidayDesc={setHolidayDesc}
+            setHolidays={setHolidays}
+            loading={loading}
+            handleAddHoliday={handleAddHoliday}
+            handleDeleteHoliday={handleDeleteHoliday}
+            fetchHolidays={fetchHolidays}
+          />} />
           <Route
             path="*"
             element={<Typography variant="h5">Velkommen til adminpanelet.</Typography>}
