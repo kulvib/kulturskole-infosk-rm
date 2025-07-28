@@ -17,6 +17,8 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import BrowserUpdatedIcon from '@mui/icons-material/BrowserUpdated';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useNavigate } from "react-router-dom";
 
 const CLIENTS = [
   {
@@ -52,6 +54,8 @@ export default function ClientDetailsPage({ clientId }) {
   const [kioskUrl, setKioskUrl] = useState(client?.kioskWebAddress ?? "");
   const [isPushing, setIsPushing] = useState(false);
 
+  const navigate = useNavigate();
+
   const handlePushKioskUrl = () => {
     setIsPushing(true);
     setTimeout(() => {
@@ -60,7 +64,8 @@ export default function ClientDetailsPage({ clientId }) {
     }, 1000);
   };
 
-  const handleChromeShutdown = () => alert("Chrome shutdown sendt til klienten.");
+  const handleChromeStart = () => alert("Chrome start sendt til klienten.");
+  const handleChromeShutdown = () => alert("Chrome luk sendt til klienten.");
   const handleClientStart = () => alert("Start sendt til klienten.");
   const handleClientRestart = () => alert("Genstart sendt til klienten.");
   const handleClientShutdown = () => alert("Shutdown sendt til klienten.");
@@ -74,6 +79,14 @@ export default function ClientDetailsPage({ clientId }) {
   return (
     <Box sx={{ maxWidth: 650, mx: "auto", mt: 4 }}>
       <Paper sx={{ p: 3 }}>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate("/clients")}
+          variant="text"
+          sx={{ mb: 2 }}
+        >
+          Tilbage til klientoversigt
+        </Button>
         <Typography variant="h5" gutterBottom>
           {client.name}
         </Typography>
@@ -130,8 +143,23 @@ export default function ClientDetailsPage({ clientId }) {
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Handlinger:</Typography>
             <Grid container spacing={2} sx={{ mt: 1 }}>
+              {/* Chrome: start */}
               <Grid item xs={12} sm={6} md={4}>
-                <Tooltip title="Sluk Chrome-browseren">
+                <Tooltip title="Start Chrome-browseren">
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="success"
+                    startIcon={<PlayArrowIcon />}
+                    onClick={handleChromeStart}
+                  >
+                    Chrome: Start
+                  </Button>
+                </Tooltip>
+              </Grid>
+              {/* Chrome: luk */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title="Luk Chrome-browseren">
                   <Button
                     fullWidth
                     variant="outlined"
@@ -139,49 +167,15 @@ export default function ClientDetailsPage({ clientId }) {
                     startIcon={<BrowserUpdatedIcon />}
                     onClick={handleChromeShutdown}
                   >
-                    Chrome: Shutdown
+                    Chrome: Luk
                   </Button>
                 </Tooltip>
               </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <Tooltip title="Start klienten">
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    color="success"
-                    startIcon={<PlayArrowIcon />}
-                    onClick={handleClientStart}
-                  >
-                    Start
-                  </Button>
-                </Tooltip>
+              {/* Divider */}
+              <Grid item xs={12}>
+                <Divider sx={{ my: 1 }} />
               </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <Tooltip title="Genstart klienten">
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    color="warning"
-                    startIcon={<RestartAltIcon />}
-                    onClick={handleClientRestart}
-                  >
-                    Genstart
-                  </Button>
-                </Tooltip>
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <Tooltip title="Sluk klienten">
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    color="error"
-                    startIcon={<PowerSettingsNewIcon />}
-                    onClick={handleClientShutdown}
-                  >
-                    Shutdown
-                  </Button>
-                </Tooltip>
-              </Grid>
+              {/* Terminal */}
               <Grid item xs={12} sm={6} md={4}>
                 <Tooltip title="Åbn terminal (WebSocket shell)">
                   <Button
@@ -195,6 +189,7 @@ export default function ClientDetailsPage({ clientId }) {
                   </Button>
                 </Tooltip>
               </Grid>
+              {/* Live Stream */}
               <Grid item xs={12} sm={6} md={4}>
                 <Tooltip title="Live stream fra klienten">
                   <Button
@@ -205,6 +200,52 @@ export default function ClientDetailsPage({ clientId }) {
                     onClick={handleLiveStream}
                   >
                     Live stream
+                  </Button>
+                </Tooltip>
+              </Grid>
+              {/* Divider */}
+              <Grid item xs={12}>
+                <Divider sx={{ my: 1 }} />
+              </Grid>
+              {/* Genstart klient */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title="Genstart klienten">
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="warning"
+                    startIcon={<RestartAltIcon />}
+                    onClick={handleClientRestart}
+                  >
+                    Genstart klient
+                  </Button>
+                </Tooltip>
+              </Grid>
+              {/* Luk klient */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title="Luk klienten">
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="error"
+                    startIcon={<PowerSettingsNewIcon />}
+                    onClick={handleClientShutdown}
+                  >
+                    Luk klient
+                  </Button>
+                </Tooltip>
+              </Grid>
+              {/* Start klient */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title="Start klienten">
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="success"
+                    startIcon={<PlayArrowIcon />}
+                    onClick={handleClientStart}
+                  >
+                    Start klient
                   </Button>
                 </Tooltip>
               </Grid>
