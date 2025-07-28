@@ -8,9 +8,16 @@ import {
   Chip,
   Divider,
   Paper,
+  Grid,
+  Tooltip,
 } from "@mui/material";
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import TerminalIcon from '@mui/icons-material/Terminal';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import BrowserUpdatedIcon from '@mui/icons-material/BrowserUpdated';
 
-// Dummy data, erstattes med API-kald
 const CLIENTS = [
   {
     id: 1,
@@ -65,7 +72,7 @@ export default function ClientDetailsPage({ clientId }) {
   }
 
   return (
-    <Box sx={{ maxWidth: 600, mx: "auto", mt: 4 }}>
+    <Box sx={{ maxWidth: 650, mx: "auto", mt: 4 }}>
       <Paper sx={{ p: 3 }}>
         <Typography variant="h5" gutterBottom>
           {client.name}
@@ -73,15 +80,11 @@ export default function ClientDetailsPage({ clientId }) {
         <Divider sx={{ mb: 2 }} />
         <Stack spacing={2}>
           <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              Lokalitet:
-            </Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Lokalitet:</Typography>
             <Typography>{client.locality}</Typography>
           </Box>
           <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              Klientdata:
-            </Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Klientdata:</Typography>
             <Stack spacing={0.5}>
               <Typography>IP: {client.ip}</Typography>
               <Typography>Software version: {client.softwareVersion}</Typography>
@@ -91,9 +94,7 @@ export default function ClientDetailsPage({ clientId }) {
             </Stack>
           </Box>
           <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              Kiosk webadresse:
-            </Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Kiosk webadresse:</Typography>
             <Stack direction="row" spacing={1} alignItems="center">
               <TextField
                 value={kioskUrl}
@@ -115,9 +116,7 @@ export default function ClientDetailsPage({ clientId }) {
             </Typography>
           </Box>
           <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              Status:
-            </Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Status:</Typography>
             <Chip
               label={client.status === "online" ? "Online" : "Offline"}
               color={client.status === "online" ? "success" : "error"}
@@ -129,29 +128,87 @@ export default function ClientDetailsPage({ clientId }) {
             />
           </Box>
           <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              Handlinger:
-            </Typography>
-            <Stack spacing={1} direction="row" flexWrap="wrap">
-              <Button variant="outlined" color="error" onClick={handleChromeShutdown}>
-                Chrome: Shutdown
-              </Button>
-              <Button variant="outlined" color="success" onClick={handleClientStart}>
-                Klient: Start
-              </Button>
-              <Button variant="outlined" color="warning" onClick={handleClientRestart}>
-                Klient: Genstart
-              </Button>
-              <Button variant="outlined" color="error" onClick={handleClientShutdown}>
-                Klient: Shutdown
-              </Button>
-              <Button variant="contained" color="secondary" onClick={handleTerminalOpen}>
-                Åbn terminal
-              </Button>
-              <Button variant="contained" color="primary" onClick={handleLiveStream}>
-                Live stream
-              </Button>
-            </Stack>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Handlinger:</Typography>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title="Sluk Chrome-browseren">
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="error"
+                    startIcon={<BrowserUpdatedIcon />}
+                    onClick={handleChromeShutdown}
+                  >
+                    Chrome: Shutdown
+                  </Button>
+                </Tooltip>
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title="Start klienten">
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="success"
+                    startIcon={<PlayArrowIcon />}
+                    onClick={handleClientStart}
+                  >
+                    Start
+                  </Button>
+                </Tooltip>
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title="Genstart klienten">
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="warning"
+                    startIcon={<RestartAltIcon />}
+                    onClick={handleClientRestart}
+                  >
+                    Genstart
+                  </Button>
+                </Tooltip>
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title="Sluk klienten">
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="error"
+                    startIcon={<PowerSettingsNewIcon />}
+                    onClick={handleClientShutdown}
+                  >
+                    Shutdown
+                  </Button>
+                </Tooltip>
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title="Åbn terminal (WebSocket shell)">
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    color="secondary"
+                    startIcon={<TerminalIcon />}
+                    onClick={handleTerminalOpen}
+                  >
+                    Terminal
+                  </Button>
+                </Tooltip>
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title="Live stream fra klienten">
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    color="primary"
+                    startIcon={<VisibilityIcon />}
+                    onClick={handleLiveStream}
+                  >
+                    Live stream
+                  </Button>
+                </Tooltip>
+              </Grid>
+            </Grid>
           </Box>
         </Stack>
       </Paper>
