@@ -183,60 +183,18 @@ export default function ClientInfoPage({ clients, onRemoveClient, setClients }) 
         <TableHead>
           <TableRow>
             <TableCell>Navn</TableCell>
-            <TableCell>Lokalitet</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Info</TableCell>
             <TableCell align="center">Godkend</TableCell>
-            <TableCell align="center">Godkendt</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {pendingClients.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6}>Ingen ikke-godkendte klienter.</TableCell>
+              <TableCell colSpan={2}>Ingen ikke-godkendte klienter.</TableCell>
             </TableRow>
           ) : (
             pendingClients.map((client) => (
               <TableRow key={client.id} hover>
                 <TableCell>{client.name}</TableCell>
-                <TableCell>
-                  <TextField
-                    value={localities[client.id]}
-                    onChange={e => handleLocalityChange(client.id, e.target.value)}
-                    size="small"
-                    variant="outlined"
-                    sx={{ minWidth: 120 }}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={client.status === "online" ? "Online" : "Offline"}
-                    color={client.status === "online" ? "success" : "error"}
-                    size="small"
-                    icon={
-                      <CheckCircleIcon
-                        sx={{
-                          color: client.status === "online" ? "green" : "red"
-                        }}
-                      />
-                    }
-                    sx={{
-                      fontWeight: "bold",
-                      bgcolor: client.status === "online" ? "#d4edda" : "#f8d7da",
-                      color: client.status === "online" ? "green" : "red"
-                    }}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Tooltip title="Vis klient-info">
-                    <IconButton
-                      color="primary"
-                      onClick={() => navigate(`/clients/${client.id}`)}
-                    >
-                      <InfoIcon />
-                    </IconButton>
-                  </Tooltip>
-                </TableCell>
                 <TableCell align="center">
                   <Button
                     variant="contained"
@@ -249,9 +207,6 @@ export default function ClientInfoPage({ clients, onRemoveClient, setClients }) 
                   >
                     Godkend
                   </Button>
-                </TableCell>
-                <TableCell align="center">
-                  <Chip label="Ikke godkendt" color="warning" size="small" />
                 </TableCell>
               </TableRow>
             ))
