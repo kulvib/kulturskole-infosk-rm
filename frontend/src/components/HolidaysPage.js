@@ -1,45 +1,77 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "../auth/AuthContext";
-import { getHolidays, addHoliday } from "../api/api";
+import React from "react";
+import {
+  Typography, Table, TableBody, TableCell, TableHead, TableRow,
+  Button, TextField, Paper, Stack, CircularProgress
+} from "@mui/material";
 
-function HolidaysPage() {
-  const { token } = useAuth();
-  const [holidays, setHolidays] = useState([]);
-  const [date, setDate] = useState("");
-  const [desc, setDesc] = useState("");
-
-  function load() {
-    getHolidays(token).then(setHolidays);
-  }
-
-  useEffect(() => {
-    if (token) load();
-    // eslint-disable-next-line
-  }, [token]);
-
-  async function handleAdd(e) {
-    e.preventDefault();
-    await addHoliday(token, { date, description: desc });
-    setDate(""); setDesc("");
-    load();
-  }
-
+export default function HolidaysPage({
+  holidays,
+  holidayDate,
+  setHolidayDate,
+  holidayDesc,
+  setHolidayDesc,
+  loading,
+  handleAddHoliday,
+  handleDeleteHoliday
+}) {
   return (
-    <div>
-      <form onSubmit={handleAdd}>
-        <input type="date" value={date} onChange={e => setDate(e.target.value)} />
-        <input placeholder="Beskrivelse" value={desc} onChange={e => setDesc(e.target.value)} />
-        <button type="submit">Tilføj fridag</button>
+    <Paper sx={{ p: 3, boxShadow: 3 }}>
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>Fridage / Helligdage</Typography>
+      <form onSubmit={handleAddHoliday}>
+        <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+          <TextField
+            type="date"
+            value={holidayDate}
+            onChange={e => setHolidayDate(e.target.value)}
+            required
+            label="Dato"
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            placeholder="Beskrivelse"
+            value={holidayDesc}
+            onChange={e => setHolidayDesc(e.target.value)}
+            required
+            label="Beskrivelse"
+          />
+          <Button type="submit" variant="contained" disabled={loading}>
+            Tilføj fridag
+          </Button>
+        </Stack>
       </form>
-      <ul>
-        {holidays.map(h => (
-          <li key={h.id}>
-            {h.date.slice(0,10)}: {h.description}
-          </li>
-        ))}
-      </ul>
-    </div>
+      {loading ? (
+        <Stack alignItems="center" sx={{ py: 4 }}>
+          <CircularProgress />
+        </Stack>
+      ) : (
+        <Table>
+          <TableHead>
+            <TableRow sx={{ background: "#f0f5f9" }}>
+              <TableCell sx={{ fontWeight: "bold" }}>Dato</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Beskrivelse</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Slet</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {holidays.map(h => (
+              <TableRow key={h.id}>
+                <TableCell>{h.date ? h.date.slice(0, 10) : ""}</TableCell>
+                <TableCell>{h.description}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={() => handleDeleteHoliday(h.id)}
+                    disabled={loading}
+                  >
+                    Slet
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </Paper>
   );
 }
-
-export default HolidaysPage;
