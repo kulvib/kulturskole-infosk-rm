@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -13,23 +13,26 @@ import {
   Button,
   Stack,
   Chip,
-  Paper
+  Paper,
+  TextField
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DeleteIcon from "@mui/icons-material/Delete";
+import InfoIcon from "@mui/icons-material/Info";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useNavigate } from "react-router-dom";
 
+// Simuleret klientdata
 const CLIENTS = [
-  { id: 1, name: "Klient A", locality: "Lokale 1", status: "online", ip: "192.168.1.101" },
-  { id: 2, name: "Klient B", locality: "Lokale 2", status: "offline", ip: "192.168.1.102" },
-  { id: 3, name: "Klient C", locality: "Lokale 3", status: "online", ip: "192.168.1.103" },
-  { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", ip: "192.168.1.104" },
+  { id: 1, name: "Klient A", locality: "Lokale 1", status: "online", ip: "192.168.1.101", apiStatus: "approved" },
+  { id: 2, name: "Klient B", locality: "Lokale 2", status: "offline", ip: "192.168.1.102", apiStatus: "approved" },
+  { id: 3, name: "Klient C", locality: "Lokale 3", status: "online", ip: "192.168.1.103", apiStatus: "pending" },
+  { id: 4, name: "Klient D", locality: "Lokale 4", status: "offline", ip: "192.168.1.104", apiStatus: "pending" },
 ];
 
-function getRefreshedClientsData() {
-  // Simulerer et API kald og returnerer opdaterede data
-  // Du kan udvide med mere dynamik eller et rigtigt API-kald.
-  return CLIENTS.map(client => ({
+// Funktion til at simulere opdatering af heartbeat/status
+function getRefreshedClientsData(clients) {
+  return clients.map(client => ({
     ...client,
     status: Math.random() > 0.5 ? "online" : "offline"
   }));
@@ -38,15 +41,40 @@ function getRefreshedClientsData() {
 export default function ClientInfoPage({ clients, onRemoveClient, setClients }) {
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [localities, setLocalities] = useState(() => {
+    const obj = {};
+    clients.forEach(c => { obj[c.id] = c.locality; });
+    return obj;
+  });
 
+  // Heartbeat: opdater status hvert 30. sekund
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setClients(prevClients => getRefreshedClientsData(prevClients));
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [setClients]);
+
+  // Refresh-knap: manuel opdatering
   const handleRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
-      // Hent nye data fra klienterne (simuleret)
-      const updatedClients = getRefreshedClientsData();
-      setClients(updatedClients);
+      setClients(prevClients => getRefreshedClientsData(prevClients));
       setIsRefreshing(false);
-    }, 1200); // simuleret netværksforsinkelse
+    }, 1200);
+  };
+
+  // Lokalitet redigeres inline
+  const handleLocalityChange = (id, value) => {
+    setLocalities(prev => ({
+      ...prev,
+      [id]: value
+    }));
+    setClients(prevClients =>
+      prevClients.map(c =>
+        c.id === id ? { ...c, locality: value } : c
+      )
+    );
   };
 
   return (
@@ -69,34 +97,63 @@ export default function ClientInfoPage({ clients, onRemoveClient, setClients }) 
             <TableCell>Navn</TableCell>
             <TableCell>Lokalitet</TableCell>
             <TableCell>Status</TableCell>
-            <TableCell>IP</TableCell>
-            <TableCell align="right">Handling</TableCell>
+            <TableCell>Info</TableCell>
+            <TableCell align="center">Fjern</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {clients.map((client) => (
-            <TableRow
-              key={client.id}
-              hover
-              sx={{ cursor: "pointer" }}
-              onClick={() => navigate(`/clients/${client.id}`)}
-            >
+            <TableRow key={client.id} hover>
               <TableCell>{client.name}</TableCell>
-              <TableCell>{client.locality}</TableCell>
+              <TableCell>
+                <TextField
+                  value={localities[client.id]}
+                  onChange={e => handleLocalityChange(client.id, e.target.value)}
+                  size="small"
+                  variant="outlined"
+                  sx={{ minWidth: 120 }}
+                />
+              </TableCell>
               <TableCell>
                 <Chip
                   label={client.status === "online" ? "Online" : "Offline"}
                   color={client.status === "online" ? "success" : "error"}
                   size="small"
+                  icon={
+                    <CheckCircleIcon
+                      sx={{
+                        color: client.status === "online" ? "green" : "red"
+                      }}
+                    />
+                  }
+                  sx={{
+                    fontWeight: "bold",
+                    bgcolor: client.status === "online" ? "#d4edda" : "#f8d7da",
+                    color: client.status === "online" ? "green" : "red"
+                  }}
                 />
               </TableCell>
-              <TableCell>{client.ip}</TableCell>
-              <TableCell align="right" onClick={e => e.stopPropagation()}>
-                <Tooltip title="Fjern klient">
-                  <IconButton color="error" onClick={() => onRemoveClient(client.id)}>
-                    <DeleteIcon />
+              <TableCell>
+                <Tooltip title="Vis klient-info">
+                  <IconButton
+                    color="primary"
+                    onClick={() => navigate(`/clients/${client.id}`)}
+                  >
+                    <InfoIcon />
                   </IconButton>
                 </Tooltip>
+              </TableCell>
+              <TableCell align="center">
+                {client.apiStatus === "approved" && (
+                  <Tooltip title="Fjern klient">
+                    <IconButton
+                      color="error"
+                      onClick={() => onRemoveClient(client.id)}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Tooltip>
+                )}
               </TableCell>
             </TableRow>
           ))}
