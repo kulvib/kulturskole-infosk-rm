@@ -1,115 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
-  Box,
-  Tabs,
-  Tab,
-  Paper,
-  Stack,
-  CircularProgress,
-  Snackbar,
-  Alert,
-} from "@mui/material";
-import ClientInfoPage from "./components/ClientInfoPage";
-import HolidaysPage from "./components/HolidaysPage";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Dashboard from "./components/Dashboard";
 import ClientDetailsPageWrapper from "./components/ClientDetailsPageWrapper";
+import HolidaysPage from "./components/HolidaysPage";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 const token = "PASTE_YOUR_JWT_TOKEN_HERE"; // Sæt din gyldige admin JWT-token her
 
-function DashboardView({
-  clients,
-  setClients,
-  holidays,
-  setHolidays,
-  holidayDate,
-  setHolidayDate,
-  holidayDesc,
-  setHolidayDesc,
-  error,
-  setError,
-  loading,
-  setLoading,
-  fetchClients,
-  fetchHolidays,
-  handleAddHoliday,
-  handleDeleteHoliday,
-  approveClient,
-  removeClient,
-}) {
-  const [tab, setTab] = useState(0);
-  const navigate = useNavigate();
-
-  return (
-    <Box sx={{ bgcolor: "#f5f7fa", minHeight: "100vh" }}>
-      <AppBar position="static" sx={{ bgcolor: "#1976d2" }}>
-        <Toolbar>
-          <Typography variant="h5" sx={{ flexGrow: 1 }}>
-            Kulturskolen Viborg – Infoskærm Admin
-          </Typography>
-          <Button
-            color="inherit"
-            variant="outlined"
-            sx={{ ml: 2, bgcolor: "#fff", color: "#1976d2", borderRadius: 2 }}
-            onClick={() => window.location.reload()}
-          >
-            Log ud
-          </Button>
-        </Toolbar>
-      </AppBar>
-      <Box sx={{ maxWidth: 1100, mx: "auto", mt: 5, bgcolor: "#fff", p: 3, borderRadius: 3, boxShadow: 2 }}>
-        {error && (
-          <Snackbar open autoHideDuration={4000} onClose={() => setError("")}>
-            <Alert severity="error" sx={{ width: "100%" }}>
-              {error}
-            </Alert>
-          </Snackbar>
-        )}
-        <Tabs
-          value={tab}
-          onChange={(_, v) => setTab(v)}
-          textColor="primary"
-          indicatorColor="primary"
-          sx={{ mb: 3 }}
-        >
-          <Tab label="Klienter" sx={{ fontWeight: "bold", fontSize: 18 }} />
-          <Tab label="Helligdage" sx={{ fontWeight: "bold", fontSize: 18 }} />
-        </Tabs>
-        {tab === 0 && (
-          <ClientInfoPage
-            clients={clients}
-            setClients={setClients}
-            loading={loading}
-            approveClient={approveClient}
-            removeClient={removeClient}
-            fetchClients={fetchClients}
-            navigate={navigate}
-          />
-        )}
-        {tab === 1 && (
-          <HolidaysPage
-            holidays={holidays}
-            holidayDate={holidayDate}
-            setHolidayDate={setHolidayDate}
-            holidayDesc={holidayDesc}
-            setHolidayDesc={setHolidayDesc}
-            setHolidays={setHolidays}
-            loading={loading}
-            handleAddHoliday={handleAddHoliday}
-            handleDeleteHoliday={handleDeleteHoliday}
-            fetchHolidays={fetchHolidays}
-          />
-        )}
-      </Box>
-    </Box>
-  );
-}
-
-function App() {
+export default function App() {
   const [clients, setClients] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [holidayDate, setHolidayDate] = useState("");
@@ -126,8 +24,7 @@ function App() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
-        setClients(data);
+        setClients(await res.json());
       } else {
         setError("Kunne ikke hente klienter");
       }
@@ -146,8 +43,7 @@ function App() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
-        setHolidays(data);
+        setHolidays(await res.json());
       } else {
         setError("Kunne ikke hente fridage");
       }
@@ -208,7 +104,7 @@ function App() {
   };
 
   // Godkend klient
-  const approveClient = async (id) => {
+  const handleApproveClient = async (id) => {
     setLoading(true);
     setError("");
     try {
@@ -228,7 +124,7 @@ function App() {
   };
 
   // Fjern klient
-  const removeClient = async (id) => {
+  const handleRemoveClient = async (id) => {
     setLoading(true);
     setError("");
     try {
@@ -247,7 +143,6 @@ function App() {
     setLoading(false);
   };
 
-  // Hent data ved mount
   useEffect(() => {
     fetchClients();
     fetchHolidays();
@@ -258,34 +153,49 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route
-          path="/"
+          path="/*"
           element={
-            <DashboardView
+            <Dashboard
               clients={clients}
               setClients={setClients}
+              loading={loading}
+              error={error}
+              onApproveClient={handleApproveClient}
+              onRemoveClient={handleRemoveClient}
               holidays={holidays}
-              setHolidays={setHolidays}
               holidayDate={holidayDate}
               setHolidayDate={setHolidayDate}
               holidayDesc={holidayDesc}
               setHolidayDesc={setHolidayDesc}
-              error={error}
-              setError={setError}
-              loading={loading}
-              setLoading={setLoading}
-              fetchClients={fetchClients}
-              fetchHolidays={fetchHolidays}
+              setHolidays={setHolidays}
               handleAddHoliday={handleAddHoliday}
               handleDeleteHoliday={handleDeleteHoliday}
-              approveClient={approveClient}
-              removeClient={removeClient}
+              fetchClients={fetchClients}
+              fetchHolidays={fetchHolidays}
             />
           }
         />
-        <Route path="/clients/:clientId" element={<ClientDetailsPageWrapper clients={clients} />} />
+        <Route
+          path="/clients/:clientId"
+          element={<ClientDetailsPageWrapper clients={clients} />}
+        />
+        <Route
+          path="/holidays"
+          element={
+            <HolidaysPage
+              holidays={holidays}
+              holidayDate={holidayDate}
+              setHolidayDate={setHolidayDate}
+              holidayDesc={holidayDesc}
+              setHolidayDesc={setHolidayDesc}
+              setHolidays={setHolidays}
+              loading={loading}
+              handleAddHoliday={handleAddHoliday}
+              handleDeleteHoliday={handleDeleteHoliday}
+            />
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
 }
-
-export default App;
