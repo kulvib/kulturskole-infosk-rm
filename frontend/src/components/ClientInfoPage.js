@@ -10,7 +10,6 @@ import {
   TableRow,
   Paper,
   TextField,
-  Button,
   IconButton,
   Chip,
 } from "@mui/material";
@@ -18,35 +17,8 @@ import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CircleIcon from "@mui/icons-material/Circle";
 
-// Dummy data – erstattes med API-kald
-const initialClients = [
-  {
-    id: 1,
-    name: "Klient A",
-    locality: "Lokale 1",
-    status: "online", // eller "offline"
-    apiStatus: "approved", // eller fx "pending"
-  },
-  {
-    id: 2,
-    name: "Klient B",
-    locality: "Lokale 2",
-    status: "offline",
-    apiStatus: "approved",
-  },
-  {
-    id: 3,
-    name: "Klient C",
-    locality: "Lokale 3",
-    status: "online",
-    apiStatus: "pending",
-  },
-];
-
-export default function ClientInfoPage() {
-  const [clients, setClients] = useState(initialClients);
-
-  // Heartbeat-opdatering (dummy: toggler status hver 30. sek)
+export default function ClientInfoPage({ clients, onRemoveClient, setClients }) {
+  // Heartbeat-opdatering (dummy: toggler status på første klient hver 30. sek)
   useEffect(() => {
     const interval = setInterval(() => {
       setClients(prev =>
@@ -56,20 +28,15 @@ export default function ClientInfoPage() {
             : c
         )
       );
-    }, 30000); // 30 sekunder
+    }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [setClients]);
 
   // Rediger lokalitet
   const handleLocalityChange = (id, value) => {
     setClients(prev =>
       prev.map(c => (c.id === id ? { ...c, locality: value } : c))
     );
-  };
-
-  // Fjern klient
-  const handleRemoveClient = id => {
-    setClients(prev => prev.filter(c => c.id !== id));
   };
 
   // Info-knap (dummy: alert)
@@ -129,21 +96,20 @@ export default function ClientInfoPage() {
                   </IconButton>
                 </TableCell>
                 <TableCell>
-                  {client.apiStatus === "approved" ? (
-                    <IconButton
-                      color="error"
-                      onClick={() => handleRemoveClient(client.id)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  ) : (
-                    <Button variant="outlined" color="inherit" disabled>
-                      Ikke godkendt
-                    </Button>
-                  )}
+                  <IconButton
+                    color="error"
+                    onClick={() => onRemoveClient(client.id)}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
                 </TableCell>
               </TableRow>
             ))}
+            {clients.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5}>Ingen godkendte klienter endnu.</TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </TableContainer>
