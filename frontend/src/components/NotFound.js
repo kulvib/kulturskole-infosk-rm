@@ -1,4 +1,6 @@
 import React from "react";
+import { Typography } from "@mui/material";
+
 export default function NotFound() {
-  return <h2>404 - Siden blev ikke fundet</h2>;
+  return <Typography variant="h4">Siden blev ikke fundet</Typography>;
 }
