@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, NavLink, useLocation } from "react-router-dom";
+import { Routes, Route, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   AppBar,
   Toolbar,
@@ -18,17 +18,30 @@ const drawerWidth = 200;
 
 export default function Dashboard() {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const menuItems = [
     { text: "Klienter", to: "/clients" },
     { text: "Helligdage", to: "/holidays" },
   ];
 
+  // Funktion: Håndter klik på "Tilføj klient"
+  const handleAddClient = () => {
+    // Her kan du åbne en modal, dialog eller navigere til en underside
+    alert("Her kan du tilføje en klient!");
+    // navigate("/clients/add");
+  };
+
   return (
     <Box sx={{ display: "flex" }}>
       <AppBar position="fixed" sx={{ zIndex: 1201 }}>
         <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          <Typography
+            variant="h6"
+            sx={{ flexGrow: 1, cursor: "pointer" }}
+            onClick={() => navigate("/")}
+            color="inherit"
+          >
             Kulturskolen Viborg - infoskærme administration
           </Typography>
           <Button color="inherit" disabled>
@@ -53,11 +66,12 @@ export default function Dashboard() {
               to={item.to}
               selected={location.pathname === item.to}
               sx={{
+                color: "black", // sort skrift uanset "selected"
                 "&.Mui-selected": {
-                  backgroundColor: "primary.main",
-                  color: "#fff",
+                  backgroundColor: "primary.light",
+                  color: "black",
                   fontWeight: "bold",
-                },
+                }
               }}
             >
               <ListItemText primary={item.text} />
@@ -67,6 +81,18 @@ export default function Dashboard() {
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3, ml: `${drawerWidth}px` }}>
         <Toolbar />
+        {/* "Tilføj klient" knap vises kun på /clients */}
+        {location.pathname === "/clients" && (
+          <Box sx={{ mb: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleAddClient}
+            >
+              Tilføj klient
+            </Button>
+          </Box>
+        )}
         <Routes>
           <Route path="clients" element={<ClientsPage />} />
           <Route path="holidays" element={<HolidaysPage />} />
