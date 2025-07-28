@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import {
   Box,
   Typography,
@@ -16,13 +16,15 @@ import {
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CircleIcon from "@mui/icons-material/Circle";
+import { useNavigate } from "react-router-dom";
 
 export default function ClientInfoPage({ clients, onRemoveClient, setClients }) {
-  // Heartbeat-opdatering (dummy: toggler status på første klient hver 30. sek)
+  const navigate = useNavigate();
+
   useEffect(() => {
     const interval = setInterval(() => {
-      setClients(prev =>
-        prev.map(c =>
+      setClients((prev) =>
+        prev.map((c) =>
           c.id === 1
             ? { ...c, status: c.status === "online" ? "offline" : "online" }
             : c
@@ -32,17 +34,14 @@ export default function ClientInfoPage({ clients, onRemoveClient, setClients }) 
     return () => clearInterval(interval);
   }, [setClients]);
 
-  // Rediger lokalitet
   const handleLocalityChange = (id, value) => {
-    setClients(prev =>
-      prev.map(c => (c.id === id ? { ...c, locality: value } : c))
+    setClients((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, locality: value } : c))
     );
   };
 
-  // Info-knap (dummy: alert)
-  const handleInfoClick = id => {
-    alert(`Viser info for klient med ID: ${id}`);
-    // navigate(`/clients/${id}`) hvis du har en infounderside
+  const handleInfoClick = (id) => {
+    navigate(`/clients/${id}`);
   };
 
   return (
@@ -62,13 +61,13 @@ export default function ClientInfoPage({ clients, onRemoveClient, setClients }) 
             </TableRow>
           </TableHead>
           <TableBody>
-            {clients.map(client => (
+            {clients.map((client) => (
               <TableRow key={client.id}>
                 <TableCell>{client.name}</TableCell>
                 <TableCell>
                   <TextField
                     value={client.locality}
-                    onChange={e => handleLocalityChange(client.id, e.target.value)}
+                    onChange={(e) => handleLocalityChange(client.id, e.target.value)}
                     size="small"
                   />
                 </TableCell>
