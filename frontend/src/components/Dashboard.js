@@ -146,22 +146,21 @@ export default function Dashboard() {
                       onClick={handleOpenApproveDialog}
                       sx={{
                         fontWeight: "bold",
-                        fontSize: "0.95rem",
+                        fontSize: "0.9rem",
                         letterSpacing: "0.04em",
                         textTransform: "uppercase",
-                        boxShadow: "0px 4px 12px 1px rgba(76,175,80,0.13)",
-                        color: "#fff",
-                        height: 36,
-                        minHeight: 36,
-                        paddingLeft: 2,
-                        paddingRight: 2,
-                        '& svg': { fontSize: 20 },
-                      }}
-                      size="small"
-                    >
-                      <AddIcon sx={{ mr: 1 }} />
-                      Tilføj klient
-                    </Fab>
+                        boxShadow: "0px 3px 10px 1px rgba(76,175,80,0.11)",
+    color: "#fff",
+    height: 32,
+    minHeight: 32,
+    paddingLeft: 1.2,
+    paddingRight: 1.2,
+    '& svg': { fontSize: 18 }
+  }}
+>
+  <AddIcon sx={{ mr: 1 }} />
+  Tilføj klient
+</Fab>
                   </Box>
                 )}
                 <ClientInfoPage
