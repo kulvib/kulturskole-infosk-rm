@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   Typography, Table, TableBody, TableCell, TableHead, TableRow, TextField,
-  IconButton, Chip, Button, CircularProgress, Tooltip, Paper, Stack
+  IconButton, Chip, Button, CircularProgress, Tooltip, Paper, Stack, Box
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -18,13 +18,14 @@ export default function ClientInfoPage({
   navigate: navProp,
 }) {
   const navigate = useNavigate();
-  // Heartbeat opdatering
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchClients && fetchClients();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchClients]);
+
+  // Split klienter
+  const approvedClients = clients.filter(
+    (c) => c.apiStatus === "approved" || c.status === "approved"
+  );
+  const pendingClients = clients.filter(
+    (c) => c.apiStatus === "pending" || c.status === "pending"
+  );
 
   // Lokalitet redigering
   const handleLocalityChange = async (id, value) => {
@@ -43,7 +44,7 @@ export default function ClientInfoPage({
 
   return (
     <Paper sx={{ p: 3, boxShadow: 3 }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>Klientliste</Typography>
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>Godkendte klienter</Typography>
       {loading ? (
         <Stack alignItems="center" sx={{ py: 4 }}>
           <CircularProgress />
@@ -56,72 +57,103 @@ export default function ClientInfoPage({
               <TableCell sx={{ fontWeight: "bold" }}>Lokalitet</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Info</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Godkend</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Fjern</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {clients.map(client => (
-              <TableRow key={client.id} sx={{ transition: "background 0.3s", ":hover": { background: "#f5f7fa" } }}>
-                <TableCell>{client.name || client.unique_id}</TableCell>
-                <TableCell>
-                  <TextField
-                    value={client.locality || ""}
-                    onChange={e => handleLocalityChange(client.id, e.target.value)}
-                    size="small"
-                    variant="outlined"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    icon={<CheckCircleIcon />}
-                    label={client.status === "online" ? "Online" : "Offline"}
-                    color={client.status === "online" ? "success" : "error"}
-                    sx={{
-                      fontWeight: "bold",
-                      bgcolor: client.status === "online" ? "#d4edda" : "#f8d7da",
-                      color: client.status === "online" ? "#388e3c" : "#d32f2f",
-                      px: 2
-                    }}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Tooltip title="Info">
-                    <IconButton
-                      color="primary"
-                      onClick={() => (navProp ? navProp(`/clients/${client.id}`) : navigate(`/clients/${client.id}`))}
-                    >
-                      <InfoIcon />
-                    </IconButton>
-                  </Tooltip>
-                </TableCell>
-                <TableCell>
-                  {client.apiStatus === "pending" && (
-                    <Button
-                      variant="contained"
-                      color="success"
-                      sx={{ fontWeight: "bold", borderRadius: 2 }}
-                      onClick={() => onApproveClient(client.id)}
-                    >
-                      Godkend
-                    </Button>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {client.apiStatus === "approved" && (
+            {approvedClients.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5}>Ingen godkendte klienter.</TableCell>
+              </TableRow>
+            ) : (
+              approvedClients.map(client => (
+                <TableRow key={client.id} sx={{ transition: "background 0.3s", ":hover": { background: "#f5f7fa" } }}>
+                  <TableCell>{client.name || client.unique_id}</TableCell>
+                  <TableCell>
+                    <TextField
+                      value={client.locality || ""}
+                      onChange={e => handleLocalityChange(client.id, e.target.value)}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      icon={<CheckCircleIcon />}
+                      label={client.status === "online" ? "Online" : "Offline"}
+                      color={client.status === "online" ? "success" : "error"}
+                      sx={{
+                        fontWeight: "bold",
+                        bgcolor: client.status === "online" ? "#d4edda" : "#f8d7da",
+                        color: client.status === "online" ? "#388e3c" : "#d32f2f",
+                        px: 2
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title="Info">
+                      <IconButton
+                        color="primary"
+                        onClick={() => (navProp ? navProp(`/clients/${client.id}`) : navigate(`/clients/${client.id}`))}
+                      >
+                        <InfoIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell>
                     <IconButton
                       color="error"
                       onClick={() => onRemoveClient(client.id)}
                     >
                       <DeleteIcon />
                     </IconButton>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       )}
+
+      {/* Ikke godkendte klienter */}
+      <Paper sx={{ mt: 4, p: 2, boxShadow: 1, bgcolor: "#fff" }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
+          Ikke godkendte klienter
+        </Typography>
+        {pendingClients.length === 0 ? (
+          <Typography>Ingen ikke-godkendte klienter.</Typography>
+        ) : (
+          <Box component="table" sx={{ width: "100%", borderCollapse: "collapse" }}>
+            <Box component="thead" sx={{ background: "#f0f5f9" }}>
+              <Box component="tr">
+                <Box component="th" sx={{ fontWeight: "bold", p: 1 }}>Navn</Box>
+                <Box component="th" sx={{ fontWeight: "bold", p: 1 }}>IP</Box>
+                <Box component="th" sx={{ fontWeight: "bold", p: 1 }}>MAC</Box>
+                <Box component="th" sx={{ fontWeight: "bold", p: 1 }}>Godkend</Box>
+              </Box>
+            </Box>
+            <Box component="tbody">
+              {pendingClients.map((client) => (
+                <Box key={client.id} component="tr" sx={{ ":hover": { background: "#f8f9fb" } }}>
+                  <Box component="td" sx={{ p: 1 }}>{client.name || client.unique_id}</Box>
+                  <Box component="td" sx={{ p: 1 }}>{client.ip || client.ip_address}</Box>
+                  <Box component="td" sx={{ p: 1 }}>{client.macAddress || client.mac_address}</Box>
+                  <Box component="td" sx={{ p: 1 }}>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      onClick={() => onApproveClient(client.id)}
+                      disabled={loading}
+                    >
+                      Godkend
+                    </Button>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        )}
+      </Paper>
     </Paper>
   );
 }
