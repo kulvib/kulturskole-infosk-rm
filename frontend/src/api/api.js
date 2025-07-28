@@ -1,17 +1,30 @@
-import axios from "axios";
+const BASE_URL = "http://localhost:8000/api";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000/api";
-console.log("API_BASE_URL:", API_BASE_URL);
+export async function getClients(token) {
+  const res = await fetch(`${BASE_URL}/clients/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Auth fejlede");
+  return await res.json();
+}
 
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: { "Content-Type": "application/json" },
-});
+export async function getHolidays(token) {
+  const res = await fetch(`${BASE_URL}/holidays/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Auth fejlede");
+  return await res.json();
+}
 
-export function setAuthToken(token) {
-  if (token) {
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-  } else {
-    delete api.defaults.headers.common["Authorization"];
-  }
+export async function addHoliday(token, {date, description}) {
+  const res = await fetch(`${BASE_URL}/holidays/`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({date, description}),
+  });
+  if (!res.ok) throw new Error("Oprettelse fejlede");
+  return await res.json();
 }
