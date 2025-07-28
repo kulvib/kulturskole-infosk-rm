@@ -11,7 +11,7 @@ import {
   ListItem,
   ListItemText,
 } from "@mui/material";
-import ClientsPage from "./ClientsPage";
+import ClientInfoPage from "./ClientInfoPage";
 import HolidaysPage from "./HolidaysPage";
 
 const drawerWidth = 200;
@@ -27,7 +27,6 @@ export default function Dashboard() {
 
   // Funktion: Håndter klik på "Tilføj klient"
   const handleAddClient = () => {
-    // Her kan du åbne en modal, dialog eller navigere til en underside
     alert("Her kan du tilføje en klient!");
     // navigate("/clients/add");
   };
@@ -66,7 +65,7 @@ export default function Dashboard() {
               to={item.to}
               selected={location.pathname === item.to}
               sx={{
-                color: "black", // sort skrift uanset "selected"
+                color: "black",
                 "&.Mui-selected": {
                   backgroundColor: "primary.light",
                   color: "black",
@@ -94,7 +93,7 @@ export default function Dashboard() {
           </Box>
         )}
         <Routes>
-          <Route path="clients" element={<ClientsPage />} />
+          <Route path="clients" element={<ClientInfoPage />} />
           <Route path="holidays" element={<HolidaysPage />} />
           <Route
             path="*"
