@@ -131,7 +131,7 @@ export default function Dashboard() {
             path="clients"
             element={
               <Box sx={{ position: "relative", minHeight: "100vh" }}>
-                {/* Grøn "Tilføj klient" knap, vises kun hvis der er pending klienter */}
+                {/* Mindre grøn "Tilføj klient" knap, vises kun hvis der er pending klienter */}
                 {pendingClients.length > 0 && (
                   <Box sx={{
                     position: "absolute",
@@ -147,12 +147,18 @@ export default function Dashboard() {
                       onClick={handleOpenApproveDialog}
                       sx={{
                         fontWeight: "bold",
-                        fontSize: "1.1rem",
+                        fontSize: "0.95rem",
                         letterSpacing: "0.04em",
                         textTransform: "uppercase",
-                        boxShadow: "0px 6px 20px 2px rgba(76,175,80,0.18)",
-                        color: "#fff"
+                        boxShadow: "0px 4px 12px 1px rgba(76,175,80,0.13)",
+                        color: "#fff",
+                        height: 36,
+                        minHeight: 36,
+                        paddingLeft: 2,
+                        paddingRight: 2,
+                        '& svg': { fontSize: 20 },
                       }}
+                      size="small"
                     >
                       <AddIcon sx={{ mr: 1 }} />
                       Tilføj klient
