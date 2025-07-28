@@ -23,7 +23,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useNavigate, useParams } from "react-router-dom";
 
-// CLIENTS hentes som prop fra Dashboard, så denne array bruges kun som fallback/demo
+// Dummydata fallback
 const CLIENTS = [
   {
     id: 1,
@@ -56,7 +56,7 @@ const CLIENTS = [
 ];
 
 function getRefreshedClientData(client) {
-  // Simulerer et API kald og returnerer opdaterede data
+  // Simulerer API kald og returnerer opdaterede data
   const now = new Date();
   if (!client) return null;
   return {
@@ -74,20 +74,19 @@ export default function ClientDetailsPage({ clients }) {
   const { clientId } = useParams();
   const navigate = useNavigate();
 
-  // Find klient fra props eller demo-data
-  const clientObj = clients
-    ? clients.find((c) => String(c.id) === String(clientId))
-    : CLIENTS.find((c) => String(c.id) === String(clientId));
+  // Brug dummydata som fallback hvis clients mangler eller er tom
+  const clientList = clients && clients.length > 0 ? clients : CLIENTS;
+  const clientObj = clientList.find((c) => String(c.id) === String(clientId));
+
   const [client, setClient] = useState(clientObj);
-  const [kioskUrl, setKioskUrl] = useState(client?.kioskWebAddress ?? "");
+  const [kioskUrl, setKioskUrl] = useState(clientObj?.kioskWebAddress ?? "");
   const [isPushing, setIsPushing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    // Opdater client hvis clients-listen ændrer sig (fx ved godkendelse)
-    const updatedClient = clients
-      ? clients.find((c) => String(c.id) === String(clientId))
-      : CLIENTS.find((c) => String(c.id) === String(clientId));
+    // Opdater client, hvis clients-listen eller clientId ændrer sig
+    const updatedClients = clients && clients.length > 0 ? clients : CLIENTS;
+    const updatedClient = updatedClients.find((c) => String(c.id) === String(clientId));
     setClient(updatedClient);
     setKioskUrl(updatedClient?.kioskWebAddress ?? "");
   }, [clients, clientId]);
@@ -114,12 +113,11 @@ export default function ClientDetailsPage({ clients }) {
       const updatedClient = getRefreshedClientData(client);
       setClient(updatedClient);
       setIsRefreshing(false);
-      // evt. setKioskUrl(updatedClient.kioskWebAddress);
-    }, 1200); // simulerer netværksforsinkelse
+    }, 1200);
   };
 
   if (!client) {
-    return <Typography>Klient ikke fundet.</Typography>;
+    return <Typography color="error" variant="h6">Klient ikke fundet.</Typography>;
   }
 
   return (
