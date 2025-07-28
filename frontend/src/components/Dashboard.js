@@ -53,7 +53,8 @@ export default function Dashboard(props) {
   const location = useLocation();
   const navigate = useNavigate();
   const [openDialog, setOpenDialog] = useState(false);
-  const [tab, setTab] = useState(location.pathname === "/holidays" ? 1 : 0);
+  // Start altid med klienter (tab 0)
+  const [tab, setTab] = useState(0);
 
   const menuItems = [
     { text: "Klienter", to: "/clients" },
