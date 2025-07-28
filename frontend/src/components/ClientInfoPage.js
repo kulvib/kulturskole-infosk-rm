@@ -32,6 +32,13 @@ const CLIENTS = [
   { id: 6, name: "Klient F", locality: "Lokale 6", status: "offline", ip: "192.168.1.106", macAddress: "00:1A:2B:3C:4D:63", apiStatus: "pending" },
   { id: 7, name: "Klient G", locality: "Lokale 7", status: "online", ip: "192.168.1.107", macAddress: "00:1A:2B:3C:4D:64", apiStatus: "approved" },
   { id: 8, name: "Klient H", locality: "Lokale 8", status: "offline", ip: "192.168.1.108", macAddress: "00:1A:2B:3C:4D:65", apiStatus: "pending" },
+  { id: 9, name: "Klient I", locality: "Lokale 9", status: "online", ip: "192.168.1.109", macAddress: "00:1A:2B:3C:4D:66", apiStatus: "approved" },
+  { id: 10, name: "Klient J", locality: "Lokale 10", status: "offline", ip: "192.168.1.110", macAddress: "00:1A:2B:3C:4D:67", apiStatus: "pending" },
+  { id: 11, name: "Klient K", locality: "Lokale 11", status: "online", ip: "192.168.1.111", macAddress: "00:1A:2B:3C:4D:68", apiStatus: "approved" },
+  { id: 12, name: "Klient L", locality: "Lokale 12", status: "offline", ip: "192.168.1.112", macAddress: "00:1A:2B:3C:4D:69", apiStatus: "pending" },
+  { id: 13, name: "Klient M", locality: "Lokale 13", status: "online", ip: "192.168.1.113", macAddress: "00:1A:2B:3C:4D:6A", apiStatus: "approved" },
+  { id: 14, name: "Klient N", locality: "Lokale 14", status: "offline", ip: "192.168.1.114", macAddress: "00:1A:2B:3C:4D:6B", apiStatus: "pending" },
+  { id: 15, name: "Klient O", locality: "Lokale 15", status: "online", ip: "192.168.1.115", macAddress: "00:1A:2B:3C:4D:6C", apiStatus: "approved" },
 ];
 
 // Funktion til at simulere opdatering af heartbeat/status
