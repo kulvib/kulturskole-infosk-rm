@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   AppBar,
   Toolbar,
@@ -19,6 +19,7 @@ const drawerWidth = 220;
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   return (
     <Box sx={{ display: "flex", bgcolor: "#f5f7fa", minHeight: "100vh" }}>
@@ -44,13 +45,21 @@ export default function Dashboard() {
         }}
       >
         <List>
-          <ListItem button onClick={() => navigate("/clients")}>
+          <ListItem
+            button
+            selected={location.pathname === "/clients"}
+            onClick={() => navigate("/clients")}
+          >
             <ListItemIcon>
               <ComputerIcon color="primary" />
             </ListItemIcon>
             <ListItemText primary="Klienter" />
           </ListItem>
-          <ListItem button onClick={() => navigate("/holidays")}>
+          <ListItem
+            button
+            selected={location.pathname === "/holidays"}
+            onClick={() => navigate("/holidays")}
+          >
             <ListItemIcon>
               <EventIcon color="primary" />
             </ListItemIcon>
@@ -65,17 +74,11 @@ export default function Dashboard() {
           p: 4,
           ml: `${drawerWidth}px`,
           mt: 8,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
+          minHeight: "100vh",
+          background: "#f5f7fa",
         }}
       >
-        <Typography variant="h4" sx={{ fontWeight: "bold", mb: 2 }}>
-          Velkommen!
-        </Typography>
-        <Typography align="center" sx={{ mb: 4 }}>
-          Vælg en funktion i menuen til venstre.
-        </Typography>
+        <Outlet />
       </Box>
     </Box>
   );
