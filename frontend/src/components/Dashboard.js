@@ -5,54 +5,77 @@ import {
   Toolbar,
   Typography,
   Box,
-  Button,
-  Paper,
-  Stack,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  CssBaseline,
 } from "@mui/material";
 import ComputerIcon from "@mui/icons-material/Computer";
 import EventIcon from "@mui/icons-material/Event";
+
+const drawerWidth = 220;
 
 export default function Dashboard() {
   const navigate = useNavigate();
 
   return (
-    <Box sx={{ bgcolor: "#f5f7fa", minHeight: "100vh" }}>
-      <AppBar position="static" sx={{ bgcolor: "#1976d2" }}>
+    <Box sx={{ display: "flex", bgcolor: "#f5f7fa", minHeight: "100vh" }}>
+      <CssBaseline />
+      <AppBar position="fixed" sx={{ zIndex: 1201 }}>
         <Toolbar>
           <Typography variant="h5" sx={{ flexGrow: 1 }}>
             Kulturskolen Viborg – Infoskærm Admin
           </Typography>
         </Toolbar>
       </AppBar>
-      <Box sx={{ maxWidth: 500, mx: "auto", mt: 8 }}>
-        <Paper sx={{ p: 4, borderRadius: 3, boxShadow: 3 }}>
-          <Typography variant="h4" align="center" sx={{ mb: 3, fontWeight: "bold" }}>
-            Velkommen!
-          </Typography>
-          <Typography align="center" sx={{ mb: 4 }}>
-            Vælg en funktion nedenfor:
-          </Typography>
-          <Stack spacing={3} direction="column" alignItems="center">
-            <Button
-              startIcon={<ComputerIcon />}
-              variant="contained"
-              size="large"
-              sx={{ minWidth: 200, fontSize: 20, borderRadius: 2 }}
-              onClick={() => navigate("/clients")}
-            >
-              Klienter
-            </Button>
-            <Button
-              startIcon={<EventIcon />}
-              variant="contained"
-              size="large"
-              sx={{ minWidth: 200, fontSize: 20, borderRadius: 2 }}
-              onClick={() => navigate("/holidays")}
-            >
-              Helligdage
-            </Button>
-          </Stack>
-        </Paper>
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          [`& .MuiDrawer-paper`]: {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            bgcolor: "#e8eaf6",
+            pt: 8,
+          },
+        }}
+      >
+        <List>
+          <ListItem button onClick={() => navigate("/clients")}>
+            <ListItemIcon>
+              <ComputerIcon color="primary" />
+            </ListItemIcon>
+            <ListItemText primary="Klienter" />
+          </ListItem>
+          <ListItem button onClick={() => navigate("/holidays")}>
+            <ListItemIcon>
+              <EventIcon color="primary" />
+            </ListItemIcon>
+            <ListItemText primary="Helligdage" />
+          </ListItem>
+        </List>
+      </Drawer>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 4,
+          ml: `${drawerWidth}px`,
+          mt: 8,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        <Typography variant="h4" sx={{ fontWeight: "bold", mb: 2 }}>
+          Velkommen!
+        </Typography>
+        <Typography align="center" sx={{ mb: 4 }}>
+          Vælg en funktion i menuen til venstre.
+        </Typography>
       </Box>
     </Box>
   );
