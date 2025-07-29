@@ -7,13 +7,13 @@ import {
   TableHead,
   TableRow,
   Button,
-  Chip,
   Paper,
   Stack,
   CircularProgress,
   TextField,
   Tooltip,
   IconButton,
+  Chip
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -55,19 +55,76 @@ export default function ClientInfoPage({
   };
 
   return (
-    <Paper sx={{ p: 3, boxShadow: 3 }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
-        Godkendte klienter
-      </Typography>
-      {loading ? (
-        <Stack alignItems="center" sx={{ py: 4 }}>
-          <CircularProgress />
-        </Stack>
-      ) : (
+    <Stack spacing={4}>
+      {/* Ikke godkendte klienter */}
+      <Paper sx={{ p: 3, boxShadow: 3, bgcolor: "#fff" }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
+          Ikke godkendte klienter
+        </Typography>
         <Table>
           <TableHead>
             <TableRow sx={{ background: "#f0f5f9" }}>
-              <TableCell sx={{ fontWeight: "bold" }}>Navn</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Klientnavn</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>IP adresse</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>MAC adresse</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Godkend klient</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={4}>
+                  <Stack alignItems="center" sx={{ py: 2 }}>
+                    <CircularProgress size={28} />
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            ) : pendingClients.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4}>
+                  Ingen ikke-godkendte klienter.
+                </TableCell>
+              </TableRow>
+            ) : (
+              pendingClients.map((client) => (
+                <TableRow
+                  key={client.id}
+                  sx={{
+                    transition: "background 0.3s",
+                    ":hover": { background: "#f5f7fa" },
+                  }}
+                >
+                  <TableCell>{client.name || client.unique_id}</TableCell>
+                  <TableCell>{client.ip || client.ip_address}</TableCell>
+                  <TableCell>{client.macAddress || client.mac_address}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      onClick={() => onApproveClient(client.id)}
+                      disabled={loading}
+                    >
+                      Godkend
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Paper>
+
+      {/* Godkendte klienter */}
+      <Paper sx={{ p: 3, boxShadow: 3, bgcolor: "#fff" }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
+          Godkendte klienter
+        </Typography>
+        <Table>
+          <TableHead>
+            <TableRow sx={{ background: "#f0f5f9" }}>
+              <TableCell sx={{ fontWeight: "bold" }}>Klientnavn</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>IP adresse</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>MAC adresse</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Lokalitet</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Info</TableCell>
@@ -75,9 +132,17 @@ export default function ClientInfoPage({
             </TableRow>
           </TableHead>
           <TableBody>
-            {approvedClients.length === 0 ? (
+            {loading ? (
               <TableRow>
-                <TableCell colSpan={5}>Ingen godkendte klienter.</TableCell>
+                <TableCell colSpan={7}>
+                  <Stack alignItems="center" sx={{ py: 2 }}>
+                    <CircularProgress size={28} />
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            ) : approvedClients.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7}>Ingen godkendte klienter.</TableCell>
               </TableRow>
             ) : (
               approvedClients.map((client) => (
@@ -89,6 +154,8 @@ export default function ClientInfoPage({
                   }}
                 >
                   <TableCell>{client.name || client.unique_id}</TableCell>
+                  <TableCell>{client.ip || client.ip_address}</TableCell>
+                  <TableCell>{client.macAddress || client.mac_address}</TableCell>
                   <TableCell>
                     <TextField
                       value={client.locality || ""}
@@ -141,60 +208,7 @@ export default function ClientInfoPage({
             )}
           </TableBody>
         </Table>
-      )}
-
-      <Paper sx={{ mt: 4, p: 2, boxShadow: 1, bgcolor: "#fff" }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
-          Ikke godkendte klienter
-        </Typography>
-        <Table>
-          <TableHead>
-            <TableRow sx={{ background: "#f0f5f9" }}>
-              <TableCell sx={{ fontWeight: "bold" }}>Navn</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>IP adresse</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>MAC adresse</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Godkend klient</TableCell>
-              {/* Tomme celler for at matche layout */}
-              <TableCell sx={{ fontWeight: "bold" }} />
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {pendingClients.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5}>
-                  Ingen ikke-godkendte klienter.
-                </TableCell>
-              </TableRow>
-            ) : (
-              pendingClients.map((client) => (
-                <TableRow
-                  key={client.id}
-                  sx={{
-                    transition: "background 0.3s",
-                    ":hover": { background: "#f5f7fa" },
-                  }}
-                >
-                  <TableCell>{client.name || client.unique_id}</TableCell>
-                  <TableCell>{client.ip || client.ip_address}</TableCell>
-                  <TableCell>{client.macAddress || client.mac_address}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="contained"
-                      color="success"
-                      onClick={() => onApproveClient(client.id)}
-                      disabled={loading}
-                    >
-                      Godkend
-                    </Button>
-                  </TableCell>
-                  {/* Tom celle for ensartet layout */}
-                  <TableCell />
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
       </Paper>
-    </Paper>
+    </Stack>
   );
 }
