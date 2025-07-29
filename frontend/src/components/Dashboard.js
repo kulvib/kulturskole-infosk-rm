@@ -11,9 +11,11 @@ import {
   ListItemIcon,
   ListItemText,
   CssBaseline,
+  Button,
 } from "@mui/material";
 import ComputerIcon from "@mui/icons-material/Computer";
 import EventIcon from "@mui/icons-material/Event";
+import LogoutIcon from "@mui/icons-material/Logout";
 
 const drawerWidth = 220;
 
@@ -21,14 +23,33 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Dummy log ud funktion — erstat evt. med rigtig logud-logik
+  const handleLogout = () => {
+    // Her kan du fx fjerne token fra localStorage/sessionStorage og redirecte
+    // localStorage.removeItem("token");
+    navigate("/login");
+  };
+
   return (
     <Box sx={{ display: "flex", bgcolor: "#f5f7fa", minHeight: "100vh" }}>
       <CssBaseline />
       <AppBar position="fixed" sx={{ zIndex: 1201 }}>
         <Toolbar>
-          <Typography variant="h5" sx={{ flexGrow: 1 }}>
-            Kulturskolen Viborg – Infoskærm Admin
+          <Typography
+            variant="h5"
+            sx={{ flexGrow: 1, cursor: "pointer", userSelect: "none" }}
+            onClick={() => navigate("/")}
+          >
+            Kulturskolen Viborg – Infoskærm Administration
           </Typography>
+          <Button
+            color="inherit"
+            startIcon={<LogoutIcon />}
+            onClick={handleLogout}
+            sx={{ ml: 2 }}
+          >
+            Log ud
+          </Button>
         </Toolbar>
       </AppBar>
       <Drawer
