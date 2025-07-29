@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Typography,
   Table,
@@ -13,12 +13,37 @@ import {
   TextField,
   Tooltip,
   IconButton,
-  Chip
+  Chip,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import { useNavigate } from "react-router-dom";
+
+// Status-chip: grøn/rød prik og tekst
+function StatusChip({ isOnline }) {
+  return (
+    <Chip
+      icon={
+        <FiberManualRecordIcon
+          sx={{
+            color: isOnline ? "#33cc33" : "#cc3333",
+            fontSize: 18,
+            ml: "3px",
+          }}
+        />
+      }
+      label={isOnline ? "Online" : "Offline"}
+      sx={{
+        fontWeight: "bold",
+        bgcolor: isOnline ? "#e5fbe5" : "#fbe5e5",
+        color: isOnline ? "#388e3c" : "#d32f2f",
+        px: 2,
+      }}
+    />
+  );
+}
 
 export default function ClientInfoPage({
   clients,
@@ -39,13 +64,20 @@ export default function ClientInfoPage({
     (c) => c.apiStatus === "pending" || c.status === "pending"
   );
 
-  // Lokalitet redigering (bruges kun for godkendte klienter)
+  // Polling: Automatisk opdatering hvert 30. sekund
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchClients();
+    }, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line
+  }, []);
+
+  // Lokalitet redigering
   const handleLocalityChange = async (id, value) => {
     await fetch(`/api/clients/${id}/update`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ locality: value }),
     });
     setClients &&
@@ -56,6 +88,19 @@ export default function ClientInfoPage({
 
   return (
     <Stack spacing={4}>
+      {/* Refresh/Opdater knap */}
+      <Stack direction="row" alignItems="center" spacing={2}>
+        <Button
+          variant="outlined"
+          onClick={fetchClients}
+          startIcon={<RefreshIcon />}
+          disabled={loading}
+        >
+          Opdater
+        </Button>
+        {loading && <span>Henter data…</span>}
+      </Stack>
+
       {/* Ikke godkendte klienter */}
       <Paper sx={{ p: 3, boxShadow: 3, bgcolor: "#fff" }}>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
@@ -123,8 +168,6 @@ export default function ClientInfoPage({
           <TableHead>
             <TableRow sx={{ background: "#f0f5f9" }}>
               <TableCell sx={{ fontWeight: "bold" }}>Klientnavn</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>IP adresse</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>MAC adresse</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Lokalitet</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Info</TableCell>
@@ -134,7 +177,7 @@ export default function ClientInfoPage({
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7}>
+                <TableCell colSpan={5}>
                   <Stack alignItems="center" sx={{ py: 2 }}>
                     <CircularProgress size={28} />
                   </Stack>
@@ -142,69 +185,68 @@ export default function ClientInfoPage({
               </TableRow>
             ) : approvedClients.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7}>Ingen godkendte klienter.</TableCell>
+                <TableCell colSpan={5}>Ingen godkendte klienter.</TableCell>
               </TableRow>
             ) : (
-              approvedClients.map((client) => (
-                <TableRow
-                  key={client.id}
-                  sx={{
-                    transition: "background 0.3s",
-                    ":hover": { background: "#f5f7fa" },
-                  }}
-                >
-                  <TableCell>{client.name || client.unique_id}</TableCell>
-                  <TableCell>{client.ip || client.ip_address}</TableCell>
-                  <TableCell>{client.macAddress || client.mac_address}</TableCell>
-                  <TableCell>
-                    <TextField
-                      value={client.locality || ""}
-                      onChange={(e) =>
-                        handleLocalityChange(client.id, e.target.value)
-                      }
-                      size="small"
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      icon={<CheckCircleIcon />}
-                      label={client.status === "online" ? "Online" : "Offline"}
-                      color={client.status === "online" ? "success" : "error"}
-                      sx={{
-                        fontWeight: "bold",
-                        bgcolor:
-                          client.status === "online" ? "#d4edda" : "#f8d7da",
-                        color:
-                          client.status === "online" ? "#388e3c" : "#d32f2f",
-                        px: 2,
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title="Info">
-                      <IconButton
-                        color="primary"
-                        onClick={() =>
-                          navProp
-                            ? navProp(`/clients/${client.id}`)
-                            : navigate(`/clients/${client.id}`)
+              approvedClients.map((client) => {
+                // Bestem om klienten er online (baseret på status eller heartbeat)
+                const isOnline =
+                  client.isOnline !== undefined
+                    ? client.isOnline
+                    : client.status === "online" ||
+                      client.heartbeat === "online" ||
+                      client.heartbeat === true;
+
+                return (
+                  <TableRow
+                    key={client.id}
+                    sx={{
+                      transition: "background 0.3s",
+                      ":hover": { background: "#f5f7fa" },
+                    }}
+                  >
+                    <TableCell>{client.name || client.unique_id}</TableCell>
+                    <TableCell>
+                      <TextField
+                        value={client.locality || ""}
+                        onChange={(e) =>
+                          handleLocalityChange(client.id, e.target.value)
                         }
-                      >
-                        <InfoIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell>
-                    <IconButton
-                      color="error"
-                      onClick={() => onRemoveClient(client.id)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
+                        size="small"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <StatusChip isOnline={isOnline} />
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title="Info">
+                        <IconButton
+                          color="primary"
+                          onClick={() =>
+                            navProp
+                              ? navProp(`/clients/${client.id}`)
+                              : navigate(`/clients/${client.id}`)
+                          }
+                        >
+                          <InfoIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell>
+                      {(client.apiStatus === "approved" ||
+                        client.status === "approved") && (
+                        <IconButton
+                          color="error"
+                          onClick={() => onRemoveClient(client.id)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
