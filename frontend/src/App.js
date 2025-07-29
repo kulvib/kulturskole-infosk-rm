@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
-import ClientDetailsPageWrapper from "./components/ClientDetailsPageWrapper";
+import ClientInfoPage from "./components/ClientInfoPage";
+import HolidaysPage from "./components/HolidaysPage";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
-const token = "PASTE_YOUR_JWT_TOKEN_HERE"; // Sæt din gyldige admin JWT-token her
+const token = "PASTE_YOUR_JWT_TOKEN_HERE"; // Husk at erstatte med din rigtige token
 
 export default function App() {
   const [clients, setClients] = useState([]);
@@ -30,7 +31,7 @@ export default function App() {
     setLoading(false);
   };
 
-  // Hent fridage
+  // Hent helligdage
   const fetchHolidays = async () => {
     setLoading(true);
     setError("");
@@ -39,14 +40,14 @@ export default function App() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) setHolidays(await res.json());
-      else setError("Kunne ikke hente fridage");
+      else setError("Kunne ikke hente helligdage");
     } catch {
-      setError("Kunne ikke hente fridage");
+      setError("Kunne ikke hente helligdage");
     }
     setLoading(false);
   };
 
-  // Tilføj fridag
+  // Tilføj helligdag
   const handleAddHoliday = async (e) => {
     e.preventDefault();
     setError("");
@@ -64,14 +65,14 @@ export default function App() {
         setHolidayDate("");
         setHolidayDesc("");
         fetchHolidays();
-      } else setError("Kunne ikke tilføje fridag");
+      } else setError("Kunne ikke tilføje helligdag");
     } catch {
-      setError("Kunne ikke tilføje fridag");
+      setError("Kunne ikke tilføje helligdag");
     }
     setLoading(false);
   };
 
-  // Slet fridag
+  // Slet helligdag
   const handleDeleteHoliday = async (id) => {
     setError("");
     setLoading(true);
@@ -81,9 +82,9 @@ export default function App() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) fetchHolidays();
-      else setError("Kunne ikke slette fridag");
+      else setError("Kunne ikke slette helligdag");
     } catch {
-      setError("Kunne ikke slette fridag");
+      setError("Kunne ikke slette helligdag");
     }
     setLoading(false);
   };
@@ -131,32 +132,35 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<Dashboard />} />
         <Route
-          path="/*"
+          path="/clients"
           element={
-            <Dashboard
+            <ClientInfoPage
               clients={clients}
               setClients={setClients}
               loading={loading}
-              error={error}
               onApproveClient={handleApproveClient}
               onRemoveClient={handleRemoveClient}
+              fetchClients={fetchClients}
+            />
+          }
+        />
+        <Route
+          path="/holidays"
+          element={
+            <HolidaysPage
               holidays={holidays}
               holidayDate={holidayDate}
               setHolidayDate={setHolidayDate}
               holidayDesc={holidayDesc}
               setHolidayDesc={setHolidayDesc}
               setHolidays={setHolidays}
+              loading={loading}
               handleAddHoliday={handleAddHoliday}
               handleDeleteHoliday={handleDeleteHoliday}
-              fetchClients={fetchClients}
-              fetchHolidays={fetchHolidays}
             />
           }
-        />
-        <Route
-          path="/clients/:clientId"
-          element={<ClientDetailsPageWrapper clients={clients} />}
         />
       </Routes>
     </BrowserRouter>
