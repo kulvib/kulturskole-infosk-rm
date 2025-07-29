@@ -132,36 +132,49 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
         <Route
-          path="/clients"
-          element={
-            <ClientInfoPage
-              clients={clients}
-              setClients={setClients}
-              loading={loading}
-              onApproveClient={handleApproveClient}
-              onRemoveClient={handleRemoveClient}
-              fetchClients={fetchClients}
-            />
-          }
-        />
-        <Route
-          path="/holidays"
-          element={
-            <HolidaysPage
-              holidays={holidays}
-              holidayDate={holidayDate}
-              setHolidayDate={setHolidayDate}
-              holidayDesc={holidayDesc}
-              setHolidayDesc={setHolidayDesc}
-              setHolidays={setHolidays}
-              loading={loading}
-              handleAddHoliday={handleAddHoliday}
-              handleDeleteHoliday={handleDeleteHoliday}
-            />
-          }
-        />
+          path="/"
+          element={<Dashboard />}
+        >
+          <Route
+            index
+            element={
+              <div style={{ marginTop: 40, textAlign: "center" }}>
+                <h2>Velkommen!</h2>
+                <p>Vælg en funktion i menuen til venstre.</p>
+              </div>
+            }
+          />
+          <Route
+            path="clients"
+            element={
+              <ClientInfoPage
+                clients={clients}
+                setClients={setClients}
+                loading={loading}
+                onApproveClient={handleApproveClient}
+                onRemoveClient={handleRemoveClient}
+                fetchClients={fetchClients}
+              />
+            }
+          />
+          <Route
+            path="holidays"
+            element={
+              <HolidaysPage
+                holidays={holidays}
+                holidayDate={holidayDate}
+                setHolidayDate={setHolidayDate}
+                holidayDesc={holidayDesc}
+                setHolidayDesc={setHolidayDesc}
+                setHolidays={setHolidays}
+                loading={loading}
+                handleAddHoliday={handleAddHoliday}
+                handleDeleteHoliday={handleDeleteHoliday}
+              />
+            }
+          />
+        </Route>
       </Routes>
     </BrowserRouter>
   );
