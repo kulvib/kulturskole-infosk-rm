@@ -1,7 +1,19 @@
 import React from "react";
 import {
-  Typography, Table, TableBody, TableCell, TableHead, TableRow, TextField,
-  IconButton, Chip, Button, CircularProgress, Tooltip, Paper, Stack
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Button,
+  Chip,
+  Paper,
+  Stack,
+  CircularProgress,
+  TextField,
+  Tooltip,
+  IconButton,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -19,7 +31,7 @@ export default function ClientInfoPage({
 }) {
   const navigate = useNavigate();
 
-  // Split klienter
+  // Godkendte og ikke-godkendte klienter
   const approvedClients = clients.filter(
     (c) => c.apiStatus === "approved" || c.status === "approved"
   );
@@ -27,7 +39,7 @@ export default function ClientInfoPage({
     (c) => c.apiStatus === "pending" || c.status === "pending"
   );
 
-  // Lokalitet redigering
+  // Lokalitet redigering (bruges kun for godkendte klienter)
   const handleLocalityChange = async (id, value) => {
     await fetch(`/api/clients/${id}/update`, {
       method: "POST",
@@ -44,7 +56,9 @@ export default function ClientInfoPage({
 
   return (
     <Paper sx={{ p: 3, boxShadow: 3 }}>
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>Godkendte klienter</Typography>
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
+        Godkendte klienter
+      </Typography>
       {loading ? (
         <Stack alignItems="center" sx={{ py: 4 }}>
           <CircularProgress />
@@ -66,13 +80,21 @@ export default function ClientInfoPage({
                 <TableCell colSpan={5}>Ingen godkendte klienter.</TableCell>
               </TableRow>
             ) : (
-              approvedClients.map(client => (
-                <TableRow key={client.id} sx={{ transition: "background 0.3s", ":hover": { background: "#f5f7fa" } }}>
+              approvedClients.map((client) => (
+                <TableRow
+                  key={client.id}
+                  sx={{
+                    transition: "background 0.3s",
+                    ":hover": { background: "#f5f7fa" },
+                  }}
+                >
                   <TableCell>{client.name || client.unique_id}</TableCell>
                   <TableCell>
                     <TextField
                       value={client.locality || ""}
-                      onChange={e => handleLocalityChange(client.id, e.target.value)}
+                      onChange={(e) =>
+                        handleLocalityChange(client.id, e.target.value)
+                      }
                       size="small"
                       variant="outlined"
                     />
@@ -84,9 +106,11 @@ export default function ClientInfoPage({
                       color={client.status === "online" ? "success" : "error"}
                       sx={{
                         fontWeight: "bold",
-                        bgcolor: client.status === "online" ? "#d4edda" : "#f8d7da",
-                        color: client.status === "online" ? "#388e3c" : "#d32f2f",
-                        px: 2
+                        bgcolor:
+                          client.status === "online" ? "#d4edda" : "#f8d7da",
+                        color:
+                          client.status === "online" ? "#388e3c" : "#d32f2f",
+                        px: 2,
                       }}
                     />
                   </TableCell>
@@ -94,7 +118,11 @@ export default function ClientInfoPage({
                     <Tooltip title="Info">
                       <IconButton
                         color="primary"
-                        onClick={() => (navProp ? navProp(`/clients/${client.id}`) : navigate(`/clients/${client.id}`))}
+                        onClick={() =>
+                          navProp
+                            ? navProp(`/clients/${client.id}`)
+                            : navigate(`/clients/${client.id}`)
+                        }
                       >
                         <InfoIcon />
                       </IconButton>
@@ -115,26 +143,37 @@ export default function ClientInfoPage({
         </Table>
       )}
 
-      {/* Ikke godkendte klienter */}
       <Paper sx={{ mt: 4, p: 2, boxShadow: 1, bgcolor: "#fff" }}>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
           Ikke godkendte klienter
         </Typography>
-        {pendingClients.length === 0 ? (
-          <Typography>Ingen ikke-godkendte klienter.</Typography>
-        ) : (
-          <Table>
-            <TableHead>
-              <TableRow sx={{ background: "#f0f5f9" }}>
-                <TableCell sx={{ fontWeight: "bold" }}>Navn</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>IP</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>MAC adresse</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>Godkend</TableCell>
+        <Table>
+          <TableHead>
+            <TableRow sx={{ background: "#f0f5f9" }}>
+              <TableCell sx={{ fontWeight: "bold" }}>Navn</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>IP adresse</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>MAC adresse</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Godkend klient</TableCell>
+              {/* Tomme celler for at matche layout */}
+              <TableCell sx={{ fontWeight: "bold" }} />
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {pendingClients.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5}>
+                  Ingen ikke-godkendte klienter.
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {pendingClients.map((client) => (
-                <TableRow key={client.id} sx={{ ":hover": { background: "#f8f9fb" } }}>
+            ) : (
+              pendingClients.map((client) => (
+                <TableRow
+                  key={client.id}
+                  sx={{
+                    transition: "background 0.3s",
+                    ":hover": { background: "#f5f7fa" },
+                  }}
+                >
                   <TableCell>{client.name || client.unique_id}</TableCell>
                   <TableCell>{client.ip || client.ip_address}</TableCell>
                   <TableCell>{client.macAddress || client.mac_address}</TableCell>
@@ -148,11 +187,13 @@ export default function ClientInfoPage({
                       Godkend
                     </Button>
                   </TableCell>
+                  {/* Tom celle for ensartet layout */}
+                  <TableCell />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+              ))
+            )}
+          </TableBody>
+        </Table>
       </Paper>
     </Paper>
   );
