@@ -12,7 +12,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 120
 
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
 # Hash for password "admin123" (skift til din egen!)
-ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "admin123")
+ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "$2a$12$5RwL7UtvyADrKv.i4DRyvuv3lnzxl84YRbmuqmoVvhobPSXORJ75O")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer()
