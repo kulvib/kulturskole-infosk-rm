@@ -1,3 +1,4 @@
+import os
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
@@ -5,7 +6,7 @@ from backend.models import AdminUser
 from backend.database import get_db
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-SECRET_KEY = "supersecretkey"
+SECRET_KEY = os.environ["SECRET_KEY"]  # Henter secret fra environment
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
 
