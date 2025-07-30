@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import clients
-from auth import router as auth_router
-from db import create_db_and_tables
+from .routers import clients
+from .auth import router as auth_router
+from .db import create_db_and_tables
 from dotenv import load_dotenv
 
 load_dotenv()  # Læs .env hvis den findes
