@@ -1,30 +1,12 @@
-const BASE_URL = "http://localhost:8000/api";
+// Henter API-url fra Netlify environment variable
+const apiUrl = import.meta.env.VITE_API_URL;
 
-export async function getClients(token) {
-  const res = await fetch(`${BASE_URL}/clients/`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error("Auth fejlede");
-  return await res.json();
-}
-
-export async function getHolidays(token) {
-  const res = await fetch(`${BASE_URL}/holidays/`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error("Auth fejlede");
-  return await res.json();
-}
-
-export async function addHoliday(token, {date, description}) {
-  const res = await fetch(`${BASE_URL}/holidays/`, {
-    method: "POST",
+// Eksempel på fetch
+export async function getClients() {
+  const res = await fetch(`${apiUrl}/api/clients/`, {
     headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({date, description}),
+      "Authorization": "Bearer " + localStorage.getItem("token") // hvis du bruger token
+    }
   });
-  if (!res.ok) throw new Error("Oprettelse fejlede");
   return await res.json();
 }
