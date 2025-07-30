@@ -1,75 +1,67 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
-from sqlalchemy.orm import Session
-from backend.models import Client
-from backend.database import get_db
-from backend.auth import get_current_admin_user
-import datetime
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import select
+from db import get_session
+from models import Client
+from typing import List, Optional
+from auth import get_current_admin_user
 
-router = APIRouter(
-    prefix="/api/clients",
-    tags=["clients"],
-)
+router = APIRouter()
 
-@router.get("/")
-def list_clients(db: Session = Depends(get_db), user=Depends(get_current_admin_user)):
-    return db.query(Client).all()
+@router.get("/clients/", response_model=List[Client])
+def get_clients(session=Depends(get_session), user=Depends(get_current_admin_user)):
+    return session.exec(select(Client)).all()
 
-@router.post("/register")
-def register_client(
-    unique_id: str = Body(...),
-    sw_version: str = Body(...),
-    ip: str = Body(...),
-    mac: str = Body(...),
-    db: Session = Depends(get_db)
-):
-    client = db.query(Client).filter(Client.unique_id == unique_id).first()
-    if client:
-        client.last_seen = datetime.datetime.utcnow()
-        client.ip_address = ip
-        client.sw_version = sw_version
-        client.mac_address = mac
-        db.commit()
-        return {"msg": "updated"}
-    client = Client(
-        unique_id=unique_id,
-        sw_version=sw_version,
-        ip_address=ip,
-        mac_address=mac,
-        last_seen=datetime.datetime.utcnow(),
-        status="pending"
-    )
-    db.add(client)
-    db.commit()
-    return {"msg": "registered"}
-
-@router.post("/{client_id}/heartbeat")
-def client_heartbeat(
-    client_id: int,
-    method: str = Body(...),
-    db: Session = Depends(get_db)
-):
-    client = db.query(Client).filter(Client.id == client_id).first()
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    client.last_seen = datetime.datetime.utcnow()
-    client.is_online = True
-    db.commit()
-    return {"msg": "heartbeat received"}
-
-@router.post("/{client_id}/approve")
-def approve_client(client_id: int, db: Session = Depends(get_db), user=Depends(get_current_admin_user)):
-    client = db.query(Client).filter(Client.id == client_id).first()
+@router.post("/clients/{id}/approve", response_model=Client)
+def approve_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+    client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     client.status = "approved"
-    db.commit()
-    return {"msg": "client approved"}
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return client
 
-@router.post("/{client_id}/remove")
-def remove_client(client_id: int, db: Session = Depends(get_db), user=Depends(get_current_admin_user)):
-    client = db.query(Client).filter(Client.id == client_id).first()
+@router.post("/clients/{id}/remove")
+def remove_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+    client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    client.status = "removed"
-    db.commit()
-    return {"msg": "client removed"}
+    session.delete(client)
+    session.commit()
+    return {"ok": True}
+
+@router.post("/clients/{id}/update", response_model=Client)
+def update_client(id: int, locality: str, session=Depends(get_session), user=Depends(get_current_admin_user)):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    client.locality = locality
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return client
+
+@router.post("/clients/", response_model=Client)
+def create_client(
+    name: Optional[str] = None,
+    unique_id: Optional[str] = None,
+    locality: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    mac_address: Optional[str] = None,
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user)
+):
+    client = Client(
+        name=name,
+        unique_id=unique_id,
+        locality=locality,
+        ip_address=ip_address,
+        mac_address=mac_address,
+        status="pending",
+        isOnline=False,
+    )
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return client
