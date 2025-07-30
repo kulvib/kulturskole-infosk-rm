@@ -5,7 +5,7 @@ import ClientInfoPage from "./components/ClientInfoPage";
 import HolidaysPage from "./components/HolidaysPage";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
-const token = "PASTE_YOUR_JWT_TOKEN_HERE"; // Husk at erstatte med din rigtige token
+const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTk5OTk5OTk5OX0.Fu6qHK7byNQ_GcanaXyvyma_d4fq_hq-wJPFuWXhyks"; // Husk at erstatte med din rigtige token
 
 export default function App() {
   const [clients, setClients] = useState([]);
