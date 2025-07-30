@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import ClientInfoPage from "./components/ClientInfoPage";
 import HolidaysPage from "./components/HolidaysPage";
+import ClientDetailsPage from "./components/ClientDetailsPage";
 
 import {
   getClients,
@@ -111,10 +112,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route
-          path="/"
-          element={<Dashboard />}
-        >
+        <Route path="/" element={<Dashboard />}>
           <Route
             index
             element={
@@ -135,6 +133,14 @@ export default function App() {
                 onApproveClient={handleApproveClient}
                 onRemoveClient={handleRemoveClient}
                 fetchClients={fetchClients}
+              />
+            }
+          />
+          <Route
+            path="clients/:clientId"
+            element={
+              <ClientDetailsPage
+                clients={clients}
               />
             }
           />
