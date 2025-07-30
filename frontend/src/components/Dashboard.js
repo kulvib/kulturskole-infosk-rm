@@ -92,7 +92,7 @@ export default function Dashboard() {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 2, // <-- Mindre padding her!
+          p: 1, // <-- Mindre padding her!
           ml: `${drawerWidth}px`,
           mt: 8,
           minHeight: "100vh",
