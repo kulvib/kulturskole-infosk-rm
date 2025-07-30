@@ -3,17 +3,21 @@ import {
   Typography, Table, TableBody, TableRow, TableCell, TextField,
   Button, Chip, Stack, Divider, Box, Paper
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import InfoIcon from "@mui/icons-material/Info";
 
-const API_URL = "https://kulturskole-infosk-rm.onrender.com";
-const token = "PASTE_YOUR_JWT_TOKEN_HERE";
+const apiUrl = process.env.REACT_APP_API_URL;
 
-export default function ClientDetailsPage({ clientId, clients }) {
+function getToken() {
+  return localStorage.getItem("token");
+}
+
+export default function ClientDetailsPage({ clients }) {
+  const { clientId } = useParams();
   const [client, setClient] = useState(null);
   const [kioskWebAddress, setKioskWebAddress] = useState("");
   const [saving, setSaving] = useState(false);
@@ -32,13 +36,17 @@ export default function ClientDetailsPage({ clientId, clients }) {
       fetchClient();
     }
     async function fetchClient() {
-      const res = await fetch(`${API_URL}/api/clients/${clientId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setClient(data);
-        setKioskWebAddress(data.kioskWebAddress || "");
+      try {
+        const res = await fetch(`${apiUrl}/api/clients/${clientId}`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setClient(data);
+          setKioskWebAddress(data.kioskWebAddress || "");
+        }
+      } catch (e) {
+        setClient(null);
       }
     }
   }, [clientId, clients]);
@@ -46,10 +54,10 @@ export default function ClientDetailsPage({ clientId, clients }) {
   // Gem ny kiosk webadresse
   const handleSaveKioskAddress = async () => {
     setSaving(true);
-    await fetch(`${API_URL}/api/clients/${clientId}/update`, {
+    await fetch(`${apiUrl}/api/clients/${clientId}/update`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${getToken()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ kioskWebAddress }),
@@ -72,13 +80,13 @@ export default function ClientDetailsPage({ clientId, clients }) {
       </Typography>
       <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
         <Chip
-          label={client.status === "online" ? "Online" : "Offline"}
-          color={client.status === "online" ? "success" : "error"}
+          label={client.isOnline ? "Online" : "Offline"}
+          color={client.isOnline ? "success" : "error"}
           sx={{ fontWeight: "bold" }}
         />
         <Chip
-          label={client.apiStatus === "approved" ? "Godkendt" : "Ikke godkendt"}
-          color={client.apiStatus === "approved" ? "success" : "warning"}
+          label={client.status === "approved" ? "Godkendt" : "Ikke godkendt"}
+          color={client.status === "approved" ? "success" : "warning"}
           sx={{ fontWeight: "bold" }}
         />
       </Stack>
