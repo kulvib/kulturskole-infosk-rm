@@ -4,5 +4,5 @@ import ClientDetailsPage from "./ClientDetailsPage";
 
 export default function ClientDetailsPageWrapper({ clients }) {
   const { clientId } = useParams();
-  return <ClientDetailsPage clientId={clientId} clients={clients} />;
+  return <ClientDetailsPage clients={clients} clientId={clientId} />;
 }
