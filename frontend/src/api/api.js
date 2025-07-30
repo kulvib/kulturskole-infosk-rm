@@ -1,14 +1,9 @@
-// src/api.js
-// Centralisér alle API-kald her og brug environment variable til API-url
-
 const apiUrl = process.env.REACT_APP_API_URL;
 
-// Hjælpefunktion til at hente token fra localStorage (eller anden kilde)
 function getToken() {
   return localStorage.getItem("token");
 }
 
-// Hent alle klienter
 export async function getClients() {
   const res = await fetch(`${apiUrl}/api/clients/`, {
     headers: {
@@ -19,7 +14,6 @@ export async function getClients() {
   return await res.json();
 }
 
-// Hent alle helligdage
 export async function getHolidays() {
   const res = await fetch(`${apiUrl}/api/holidays/`, {
     headers: {
@@ -30,7 +24,6 @@ export async function getHolidays() {
   return await res.json();
 }
 
-// Tilføj helligdag
 export async function addHoliday(date, description) {
   const res = await fetch(`${apiUrl}/api/holidays/`, {
     method: "POST",
@@ -44,7 +37,6 @@ export async function addHoliday(date, description) {
   return await res.json();
 }
 
-// Slet helligdag
 export async function deleteHoliday(id) {
   const res = await fetch(`${apiUrl}/api/holidays/${id}`, {
     method: "DELETE",
@@ -55,7 +47,6 @@ export async function deleteHoliday(id) {
   if (!res.ok) throw new Error("Kunne ikke slette helligdag");
 }
 
-// Godkend klient
 export async function approveClient(id) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/approve`, {
     method: "POST",
@@ -67,7 +58,6 @@ export async function approveClient(id) {
   return await res.json();
 }
 
-// Fjern klient
 export async function removeClient(id) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/remove`, {
     method: "POST",
