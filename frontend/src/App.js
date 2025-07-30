@@ -3,32 +3,104 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import ClientInfoPage from "./components/ClientInfoPage";
 import HolidaysPage from "./components/HolidaysPage";
-import { getClients, getHolidays } from "./api"; // Tilføj dine API-funktioner her
+
+import {
+  getClients,
+  getHolidays,
+  addHoliday,
+  deleteHoliday,
+  approveClient,
+  removeClient,
+} from "./api";
 
 export default function App() {
   const [clients, setClients] = useState([]);
   const [holidays, setHolidays] = useState([]);
-  // ... resten af dine states
+  const [holidayDate, setHolidayDate] = useState("");
+  const [holidayDesc, setHolidayDesc] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Hent klienter
+  // Hent klienter fra backend
   const fetchClients = async () => {
+    setLoading(true);
+    setError("");
     try {
-      setClients(await getClients());
-    } catch {
-      // error handling
+      const data = await getClients();
+      setClients(data);
+    } catch (err) {
+      setError(err.message);
     }
+    setLoading(false);
   };
 
-  // Hent helligdage
+  // Hent helligdage fra backend
   const fetchHolidays = async () => {
+    setLoading(true);
+    setError("");
     try {
-      setHolidays(await getHolidays());
-    } catch {
-      // error handling
+      const data = await getHolidays();
+      setHolidays(data);
+    } catch (err) {
+      setError(err.message);
     }
+    setLoading(false);
   };
 
-  // ... resten af dine metoder - brug api.js funktionerne
+  // Tilføj helligdag
+  const handleAddHoliday = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await addHoliday(holidayDate, holidayDesc);
+      setHolidayDate("");
+      setHolidayDesc("");
+      fetchHolidays();
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+
+  // Slet helligdag
+  const handleDeleteHoliday = async (id) => {
+    setError("");
+    setLoading(true);
+    try {
+      await deleteHoliday(id);
+      fetchHolidays();
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+
+  // Godkend klient
+  const handleApproveClient = async (id) => {
+    setLoading(true);
+    setError("");
+    try {
+      await approveClient(id);
+      fetchClients();
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+
+  // Fjern klient
+  const handleRemoveClient = async (id) => {
+    setLoading(true);
+    setError("");
+    try {
+      await removeClient(id);
+      fetchClients();
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
     fetchClients();
@@ -36,5 +108,54 @@ export default function App() {
     // eslint-disable-next-line
   }, []);
 
-  // ... resten af din komponent
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/"
+          element={<Dashboard />}
+        >
+          <Route
+            index
+            element={
+              <div style={{ marginTop: 40, textAlign: "center" }}>
+                <h2>Velkommen!</h2>
+                <p>Vælg en funktion i menuen til venstre.</p>
+                {error && <p style={{ color: "red" }}>{error}</p>}
+              </div>
+            }
+          />
+          <Route
+            path="clients"
+            element={
+              <ClientInfoPage
+                clients={clients}
+                setClients={setClients}
+                loading={loading}
+                onApproveClient={handleApproveClient}
+                onRemoveClient={handleRemoveClient}
+                fetchClients={fetchClients}
+              />
+            }
+          />
+          <Route
+            path="holidays"
+            element={
+              <HolidaysPage
+                holidays={holidays}
+                holidayDate={holidayDate}
+                setHolidayDate={setHolidayDate}
+                holidayDesc={holidayDesc}
+                setHolidayDesc={setHolidayDesc}
+                setHolidays={setHolidays}
+                loading={loading}
+                handleAddHoliday={handleAddHoliday}
+                handleDeleteHoliday={handleDeleteHoliday}
+              />
+            }
+          />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
 }
