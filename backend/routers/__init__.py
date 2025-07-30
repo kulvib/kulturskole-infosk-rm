@@ -1,1 +1,1 @@
-hele main.py og filstrukturen præcist!
+# Denne fil gør routers til et Python-pakkemodul!
