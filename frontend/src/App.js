@@ -7,7 +7,7 @@ import ClientDetailsPage from "./components/ClientDetailsPage";
 import LoginPage from "./components/LoginPage";
 import HomePage from "./components/HomePage";
 import ProtectedRoute from "./auth/ProtectedRoute";
-import { AuthProvider } from "./authcontext"; // <-- IMPORTÉR AuthProvider
+import { AuthProvider } from "./auth/authcontext"; // <-- KORREKT STED
 
 import {
   getClients,
