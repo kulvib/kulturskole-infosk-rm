@@ -20,7 +20,8 @@ import {
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
-import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
 import { Link } from "react-router-dom";
 
 export default function ClientInfoPage({
@@ -68,27 +69,34 @@ export default function ClientInfoPage({
     setSavingLocation((prev) => ({ ...prev, [clientId]: false }));
   };
 
-  // Hjælpekomponent til status (online/offline)
-  function StatusCell({ isOnline }) {
-    return (
-      <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
-        <FiberManualRecordIcon
-          sx={{
-            color: isOnline ? "green" : "red",
-            fontSize: 18,
-          }}
-        />
-        <Typography
-          sx={{
-            fontWeight: 700,
-            color: isOnline ? "green" : "red",
-            textTransform: "lowercase",
-            ml: 0.5,
-          }}
-        >
-          {isOnline ? "online" : "offline"}
-        </Typography>
-      </Stack>
+  // Status-chip med ikon og tekst integreret
+  function ClientStatusCell({ isOnline }) {
+    return isOnline ? (
+      <Chip
+        icon={<CheckCircleIcon sx={{ color: "#fff" }} />}
+        label="online"
+        sx={{
+          bgcolor: "green",
+          color: "#fff",
+          fontWeight: 700,
+          textTransform: "lowercase",
+          minWidth: 100,
+          pl: "8px",
+        }}
+      />
+    ) : (
+      <Chip
+        icon={<CancelIcon sx={{ color: "#fff" }} />}
+        label="offline"
+        sx={{
+          bgcolor: "red",
+          color: "#fff",
+          fontWeight: 700,
+          textTransform: "lowercase",
+          minWidth: 100,
+          pl: "8px",
+        }}
+      />
     );
   }
 
@@ -156,7 +164,7 @@ export default function ClientInfoPage({
                     </TableCell>
                     {/* Status */}
                     <TableCell align="center">
-                      <StatusCell isOnline={client.isOnline} />
+                      <ClientStatusCell isOnline={client.isOnline} />
                     </TableCell>
                     {/* Info */}
                     <TableCell align="center">
