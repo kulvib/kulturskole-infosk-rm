@@ -22,7 +22,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { Link } from "react-router-dom";
-import { useAuth } from "../authcontext"; // <-- Tilføj denne linje
+import { useAuth } from "../auth/authcontext"; // <-- Korrekt sti!
 
 const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
 
@@ -33,7 +33,7 @@ export default function ClientInfoPage({
   onRemoveClient,
   fetchClients,
 }) {
-  const { token } = useAuth(); // <-- Brug context til token
+  const { token } = useAuth();
 
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
