@@ -23,19 +23,20 @@ import AddIcon from "@mui/icons-material/Add";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { Link } from "react-router-dom";
 
+const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
+
 export default function ClientInfoPage({
   clients,
   loading,
   onApproveClient,
   onRemoveClient,
   fetchClients,
+  token, // Hvis du bruger authentication, send token som prop
 }) {
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
 
-  // Godkendte: status skal være "approved"
   const approvedClients = clients?.filter((c) => c.status === "approved") || [];
-  // Ikke godkendte
   const unapprovedClients = clients?.filter((c) => c.status !== "approved") || [];
 
   useEffect(() => {
@@ -56,19 +57,25 @@ export default function ClientInfoPage({
   const handleLocationSave = async (clientId) => {
     setSavingLocation((prev) => ({ ...prev, [clientId]: true }));
     try {
-      await fetch(`/api/clients/${clientId}/update`, {
+      const res = await fetch(`${API_BASE}/api/clients/${clientId}/update`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ locality: editableLocations[clientId] }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || data.message || "Ukendt fejl");
+      }
       fetchClients();
     } catch (err) {
-      alert("Kunne ikke gemme lokalitet");
+      alert("Kunne ikke gemme lokalitet: " + err.message);
     }
     setSavingLocation((prev) => ({ ...prev, [clientId]: false }));
   };
 
-  // Status-chip med lille dot og tekst integreret
   function ClientStatusCell({ isOnline }) {
     return (
       <Chip
@@ -127,11 +134,9 @@ export default function ClientInfoPage({
               ) : (
                 approvedClients.map((client) => (
                   <TableRow key={client.id} hover>
-                    {/* Klientnavn */}
                     <TableCell>
                       {client.name}
                     </TableCell>
-                    {/* Lokalitet */}
                     <TableCell>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <TextField
@@ -161,11 +166,9 @@ export default function ClientInfoPage({
                         </Button>
                       </Stack>
                     </TableCell>
-                    {/* Status */}
                     <TableCell align="center">
                       <ClientStatusCell isOnline={client.isOnline} />
                     </TableCell>
-                    {/* Info */}
                     <TableCell align="center">
                       <Tooltip title="Info">
                         <IconButton
@@ -177,7 +180,6 @@ export default function ClientInfoPage({
                         </IconButton>
                       </Tooltip>
                     </TableCell>
-                    {/* Fjern */}
                     <TableCell align="center">
                       <Tooltip title="Fjern klient">
                         <IconButton
@@ -225,11 +227,9 @@ export default function ClientInfoPage({
                       {client.name || "Ukendt navn"}
                     </TableCell>
                     <TableCell>
-                      {/* Ingen farve på IP-adresse */}
                       <span>{client.ip_address || "ukendt"}</span>
                     </TableCell>
                     <TableCell>
-                      {/* Ingen farve på MAC-adresse */}
                       <span>{client.mac_address || "ukendt"}</span>
                     </TableCell>
                     <TableCell align="center">
