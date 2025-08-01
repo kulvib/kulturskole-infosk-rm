@@ -6,3 +6,4 @@ bcrypt==4.0.1
 pydantic
 uvicorn
 python-dotenv
+python-multipart
