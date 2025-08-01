@@ -1,12 +1,11 @@
 from fastapi import FastAPI, APIRouter, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import clients
-from .auth import router as auth_router
+from .auth import router as auth_router, get_password_hash
 from .db import create_db_and_tables, engine
 from dotenv import load_dotenv
 from sqlmodel import Session
-from .models import User  # Ret stien hvis nødvendigt
-from .auth import get_password_hash  # Ret stien hvis nødvendigt
+from .models import User  # Nu eksisterer User (se tidligere besked)
 
 load_dotenv()  # Læs .env hvis den findes
 
@@ -30,7 +29,7 @@ app.add_middleware(
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router)
 
-# --- MIDLERTIDIG: Endpoint til at oprette admin ---
+# --- MIDLERTIDIG ENDPOINT: Opret admin-bruger ---
 admin_router = APIRouter()
 
 @admin_router.post("/create-admin")
