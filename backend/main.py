@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import clients
@@ -8,6 +9,9 @@ from sqlmodel import Session, select
 from .models import User
 
 load_dotenv()
+
+# Hent admin-kodeord fra miljøvariabel (eller brug fallback hvis ikke sat)
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "meget_sikkert_fallback_kodeord")
 
 app = FastAPI(
     title="Kulturskole Infoskaerm Backend",
@@ -20,7 +24,7 @@ def ensure_admin_user():
         if not user:
             admin = User(
                 username="admin",
-                hashed_password=get_password_hash("KulVib2025info"),
+                hashed_password=get_password_hash(ADMIN_PASSWORD),
                 role="admin",
                 is_active=True
             )
@@ -37,7 +41,9 @@ def on_startup():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Juster evt. til din frontend-url
+    allow_origins=[
+        "https://inforskaerm-frontend.netlify.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
