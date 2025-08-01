@@ -28,27 +28,3 @@ app.add_middleware(
 
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router)
-
-# --- MIDLERTIDIG ENDPOINT: Opret admin-bruger ---
-admin_router = APIRouter()
-
-@admin_router.post("/create-admin")
-def create_admin():
-    with Session(engine) as session:
-        user = session.exec(
-            select(User).where(User.username == "admin")
-        ).first()
-        if user:
-            raise HTTPException(status_code=400, detail="Admin already exists")
-        admin = User(
-            username="admin",
-            hashed_password=get_password_hash("KulVib2025info"),
-            role="admin",
-            is_active=True
-        )
-        session.add(admin)
-        session.commit()
-        return {"msg": "Admin created"}
-
-app.include_router(admin_router)
-# --- SLET ovenstående når admin er oprettet! ---
