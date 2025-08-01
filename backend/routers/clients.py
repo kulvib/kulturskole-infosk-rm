@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 from typing import List
+from datetime import datetime, timedelta
 from ..db import get_session
 from ..models import Client, ClientCreate, ClientUpdate
 from ..auth import get_current_admin_user
@@ -9,7 +10,14 @@ router = APIRouter()
 
 @router.get("/clients/", response_model=List[Client])
 def get_clients(session=Depends(get_session), user=Depends(get_current_admin_user)):
-    return session.exec(select(Client)).all()
+    clients = session.exec(select(Client)).all()
+    now = datetime.utcnow()
+    for client in clients:
+        # Online hvis heartbeat (last_seen) er under 2 minutter gammel
+        client.isOnline = (
+            client.last_seen is not None and (now - client.last_seen) < timedelta(minutes=2)
+        )
+    return clients
 
 @router.post("/clients/", response_model=Client)
 def create_client(
@@ -25,6 +33,7 @@ def create_client(
         mac_address=client_in.mac_address,
         status="pending",
         isOnline=False,
+        last_seen=None,
     )
     session.add(client)
     session.commit()
@@ -54,6 +63,20 @@ def approve_client(id: int, session=Depends(get_session), user=Depends(get_curre
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     client.status = "approved"
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return client
+
+@router.post("/clients/{id}/heartbeat", response_model=Client)
+def client_heartbeat(
+    id: int,
+    session=Depends(get_session)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    client.last_seen = datetime.utcnow()
     session.add(client)
     session.commit()
     session.refresh(client)
