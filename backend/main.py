@@ -5,9 +5,9 @@ from .auth import router as auth_router, get_password_hash
 from .db import create_db_and_tables, engine
 from dotenv import load_dotenv
 from sqlmodel import Session
-from .models import User  # Nu eksisterer User (se tidligere besked)
+from .models import User
 
-load_dotenv()  # Læs .env hvis den findes
+load_dotenv()
 
 app = FastAPI(
     title="Kulturskole Infoskaerm Backend",
@@ -20,7 +20,7 @@ def on_startup():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Sæt evt. din frontend-url
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
