@@ -6,16 +6,14 @@ class Client(SQLModel, table=True):
     name: Optional[str]
     unique_id: Optional[str]
     locality: Optional[str]
-    status: str = "pending"       # "pending" eller "approved"
+    status: str = "pending"
     ip_address: Optional[str]
     mac_address: Optional[str]
     isOnline: Optional[bool] = False
 
-# ---- TILFØJ DENNE ----
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str
     hashed_password: str
-    role: str = "user"           # "admin" eller "user"
+    role: str = "user"
     is_active: bool = True
-# ------------------------
