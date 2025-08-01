@@ -5,7 +5,7 @@ import ClientInfoPage from "./components/ClientInfoPage";
 import HolidaysPage from "./components/HolidaysPage";
 import ClientDetailsPage from "./components/ClientDetailsPage";
 import LoginPage from "./components/LoginPage";
-import HomePage from "./components/HomePage"; // <-- NY
+import HomePage from "./components/HomePage";
 import ProtectedRoute from "./auth/ProtectedRoute";
 
 import {
@@ -25,7 +25,86 @@ export default function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ... alle dine fetch/add/remove-metoder (samme som før)
+  // Fetch clients from API
+  const fetchClients = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getClients();
+      setClients(data);
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+
+  // Fetch holidays from API
+  const fetchHolidays = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getHolidays();
+      setHolidays(data);
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+
+  // Add a new holiday
+  const handleAddHoliday = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      await addHoliday(holidayDate, holidayDesc);
+      setHolidayDate("");
+      setHolidayDesc("");
+      fetchHolidays();
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+
+  // Delete a holiday
+  const handleDeleteHoliday = async (id) => {
+    setLoading(true);
+    setError("");
+    try {
+      await deleteHoliday(id);
+      fetchHolidays();
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+
+  // Approve a client
+  const handleApproveClient = async (id) => {
+    setLoading(true);
+    setError("");
+    try {
+      await approveClient(id);
+      fetchClients();
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+
+  // Remove a client
+  const handleRemoveClient = async (id) => {
+    setLoading(true);
+    setError("");
+    try {
+      await removeClient(id);
+      fetchClients();
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
     fetchClients();
@@ -46,10 +125,7 @@ export default function App() {
           }
         >
           {/* Forside: HomePage */}
-          <Route
-            index
-            element={<HomePage />} // <-- NY forside!
-          />
+          <Route index element={<HomePage />} />
           <Route
             path="clients"
             element={
@@ -65,11 +141,7 @@ export default function App() {
           />
           <Route
             path="clients/:clientId"
-            element={
-              <ClientDetailsPage
-                clients={clients}
-              />
-            }
+            element={<ClientDetailsPage clients={clients} />}
           />
           <Route
             path="holidays"
