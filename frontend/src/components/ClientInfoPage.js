@@ -31,7 +31,7 @@ export default function ClientInfoPage({
   onApproveClient,
   onRemoveClient,
   fetchClients,
-  token, // Hvis du bruger authentication, send token som prop
+  token, // token skal sendes som prop!
 }) {
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
@@ -54,6 +54,7 @@ export default function ClientInfoPage({
     return () => clearInterval(interval);
   }, [fetchClients]);
 
+  // Brug token i alle requests!
   const handleLocationSave = async (clientId) => {
     setSavingLocation((prev) => ({ ...prev, [clientId]: true }));
     try {
@@ -61,7 +62,7 @@ export default function ClientInfoPage({
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Authorization": `Bearer ${token}`, // token SKAL med!
         },
         body: JSON.stringify({ locality: editableLocations[clientId] }),
       });
