@@ -1,4 +1,4 @@
-import { useAuth } from "./authcontext";
+import { useAuth } from "./auth/authcontext";
 
 const apiUrl = process.env.REACT_APP_API_URL || "https://kulturskole-infosk-rm.onrender.com";
 
