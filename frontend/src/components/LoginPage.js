@@ -9,17 +9,21 @@ import {
   Typography,
   Alert,
   Paper,
+  IconButton,
+  InputAdornment,
 } from "@mui/material";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 export default function LoginPage() {
   const { token, loginUser } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Hvis allerede logget ind, så redirect væk fra login
   useEffect(() => {
     if (token) {
       navigate("/", { replace: true });
@@ -33,12 +37,13 @@ export default function LoginPage() {
     try {
       const data = await login(username, password);
       loginUser(data.access_token);
-      // Efter login redirecter useEffect ovenfor automatisk
     } catch (err) {
       setError(err.message);
     }
     setLoading(false);
   };
+
+  const handleClickShowPassword = () => setShowPassword((show) => !show);
 
   return (
     <Box
@@ -80,9 +85,22 @@ export default function LoginPage() {
             label="Kodeord"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            type="password"
+            type={showPassword ? "text" : "password"}
             required
             variant="outlined"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle password visibility"
+                    onClick={handleClickShowPassword}
+                    edge="end"
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
           <Button
             type="submit"
