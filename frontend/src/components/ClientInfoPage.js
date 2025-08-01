@@ -33,11 +33,9 @@ export default function ClientInfoPage({
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
 
-  // Opdel klienter
   const approvedClients = clients?.filter((c) => c.status === "approved") || [];
   const unapprovedClients = clients?.filter((c) => c.status !== "approved") || [];
 
-  // Initier lokalitet-felter for godkendte klienter
   useEffect(() => {
     const initialLocations = {};
     approvedClients.forEach(
@@ -46,7 +44,6 @@ export default function ClientInfoPage({
     setEditableLocations(initialLocations);
   }, [clients]);
 
-  // Poll for opdatering af online-status
   useEffect(() => {
     const interval = setInterval(() => {
       fetchClients();
@@ -54,7 +51,6 @@ export default function ClientInfoPage({
     return () => clearInterval(interval);
   }, [fetchClients]);
 
-  // Gem lokalitet i backend
   const handleLocationSave = async (clientId) => {
     setSavingLocation((prev) => ({ ...prev, [clientId]: true }));
     try {
@@ -100,7 +96,7 @@ export default function ClientInfoPage({
                   <TableRow key={client.id} hover>
                     {/* Klientnavn */}
                     <TableCell>
-                      <Typography fontWeight={600}>{client.name}</Typography>
+                      {client.name}
                     </TableCell>
                     {/* Lokalitet */}
                     <TableCell>
@@ -200,9 +196,7 @@ export default function ClientInfoPage({
                 unapprovedClients.map((client) => (
                   <TableRow key={client.id} hover>
                     <TableCell>
-                      <Typography fontWeight={600}>
-                        {client.name || "Ukendt navn"}
-                      </Typography>
+                      {client.name || "Ukendt navn"}
                     </TableCell>
                     <TableCell>
                       <Chip
