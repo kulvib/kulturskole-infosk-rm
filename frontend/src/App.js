@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import ClientInfoPage from "./components/ClientInfoPage";
 import HolidaysPage from "./components/HolidaysPage";
@@ -115,7 +115,6 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-
         <Route
           path="/"
           element={
@@ -124,15 +123,10 @@ export default function App() {
             </ProtectedRoute>
           }
         >
+          {/* Redirect dashboard-root til /clients */}
           <Route
             index
-            element={
-              <div style={{ marginTop: 40, textAlign: "center" }}>
-                <h2>Velkommen!</h2>
-                <p>Vælg en funktion i menuen til venstre.</p>
-                {error && <p style={{ color: "red" }}>{error}</p>}
-              </div>
-            }
+            element={<Navigate to="clients" replace />}
           />
           <Route
             path="clients"
