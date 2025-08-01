@@ -33,7 +33,9 @@ export default function ClientInfoPage({
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
 
+  // Godkendte: status skal være "approved" (eller brug det relevante felt fra din backend)
   const approvedClients = clients?.filter((c) => c.status === "approved") || [];
+  // Ikke godkendte
   const unapprovedClients = clients?.filter((c) => c.status !== "approved") || [];
 
   useEffect(() => {
@@ -65,6 +67,30 @@ export default function ClientInfoPage({
     }
     setSavingLocation((prev) => ({ ...prev, [clientId]: false }));
   };
+
+  // Hjælpekomponent til status (online/offline)
+  function StatusCell({ isOnline }) {
+    return (
+      <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
+        <FiberManualRecordIcon
+          sx={{
+            color: isOnline ? "green" : "red",
+            fontSize: 18,
+          }}
+        />
+        <Typography
+          sx={{
+            fontWeight: 700,
+            color: isOnline ? "green" : "red",
+            textTransform: "lowercase",
+            ml: 0.5,
+          }}
+        >
+          {isOnline ? "online" : "offline"}
+        </Typography>
+      </Stack>
+    );
+  }
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
@@ -130,14 +156,7 @@ export default function ClientInfoPage({
                     </TableCell>
                     {/* Status */}
                     <TableCell align="center">
-                      <Tooltip title={client.isOnline ? "Online" : "Offline"}>
-                        <FiberManualRecordIcon
-                          sx={{
-                            color: client.isOnline ? "green" : "red",
-                            fontSize: 22,
-                          }}
-                        />
-                      </Tooltip>
+                      <StatusCell isOnline={client.isOnline} />
                     </TableCell>
                     {/* Info */}
                     <TableCell align="center">
@@ -199,18 +218,12 @@ export default function ClientInfoPage({
                       {client.name || "Ukendt navn"}
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={client.ip_address || "ukendt"}
-                        size="small"
-                        sx={{ bgcolor: "#e3f2fd" }}
-                      />
+                      {/* Ingen farve på IP-adresse */}
+                      <span>{client.ip_address || "ukendt"}</span>
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={client.mac_address || "ukendt"}
-                        size="small"
-                        sx={{ bgcolor: "#f3e5f5" }}
-                      />
+                      {/* Ingen farve på MAC-adresse */}
+                      <span>{client.mac_address || "ukendt"}</span>
                     </TableCell>
                     <TableCell align="center">
                       <Button
