@@ -1,107 +1,230 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
-  Typography, Table, TableHead, TableBody, TableRow, TableCell,
-  IconButton, CircularProgress, Button, Stack, Paper, Chip
+  Box,
+  Typography,
+  Paper,
+  List,
+  ListItem,
+  ListItemText,
+  IconButton,
+  TextField,
+  Button,
+  Divider,
+  Chip,
+  Tooltip,
+  Stack,
+  CircularProgress,
 } from "@mui/material";
-import CheckIcon from "@mui/icons-material/Check";
-import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
-import { useNavigate } from "react-router-dom";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import { Link } from "react-router-dom";
 
 export default function ClientInfoPage({
-  clients, loading, onApproveClient, onRemoveClient, fetchClients
+  clients,
+  setClients,
+  loading,
+  onApproveClient,
+  onRemoveClient,
+  fetchClients,
 }) {
-  const navigate = useNavigate();
+  // Midlertidig lagring af lokalitetsfelt
+  const [editableLocations, setEditableLocations] = useState({});
+  const [savingLocation, setSavingLocation] = useState({}); // id: bool
+
+  // Opdel klienter
+  const approvedClients = clients.filter((c) => c.status === "approved");
+  const unapprovedClients = clients.filter((c) => c.status !== "approved");
+
+  // Initialiser lokalitetsfelter for godkendte klienter
+  useEffect(() => {
+    const initialLocations = {};
+    approvedClients.forEach(
+      (client) => (initialLocations[client.id] = client.locality || "")
+    );
+    setEditableLocations(initialLocations);
+  }, [clients]);
+
+  // Opdater klienter hvert 15. sekund for frisk online-status
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchClients();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [fetchClients]);
+
+  // Gem lokalitet i backend
+  const handleLocationSave = async (clientId) => {
+    setSavingLocation((prev) => ({ ...prev, [clientId]: true }));
+    try {
+      await fetch(`/api/clients/${clientId}/update`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locality: editableLocations[clientId] }),
+      });
+      // Opdatér klientlisten
+      fetchClients();
+    } catch (err) {
+      alert("Kunne ikke gemme lokalitet");
+    }
+    setSavingLocation((prev) => ({ ...prev, [clientId]: false }));
+  };
+
+  const handleLocationChange = (clientId, value) => {
+    setEditableLocations((prev) => ({
+      ...prev,
+      [clientId]: value,
+    }));
+  };
 
   return (
-    <Paper sx={{ p: 3, maxWidth: 1000, mx: "auto", mt: 2, boxShadow: 2 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h5" sx={{ fontWeight: "bold" }}>
-          Klienter
-        </Typography>
-        <Button onClick={fetchClients} disabled={loading} variant="outlined">
-          Opdater liste
-        </Button>
-      </Stack>
-      {loading ? (
-        <Stack alignItems="center" justifyContent="center" sx={{ minHeight: 200 }}>
-          <CircularProgress />
-        </Stack>
-      ) : (
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Navn</TableCell>
-              <TableCell>Lokalitet</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Godkendt</TableCell>
-              <TableCell>Online</TableCell>
-              <TableCell>Handlinger</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {clients.map((client) => (
-              <TableRow key={client.id || client.unique_id}>
-                <TableCell>
-                  {client.name || client.unique_id}
-                </TableCell>
-                <TableCell>{client.locality}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={client.isOnline ? "Online" : "Offline"}
-                    color={client.isOnline ? "success" : "error"}
-                    size="small"
+    <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
+      <Typography variant="h5" sx={{ mb: 2 }}>
+        Godkendte klienter
+      </Typography>
+      <Paper sx={{ mb: 4 }}>
+        <List>
+          {approvedClients.length === 0 && (
+            <ListItem>
+              <ListItemText primary="Ingen godkendte klienter." />
+            </ListItem>
+          )}
+          {approvedClients.map((client) => (
+            <React.Fragment key={client.id}>
+              <ListItem
+                secondaryAction={
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {/* Info-knap */}
+                    <Tooltip title="Info">
+                      <IconButton
+                        component={Link}
+                        to={`/clients/${client.id}`}
+                        color="primary"
+                      >
+                        <InfoIcon />
+                      </IconButton>
+                    </Tooltip>
+                    {/* Fjern klient */}
+                    <Tooltip title="Fjern klient">
+                      <IconButton
+                        edge="end"
+                        color="error"
+                        onClick={() => onRemoveClient(client.id)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                }
+              >
+                {/* Online/offline prik */}
+                <Tooltip
+                  title={client.isOnline ? "Online" : "Offline"}
+                >
+                  <FiberManualRecordIcon
+                    sx={{
+                      color: client.isOnline ? "green" : "red",
+                      mr: 1,
+                    }}
                   />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={client.status === "approved" ? "Godkendt" : "Afventer"}
-                    color={client.status === "approved" ? "success" : "warning"}
+                </Tooltip>
+                {/* Klientnavn */}
+                <ListItemText
+                  primary={
+                    <Typography sx={{ fontWeight: 600 }}>
+                      {client.name}
+                    </Typography>
+                  }
+                  secondary={
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Typography variant="caption" sx={{ color: "gray" }}>
+                        Lokalitet:
+                      </Typography>
+                      <TextField
+                        size="small"
+                        value={editableLocations[client.id] || ""}
+                        onChange={(e) =>
+                          handleLocationChange(client.id, e.target.value)
+                        }
+                        disabled={savingLocation[client.id]}
+                        sx={{ width: 180 }}
+                      />
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleLocationSave(client.id)}
+                        disabled={savingLocation[client.id]}
+                        sx={{ ml: 1 }}
+                      >
+                        {savingLocation[client.id] ? (
+                          <CircularProgress size={18} />
+                        ) : (
+                          "Gem"
+                        )}
+                      </Button>
+                    </Stack>
+                  }
+                />
+              </ListItem>
+              <Divider />
+            </React.Fragment>
+          ))}
+        </List>
+      </Paper>
+
+      <Typography variant="h5" sx={{ mb: 2 }}>
+        Ikke godkendte klienter
+      </Typography>
+      <Paper>
+        <List>
+          {unapprovedClients.length === 0 && (
+            <ListItem>
+              <ListItemText primary="Ingen ikke-godkendte klienter." />
+            </ListItem>
+          )}
+          {unapprovedClients.map((client) => (
+            <React.Fragment key={client.id}>
+              <ListItem
+                secondaryAction={
+                  <Button
+                    variant="contained"
+                    color="success"
                     size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={client.isOnline ? "Ja" : "Nej"}
-                    color={client.isOnline ? "success" : "default"}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  <IconButton
+                    startIcon={<AddIcon />}
                     onClick={() => onApproveClient(client.id)}
-                    disabled={client.status === "approved"}
-                    title="Godkend klient"
                   >
-                    <CheckIcon color={client.status === "approved" ? "disabled" : "success"} />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => onRemoveClient(client.id)}
-                    title="Fjern klient"
-                  >
-                    <DeleteIcon color="error" />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => navigate(`/clients/${client.id}`)}
-                    title="Detaljer"
-                  >
-                    <InfoIcon color="primary" />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-            {clients.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6}>
-                  <Typography color="text.secondary" align="center">
-                    Ingen klienter fundet
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      )}
-    </Paper>
+                    Tilføj klient
+                  </Button>
+                }
+              >
+                <ListItemText
+                  primary={
+                    <Typography sx={{ fontWeight: 600 }}>
+                      {client.name || "Ukendt navn"}
+                    </Typography>
+                  }
+                  secondary={
+                    <Stack direction="row" spacing={3}>
+                      <Chip
+                        label={`IP: ${client.ip_address || "ukendt"}`}
+                        size="small"
+                        sx={{ bgcolor: "#e3f2fd" }}
+                      />
+                      <Chip
+                        label={`MAC: ${client.mac_address || "ukendt"}`}
+                        size="small"
+                        sx={{ bgcolor: "#f3e5f5" }}
+                      />
+                    </Stack>
+                  }
+                />
+              </ListItem>
+              <Divider />
+            </React.Fragment>
+          ))}
+        </List>
+      </Paper>
+    </Box>
   );
 }
