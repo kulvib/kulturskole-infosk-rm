@@ -20,7 +20,7 @@ class Client(ClientBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     status: str = "pending"
     isOnline: bool = False
-    last_seen: Optional[datetime] = None   # <-- tilføjet
+    last_seen: Optional[datetime] = None   # <-- tilføjet til heartbeat
 
 class ClientCreate(ClientBase):
     pass
