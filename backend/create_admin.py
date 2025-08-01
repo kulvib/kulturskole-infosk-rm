@@ -1,19 +1,17 @@
-from sqlmodel import Session
+from sqlmodel import Session, select
 from .db import engine
 from .models import User
 from .auth import get_password_hash
 
-def create_admin_user():
+def create_admin():
     with Session(engine) as session:
-        user = session.exec(
-            User.select().where(User.username == "admin")
-        ).first()
+        user = session.exec(select(User).where(User.username == "admin")).first()
         if user:
-            print("Admin already exists")
+            print("Admin user already exists.")
             return
         admin = User(
             username="admin",
-            hashed_password=get_password_hash("admin123"),
+            hashed_password=get_password_hash("KulVibinfo2025"),
             role="admin",
             is_active=True
         )
@@ -22,4 +20,4 @@ def create_admin_user():
         print("Admin user created!")
 
 if __name__ == "__main__":
-    create_admin_user()
+    create_admin()
