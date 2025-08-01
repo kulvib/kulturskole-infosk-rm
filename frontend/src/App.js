@@ -7,6 +7,7 @@ import ClientDetailsPage from "./components/ClientDetailsPage";
 import LoginPage from "./components/LoginPage";
 import HomePage from "./components/HomePage";
 import ProtectedRoute from "./auth/ProtectedRoute";
+import { AuthProvider } from "./authcontext"; // <-- IMPORTÉR AuthProvider
 
 import {
   getClients,
@@ -113,54 +114,56 @@ export default function App() {
   }, []);
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        >
-          {/* Forside: HomePage */}
-          <Route index element={<HomePage />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
           <Route
-            path="clients"
+            path="/"
             element={
-              <ClientInfoPage
-                clients={clients}
-                setClients={setClients}
-                loading={loading}
-                onApproveClient={handleApproveClient}
-                onRemoveClient={handleRemoveClient}
-                fetchClients={fetchClients}
-              />
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
             }
-          />
-          <Route
-            path="clients/:clientId"
-            element={<ClientDetailsPage clients={clients} />}
-          />
-          <Route
-            path="holidays"
-            element={
-              <HolidaysPage
-                holidays={holidays}
-                holidayDate={holidayDate}
-                setHolidayDate={setHolidayDate}
-                holidayDesc={holidayDesc}
-                setHolidayDesc={setHolidayDesc}
-                setHolidays={setHolidays}
-                loading={loading}
-                handleAddHoliday={handleAddHoliday}
-                handleDeleteHoliday={handleDeleteHoliday}
-              />
-            }
-          />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+          >
+            {/* Forside: HomePage */}
+            <Route index element={<HomePage />} />
+            <Route
+              path="clients"
+              element={
+                <ClientInfoPage
+                  clients={clients}
+                  setClients={setClients}
+                  loading={loading}
+                  onApproveClient={handleApproveClient}
+                  onRemoveClient={handleRemoveClient}
+                  fetchClients={fetchClients}
+                />
+              }
+            />
+            <Route
+              path="clients/:clientId"
+              element={<ClientDetailsPage clients={clients} />}
+            />
+            <Route
+              path="holidays"
+              element={
+                <HolidaysPage
+                  holidays={holidays}
+                  holidayDate={holidayDate}
+                  setHolidayDate={setHolidayDate}
+                  holidayDesc={holidayDesc}
+                  setHolidayDesc={setHolidayDesc}
+                  setHolidays={setHolidays}
+                  loading={loading}
+                  handleAddHoliday={handleAddHoliday}
+                  handleDeleteHoliday={handleDeleteHoliday}
+                />
+              }
+            />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
