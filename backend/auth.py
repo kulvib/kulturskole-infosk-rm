@@ -1,17 +1,16 @@
 from fastapi import APIRouter, HTTPException, Depends, status
-from pydantic import BaseModel
-from passlib.context import CryptContext
 from sqlmodel import Session, select
-from .models import User
-from .db import engine, get_session
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from passlib.context import CryptContext
+from pydantic import BaseModel
 from typing import Optional
+from .db import get_session
+from .models import User
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
-# Brug Pydantic-modeller
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -46,8 +45,7 @@ def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    # Her skal du generere et JWT-token med fx python-jose.
-    # Eksempel-token for illustration:
+    # Her skal du generere et JWT-token og returnere
     token = "FAKETOKEN"
     return {"access_token": token, "token_type": "bearer"}
 
@@ -55,8 +53,7 @@ def get_current_admin_user(
     token: str = Depends(oauth2_scheme),
     session: Session = Depends(get_session)
 ):
-    # Her skal du dekode JWT-token og finde bruger i DB
-    # For nu: dummy admin-bruger for eksempel
+    # Dummy lookup, indsæt evt. JWT-dekoder her
     user = session.exec(select(User).where(User.username == "admin")).first()
     if not user or user.role != "admin":
         raise HTTPException(status_code=403, detail="Admins only")
