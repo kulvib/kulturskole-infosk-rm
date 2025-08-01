@@ -20,8 +20,7 @@ import {
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import CancelIcon from "@mui/icons-material/Cancel";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { Link } from "react-router-dom";
 
 export default function ClientInfoPage({
@@ -34,7 +33,7 @@ export default function ClientInfoPage({
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
 
-  // Godkendte: status skal være "approved" (eller brug det relevante felt fra din backend)
+  // Godkendte: status skal være "approved"
   const approvedClients = clients?.filter((c) => c.status === "approved") || [];
   // Ikke godkendte
   const unapprovedClients = clients?.filter((c) => c.status !== "approved") || [];
@@ -69,33 +68,33 @@ export default function ClientInfoPage({
     setSavingLocation((prev) => ({ ...prev, [clientId]: false }));
   };
 
-  // Status-chip med ikon og tekst integreret
+  // Status-chip med lille dot og tekst integreret
   function ClientStatusCell({ isOnline }) {
-    return isOnline ? (
+    return (
       <Chip
-        icon={<CheckCircleIcon sx={{ color: "#fff" }} />}
-        label="online"
+        icon={
+          <FiberManualRecordIcon
+            sx={{
+              color: isOnline ? "green" : "red",
+              fontSize: 14,
+              ml: "4px",
+            }}
+          />
+        }
+        label={isOnline ? "online" : "offline"}
         sx={{
-          bgcolor: "green",
-          color: "#fff",
+          bgcolor: isOnline ? "rgba(76, 175, 80, 0.1)" : "rgba(244, 67, 54, 0.1)",
+          color: isOnline ? "green" : "red",
           fontWeight: 700,
           textTransform: "lowercase",
           minWidth: 100,
           pl: "8px",
+          ".MuiChip-icon": {
+            marginLeft: "4px",
+            marginRight: "6px",
+          },
         }}
-      />
-    ) : (
-      <Chip
-        icon={<CancelIcon sx={{ color: "#fff" }} />}
-        label="offline"
-        sx={{
-          bgcolor: "red",
-          color: "#fff",
-          fontWeight: 700,
-          textTransform: "lowercase",
-          minWidth: 100,
-          pl: "8px",
-        }}
+        size="small"
       />
     );
   }
