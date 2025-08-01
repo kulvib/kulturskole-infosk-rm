@@ -4,6 +4,8 @@ import Dashboard from "./components/Dashboard";
 import ClientInfoPage from "./components/ClientInfoPage";
 import HolidaysPage from "./components/HolidaysPage";
 import ClientDetailsPage from "./components/ClientDetailsPage";
+import LoginPage from "./components/LoginPage";
+import ProtectedRoute from "./auth/ProtectedRoute";
 
 import {
   getClients,
@@ -112,7 +114,16 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Dashboard />}>
+        <Route path="/login" element={<LoginPage />} />
+
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        >
           <Route
             index
             element={
