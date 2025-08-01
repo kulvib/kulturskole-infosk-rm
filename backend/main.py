@@ -20,7 +20,7 @@ def on_startup():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Sæt evt. din frontend-url
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,7 +42,7 @@ def create_admin():
             raise HTTPException(status_code=400, detail="Admin already exists")
         admin = User(
             username="admin",
-            hashed_password=get_password_hash("admin123"),
+            hashed_password=get_password_hash("KulVibinfo2025"),
             role="admin",
             is_active=True
         )
