@@ -1,40 +1,127 @@
 import React from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import LogoutButton from "./LogoutButton";
-import { AppBar, Toolbar, Typography, Box, Button } from "@mui/material";
+import {
+  Box,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Toolbar,
+  Typography,
+  AppBar,
+} from "@mui/material";
+
+const drawerWidth = 230;
+
+const menuItems = [
+  {
+    text: "Klienter",
+    path: "/clients",
+    match: "/clients",
+  },
+  {
+    text: "Helligdage",
+    path: "/holidays",
+    match: "/holidays",
+  },
+];
 
 export default function Dashboard() {
   const location = useLocation();
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
-      <AppBar position="static" elevation={3}>
+    <Box sx={{ display: "flex" }}>
+      {/* AppBar for branding and log out */}
+      <AppBar
+        position="fixed"
+        sx={{
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          background: "#036",
+          color: "#fff",
+          boxShadow: 2,
+          height: 64,
+          display: "flex",
+          justifyContent: "center",
+        }}
+        elevation={3}
+      >
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Kulturskole Admin
-            </Typography>
-            <Button
-              color={location.pathname.startsWith("/clients") ? "secondary" : "inherit"}
-              component={Link}
-              to="/clients"
-              sx={{ ml: 2 }}
-            >
-              Klienter
-            </Button>
-            <Button
-              color={location.pathname.startsWith("/holidays") ? "secondary" : "inherit"}
-              component={Link}
-              to="/holidays"
-              sx={{ ml: 2 }}
-            >
-              Helligdage
-            </Button>
-          </Box>
-          <LogoutButton />
+          <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>
+            Kulturskolen Viborg - infoskærm administration
+          </Typography>
+          <LogoutButton color="inherit" />
         </Toolbar>
       </AppBar>
-      <Box sx={{ p: 3 }}>
+
+      {/* Drawer for menu */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          [`& .MuiDrawer-paper`]: {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            background: "#eee",
+            borderRight: "1px solid #e0e0e0",
+          },
+        }}
+      >
+        <Toolbar />
+        <List sx={{ mt: 2 }}>
+          {menuItems.map((item) => (
+            <ListItem key={item.text} disablePadding>
+              <ListItemButton
+                component={Link}
+                to={item.path}
+                selected={location.pathname.startsWith(item.match)}
+                sx={{
+                  borderRadius: 2,
+                  mx: 1,
+                  my: 0.5,
+                  backgroundColor: location.pathname.startsWith(item.match)
+                    ? "#e0f2f1"
+                    : "inherit",
+                  "&:hover": {
+                    backgroundColor: "#b2ebf2",
+                  },
+                }}
+              >
+                <ListItemText
+                  primary={
+                    <Typography
+                      sx={{
+                        fontWeight: location.pathname.startsWith(item.match)
+                          ? 700
+                          : 400,
+                        color: "#036",
+                      }}
+                    >
+                      {item.text}
+                    </Typography>
+                  }
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Drawer>
+
+      {/* Main content */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: `calc(100% - ${drawerWidth}px)`,
+          minHeight: "100vh",
+          background: "#f6f9fb",
+        }}
+      >
+        {/* Ensure content is not hidden behind AppBar */}
+        <Toolbar />
         <Outlet />
       </Box>
     </Box>
