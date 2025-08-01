@@ -7,3 +7,4 @@ pydantic
 uvicorn
 python-dotenv
 python-multipart
+psycopg2-binary
