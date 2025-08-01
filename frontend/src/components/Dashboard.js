@@ -122,7 +122,7 @@ export default function Dashboard() {
       >
         {/* Ensure content is not hidden behind AppBar */}
         <Toolbar />
-        <Outlet /> {/* Her vises HomePage, ClientInfoPage, HolidaysPage osv. */}
+        <Outlet /> {/* <- HER! HomePage, ClientInfoPage osv. bliver vist her */}
       </Box>
     </Box>
   );
