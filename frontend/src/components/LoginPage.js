@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../auth/authcontext";
+import { useNavigate } from "react-router-dom";
 import { login } from "../api";
 import {
   Box,
@@ -11,11 +12,19 @@ import {
 } from "@mui/material";
 
 export default function LoginPage() {
-  const { loginUser } = useAuth();
+  const { token, loginUser } = useAuth();
+  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Hvis allerede logget ind, så redirect væk fra login
+  useEffect(() => {
+    if (token) {
+      navigate("/", { replace: true });
+    }
+  }, [token, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,7 +33,7 @@ export default function LoginPage() {
     try {
       const data = await login(username, password);
       loginUser(data.access_token);
-      // Siden redirectes automatisk af ProtectedRoute i App.js
+      // Efter login redirecter useEffect ovenfor automatisk
     } catch (err) {
       setError(err.message);
     }
