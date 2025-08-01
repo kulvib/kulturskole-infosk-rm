@@ -4,7 +4,7 @@ from .routers import clients
 from .auth import router as auth_router, get_password_hash
 from .db import create_db_and_tables, engine
 from dotenv import load_dotenv
-from sqlmodel import Session
+from sqlmodel import Session, select
 from .models import User
 
 load_dotenv()
@@ -36,7 +36,7 @@ admin_router = APIRouter()
 def create_admin():
     with Session(engine) as session:
         user = session.exec(
-            User.select().where(User.username == "admin")
+            select(User).where(User.username == "admin")
         ).first()
         if user:
             raise HTTPException(status_code=400, detail="Admin already exists")
