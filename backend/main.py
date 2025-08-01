@@ -3,14 +3,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import clients
 from .auth import router as auth_router, get_password_hash
-from .db import create_db_and_tables, engine
+from .db import create_db_and_tables, engine, get_session
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 from .models import User
 
 load_dotenv()
 
-# Hent admin-kodeord fra miljøvariabel (eller brug fallback hvis ikke sat)
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "meget_sikkert_fallback_kodeord")
 
 app = FastAPI(
@@ -50,4 +49,4 @@ app.add_middleware(
 )
 
 app.include_router(clients.router, prefix="/api")
-app.include_router(auth_router)
+app.include_router(auth_router, prefix="/auth")
