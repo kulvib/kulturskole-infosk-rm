@@ -1,11 +1,23 @@
+import os
 from fastapi import APIRouter, HTTPException, Depends, status
-from sqlmodel import Session, select
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
+from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from dotenv import load_dotenv
+
 from .db import get_session
 from .models import User
+
+# Indlæs .env variabler
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY", "fallback-key")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -14,12 +26,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 class Token(BaseModel):
     access_token: str
     token_type: str
-
-class UserOut(BaseModel):
-    id: int
-    username: str
-    role: str
-    is_active: bool
 
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -33,6 +39,13 @@ def authenticate_user(username: str, password: str, session: Session):
         return None
     return user
 
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
 @router.post("/token", response_model=Token)
 def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -45,16 +58,28 @@ def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    # Her skal du generere et JWT-token og returnere
-    token = "FAKETOKEN"
-    return {"access_token": token, "token_type": "bearer"}
+    # Generer JWT-token
+    access_token = create_access_token(data={"sub": user.username, "role": getattr(user, "role", "admin")})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 def get_current_admin_user(
     token: str = Depends(oauth2_scheme),
     session: Session = Depends(get_session)
 ):
-    # Dummy lookup, indsæt evt. JWT-dekoder her
-    user = session.exec(select(User).where(User.username == "admin")).first()
-    if not user or user.role != "admin":
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        role: str = payload.get("role")
+        if username is None or role is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = session.exec(select(User).where(User.username == username)).first()
+    if not user or getattr(user, "role", "admin") != "admin":
         raise HTTPException(status_code=403, detail="Admins only")
     return user
