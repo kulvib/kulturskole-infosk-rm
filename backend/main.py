@@ -28,3 +28,24 @@ app.add_middleware(
 
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router)
+
+from sqlmodel import Session, select
+from backend.db import engine
+from backend.models import User
+from backend.auth import get_password_hash
+
+@app.post("/create-admin")
+def create_admin():
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.username == "admin")).first()
+        if user:
+            return {"msg": "Admin already exists"}
+        admin = User(
+            username="admin",
+            hashed_password=get_password_hash("KulVib2025info"),
+            role="admin",
+            is_active=True
+        )
+        session.add(admin)
+        session.commit()
+        return {"msg": "Admin user created"}
