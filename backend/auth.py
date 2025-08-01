@@ -5,14 +5,13 @@ from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from pydantic import BaseModel
+from sqlmodel import Session, select
+from .db import engine
+from .models import User
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "supersecretkey")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
-
-ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
-# Hash for password "admin123"
-ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "$2b$12$KIXQ5p63j7pAqkqgAF.1QO1S1WQm7y3K9C5lKfFv0hUTR9G9Wb7eG")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer()
@@ -27,6 +26,9 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -36,7 +38,7 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_current_admin_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -46,17 +48,30 @@ def get_current_admin_user(credentials: HTTPAuthorizationCredentials = Depends(b
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        if username != ADMIN_USERNAME:
+        if username is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    return username
+    # Slå brugeren op i databasen
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.username == username)).first()
+        if user is None:
+            raise credentials_exception
+    return user
+
+def get_current_admin_user(user: User = Depends(get_current_user)):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return user
 
 @router.post("/login", response_model=Token)
 def login(form: LoginRequest):
-    if form.username != ADMIN_USERNAME:
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
-    if not verify_password(form.password, ADMIN_PASSWORD_HASH):
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
-    token = create_access_token({"sub": ADMIN_USERNAME})
+    # Slå bruger op i databasen
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.username == form.username)).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Incorrect username or password")
+        if not verify_password(form.password, user.hashed_password):
+            raise HTTPException(status_code=401, detail="Incorrect username or password")
+    token = create_access_token({"sub": user.username})
     return {"access_token": token, "token_type": "bearer"}
