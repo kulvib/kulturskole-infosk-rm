@@ -11,7 +11,7 @@ def create_admin():
             return
         admin = User(
             username="admin",
-            hashed_password=get_password_hash("KulVibinfo2025"),
+            hashed_password=get_password_hash("KulVib2025info"),
             role="admin",
             is_active=True
         )
