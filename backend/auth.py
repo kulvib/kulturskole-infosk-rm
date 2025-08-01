@@ -38,35 +38,8 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    token = credentials.credentials
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-    # Slå brugeren op i databasen
-    with Session(engine) as session:
-        user = session.exec(select(User).where(User.username == username)).first()
-        if user is None:
-            raise credentials_exception
-    return user
-
-def get_current_admin_user(user: User = Depends(get_current_user)):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
-    return user
-
 @router.post("/login", response_model=Token)
 def login(form: LoginRequest):
-    # Slå bruger op i databasen
     with Session(engine) as session:
         user = session.exec(select(User).where(User.username == form.username)).first()
         if not user:
