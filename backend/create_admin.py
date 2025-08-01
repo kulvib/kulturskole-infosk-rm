@@ -1,15 +1,17 @@
 from fastapi import APIRouter, HTTPException
 from sqlmodel import Session
-from backend.models import User  # Ret til korrekt import
-from backend.auth import get_password_hash  # Ret til korrekt import
-from backend.database import engine  # Ret til korrekt import
+from backend.models import User    # Ret denne import til hvor din User-model ligger
+from backend.auth import get_password_hash  # Ret denne import til hvor din hash-funktion ligger
+from backend.database import engine         # Ret denne import til hvor din engine ligger
 
 router = APIRouter()
 
 @router.post("/create-admin")
 def create_admin():
     with Session(engine) as session:
-        user = session.query(User).filter(User.username == "admin").first()
+        user = session.exec(
+            User.select().where(User.username == "admin")
+        ).first()
         if user:
             raise HTTPException(status_code=400, detail="Admin already exists")
         admin = User(
