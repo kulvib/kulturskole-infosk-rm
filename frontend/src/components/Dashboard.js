@@ -31,11 +31,6 @@ const menuItems = [
 export default function Dashboard() {
   const location = useLocation();
 
-  // Tjek om vi er på dashboard-root (uden undersider)
-  const isOnDashboardRoot =
-    location.pathname === "/dashboard" ||
-    location.pathname === "/dashboard/";
-
   return (
     <Box sx={{ display: "flex" }}>
       {/* AppBar for branding and log out */}
@@ -127,21 +122,7 @@ export default function Dashboard() {
       >
         {/* Ensure content is not hidden behind AppBar */}
         <Toolbar />
-        {isOnDashboardRoot ? (
-          <Typography
-            variant="h5"
-            sx={{
-              mt: 6,
-              textAlign: "center",
-              fontWeight: 600,
-              color: "#222",
-            }}
-          >
-            Mainområde - Velkommen til Kulturskolen Viborg infoskærms administration
-          </Typography>
-        ) : (
-          <Outlet />
-        )}
+        <Outlet /> {/* Her vises HomePage, ClientInfoPage, HolidaysPage osv. */}
       </Box>
     </Box>
   );
