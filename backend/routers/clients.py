@@ -1,22 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
-from ..db import get_session
-from ..models import Client
 from typing import List
+from ..db import get_session
+from ..models import Client, ClientCreate, ClientUpdate
 from ..auth import get_current_admin_user
-from pydantic import BaseModel
 
 router = APIRouter()
-
-class ClientCreate(BaseModel):
-    name: str
-    unique_id: str
-    locality: str
-    ip_address: str
-    mac_address: str
-
-class ClientUpdate(BaseModel):
-    locality: str
 
 @router.get("/clients/", response_model=List[Client])
 def get_clients(session=Depends(get_session), user=Depends(get_current_admin_user)):
@@ -52,7 +41,8 @@ def update_client(
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    client.locality = client_update.locality
+    if client_update.locality is not None:
+        client.locality = client_update.locality
     session.add(client)
     session.commit()
     session.refresh(client)
