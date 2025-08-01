@@ -3,180 +3,25 @@ import {
   Box,
   Typography,
   Paper,
-  List,
-  ListItem,
-  ListItemText,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   IconButton,
   TextField,
   Button,
-  Divider,
-  Chip,
   Tooltip,
-  Stack,
   CircularProgress,
-  Skeleton,
-  useTheme,
+  Stack,
+  Chip,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { Link } from "react-router-dom";
-
-function OnlineIndicator({ online }) {
-  const theme = useTheme();
-  return (
-    <FiberManualRecordIcon
-      sx={{
-        color: online ? theme.palette.success.main : theme.palette.error.main,
-        fontSize: 18,
-        mr: 1,
-      }}
-    />
-  );
-}
-
-function ClientRow({
-  client,
-  onRemove,
-  onSaveLocality,
-  isSaving,
-  editableLocation,
-  setEditableLocation,
-}) {
-  return (
-    <Paper
-      variant="outlined"
-      sx={{
-        mb: 2,
-        p: 2,
-        borderRadius: 2,
-        bgcolor: client.isOnline ? "rgba(76,175,80,0.07)" : "background.paper",
-        transition: "background 0.2s",
-      }}
-    >
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        alignItems={{ xs: "flex-start", sm: "center" }}
-        justifyContent="space-between"
-        spacing={2}
-      >
-        <Stack direction="row" alignItems="center" spacing={2} flex={1}>
-          <OnlineIndicator online={client.isOnline} />
-          <Box>
-            <Typography variant="h6" fontWeight={600}>
-              {client.name}
-            </Typography>
-            <Stack direction="row" spacing={1} alignItems="center" mt={0.5}>
-              <Typography variant="caption" color="text.secondary">
-                Lokalitet:
-              </Typography>
-              <TextField
-                size="small"
-                value={editableLocation[client.id] || ""}
-                onChange={e =>
-                  setEditableLocation({ ...editableLocation, [client.id]: e.target.value })
-                }
-                disabled={isSaving}
-                sx={{ width: 140 }}
-                inputProps={{ style: { fontSize: 13 } }}
-              />
-              <Button
-                size="small"
-                variant="contained"
-                color="primary"
-                onClick={() => onSaveLocality(client.id)}
-                disabled={isSaving}
-                sx={{ ml: 1, minWidth: 60, fontSize: 12 }}
-              >
-                {isSaving ? <CircularProgress size={16} /> : "Gem"}
-              </Button>
-            </Stack>
-            <Stack direction="row" spacing={1} mt={1}>
-              <Chip
-                label={client.ip_address}
-                color="default"
-                variant="outlined"
-                size="small"
-              />
-              <Chip
-                label={client.mac_address}
-                color="default"
-                variant="outlined"
-                size="small"
-              />
-            </Stack>
-          </Box>
-        </Stack>
-        <Stack direction="row" spacing={1}>
-          <Tooltip title="Info">
-            <IconButton component={Link} to={`/clients/${client.id}`} color="primary">
-              <InfoIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Fjern klient">
-            <IconButton
-              color="error"
-              onClick={() => onRemove(client.id)}
-              sx={{ ml: 1 }}
-            >
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Stack>
-    </Paper>
-  );
-}
-
-function PendingClientRow({ client, onApprove }) {
-  return (
-    <Paper
-      variant="outlined"
-      sx={{
-        mb: 2,
-        p: 2,
-        borderRadius: 2,
-        bgcolor: "background.paper",
-      }}
-    >
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        alignItems={{ xs: "flex-start", sm: "center" }}
-        justifyContent="space-between"
-        spacing={2}
-      >
-        <Box>
-          <Typography variant="h6" fontWeight={600}>
-            {client.name || "Ukendt navn"}
-          </Typography>
-          <Stack direction="row" spacing={1} mt={1}>
-            <Chip
-              label={`IP: ${client.ip_address || "ukendt"}`}
-              size="small"
-              sx={{ bgcolor: "#e3f2fd" }}
-            />
-            <Chip
-              label={`MAC: ${client.mac_address || "ukendt"}`}
-              size="small"
-              sx={{ bgcolor: "#f3e5f5" }}
-            />
-          </Stack>
-        </Box>
-        <Button
-          variant="contained"
-          color="success"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={() => onApprove(client.id)}
-          sx={{ minWidth: 120 }}
-        >
-          Tilføj klient
-        </Button>
-      </Stack>
-    </Paper>
-  );
-}
 
 export default function ClientInfoPage({
   clients,
@@ -188,9 +33,11 @@ export default function ClientInfoPage({
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
 
+  // Opdel klienter
   const approvedClients = clients?.filter((c) => c.status === "approved") || [];
   const unapprovedClients = clients?.filter((c) => c.status !== "approved") || [];
 
+  // Initier lokalitet-felter for godkendte klienter
   useEffect(() => {
     const initialLocations = {};
     approvedClients.forEach(
@@ -199,6 +46,7 @@ export default function ClientInfoPage({
     setEditableLocations(initialLocations);
   }, [clients]);
 
+  // Poll for opdatering af online-status
   useEffect(() => {
     const interval = setInterval(() => {
       fetchClients();
@@ -206,6 +54,7 @@ export default function ClientInfoPage({
     return () => clearInterval(interval);
   }, [fetchClients]);
 
+  // Gem lokalitet i backend
   const handleLocationSave = async (clientId) => {
     setSavingLocation((prev) => ({ ...prev, [clientId]: true }));
     try {
@@ -222,60 +71,172 @@ export default function ClientInfoPage({
   };
 
   return (
-    <Box sx={{ maxWidth: 700, mx: "auto", mt: 4 }}>
+    <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
+      {/* Godkendte klienter */}
       <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
         Godkendte klienter
       </Typography>
-      {loading ? (
-        Array.from({ length: 2 }).map((_, i) => (
-          <Paper variant="outlined" sx={{ mb: 2, p: 2, borderRadius: 2 }} key={i}>
-            <Skeleton variant="rectangular" height={48} />
-          </Paper>
-        ))
-      ) : approvedClients.length === 0 ? (
-        <Paper sx={{ p: 2, mb: 4 }}>
-          <Typography variant="body1" color="text.secondary">
-            Ingen godkendte klienter.
-          </Typography>
-        </Paper>
-      ) : (
-        approvedClients.map((client) => (
-          <ClientRow
-            key={client.id}
-            client={client}
-            onRemove={onRemoveClient}
-            onSaveLocality={handleLocationSave}
-            isSaving={!!savingLocation[client.id]}
-            editableLocation={editableLocations}
-            setEditableLocation={setEditableLocations}
-          />
-        ))
-      )}
+      <Paper sx={{ mb: 4 }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
+                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
+                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {approvedClients.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">
+                    Ingen godkendte klienter.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                approvedClients.map((client) => (
+                  <TableRow key={client.id} hover>
+                    {/* Klientnavn */}
+                    <TableCell>
+                      <Typography fontWeight={600}>{client.name}</Typography>
+                    </TableCell>
+                    {/* Lokalitet */}
+                    <TableCell>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <TextField
+                          size="small"
+                          value={editableLocations[client.id] || ""}
+                          onChange={(e) =>
+                            setEditableLocations((prev) => ({
+                              ...prev,
+                              [client.id]: e.target.value,
+                            }))
+                          }
+                          disabled={savingLocation[client.id]}
+                          sx={{ width: 150 }}
+                        />
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => handleLocationSave(client.id)}
+                          disabled={savingLocation[client.id]}
+                          sx={{ minWidth: 44, px: 1 }}
+                        >
+                          {savingLocation[client.id] ? (
+                            <CircularProgress size={18} />
+                          ) : (
+                            "Gem"
+                          )}
+                        </Button>
+                      </Stack>
+                    </TableCell>
+                    {/* Status */}
+                    <TableCell align="center">
+                      <Tooltip title={client.isOnline ? "Online" : "Offline"}>
+                        <FiberManualRecordIcon
+                          sx={{
+                            color: client.isOnline ? "green" : "red",
+                            fontSize: 22,
+                          }}
+                        />
+                      </Tooltip>
+                    </TableCell>
+                    {/* Info */}
+                    <TableCell align="center">
+                      <Tooltip title="Info">
+                        <IconButton
+                          component={Link}
+                          to={`/clients/${client.id}`}
+                          color="primary"
+                        >
+                          <InfoIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                    {/* Fjern */}
+                    <TableCell align="center">
+                      <Tooltip title="Fjern klient">
+                        <IconButton
+                          color="error"
+                          onClick={() => onRemoveClient(client.id)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
+      {/* Ikke godkendte klienter */}
       <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
         Ikke godkendte klienter
       </Typography>
-      {loading ? (
-        Array.from({ length: 1 }).map((_, i) => (
-          <Paper variant="outlined" sx={{ mb: 2, p: 2, borderRadius: 2 }} key={i}>
-            <Skeleton variant="rectangular" height={40} />
-          </Paper>
-        ))
-      ) : unapprovedClients.length === 0 ? (
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="body1" color="text.secondary">
-            Ingen ikke-godkendte klienter.
-          </Typography>
-        </Paper>
-      ) : (
-        unapprovedClients.map((client) => (
-          <PendingClientRow
-            key={client.id}
-            client={client}
-            onApprove={onApproveClient}
-          />
-        ))
-      )}
+      <Paper>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>IP-adresse</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>MAC-adresse</TableCell>
+                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Tilføj</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {unapprovedClients.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    Ingen ikke-godkendte klienter.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                unapprovedClients.map((client) => (
+                  <TableRow key={client.id} hover>
+                    <TableCell>
+                      <Typography fontWeight={600}>
+                        {client.name || "Ukendt navn"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={client.ip_address || "ukendt"}
+                        size="small"
+                        sx={{ bgcolor: "#e3f2fd" }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={client.mac_address || "ukendt"}
+                        size="small"
+                        sx={{ bgcolor: "#f3e5f5" }}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Button
+                        variant="contained"
+                        color="success"
+                        size="small"
+                        startIcon={<AddIcon />}
+                        onClick={() => onApproveClient(client.id)}
+                        sx={{ minWidth: 44 }}
+                      >
+                        Tilføj
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
     </Box>
   );
 }
