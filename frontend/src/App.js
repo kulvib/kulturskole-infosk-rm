@@ -5,6 +5,7 @@ import ClientInfoPage from "./components/ClientInfoPage";
 import HolidaysPage from "./components/HolidaysPage";
 import ClientDetailsPage from "./components/ClientDetailsPage";
 import LoginPage from "./components/LoginPage";
+import HomePage from "./components/HomePage"; // <-- NY
 import ProtectedRoute from "./auth/ProtectedRoute";
 
 import {
@@ -24,86 +25,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Hent klienter fra backend
-  const fetchClients = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await getClients();
-      setClients(data);
-    } catch (err) {
-      setError(err.message);
-    }
-    setLoading(false);
-  };
-
-  // Hent helligdage fra backend
-  const fetchHolidays = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await getHolidays();
-      setHolidays(data);
-    } catch (err) {
-      setError(err.message);
-    }
-    setLoading(false);
-  };
-
-  // Tilføj helligdag
-  const handleAddHoliday = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      await addHoliday(holidayDate, holidayDesc);
-      setHolidayDate("");
-      setHolidayDesc("");
-      fetchHolidays();
-    } catch (err) {
-      setError(err.message);
-    }
-    setLoading(false);
-  };
-
-  // Slet helligdag
-  const handleDeleteHoliday = async (id) => {
-    setError("");
-    setLoading(true);
-    try {
-      await deleteHoliday(id);
-      fetchHolidays();
-    } catch (err) {
-      setError(err.message);
-    }
-    setLoading(false);
-  };
-
-  // Godkend klient
-  const handleApproveClient = async (id) => {
-    setLoading(true);
-    setError("");
-    try {
-      await approveClient(id);
-      fetchClients();
-    } catch (err) {
-      setError(err.message);
-    }
-    setLoading(false);
-  };
-
-  // Fjern klient
-  const handleRemoveClient = async (id) => {
-    setLoading(true);
-    setError("");
-    try {
-      await removeClient(id);
-      fetchClients();
-    } catch (err) {
-      setError(err.message);
-    }
-    setLoading(false);
-  };
+  // ... alle dine fetch/add/remove-metoder (samme som før)
 
   useEffect(() => {
     fetchClients();
@@ -123,10 +45,10 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          {/* Redirect dashboard-root til /clients */}
+          {/* Forside: HomePage */}
           <Route
             index
-            element={<Navigate to="clients" replace />}
+            element={<HomePage />} // <-- NY forside!
           />
           <Route
             path="clients"
