@@ -136,6 +136,21 @@ export default function ClientDetailsPage({ client, fetchClient }) {
 
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4 }}>
+      {/* Refresh icon aligned to right */}
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+        <Tooltip title="Opdater klient">
+          <span>
+            <IconButton
+              onClick={handleRefreshClient}
+              disabled={refreshing}
+              size="large"
+              color="primary"
+            >
+              {refreshing ? <CircularProgress size={24} /> : <RefreshIcon />}
+            </IconButton>
+          </span>
+        </Tooltip>
+      </Box>
       <Grid container spacing={4}>
         {/* Samlet afsnit 1 & 2 */}
         <Grid item xs={12}>
@@ -147,22 +162,6 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                     {client.name}
                   </Typography>
                   <ClientStatusChip status={client.status} isOnline={client.isOnline} />
-                  <Typography sx={{ color: "#888", ml: 2 }}>
-                    ID: {client.id}
-                  </Typography>
-                  <Tooltip title="Opdater klient">
-                    <span>
-                      <IconButton
-                        onClick={handleRefreshClient}
-                        disabled={refreshing}
-                        size="large"
-                        sx={{ ml: 2 }}
-                        color="primary"
-                      >
-                        {refreshing ? <CircularProgress size={24} /> : <RefreshIcon />}
-                      </IconButton>
-                    </span>
-                  </Tooltip>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOnIcon color="primary" />
@@ -200,6 +199,11 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }}>Oppetid:</Typography>
                   <Typography>{client.uptime || "ukendt"}</Typography>
                 </Stack>
+                {/* Klient ID placeres her, efter Oppetid */}
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography sx={{ fontWeight: 600, minWidth: 90 }}>Klient ID:</Typography>
+                  <Typography sx={{ color: "#888" }}>{client.id}</Typography>
+                </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }}>IP-adresse:</Typography>
@@ -234,7 +238,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                   value={kioskUrl}
                   onChange={e => setKioskUrl(e.target.value)}
                   sx={{
-                    width: 220,
+                    width: 440, // Dobbelt så langt som før
                     "& .MuiInputBase-input": { fontSize: "1rem" },
                     "& .MuiInputBase-root": { height: 30 },
                   }}
