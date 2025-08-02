@@ -29,7 +29,6 @@ export default function ClientInfoPage({
   clients,
   loading,
   onApproveClient,
-  onRemoveClient,
   fetchClients,
 }) {
   const { token } = useAuth();
@@ -100,6 +99,19 @@ export default function ClientInfoPage({
     setSavingLocation((prev) => ({ ...prev, [clientId]: false }));
   };
 
+  // Slet klient og opdater listen
+  const onRemoveClient = async (clientId) => {
+    try {
+      await fetch(`${API_BASE}/api/clients/${clientId}/remove`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchClients();
+    } catch (err) {
+      alert("Kunne ikke fjerne klient: " + err.message);
+    }
+  };
+
   // Statusfelt med lys rød/grøn og sort, ikke fed tekst
   function ClientStatusCell({ isOnline }) {
     return (
@@ -134,154 +146,152 @@ export default function ClientInfoPage({
   const showLoadingText = loading || !clients || clients.length === 0;
 
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, position: "relative" }}>
-      {/* Fade tekst "Vent venligst" */}
-      {showLoadingText && (
+    <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
+      {/* Kun loading-fade besked, intet andet synligt */}
+      {showLoadingText ? (
         <Box
           sx={{
-            position: "absolute",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "60vh",
             width: "100%",
-            top: 100,
+            position: "absolute",
+            top: 0,
             left: 0,
             zIndex: 10,
-            display: "flex",
-            justifyContent: "center",
-            pointerEvents: "none",
+            bgcolor: "background.default",
           }}
         >
           <Typography
+            variant="h5"
             sx={{
-              fontSize: 28,
               color: "#444",
               animation: "fade 1.5s infinite alternate",
+              fontWeight: 700,
+              textTransform: "none",
               fontFamily: "inherit",
-              fontWeight: 400,
-              textShadow: "0 2px 10px #fff",
               '@keyframes fade': {
                 from: { opacity: 0.2 },
                 to: { opacity: 1 },
               },
             }}
           >
-            Vent venligst...
+            vent venligst...
           </Typography>
         </Box>
-      )}
-
-      {/* Top row med titel og opdater-knap */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          Godkendte klienter
-        </Typography>
-        <Tooltip title="Opdater klientdata">
-          <span>
-            <Button
-              startIcon={
-                refreshing ? (
-                  <CircularProgress size={20} />
-                ) : (
-                  <RefreshIcon />
-                )
-              }
-              onClick={handleRefresh}
-              disabled={refreshing}
-              sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
-            >
-              Opdater
-            </Button>
-          </span>
-        </Tooltip>
-      </Stack>
-      {!showLoadingText && (
-        <Paper sx={{ mb: 4 }}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
-                  <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
-                  <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {approvedClients.length === 0 ? (
+      ) : (
+        <>
+          {/* Top row med titel og opdater-knap */}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              Godkendte klienter
+            </Typography>
+            <Tooltip title="Opdater klientdata">
+              <span>
+                <Button
+                  startIcon={
+                    refreshing ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      <RefreshIcon />
+                    )
+                  }
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
+                >
+                  Opdater
+                </Button>
+              </span>
+            </Tooltip>
+          </Stack>
+          <Paper sx={{ mb: 4 }}>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
-                      Ingen godkendte klienter.
-                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
+                    <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
+                    <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
                   </TableRow>
-                ) : (
-                  approvedClients.map((client) => (
-                    <TableRow key={client.id} hover>
-                      <TableCell>
-                        {client.name}
-                      </TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <TextField
-                            size="small"
-                            value={editableLocations[client.id] || ""}
-                            onChange={(e) =>
-                              setEditableLocations((prev) => ({
-                                ...prev,
-                                [client.id]: e.target.value,
-                              }))
-                            }
-                            disabled={savingLocation[client.id]}
-                            sx={{ width: 150 }}
-                          />
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => handleLocationSave(client.id)}
-                            disabled={savingLocation[client.id]}
-                            sx={{ minWidth: 44, px: 1 }}
-                          >
-                            {savingLocation[client.id] ? (
-                              <CircularProgress size={18} />
-                            ) : (
-                              "Gem"
-                            )}
-                          </Button>
-                        </Stack>
-                      </TableCell>
-                      <TableCell align="center">
-                        <ClientStatusCell isOnline={client.isOnline} />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Tooltip title="Info">
-                          <IconButton
-                            component={Link}
-                            to={`/clients/${client.id}`}
-                            color="primary"
-                          >
-                            <InfoIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell align="center">
-                        <Tooltip title="Fjern klient">
-                          <IconButton
-                            color="error"
-                            onClick={() => onRemoveClient(client.id)}
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
+                </TableHead>
+                <TableBody>
+                  {approvedClients.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        Ingen godkendte klienter.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      )}
-      {/* Ikke godkendte klienter */}
-      {!showLoadingText && (
-        <>
+                  ) : (
+                    approvedClients.map((client) => (
+                      <TableRow key={client.id} hover>
+                        <TableCell>
+                          {client.name}
+                        </TableCell>
+                        <TableCell>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <TextField
+                              size="small"
+                              value={editableLocations[client.id] || ""}
+                              onChange={(e) =>
+                                setEditableLocations((prev) => ({
+                                  ...prev,
+                                  [client.id]: e.target.value,
+                                }))
+                              }
+                              disabled={savingLocation[client.id]}
+                              sx={{ width: 150 }}
+                            />
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => handleLocationSave(client.id)}
+                              disabled={savingLocation[client.id]}
+                              sx={{ minWidth: 44, px: 1 }}
+                            >
+                              {savingLocation[client.id] ? (
+                                <CircularProgress size={18} />
+                              ) : (
+                                "Gem"
+                              )}
+                            </Button>
+                          </Stack>
+                        </TableCell>
+                        <TableCell align="center">
+                          <ClientStatusCell isOnline={client.isOnline} />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="Info">
+                            <IconButton
+                              component={Link}
+                              to={`/clients/${client.id}`}
+                              color="primary"
+                            >
+                              <InfoIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="Fjern klient">
+                            <IconButton
+                              color="error"
+                              onClick={() => onRemoveClient(client.id)}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+          {/* Ikke godkendte klienter */}
           <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
             Ikke godkendte klienter
           </Typography>
