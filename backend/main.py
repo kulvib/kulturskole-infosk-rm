@@ -1,9 +1,9 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import clients
 from .routers import mqtt
-from .routers import holidays  # <-- NY LINJE!
+from .routers import holidays
 from .auth import router as auth_router, get_password_hash
 from .db import create_db_and_tables, engine, get_session
 from dotenv import load_dotenv
@@ -40,7 +40,7 @@ def ensure_admin_user():
 def on_startup():
     create_db_and_tables()
     ensure_admin_user()
-    mqtt_connect()  # Starter MQTT forbindelse
+    mqtt_connect()
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,7 +52,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# WebSocket: global liste over klienter
+connected_websockets = []
+
+@app.websocket("/ws/clients")
+async def clients_ws(websocket: WebSocket):
+    await websocket.accept()
+    connected_websockets.append(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # holder forbindelsen åben
+    except WebSocketDisconnect:
+        connected_websockets.remove(websocket)
+
+async def notify_clients_updated():
+    # Send "update" til alle forbundne websockets
+    for ws in connected_websockets:
+        try:
+            await ws.send_text("update")
+        except Exception:
+            pass  # evt. håndter fejl her
+
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
 app.include_router(mqtt.router, prefix="/mqtt")
-app.include_router(holidays.router, prefix="/api")  # <-- NY LINJE!
+app.include_router(holidays.router, prefix="/api")
