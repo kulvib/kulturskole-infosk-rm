@@ -30,7 +30,7 @@ export default function ClientInfoPage({
   onApproveClient,
   onRemoveClient,
   fetchClients,
-  }) {
+}) {
   // Lokalitet state
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
@@ -130,7 +130,7 @@ export default function ClientInfoPage({
     }
   };
 
-  // Statusfelt
+  // Statusfelt (mindre tekst)
   function ClientStatusCell({ isOnline }) {
     return (
       <Box
@@ -138,13 +138,13 @@ export default function ClientInfoPage({
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 48, // mindre bredde
-          height: 20, // mindre højde
+          width: 48,
+          height: 20,
           borderRadius: "12px",
           bgcolor: isOnline ? "#43a047" : "#FF8A80",
           color: "#111",
           fontWeight: 400,
-          fontSize: 15, // tekststørrelse uændret
+          fontSize: 13, // mindre tekst
           boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
         }}
       >
@@ -264,9 +264,9 @@ export default function ClientInfoPage({
                                     }
                                     disabled={savingLocation[client.id]}
                                     sx={{
-                                      width: 120, // mindre bredde
+                                      width: 120,
                                       '& .MuiInputBase-root': {
-                                        height: 30, // mindre højde på inputramme
+                                        height: 30,
                                       }
                                     }}
                                   />
@@ -275,7 +275,7 @@ export default function ClientInfoPage({
                                     variant="outlined"
                                     onClick={() => handleLocationSave(client.id)}
                                     disabled={savingLocation[client.id]}
-                                    sx={{ minWidth: 44, px: 1, height: 30 }} // mindre højde på knap
+                                    sx={{ minWidth: 44, px: 1, height: 30 }}
                                   >
                                     {savingLocation[client.id] ? (
                                       <CircularProgress size={18} />
