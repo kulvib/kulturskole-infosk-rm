@@ -23,6 +23,19 @@ import { Link } from "react-router-dom";
 import { updateClient } from "../api";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
+// Hjælpefunktion til at formatere dato/tid
+function formatTimestamp(isoDate) {
+  if (!isoDate) return "";
+  const date = new Date(isoDate);
+  return date.toLocaleString("da-DK", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function ClientInfoPage({
   clients,
   loading,
@@ -271,13 +284,14 @@ export default function ClientInfoPage({
                 <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>IP-adresse</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>MAC-adresse</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Tilføjet</TableCell>
                 <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Tilføj</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {unapprovedClients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} align="center">
+                  <TableCell colSpan={5} align="center">
                     Ingen ikke-godkendte klienter.
                   </TableCell>
                 </TableRow>
@@ -292,6 +306,9 @@ export default function ClientInfoPage({
                     </TableCell>
                     <TableCell>
                       <span>{client.mac_address || "ukendt"}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span>{formatTimestamp(client.created_at)}</span>
                     </TableCell>
                     <TableCell align="center">
                       <Button
