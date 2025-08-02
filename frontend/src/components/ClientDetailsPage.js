@@ -25,16 +25,27 @@ import MemoryIcon from "@mui/icons-material/Memory";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
-// Offline/Online status: meget lille, kun grøn/rød cirkel
+// VIGTIGT: Importér updateClient, pushKioskUrl, clientAction, openTerminal, openRemoteDesktop, getClientStream
+import {
+  updateClient,
+  pushKioskUrl,
+  clientAction,
+  openTerminal,
+  openRemoteDesktop,
+  getClientStream,
+} from "../api";
+
+// Offline/Online status: meget lille, kun grøn/rød cirkel + tekst med Roboto font
 function ClientStatusIcon({ isOnline }) {
   return (
     <Box
       sx={{
-        display: "inline-flex", // NB! "inline-flex" for tekst og ikon
+        display: "inline-flex",
         alignItems: "center",
-        fontFamily: "Roboto, Helvetica, Arial, sans-serif", // <--- HER!
+        fontFamily: "Roboto, Helvetica, Arial, sans-serif",
         fontSize: 13,
         fontWeight: 400,
+        ml: 1,
       }}
     >
       <Box
@@ -43,7 +54,6 @@ function ClientStatusIcon({ isOnline }) {
           height: 14,
           borderRadius: "50%",
           bgcolor: isOnline ? "#66FF33" : "#CC3300",
-          ml: 1,
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
         }}
