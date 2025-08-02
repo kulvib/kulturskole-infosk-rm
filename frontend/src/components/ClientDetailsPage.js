@@ -25,7 +25,6 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import LanIcon from "@mui/icons-material/Lan";
 import MemoryIcon from "@mui/icons-material/Memory";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import PublicIcon from "@mui/icons-material/Public";
 
 import {
   updateClient,
@@ -128,165 +127,181 @@ export default function ClientDetailsPage({ client, fetchClient }) {
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
+    <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4 }}>
       <Stack spacing={4}>
-        {/* Afsnit 1: ID, Navn, Status */}
-        <Card elevation={2} sx={{ p: 3, borderRadius: 3 }}>
-          <Stack direction="row" alignItems="center" spacing={4} justifyContent="space-between">
-            <Stack direction="row" spacing={4} alignItems="center">
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                {client.name}
-              </Typography>
-              <Typography sx={{ color: "#888", fontSize: 18 }}>
-                ID: {client.id}
-              </Typography>
-            </Stack>
-            <ClientStatusChip status={client.status} isOnline={client.isOnline} />
-          </Stack>
-        </Card>
-
-        {/* Afsnit 2: Klientdata */}
-        <Card elevation={2} sx={{ p: 3, borderRadius: 3 }}>
-          <Grid container spacing={2} alignItems="center">
-            {/* Lokalitet - redigerbar */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <LocationOnIcon color="primary" />
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  Lokalitet:
-                </Typography>
+        {/* Afsnit 1 & 2 i to kolonner */}
+        <Grid container spacing={4}>
+          {/* Afsnit 1 - ID, Navn, Status */}
+          <Grid item xs={12} md={5}>
+            <Card elevation={2} sx={{ p: 3, borderRadius: 3, height: "100%" }}>
+              <Stack spacing={2}>
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <Typography variant="body1" sx={{ fontWeight: 600, minWidth: 64 }}>
+                    ID:
+                  </Typography>
+                  <Typography sx={{ color: "#888", fontSize: 18 }}>
+                    {client.id}
+                  </Typography>
+                </Stack>
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <Typography variant="body1" sx={{ fontWeight: 700, minWidth: 64 }}>
+                    Klientnavn:
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                    {client.name}
+                  </Typography>
+                </Stack>
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <Typography variant="body1" sx={{ fontWeight: 600, minWidth: 64 }}>
+                    Status:
+                  </Typography>
+                  <ClientStatusChip status={client.status} isOnline={client.isOnline} />
+                </Stack>
               </Stack>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
-                <TextField
-                  size="small"
-                  value={locality}
-                  onChange={e => setLocality(e.target.value)}
-                  sx={{
-                    width: 140,
-                    "& .MuiInputBase-input": { fontSize: "1rem" },
-                    "& .MuiInputBase-root": { height: 30 },
-                  }}
-                  disabled={savingLocality}
-                />
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={handleLocalitySave}
-                  disabled={savingLocality}
-                  sx={{ minWidth: 44, px: 1, height: 30 }}
-                >
-                  {savingLocality ? <CircularProgress size={18} /> : "Gem"}
-                </Button>
-              </Stack>
-            </Grid>
-            {/* Sidst set */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <AccessTimeIcon color="primary" />
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  Sidst set:
-                </Typography>
-                <Typography variant="body1" sx={{ ml: 1 }}>
-                  {client.last_seen || "ukendt"}
-                </Typography>
-              </Stack>
-            </Grid>
-            {/* Oppetid */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <AccessTimeIcon color="primary" />
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  Oppetid:
-                </Typography>
-                <Typography variant="body1" sx={{ ml: 1 }}>
-                  {client.uptime || "ukendt"}
-                </Typography>
-              </Stack>
-            </Grid>
-            {/* IP-adresse */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <LanIcon color="primary" />
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  IP-adresse:
-                </Typography>
-                <Typography variant="body1" sx={{ ml: 1 }}>
-                  {client.ip_address || "ukendt"}
-                </Typography>
-              </Stack>
-            </Grid>
-            {/* MAC-adresse */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <LanIcon color="primary" />
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  MAC-adresse:
-                </Typography>
-                <Typography variant="body1" sx={{ ml: 1 }}>
-                  {client.mac_address || "ukendt"}
-                </Typography>
-              </Stack>
-            </Grid>
-            {/* Ubuntu version */}
-            <Grid item xs={12} sm={6} md={4}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <MemoryIcon color="primary" />
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  Ubuntu version:
-                </Typography>
-                <Typography variant="body1" sx={{ ml: 1 }}>
-                  {client.ubuntu_version || "ukendt"}
-                </Typography>
-              </Stack>
-            </Grid>
+            </Card>
           </Grid>
-        </Card>
+          {/* Afsnit 2 - Klientdata */}
+          <Grid item xs={12} md={7}>
+            <Card elevation={2} sx={{ p: 3, borderRadius: 3, height: "100%" }}>
+              <Grid container spacing={2} alignItems="center">
+                {/* Lokalitet - redigerbar */}
+                <Grid item xs={12} sm={6}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <LocationOnIcon color="primary" />
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      Lokalitet:
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                    <TextField
+                      size="small"
+                      value={locality}
+                      onChange={e => setLocality(e.target.value)}
+                      sx={{
+                        width: 140,
+                        "& .MuiInputBase-input": { fontSize: "1rem" },
+                        "& .MuiInputBase-root": { height: 30 },
+                      }}
+                      disabled={savingLocality}
+                    />
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={handleLocalitySave}
+                      disabled={savingLocality}
+                      sx={{ minWidth: 44, px: 1, height: 30 }}
+                    >
+                      {savingLocality ? <CircularProgress size={18} /> : "Gem"}
+                    </Button>
+                  </Stack>
+                </Grid>
+                {/* Sidst set */}
+                <Grid item xs={12} sm={6}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <AccessTimeIcon color="primary" />
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      Sidst set:
+                    </Typography>
+                    <Typography variant="body1" sx={{ ml: 1 }}>
+                      {client.last_seen || "ukendt"}
+                    </Typography>
+                  </Stack>
+                </Grid>
+                {/* Oppetid */}
+                <Grid item xs={12} sm={6}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <AccessTimeIcon color="primary" />
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      Oppetid:
+                    </Typography>
+                    <Typography variant="body1" sx={{ ml: 1 }}>
+                      {client.uptime || "ukendt"}
+                    </Typography>
+                  </Stack>
+                </Grid>
+                {/* IP-adresse */}
+                <Grid item xs={12} sm={6}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <LanIcon color="primary" />
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      IP-adresse:
+                    </Typography>
+                    <Typography variant="body1" sx={{ ml: 1 }}>
+                      {client.ip_address || "ukendt"}
+                    </Typography>
+                  </Stack>
+                </Grid>
+                {/* MAC-adresse */}
+                <Grid item xs={12} sm={6}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <LanIcon color="primary" />
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      MAC-adresse:
+                    </Typography>
+                    <Typography variant="body1" sx={{ ml: 1 }}>
+                      {client.mac_address || "ukendt"}
+                    </Typography>
+                  </Stack>
+                </Grid>
+                {/* Ubuntu version */}
+                <Grid item xs={12} sm={6}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <MemoryIcon color="primary" />
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      Ubuntu version:
+                    </Typography>
+                    <Typography variant="body1" sx={{ ml: 1 }}>
+                      {client.ubuntu_version || "ukendt"}
+                    </Typography>
+                  </Stack>
+                </Grid>
+              </Grid>
+            </Card>
+          </Grid>
+        </Grid>
 
-        {/* Afsnit 3: Kiosk webadresse + Chrome Shutdown */}
+        {/* Afsnit 3: Kiosk webadresse + Luk Chrome Browser på samme linje */}
         <Card elevation={2} sx={{ p: 3, borderRadius: 3 }}>
-          <Stack spacing={2}>
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <ChromeReaderModeIcon color="primary" />
-              <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                Kiosk webadresse:
-              </Typography>
-              <TextField
-                size="small"
-                value={kioskUrl}
-                onChange={e => setKioskUrl(e.target.value)}
-                sx={{
-                  width: 220,
-                  "& .MuiInputBase-input": { fontSize: "1rem" },
-                  "& .MuiInputBase-root": { height: 30 },
-                }}
-                disabled={savingKioskUrl}
-              />
-              <Button
-                size="small"
-                variant="outlined"
-                color="primary"
-                onClick={handleKioskUrlSave}
-                disabled={savingKioskUrl}
-                sx={{ minWidth: 44, px: 1, height: 30 }}
-              >
-                {savingKioskUrl ? <CircularProgress size={18} /> : "Gem"}
-              </Button>
-            </Stack>
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Tooltip title="Luk Chrome Browser på klient">
-                <span>
-                  <Button
-                    variant="outlined"
-                    color="secondary"
-                    startIcon={<PowerSettingsNewIcon />}
-                    onClick={() => handleClientAction("chrome-shutdown")}
-                    disabled={actionLoading["chrome-shutdown"]}
-                  >
-                    Luk Chrome Browser
-                  </Button>
-                </span>
-              </Tooltip>
-            </Stack>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <ChromeReaderModeIcon color="primary" />
+            <Typography variant="body1" sx={{ fontWeight: 700 }}>
+              Kiosk webadresse:
+            </Typography>
+            <TextField
+              size="small"
+              value={kioskUrl}
+              onChange={e => setKioskUrl(e.target.value)}
+              sx={{
+                width: 220,
+                "& .MuiInputBase-input": { fontSize: "1rem" },
+                "& .MuiInputBase-root": { height: 30 },
+              }}
+              disabled={savingKioskUrl}
+            />
+            <Button
+              size="small"
+              variant="outlined"
+              color="primary"
+              onClick={handleKioskUrlSave}
+              disabled={savingKioskUrl}
+              sx={{ minWidth: 44, px: 1, height: 30 }}
+            >
+              {savingKioskUrl ? <CircularProgress size={18} /> : "Gem"}
+            </Button>
+            <Tooltip title="Luk Chrome Browser på klient">
+              <span>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  startIcon={<PowerSettingsNewIcon />}
+                  onClick={() => handleClientAction("chrome-shutdown")}
+                  disabled={actionLoading["chrome-shutdown"]}
+                  sx={{ ml: 2 }}
+                >
+                  Luk Chrome Browser
+                </Button>
+              </span>
+            </Tooltip>
           </Stack>
         </Card>
 
