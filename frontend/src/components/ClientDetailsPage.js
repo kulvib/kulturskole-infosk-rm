@@ -24,6 +24,8 @@ import LanIcon from "@mui/icons-material/Lan";
 import MemoryIcon from "@mui/icons-material/Memory";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { useNavigate } from "react-router-dom";
 
 import {
   updateClient,
@@ -76,6 +78,8 @@ export default function ClientDetailsPage() {
 
   const [actionLoading, setActionLoading] = useState({});
   const [refreshing, setRefreshing] = useState(false);
+
+  const navigate = useNavigate();
 
   // Fetch client by id
   const fetchClient = async () => {
@@ -161,7 +165,22 @@ export default function ClientDetailsPage() {
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 3 }}>
-      <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", mb: 1 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+        {/* Tilbage-knap til venstre */}
+        <Button
+          variant="outlined"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate("/clients")}
+          sx={{
+            textTransform: "none",
+            fontWeight: 500,
+            minWidth: 0,
+            px: 2,
+          }}
+        >
+          Tilbage til klientoversigt
+        </Button>
+        {/* Opdater-knap til højre */}
         <Tooltip title="Opdater klient">
           <span>
             <Button
@@ -189,6 +208,7 @@ export default function ClientDetailsPage() {
         </Tooltip>
       </Box>
       <Grid container spacing={sectionSpacing}>
+        {/* ... resten af komponenten uændret ... */}
         {/* Afsnit 1: Klient-info */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
