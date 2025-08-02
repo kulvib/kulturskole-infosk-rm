@@ -20,4 +20,6 @@ def connect():
     print("Starter MQTT-forbindelse til Mosquitto...")
     client.connect(MQTT_BROKER, MQTT_PORT)
     client.loop_start()
-    client.publish(MQTT_TOPIC, "Hej fra FastAPI backend!")  # Du kan fjerne denne linje, hvis du ikke vil sende ved opstart
+
+def send_message(message, topic=MQTT_TOPIC):
+    client.publish(topic, message)
