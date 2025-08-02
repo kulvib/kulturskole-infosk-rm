@@ -8,7 +8,6 @@ import {
   Button,
   Stack,
   TextField,
-  Chip,
   CircularProgress,
   Tooltip,
   IconButton,
@@ -26,57 +25,27 @@ import MemoryIcon from "@mui/icons-material/Memory";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
-import {
-  updateClient,
-  pushKioskUrl,
-  clientAction,
-  openTerminal,
-  openRemoteDesktop,
-  getClientStream,
-} from "../api";
-
-// Status-chip helper
-function ClientStatusChip({ status, isOnline }) {
-  let color = "default";
-  let label = status;
-  if (status === "approved") {
-    color = isOnline ? "success" : "warning";
-    label = isOnline ? "Online" : "Offline";
-  } else if (status === "pending") {
-    color = "default";
-    label = "Afventer godkendelse";
-  } else if (status === "removed") {
-    color = "error";
-    label = "Fjernet";
-  }
+// Offline/Online status chip på samme måde som ClientInfoPage.js
+function ClientStatusCell({ isOnline }) {
   return (
-    <Chip
-      label={label}
-      color={color}
-      variant={color === "default" ? "outlined" : "filled"}
-      icon={
-        <Box
-          sx={{
-            width: 16,
-            height: 16,
-            borderRadius: "50%",
-            bgcolor: isOnline ? "#66FF33" : "#CC3300",
-            display: "inline-block",
-            mr: 0.5,
-          }}
-        />
-      }
+    <Box
       sx={{
-        fontWeight: 600,
-        minWidth: 80,
-        fontSize: "0.90rem",
-        letterSpacing: 0.5,
-        pl: 1,
-        pr: 1,
-        height: 28,
-        ".MuiChip-icon": { fontSize: 18 },
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 48,
+        height: 20,
+        borderRadius: "12px",
+        bgcolor: isOnline ? "#66FF33" : "#CC3300",
+        color: "#fff",
+        fontWeight: 400,
+        fontSize: 13,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+        ml: 2,
       }}
-    />
+    >
+      {isOnline ? "online" : "offline"}
+    </Box>
   );
 }
 
@@ -150,8 +119,11 @@ export default function ClientDetailsPage({ client, fetchClient }) {
     setRefreshing(false);
   };
 
+  // Mindre afstand og ens afstand mellem afsnit
+  const sectionSpacing = 2; // mindre end før
+
   return (
-    <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4 }}>
+    <Box sx={{ maxWidth: 900, mx: "auto", mt: 3 }}>
       {/* Refresh icon aligned to right, with text */}
       <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", mb: 1 }}>
         <Tooltip title="Opdater klient">
@@ -180,27 +152,25 @@ export default function ClientDetailsPage({ client, fetchClient }) {
           </span>
         </Tooltip>
       </Box>
-      <Grid container spacing={4}>
-        {/* Samlet afsnit 1 & 2 */}
+      <Grid container spacing={sectionSpacing}>
+        {/* Afsnit 1: Klient-info */}
         <Grid item xs={12}>
-          <Card elevation={3} sx={{ borderRadius: 3, mb: 3 }}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
-              <Stack spacing={2}>
+              <Stack spacing={1.5}>
                 <Stack direction="row" alignItems="center" spacing={2}>
                   <Typography
-                    variant="h3"
+                    variant="h4"
                     sx={{
                       fontWeight: 700,
                       lineHeight: 1.15,
                       letterSpacing: 0.5,
-                      fontSize: { xs: "2rem", sm: "2.7rem", md: "3rem" },
+                      fontSize: { xs: "1.3rem", sm: "2rem", md: "2.2rem" },
                     }}
                   >
                     {client.name}
                   </Typography>
-                  <Box sx={{ ml: 1 }}>
-                    <ClientStatusChip status={client.status} isOnline={client.isOnline} />
-                  </Box>
+                  <ClientStatusCell isOnline={client.isOnline} />
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOnIcon color="primary" />
@@ -238,7 +208,6 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }}>Oppetid:</Typography>
                   <Typography>{client.uptime || "ukendt"}</Typography>
                 </Stack>
-                {/* Klient ID med samme ikon som IP-adresse */}
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }}>Klient ID:</Typography>
@@ -264,9 +233,9 @@ export default function ClientDetailsPage({ client, fetchClient }) {
           </Card>
         </Grid>
 
-        {/* Afsnit 3: Kiosk webadresse + Luk Chrome Browser */}
+        {/* Afsnit 2: Kiosk webadresse + Luk Chrome Browser */}
         <Grid item xs={12}>
-          <Card elevation={3} sx={{ borderRadius: 3 }}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
               <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 1 }}>
                 <ChromeReaderModeIcon color="primary" />
@@ -313,9 +282,9 @@ export default function ClientDetailsPage({ client, fetchClient }) {
           </Card>
         </Grid>
 
-        {/* Afsnit 4: Fjernadgang */}
+        {/* Afsnit 3: Fjernadgang */}
         <Grid item xs={12}>
-          <Card elevation={3} sx={{ borderRadius: 3 }}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
               <Stack direction="row" spacing={2}>
                 <Tooltip title="Åbn fjernskrivebord på klient">
@@ -347,9 +316,9 @@ export default function ClientDetailsPage({ client, fetchClient }) {
           </Card>
         </Grid>
 
-        {/* Afsnit 5: Handlinger */}
+        {/* Afsnit 4: Handlinger */}
         <Grid item xs={12}>
-          <Card elevation={3} sx={{ borderRadius: 3 }}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
               <Stack direction="row" spacing={2}>
                 <Tooltip title="Genstart klient">
@@ -396,9 +365,9 @@ export default function ClientDetailsPage({ client, fetchClient }) {
           </Card>
         </Grid>
 
-        {/* Afsnit 6: Livestream */}
+        {/* Afsnit 5: Livestream */}
         <Grid item xs={12}>
-          <Card elevation={3} sx={{ borderRadius: 3 }}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
                 <VideocamIcon color="action" fontSize="large" />
@@ -411,13 +380,14 @@ export default function ClientDetailsPage({ client, fetchClient }) {
               {/* Til WebRTC: */}
               {/* <video src={getClientStream(client.id)} controls autoPlay style={{ maxWidth: 500 }} /> */}
               <Box sx={{
-                p: 3,
+                p: 2,
                 border: "1px solid #eee",
                 borderRadius: 2,
                 background: "#fafafa",
                 textAlign: "center",
                 color: "#888",
-                fontStyle: "italic"
+                fontStyle: "italic",
+                fontSize: "1rem"
               }}>
                 Livestream placeholder (MJPEG/WebRTC)
               </Box>
