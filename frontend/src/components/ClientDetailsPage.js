@@ -11,6 +11,7 @@ import {
   Chip,
   CircularProgress,
   Tooltip,
+  IconButton,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -23,6 +24,7 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import LanIcon from "@mui/icons-material/Lan";
 import MemoryIcon from "@mui/icons-material/Memory";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
 import {
   updateClient,
@@ -70,6 +72,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
   const [savingKioskUrl, setSavingKioskUrl] = useState(false);
 
   const [actionLoading, setActionLoading] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
 
   if (!client) {
     return (
@@ -120,35 +123,47 @@ export default function ClientDetailsPage({ client, fetchClient }) {
   const handleOpenTerminal = () => openTerminal(client.id);
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
+  // Opdater klient
+  const handleRefreshClient = async () => {
+    setRefreshing(true);
+    try {
+      await fetchClient?.();
+    } catch (err) {
+      alert("Kunne ikke opdatere klienten: " + err.message);
+    }
+    setRefreshing(false);
+  };
+
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4 }}>
       <Grid container spacing={4}>
-
-        {/* Afsnit 1 & 2: Basisinfo og Klientdata side om side */}
-        <Grid item xs={12} md={6}>
-          {/* Afsnit 1 */}
+        {/* Samlet afsnit 1 & 2 */}
+        <Grid item xs={12}>
           <Card elevation={3} sx={{ borderRadius: 3, mb: 3 }}>
             <CardContent>
               <Stack spacing={2}>
-                <Typography variant="caption" sx={{ letterSpacing: 2, color: "#888" }}>Afsnit 1</Typography>
                 <Stack direction="row" alignItems="center" spacing={2}>
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
                     {client.name}
                   </Typography>
                   <ClientStatusChip status={client.status} isOnline={client.isOnline} />
+                  <Typography sx={{ color: "#888", ml: 2 }}>
+                    ID: {client.id}
+                  </Typography>
+                  <Tooltip title="Opdater klient">
+                    <span>
+                      <IconButton
+                        onClick={handleRefreshClient}
+                        disabled={refreshing}
+                        size="large"
+                        sx={{ ml: 2 }}
+                        color="primary"
+                      >
+                        {refreshing ? <CircularProgress size={24} /> : <RefreshIcon />}
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                 </Stack>
-                <Typography sx={{ color: "#888" }}>ID: {client.id}</Typography>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          {/* Afsnit 2 */}
-          <Card elevation={3} sx={{ borderRadius: 3, mb: 3 }}>
-            <CardContent>
-              <Typography variant="caption" sx={{ letterSpacing: 2, color: "#888" }}>Afsnit 2</Typography>
-              <Stack spacing={2}>
-                {/* Lokalitet - redigerbar */}
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOnIcon color="primary" />
                   <Typography variant="body1" sx={{ fontWeight: 600, minWidth: 90 }}>
@@ -209,7 +224,6 @@ export default function ClientDetailsPage({ client, fetchClient }) {
         <Grid item xs={12}>
           <Card elevation={3} sx={{ borderRadius: 3 }}>
             <CardContent>
-              <Typography variant="caption" sx={{ letterSpacing: 2, color: "#888" }}>Afsnit 3</Typography>
               <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 1 }}>
                 <ChromeReaderModeIcon color="primary" />
                 <Typography variant="body1" sx={{ fontWeight: 600 }}>
@@ -259,10 +273,6 @@ export default function ClientDetailsPage({ client, fetchClient }) {
         <Grid item xs={12}>
           <Card elevation={3} sx={{ borderRadius: 3 }}>
             <CardContent>
-              <Typography variant="caption" sx={{ letterSpacing: 2, color: "#888" }}>Afsnit 4</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-                Fjernadgang
-              </Typography>
               <Stack direction="row" spacing={2}>
                 <Tooltip title="Åbn fjernskrivebord på klient">
                   <span>
@@ -297,10 +307,6 @@ export default function ClientDetailsPage({ client, fetchClient }) {
         <Grid item xs={12}>
           <Card elevation={3} sx={{ borderRadius: 3 }}>
             <CardContent>
-              <Typography variant="caption" sx={{ letterSpacing: 2, color: "#888" }}>Afsnit 5</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-                Handlinger
-              </Typography>
               <Stack direction="row" spacing={2}>
                 <Tooltip title="Genstart klient">
                   <span>
@@ -350,7 +356,6 @@ export default function ClientDetailsPage({ client, fetchClient }) {
         <Grid item xs={12}>
           <Card elevation={3} sx={{ borderRadius: 3 }}>
             <CardContent>
-              <Typography variant="caption" sx={{ letterSpacing: 2, color: "#888" }}>Afsnit 6</Typography>
               <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
                 <VideocamIcon color="action" fontSize="large" />
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
