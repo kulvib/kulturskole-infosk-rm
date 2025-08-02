@@ -34,28 +34,47 @@ export default function ClientInfoPage({
 }) {
   const { token } = useAuth();
 
+  // Lokalitet state
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
+  // Sorterings state
+  const [sortOrderEditing, setSortOrderEditing] = useState({});
+  const [savingSortOrder, setSavingSortOrder] = useState({});
   const [refreshing, setRefreshing] = useState(false);
 
-  // Sortér klienter alfabetisk efter navn
+  // Godkendte klienter sorteret efter sort_order, derefter navn
   const approvedClients = (clients?.filter((c) => c.status === "approved") || [])
     .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      if (a.sort_order !== null && b.sort_order !== null) {
+        return a.sort_order - b.sort_order;
+      }
+      if (a.sort_order !== null) return -1;
+      if (b.sort_order !== null) return 1;
+      return a.name.localeCompare(b.name);
+    });
 
+  // Ikke-godkendte klienter alfabetisk
   const unapprovedClients = (clients?.filter((c) => c.status !== "approved") || [])
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Init state for lokalitet og sort_order når klientlisten ændres
   useEffect(() => {
     const initialLocations = {};
-    approvedClients.forEach(
-      (client) => (initialLocations[client.id] = client.locality || "")
-    );
+    const initialSortOrders = {};
+    approvedClients.forEach((client) => {
+      initialLocations[client.id] = client.locality || "";
+      initialSortOrders[client.id] =
+        client.sort_order !== undefined && client.sort_order !== null
+          ? client.sort_order
+          : "";
+    });
     setEditableLocations(initialLocations);
+    setSortOrderEditing(initialSortOrders);
   }, [clients]);
 
-  // Polling: check for new data every 15s, only update if data changed
+  // Polling for opdatering (valgfri)
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -64,20 +83,18 @@ export default function ClientInfoPage({
         });
         if (res.ok) {
           const newClients = await res.json();
-          // Compare old and new data
           const oldStr = JSON.stringify(clients);
           const newStr = JSON.stringify(newClients);
           if (oldStr !== newStr) {
             fetchClients();
           }
         }
-      } catch (e) {
-        // Optionally handle fetch error
-      }
+      } catch (e) { }
     }, 15000);
     return () => clearInterval(interval);
   }, [clients, token, fetchClients]);
 
+  // Gem lokalitet
   const handleLocationSave = async (clientId) => {
     setSavingLocation((prev) => ({ ...prev, [clientId]: true }));
     try {
@@ -90,9 +107,7 @@ export default function ClientInfoPage({
         body: JSON.stringify({ locality: editableLocations[clientId] }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.detail || data.message || "Ukendt fejl");
-      }
+      if (!res.ok) throw new Error(data.detail || data.message || "Ukendt fejl");
       fetchClients();
     } catch (err) {
       alert("Kunne ikke gemme lokalitet: " + err.message);
@@ -100,7 +115,30 @@ export default function ClientInfoPage({
     setSavingLocation((prev) => ({ ...prev, [clientId]: false }));
   };
 
-  // Slet klient og opdater listen
+  // Gem sort_order
+  const handleSortOrderSave = async (clientId) => {
+    setSavingSortOrder((prev) => ({ ...prev, [clientId]: true }));
+    try {
+      const val = sortOrderEditing[clientId];
+      const sort_order = val === "" ? null : Number(val);
+      const res = await fetch(`${API_BASE}/api/clients/${clientId}/update`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ sort_order }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.message || "Ukendt fejl");
+      fetchClients();
+    } catch (err) {
+      alert("Kunne ikke gemme sortering: " + err.message);
+    }
+    setSavingSortOrder((prev) => ({ ...prev, [clientId]: false }));
+  };
+
+  // Slet klient
   const handleRemoveClient = async (clientId) => {
     try {
       await onRemoveClient(clientId);
@@ -110,7 +148,7 @@ export default function ClientInfoPage({
     }
   };
 
-  // Statusfelt med lys rød/grøn og sort, ikke fed tekst
+  // Statusfelt
   function ClientStatusCell({ isOnline }) {
     return (
       <Box
@@ -121,9 +159,9 @@ export default function ClientInfoPage({
           width: 80,
           height: 32,
           borderRadius: "16px",
-          bgcolor: isOnline ? "#43a047" : "#FF8A80", // Lys grøn / lys rød
-          color: "#111", // Sort tekst
-          fontWeight: 400, // Ikke fed
+          bgcolor: isOnline ? "#43a047" : "#FF8A80",
+          color: "#111",
+          fontWeight: 400,
           fontSize: 15,
           boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
         }}
@@ -133,19 +171,17 @@ export default function ClientInfoPage({
     );
   }
 
-  // Håndter opdater-knap
+  // Refresh-knap
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchClients();
     setRefreshing(false);
   };
 
-  // Fade tekst, vises mens der loades klienter
   const showLoadingText = loading || !clients || clients.length === 0;
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
-      {/* Kun loading-fade besked, intet andet synligt */}
       {showLoadingText ? (
         <Box
           sx={{
@@ -180,7 +216,7 @@ export default function ClientInfoPage({
         </Box>
       ) : (
         <>
-          {/* Top row med titel og opdater-knap */}
+          {/* Toprow med titel og opdater-knap */}
           <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
             <Typography variant="h5" sx={{ fontWeight: 700 }}>
               Godkendte klienter
@@ -211,6 +247,7 @@ export default function ClientInfoPage({
                   <TableRow>
                     <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Sortering</TableCell>
                     <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
                     <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
                     <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
@@ -219,7 +256,7 @@ export default function ClientInfoPage({
                 <TableBody>
                   {approvedClients.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
+                      <TableCell colSpan={6} align="center">
                         Ingen godkendte klienter.
                       </TableCell>
                     </TableRow>
@@ -233,7 +270,7 @@ export default function ClientInfoPage({
                           <Stack direction="row" spacing={1} alignItems="center">
                             <TextField
                               size="small"
-                              value={editableLocations[client.id] || ""}
+                              value={editableLocations[client.id]}
                               onChange={(e) =>
                                 setEditableLocations((prev) => ({
                                   ...prev,
@@ -251,6 +288,37 @@ export default function ClientInfoPage({
                               sx={{ minWidth: 44, px: 1 }}
                             >
                               {savingLocation[client.id] ? (
+                                <CircularProgress size={18} />
+                              ) : (
+                                "Gem"
+                              )}
+                            </Button>
+                          </Stack>
+                        </TableCell>
+                        <TableCell>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <TextField
+                              size="small"
+                              type="number"
+                              value={sortOrderEditing[client.id]}
+                              onChange={(e) =>
+                                setSortOrderEditing((prev) => ({
+                                  ...prev,
+                                  [client.id]: e.target.value,
+                                }))
+                              }
+                              disabled={savingSortOrder[client.id]}
+                              sx={{ width: 60 }}
+                              inputProps={{ min: 0 }}
+                            />
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => handleSortOrderSave(client.id)}
+                              disabled={savingSortOrder[client.id]}
+                              sx={{ minWidth: 44, px: 1 }}
+                            >
+                              {savingSortOrder[client.id] ? (
                                 <CircularProgress size={18} />
                               ) : (
                                 "Gem"
