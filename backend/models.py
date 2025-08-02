@@ -20,10 +20,12 @@ class Client(ClientBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     status: str = "pending"
     isOnline: bool = False
-    last_seen: Optional[datetime] = None   # <-- tilføjet til heartbeat
+    last_seen: Optional[datetime] = None
+    sort_order: Optional[int] = Field(default=None, index=True)  # <-- NYT FELT
 
 class ClientCreate(ClientBase):
-    pass
+    sort_order: Optional[int] = None   # <-- Mulighed for at sætte ved oprettelse
 
 class ClientUpdate(SQLModel):
     locality: Optional[str] = None
+    sort_order: Optional[int] = None   # <-- Mulighed for at opdatere sort_order
