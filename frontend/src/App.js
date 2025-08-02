@@ -8,7 +8,6 @@ import LoginPage from "./components/LoginPage";
 import HomePage from "./components/HomePage";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import { AuthProvider } from "./auth/authcontext";
-
 import {
   getClients,
   getHolidays,
@@ -31,15 +30,10 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("Du er ikke logget ind.");
-      console.log("Token i fetchClients:", token);
       const data = await getClients();
-      console.log("Klienter fra API:", data);
       setClients(data);
     } catch (err) {
       setError(err.message);
-      console.log("Fejl fra getClients:", err);
     }
     setLoading(false);
   };
@@ -49,8 +43,6 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("Du er ikke logget ind.");
       const data = await getHolidays();
       setHolidays(data);
     } catch (err) {
@@ -114,7 +106,6 @@ export default function App() {
     setLoading(false);
   };
 
-  // Hent data KUN hvis token findes (efter login)
   useEffect(() => {
     if (localStorage.getItem("token")) {
       fetchClients();
@@ -141,7 +132,6 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            {/* Forside: HomePage */}
             <Route index element={<HomePage />} />
             <Route
               path="clients"
@@ -177,7 +167,6 @@ export default function App() {
               }
             />
           </Route>
-          {/* Fallback hvis path ikke findes */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
