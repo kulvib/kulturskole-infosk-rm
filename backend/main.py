@@ -11,8 +11,9 @@ from sqlmodel import Session, select
 from .models import User
 from .services.mqtt_service import connect as mqtt_connect
 
-load_dotenv()
+from .ws_manager import connected_websockets  # <--- importér fra ws_manager
 
+load_dotenv()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "meget_sikkert_fallback_kodeord")
 
 app = FastAPI(
@@ -52,9 +53,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# WebSocket: global liste over klienter
-connected_websockets = []
-
 @app.websocket("/ws/clients")
 async def clients_ws(websocket: WebSocket):
     await websocket.accept()
@@ -64,14 +62,6 @@ async def clients_ws(websocket: WebSocket):
             await websocket.receive_text()  # holder forbindelsen åben
     except WebSocketDisconnect:
         connected_websockets.remove(websocket)
-
-async def notify_clients_updated():
-    # Send "update" til alle forbundne websockets
-    for ws in connected_websockets:
-        try:
-            await ws.send_text("update")
-        except Exception:
-            pass  # evt. håndter fejl her
 
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
