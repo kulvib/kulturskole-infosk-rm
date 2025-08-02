@@ -27,7 +27,6 @@ import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 function formatTimestamp(isoDate) {
   if (!isoDate) return "";
   const date = new Date(isoDate);
-  // Fx "24.02.2025, Kl. 00:10"
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const year = date.getFullYear();
@@ -43,11 +42,9 @@ export default function ClientInfoPage({
   onRemoveClient,
   fetchClients,
 }) {
-  // Drag & drop state
   const [refreshing, setRefreshing] = useState(false);
   const [dragClients, setDragClients] = useState([]);
 
-  // Hent klienter automatisk når siden vises
   useEffect(() => {
     if (typeof fetchClients === "function") {
       fetchClients();
@@ -55,7 +52,6 @@ export default function ClientInfoPage({
     // eslint-disable-next-line
   }, []);
 
-  // Initialiser dragClients, når klientlisten ændres
   useEffect(() => {
     const approved = (clients?.filter((c) => c.status === "approved") || []).slice();
     approved.sort((a, b) => {
@@ -74,12 +70,10 @@ export default function ClientInfoPage({
     setDragClients(approved);
   }, [clients]);
 
-  // Ikke-godkendte klienter
   const unapprovedClients = (clients?.filter((c) => c.status !== "approved") || [])
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Slet klient
   const handleRemoveClient = async (clientId) => {
     try {
       await onRemoveClient(clientId);
@@ -89,16 +83,14 @@ export default function ClientInfoPage({
     }
   };
 
-  // Drag & drop handler
   const onDragEnd = async (result) => {
     if (!result.destination) return;
     const reordered = Array.from(dragClients);
     const [removed] = reordered.splice(result.source.index, 1);
     reordered.splice(result.destination.index, 0, removed);
 
-    setDragClients(reordered); // UI opdateres straks
+    setDragClients(reordered);
     try {
-      // sort_order starter fra 1
       for (let i = 0; i < reordered.length; i++) {
         await updateClient(reordered[i].id, { sort_order: i + 1 });
       }
@@ -108,7 +100,6 @@ export default function ClientInfoPage({
     }
   };
 
-  // Statusfelt (mindre tekst, HVID tekst)
   function ClientStatusCell({ isOnline }) {
     return (
       <Box
@@ -131,14 +122,12 @@ export default function ClientInfoPage({
     );
   }
 
-  // Refresh-knap
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchClients();
     setRefreshing(false);
   };
 
-  // Godkend klient og opdater listen med det samme
   const handleApproveClient = async (clientId) => {
     try {
       await onApproveClient(clientId);
@@ -148,7 +137,6 @@ export default function ClientInfoPage({
     }
   };
 
-  // Loading kun hvis loading er true
   if (loading) {
     return (
       <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
