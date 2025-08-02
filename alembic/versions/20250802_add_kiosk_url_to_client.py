@@ -2,7 +2,7 @@
 
 Revision ID: 20250802_add_kiosk_url_to_client
 Revises: 
-Create Date: 2025-08-02 16:05:00.000000
+Create Date: 2025-08-02 16:10:00.000000
 
 """
 from alembic import op
