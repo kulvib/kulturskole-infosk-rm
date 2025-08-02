@@ -26,6 +26,9 @@ class Client(ClientBase, table=True):
     ubuntu_version: Optional[str] = None
     uptime: Optional[str] = None
 
+    # TILFØJ DETTE FELT:
+    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
 class ClientCreate(ClientBase):
     sort_order: Optional[int] = None
 
