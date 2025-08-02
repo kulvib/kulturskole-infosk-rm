@@ -1,16 +1,10 @@
 import paho.mqtt.client as mqtt
-import ssl
-import os
 import time
 
-MQTT_BROKER = "broker.emqx.cloud"  # eller din custom EMQX Cloud endpoint
-MQTT_PORT = 8883
-MQTT_USER = "DIT_EMQX_BRUGERNAVN"
-MQTT_PASS = "DIT_EMQX_PASSWORD"
+MQTT_BROKER = "test.mosquitto.org"
+MQTT_PORT = 1883
 
 client = mqtt.Client()
-client.username_pw_set(MQTT_USER, MQTT_PASS)
-client.tls_set()  # EMQX Cloud bruger standard certifikat, ingen fil nødvendig
 
 def on_connect(client, userdata, flags, rc):
     print("Connected!", rc)
@@ -24,7 +18,7 @@ client.on_message = on_message
 
 client.connect(MQTT_BROKER, MQTT_PORT)
 client.loop_start()
-client.publish("test/topic", "Hej fra EMQX backend!")
+client.publish("test/topic", "Hej fra Mosquitto backend!")
 
 try:
     while True:
