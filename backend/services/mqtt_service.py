@@ -10,6 +10,14 @@ MQTT_USERNAME = "admin"
 MQTT_PASSWORD = "KulVib2025info"
 
 # Path to CA certificate
+CA_CERT_PATH = os.path.join(os.path.dirname(__file__), "hivemq-root-ca.pem")
+
+client = mqtt.Client()
+
+def connect():
+    client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+    client.tls_set(ca_certs=CA_CERT_PATH, cert_reqs=ssl.CERT_REQUIRED)
+    try:
         client.connect(MQTT_BROKER, MQTT_PORT)
         print("Connected to HiveMQ Cloud broker with secure TLS!")
     except Exception as e:
