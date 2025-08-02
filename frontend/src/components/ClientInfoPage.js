@@ -21,7 +21,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { Link } from "react-router-dom";
-import { updateClient } from "../api"; // Brug din api.js!
+import { updateClient } from "../api";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
 export default function ClientInfoPage({
   clients,
@@ -37,11 +38,12 @@ export default function ClientInfoPage({
   const [sortOrderEditing, setSortOrderEditing] = useState({});
   const [savingSortOrder, setSavingSortOrder] = useState({});
   const [refreshing, setRefreshing] = useState(false);
+  const [dragClients, setDragClients] = useState([]);
 
-  // Sortering: sort_order laveste først, derefter navn
-  const approvedClients = (clients?.filter((c) => c.status === "approved") || [])
-    .slice()
-    .sort((a, b) => {
+  // Initialiser dragClients og edit states, når klientlisten ændres
+  useEffect(() => {
+    const approved = (clients?.filter((c) => c.status === "approved") || []).slice();
+    approved.sort((a, b) => {
       if (
         a.sort_order !== null &&
         a.sort_order !== undefined &&
@@ -54,16 +56,11 @@ export default function ClientInfoPage({
       if (b.sort_order !== null && b.sort_order !== undefined) return 1;
       return a.name.localeCompare(b.name);
     });
+    setDragClients(approved);
 
-  const unapprovedClients = (clients?.filter((c) => c.status !== "approved") || [])
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  // Init state for lokalitet og sort_order når klientlisten ændres
-  useEffect(() => {
     const initialLocations = {};
     const initialSortOrders = {};
-    approvedClients.forEach((client) => {
+    approved.forEach((client) => {
       initialLocations[client.id] = client.locality || "";
       initialSortOrders[client.id] =
         client.sort_order !== undefined && client.sort_order !== null
@@ -73,6 +70,11 @@ export default function ClientInfoPage({
     setEditableLocations(initialLocations);
     setSortOrderEditing(initialSortOrders);
   }, [clients]);
+
+  // Ikke-godkendte klienter
+  const unapprovedClients = (clients?.filter((c) => c.status !== "approved") || [])
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // Gem lokalitet
   const handleLocationSave = async (clientId) => {
@@ -110,6 +112,26 @@ export default function ClientInfoPage({
     }
   };
 
+  // Drag & drop handler
+  const onDragEnd = async (result) => {
+    if (!result.destination) return;
+    const reordered = Array.from(dragClients);
+    const [removed] = reordered.splice(result.source.index, 1);
+    reordered.splice(result.destination.index, 0, removed);
+
+    setDragClients(reordered); // UI opdateres straks
+    try {
+      // sort_order starter fra 1
+      for (let i = 0; i < reordered.length; i++) {
+        await updateClient(reordered[i].id, { sort_order: i + 1 });
+      }
+      fetchClients();
+    } catch (err) {
+      alert("Kunne ikke opdatere sortering: " + err.message);
+    }
+  };
+
+  // Statusfelt
   function ClientStatusCell({ isOnline }) {
     return (
       <Box
@@ -147,14 +169,9 @@ export default function ClientInfoPage({
           variant="h5"
           sx={{
             color: "#444",
-            animation: "fade 1.5s infinite alternate",
             fontWeight: 700,
             textTransform: "none",
             fontFamily: "inherit",
-            '@keyframes fade': {
-              from: { opacity: 0.2 },
-              to: { opacity: 1 },
-            },
           }}
         >
           vent venligst...
@@ -167,7 +184,7 @@ export default function ClientInfoPage({
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          Godkendte klienter
+          Godkendte klienter (træk og slip for at sortere)
         </Typography>
         <Tooltip title="Opdater klientdata">
           <span>
@@ -190,119 +207,153 @@ export default function ClientInfoPage({
       </Stack>
       <Paper sx={{ mb: 4 }}>
         <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Sortering</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {approvedClients.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    Ingen godkendte klienter.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                approvedClients.map((client) => (
-                  <TableRow key={client.id} hover>
-                    <TableCell>
-                      {client.name}
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <TextField
-                          size="small"
-                          value={editableLocations[client.id]}
-                          onChange={(e) =>
-                            setEditableLocations((prev) => ({
-                              ...prev,
-                              [client.id]: e.target.value,
-                            }))
-                          }
-                          disabled={savingLocation[client.id]}
-                          sx={{ width: 150 }}
-                        />
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => handleLocationSave(client.id)}
-                          disabled={savingLocation[client.id]}
-                          sx={{ minWidth: 44, px: 1 }}
+          <DragDropContext onDragEnd={onDragEnd}>
+            <Droppable droppableId="clients-droppable">
+              {(provided) => (
+                <Table
+                  size="small"
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                >
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}></TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Sortering</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {dragClients.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} align="center">
+                          Ingen godkendte klienter.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      dragClients.map((client, idx) => (
+                        <Draggable
+                          key={client.id}
+                          draggableId={client.id.toString()}
+                          index={idx}
                         >
-                          {savingLocation[client.id] ? (
-                            <CircularProgress size={18} />
-                          ) : (
-                            "Gem"
+                          {(provided, snapshot) => (
+                            <TableRow
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              style={{
+                                ...provided.draggableProps.style,
+                                background: snapshot.isDragging
+                                  ? "#e3f2fd"
+                                  : undefined,
+                              }}
+                              hover
+                            >
+                              <TableCell
+                                {...provided.dragHandleProps}
+                                sx={{ width: 42, cursor: "grab" }}
+                              >
+                                <span style={{ fontSize: 20 }}>☰</span>
+                              </TableCell>
+                              <TableCell>{client.name}</TableCell>
+                              <TableCell>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <TextField
+                                    size="small"
+                                    value={editableLocations[client.id]}
+                                    onChange={(e) =>
+                                      setEditableLocations((prev) => ({
+                                        ...prev,
+                                        [client.id]: e.target.value,
+                                      }))
+                                    }
+                                    disabled={savingLocation[client.id]}
+                                    sx={{ width: 150 }}
+                                  />
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => handleLocationSave(client.id)}
+                                    disabled={savingLocation[client.id]}
+                                    sx={{ minWidth: 44, px: 1 }}
+                                  >
+                                    {savingLocation[client.id] ? (
+                                      <CircularProgress size={18} />
+                                    ) : (
+                                      "Gem"
+                                    )}
+                                  </Button>
+                                </Stack>
+                              </TableCell>
+                              <TableCell>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    value={sortOrderEditing[client.id]}
+                                    onChange={(e) =>
+                                      setSortOrderEditing((prev) => ({
+                                        ...prev,
+                                        [client.id]: e.target.value,
+                                      }))
+                                    }
+                                    disabled={savingSortOrder[client.id]}
+                                    sx={{ width: 60 }}
+                                    inputProps={{ min: 0 }}
+                                  />
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => handleSortOrderSave(client.id)}
+                                    disabled={savingSortOrder[client.id]}
+                                    sx={{ minWidth: 44, px: 1 }}
+                                  >
+                                    {savingSortOrder[client.id] ? (
+                                      <CircularProgress size={18} />
+                                    ) : (
+                                      "Gem"
+                                    )}
+                                  </Button>
+                                </Stack>
+                              </TableCell>
+                              <TableCell align="center">
+                                <ClientStatusCell isOnline={client.isOnline} />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Tooltip title="Info">
+                                  <IconButton
+                                    component={Link}
+                                    to={`/clients/${client.id}`}
+                                    color="primary"
+                                  >
+                                    <InfoIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Tooltip title="Fjern klient">
+                                  <IconButton
+                                    color="error"
+                                    onClick={() => handleRemoveClient(client.id)}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              </TableCell>
+                            </TableRow>
                           )}
-                        </Button>
-                      </Stack>
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <TextField
-                          size="small"
-                          type="number"
-                          value={sortOrderEditing[client.id]}
-                          onChange={(e) =>
-                            setSortOrderEditing((prev) => ({
-                              ...prev,
-                              [client.id]: e.target.value,
-                            }))
-                          }
-                          disabled={savingSortOrder[client.id]}
-                          sx={{ width: 60 }}
-                          inputProps={{ min: 0 }}
-                        />
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => handleSortOrderSave(client.id)}
-                          disabled={savingSortOrder[client.id]}
-                          sx={{ minWidth: 44, px: 1 }}
-                        >
-                          {savingSortOrder[client.id] ? (
-                            <CircularProgress size={18} />
-                          ) : (
-                            "Gem"
-                          )}
-                        </Button>
-                      </Stack>
-                    </TableCell>
-                    <TableCell align="center">
-                      <ClientStatusCell isOnline={client.isOnline} />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Tooltip title="Info">
-                        <IconButton
-                          component={Link}
-                          to={`/clients/${client.id}`}
-                          color="primary"
-                        >
-                          <InfoIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Tooltip title="Fjern klient">
-                        <IconButton
-                          color="error"
-                          onClick={() => handleRemoveClient(client.id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
+                        </Draggable>
+                      ))
+                    )}
+                    {provided.placeholder}
+                  </TableBody>
+                </Table>
               )}
-            </TableBody>
-          </Table>
+            </Droppable>
+          </DragDropContext>
         </TableContainer>
       </Paper>
       {/* Ikke godkendte klienter */}
