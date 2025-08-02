@@ -123,6 +123,7 @@ export async function approveClient(id) {
 export async function removeClient(id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
+  // BEMÆRK: Dit endpoint bruger POST - hvis backend kun accepterer DELETE, så skift til DELETE!
   const res = await fetch(`${apiUrl}/api/clients/${id}/remove`, {
     method: "POST",
     headers: { Authorization: "Bearer " + token },
@@ -135,4 +136,6 @@ export async function removeClient(id) {
     } catch {}
     throw new Error(msg);
   }
+  // Hvis API returnerer noget, kan du returnere det her:
+  // return await res.json();
 }
