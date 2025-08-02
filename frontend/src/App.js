@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import ClientInfoPage from "./components/ClientInfoPage";
 import HolidaysPage from "./components/HolidaysPage";
-import ClientDetailsPageWrapper from "./components/ClientDetailsPageWrapper"; // <-- brug wrapperen!
+import ClientDetailsPageWrapper from "./components/ClientDetailsPageWrapper";
 import LoginPage from "./components/LoginPage";
 import HomePage from "./components/HomePage";
 import ProtectedRoute from "./auth/ProtectedRoute";
@@ -16,6 +16,7 @@ import {
   approveClient,
   removeClient,
 } from "./api";
+import { useClientWebSocket } from "./useClientWebSocket"; // <--- tilføj
 
 export default function App() {
   const [clients, setClients] = useState([]);
@@ -106,6 +107,8 @@ export default function App() {
     setLoading(false);
   };
 
+  useClientWebSocket(fetchClients); // <--- tilføj dette!
+
   useEffect(() => {
     if (localStorage.getItem("token")) {
       fetchClients();
@@ -116,7 +119,6 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        {/* Vis fejl hvis der er */}
         {error && (
           <div style={{ color: "red", padding: 10, fontWeight: 600 }}>
             {error}
