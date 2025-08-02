@@ -30,7 +30,7 @@ export default function ClientInfoPage({
   onApproveClient,
   onRemoveClient,
   fetchClients,
-}) {
+  }) {
   // Lokalitet state
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
@@ -263,14 +263,19 @@ export default function ClientInfoPage({
                                       }))
                                     }
                                     disabled={savingLocation[client.id]}
-                                    sx={{ width: 150 }}
+                                    sx={{
+                                      width: 120, // mindre bredde
+                                      '& .MuiInputBase-root': {
+                                        height: 30, // mindre højde på inputramme
+                                      }
+                                    }}
                                   />
                                   <Button
                                     size="small"
                                     variant="outlined"
                                     onClick={() => handleLocationSave(client.id)}
                                     disabled={savingLocation[client.id]}
-                                    sx={{ minWidth: 44, px: 1 }}
+                                    sx={{ minWidth: 44, px: 1, height: 30 }} // mindre højde på knap
                                   >
                                     {savingLocation[client.id] ? (
                                       <CircularProgress size={18} />
