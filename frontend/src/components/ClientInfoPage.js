@@ -95,7 +95,7 @@ export default function ClientInfoPage({
     }
   };
 
-  // Statusfelt (mindre tekst)
+  // Statusfelt (mindre tekst, HVID tekst)
   function ClientStatusCell({ isOnline }) {
     return (
       <Box
@@ -107,7 +107,7 @@ export default function ClientInfoPage({
           height: 20,
           borderRadius: "12px",
           bgcolor: isOnline ? "#66FF33" : "#CC3300",
-          color: "#111",
+          color: "#fff",
           fontWeight: 400,
           fontSize: 13,
           boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
