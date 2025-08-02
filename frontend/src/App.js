@@ -31,7 +31,7 @@ export default function App() {
 
   useEffect(() => {
     // MQTT integration
-    const client = mqtt.connect("ws://test.mosquitto.org:8080");
+    const client = mqtt.connect("wss://test.mosquitto.org:8081");
 
     client.on("connect", () => {
       console.log("Frontend tilsluttet Mosquitto!");
