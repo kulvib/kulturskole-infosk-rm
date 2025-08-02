@@ -54,11 +54,27 @@ function ClientStatusChip({ status, isOnline }) {
       label={label}
       color={color}
       variant={color === "default" ? "outlined" : "filled"}
+      icon={
+        <Box
+          sx={{
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            bgcolor: isOnline ? "#66FF33" : "#CC3300",
+            display: "inline-block",
+            mr: 0.5,
+          }}
+        />
+      }
       sx={{
         fontWeight: 600,
-        minWidth: 90,
-        fontSize: "1rem",
+        minWidth: 80,
+        fontSize: "0.90rem",
         letterSpacing: 0.5,
+        pl: 1,
+        pr: 1,
+        height: 28,
+        ".MuiChip-icon": { fontSize: 18 },
       }}
     />
   );
@@ -136,18 +152,31 @@ export default function ClientDetailsPage({ client, fetchClient }) {
 
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4 }}>
-      {/* Refresh icon aligned to right */}
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+      {/* Refresh icon aligned to right, with text */}
+      <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", mb: 1 }}>
         <Tooltip title="Opdater klient">
           <span>
-            <IconButton
+            <Button
+              startIcon={
+                refreshing ? (
+                  <CircularProgress size={22} />
+                ) : (
+                  <RefreshIcon fontSize="medium" />
+                )
+              }
               onClick={handleRefreshClient}
               disabled={refreshing}
-              size="large"
               color="primary"
+              sx={{
+                fontWeight: 500,
+                textTransform: "none",
+                minWidth: 0,
+                mr: 1,
+                px: 2,
+              }}
             >
-              {refreshing ? <CircularProgress size={24} /> : <RefreshIcon />}
-            </IconButton>
+              Opdater
+            </Button>
           </span>
         </Tooltip>
       </Box>
@@ -158,10 +187,20 @@ export default function ClientDetailsPage({ client, fetchClient }) {
             <CardContent>
               <Stack spacing={2}>
                 <Stack direction="row" alignItems="center" spacing={2}>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  <Typography
+                    variant="h3"
+                    sx={{
+                      fontWeight: 700,
+                      lineHeight: 1.15,
+                      letterSpacing: 0.5,
+                      fontSize: { xs: "2rem", sm: "2.7rem", md: "3rem" },
+                    }}
+                  >
                     {client.name}
                   </Typography>
-                  <ClientStatusChip status={client.status} isOnline={client.isOnline} />
+                  <Box sx={{ ml: 1 }}>
+                    <ClientStatusChip status={client.status} isOnline={client.isOnline} />
+                  </Box>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOnIcon color="primary" />
@@ -199,8 +238,9 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }}>Oppetid:</Typography>
                   <Typography>{client.uptime || "ukendt"}</Typography>
                 </Stack>
-                {/* Klient ID placeres her, efter Oppetid */}
+                {/* Klient ID med samme ikon som IP-adresse */}
                 <Stack direction="row" spacing={1} alignItems="center">
+                  <LanIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }}>Klient ID:</Typography>
                   <Typography sx={{ color: "#888" }}>{client.id}</Typography>
                 </Stack>
@@ -238,7 +278,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                   value={kioskUrl}
                   onChange={e => setKioskUrl(e.target.value)}
                   sx={{
-                    width: 440, // Dobbelt så langt som før
+                    width: 440,
                     "& .MuiInputBase-input": { fontSize: "1rem" },
                     "& .MuiInputBase-root": { height: 30 },
                   }}
