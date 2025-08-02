@@ -3,11 +3,13 @@ import json
 import ssl
 import os
 
+# HiveMQ Cloud broker information
 MQTT_BROKER = "1e5fd0288c8b4cbaa4a919bd6dd47575.s1.eu.hivemq.cloud"
 MQTT_PORT = 8883
 MQTT_USERNAME = "admin"
 MQTT_PASSWORD = "KulVib2025info"
 
+# Path to CA certificate
 CA_CERT_PATH = os.path.join(os.path.dirname(__file__), "hivemq-root-ca.pem")
 
 client = mqtt.Client()
