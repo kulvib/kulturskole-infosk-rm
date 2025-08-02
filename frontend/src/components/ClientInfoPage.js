@@ -284,12 +284,13 @@ export default function ClientInfoPage({
                 <TableCell sx={{ fontWeight: 700 }}>MAC-adresse</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Tilføjet</TableCell>
                 <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Tilføj</TableCell>
+                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {unapprovedClients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
+                  <TableCell colSpan={6} align="center">
                     Ingen ikke-godkendte klienter.
                   </TableCell>
                 </TableRow>
@@ -319,6 +320,16 @@ export default function ClientInfoPage({
                       >
                         Tilføj
                       </Button>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="Fjern klient">
+                        <IconButton
+                          color="error"
+                          onClick={() => handleRemoveClient(client.id)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))
