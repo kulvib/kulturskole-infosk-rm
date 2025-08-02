@@ -7,6 +7,7 @@ from .db import create_db_and_tables, engine, get_session
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 from .models import User
+from .services.mqtt_service import connect as mqtt_connect  # <-- NYT
 
 load_dotenv()
 
@@ -37,6 +38,7 @@ def ensure_admin_user():
 def on_startup():
     create_db_and_tables()
     ensure_admin_user()
+    mqtt_connect()  # <-- NYT: starter MQTT forbindelse
 
 app.add_middleware(
     CORSMiddleware,
