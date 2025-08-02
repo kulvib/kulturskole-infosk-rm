@@ -138,6 +138,16 @@ export default function ClientInfoPage({
     setRefreshing(false);
   };
 
+  // Godkend klient og opdater listen med det samme
+  const handleApproveClient = async (clientId) => {
+    try {
+      await onApproveClient(clientId);
+      fetchClients();
+    } catch (err) {
+      alert("Kunne ikke godkende klient: " + err.message);
+    }
+  };
+
   // Loading kun hvis loading er true
   if (loading) {
     return (
@@ -316,7 +326,7 @@ export default function ClientInfoPage({
                         color="success"
                         size="small"
                         startIcon={<AddIcon />}
-                        onClick={() => onApproveClient(client.id)}
+                        onClick={() => handleApproveClient(client.id)}
                         sx={{ minWidth: 44 }}
                       >
                         Tilføj
