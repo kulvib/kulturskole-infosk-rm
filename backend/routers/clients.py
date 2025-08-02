@@ -17,6 +17,8 @@ def get_clients(session=Depends(get_session), user=Depends(get_current_admin_use
         client.isOnline = (
             client.last_seen is not None and (now - client.last_seen) < timedelta(minutes=2)
         )
+    # Sorter efter sort_order (laveste først), derefter navn
+    clients.sort(key=lambda c: (c.sort_order is None, c.sort_order if c.sort_order is not None else 9999, c.name))
     return clients
 
 @router.post("/clients/", response_model=Client)
@@ -34,6 +36,7 @@ def create_client(
         status="pending",
         isOnline=False,
         last_seen=None,
+        sort_order=client_in.sort_order,  # NYT FELT
     )
     session.add(client)
     session.commit()
@@ -52,6 +55,8 @@ def update_client(
         raise HTTPException(status_code=404, detail="Client not found")
     if client_update.locality is not None:
         client.locality = client_update.locality
+    if client_update.sort_order is not None:
+        client.sort_order = client_update.sort_order
     session.add(client)
     session.commit()
     session.refresh(client)
