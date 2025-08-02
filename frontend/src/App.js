@@ -16,6 +16,7 @@ import {
   approveClient,
   removeClient,
 } from "./api";
+import mqtt from "mqtt";
 
 export default function App() {
   const [clients, setClients] = useState([]);
@@ -24,6 +25,32 @@ export default function App() {
   const [holidayDesc, setHolidayDesc] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // MQTT state
+  const [mqttMessages, setMqttMessages] = useState([]);
+
+  useEffect(() => {
+    // MQTT integration
+    const client = mqtt.connect("ws://test.mosquitto.org:8080");
+
+    client.on("connect", () => {
+      console.log("Frontend tilsluttet Mosquitto!");
+      client.subscribe("test/topic");
+      client.publish("test/topic", "Hej fra Mosquitto frontend!");
+    });
+
+    client.on("message", (topic, message) => {
+      setMqttMessages((prev) => [
+        ...prev,
+        `${new Date().toLocaleTimeString()}: ${message.toString()}`,
+      ]);
+    });
+
+    // Cleanup
+    return () => {
+      client.end();
+    };
+  }, []);
 
   // Fetch clients from API
   const fetchClients = async () => {
@@ -120,6 +147,19 @@ export default function App() {
         {error && (
           <div style={{ color: "red", padding: 10, fontWeight: 600 }}>
             {error}
+          </div>
+        )}
+        {/* Vis MQTT beskeder øverst */}
+        {mqttMessages.length > 0 && (
+          <div style={{ background: "#eee", padding: 10, marginBottom: 10 }}>
+            <div style={{ fontWeight: 600, marginBottom: 5 }}>
+              Live MQTT beskeder:
+            </div>
+            <ul style={{ margin: 0 }}>
+              {mqttMessages.slice(-5).map((msg, idx) => (
+                <li key={idx} style={{ fontSize: 13 }}>{msg}</li>
+              ))}
+            </ul>
           </div>
         )}
         <Routes>
