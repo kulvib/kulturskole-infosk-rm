@@ -1,200 +1,283 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
-  Typography, Table, TableBody, TableRow, TableCell, TextField,
-  Button, Chip, Stack, Divider, Box, Paper
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  Button,
+  Stack,
+  Divider,
+  CircularProgress,
+  Tooltip,
 } from "@mui/material";
-import { useNavigate, useParams } from "react-router-dom";
-import TerminalIcon from "@mui/icons-material/Terminal";
-import VideocamIcon from "@mui/icons-material/Videocam";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import InfoIcon from "@mui/icons-material/Info";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import TerminalIcon from "@mui/icons-material/Terminal";
+import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import ChromeReaderModeIcon from "@mui/icons-material/ChromeReaderMode";
 
-const apiUrl = process.env.REACT_APP_API_URL;
+// For API calls, expand your api.js with relevant endpoints:
+import {
+  updateClient,
+  pushKioskUrl,
+  clientAction,
+  openTerminal,
+  openRemoteDesktop,
+  getClientStream,
+} from "../api";
 
-function getToken() {
-  return localStorage.getItem("token");
-}
+export default function ClientDetailsPage({ client, fetchClient }) {
+  // Local state for editable fields
+  const [locality, setLocality] = useState(client.locality || "");
+  const [savingLocality, setSavingLocality] = useState(false);
 
-export default function ClientDetailsPage({ clients }) {
-  const { clientId } = useParams();
-  const [client, setClient] = useState(null);
-  const [kioskWebAddress, setKioskWebAddress] = useState("");
-  const [saving, setSaving] = useState(false);
-  const navigate = useNavigate();
+  const [kioskUrl, setKioskUrl] = useState(client.kiosk_url || "");
+  const [savingKioskUrl, setSavingKioskUrl] = useState(false);
 
-  useEffect(() => {
-    const localClient =
-      clients &&
-      clients.find(
-        (c) => String(c.id) === String(clientId) || String(c.unique_id) === String(clientId)
-      );
-    if (localClient) {
-      setClient(localClient);
-      setKioskWebAddress(localClient.kioskWebAddress || "");
-    } else {
+  // Action feedback
+  const [actionLoading, setActionLoading] = useState({});
+
+  // Save locality
+  const handleLocalitySave = async () => {
+    setSavingLocality(true);
+    try {
+      await updateClient(client.id, { locality });
       fetchClient();
+    } catch (err) {
+      alert("Kunne ikke gemme lokalitet: " + err.message);
     }
-    async function fetchClient() {
-      try {
-        const res = await fetch(`${apiUrl}/api/clients/${clientId}`, {
-          headers: { Authorization: `Bearer ${getToken()}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setClient(data);
-          setKioskWebAddress(data.kioskWebAddress || "");
-        }
-      } catch (e) {
-        setClient(null);
-      }
-    }
-  }, [clientId, clients]);
-
-  // Gem ny kiosk webadresse
-  const handleSaveKioskAddress = async () => {
-    setSaving(true);
-    await fetch(`${apiUrl}/api/clients/${clientId}/update`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${getToken()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ kioskWebAddress }),
-    });
-    setSaving(false);
+    setSavingLocality(false);
   };
 
-  // Actions (placeholder)
-  const handleChromeShutdown = () => alert("Chrome shutdown trigget!");
-  const handleClientAction = (action) => alert(`Client ${action} trigget!`);
-  const handleOpenTerminal = () => alert("Åbner terminal (WebSocket proxy)");
-  const handleOpenLiveStream = () => alert("Live stream åbnes (MJPEG/WebRTC)");
+  // Save Kiosk URL
+  const handleKioskUrlSave = async () => {
+    setSavingKioskUrl(true);
+    try {
+      await pushKioskUrl(client.id, kioskUrl); // Implementér i api.js
+      fetchClient();
+    } catch (err) {
+      alert("Kunne ikke opdatere kiosk webadresse: " + err.message);
+    }
+    setSavingKioskUrl(false);
+  };
 
-  if (!client) return <Typography sx={{ mt: 3 }}>Indlæser...</Typography>;
+  // Generic client action
+  const handleClientAction = async (action) => {
+    setActionLoading((prev) => ({ ...prev, [action]: true }));
+    try {
+      await clientAction(client.id, action); // fx "start", "restart", "shutdown", "chrome-shutdown"
+      fetchClient();
+    } catch (err) {
+      alert("Handlingen mislykkedes: " + err.message);
+    }
+    setActionLoading((prev) => ({ ...prev, [action]: false }));
+  };
+
+  // Terminal
+  const handleOpenTerminal = () => {
+    openTerminal(client.id); // Implementér WebSocket shell proxy
+  };
+
+  // Remote Desktop
+  const handleOpenRemoteDesktop = () => {
+    openRemoteDesktop(client.id); // Implementér Ubuntu fjernskrivebord
+  };
+
+  // Stream (MJPEG/WebRTC)
+  // Her vises et billede eller video fra klienten, fx <img src={getClientStream(client.id)} />
+  // For WebRTC kan du vise <video ...> og styre streamen via backend
 
   return (
-    <Paper sx={{ p: 3, maxWidth: 700, mx: "auto", mt: 5, boxShadow: 3 }}>
-      <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
-        Klientinfo: {client.name || client.unique_id}
-      </Typography>
-      <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-        <Chip
-          label={client.isOnline ? "Online" : "Offline"}
-          color={client.isOnline ? "success" : "error"}
-          sx={{ fontWeight: "bold" }}
-        />
-        <Chip
-          label={client.status === "approved" ? "Godkendt" : "Ikke godkendt"}
-          color={client.status === "approved" ? "success" : "warning"}
-          sx={{ fontWeight: "bold" }}
-        />
-      </Stack>
-      <Table sx={{ mb: 3 }}>
-        <TableBody>
-          <TableRow>
-            <TableCell variant="head">Navn</TableCell>
-            <TableCell>{client.name || client.unique_id}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell variant="head">Lokalitet</TableCell>
-            <TableCell>{client.locality}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell variant="head">IP-adresse</TableCell>
-            <TableCell>{client.ip || client.ip_address}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell variant="head">MAC-adresse</TableCell>
-            <TableCell>{client.macAddress || client.mac_address}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell variant="head">Software version</TableCell>
-            <TableCell>{client.softwareVersion || client.sw_version}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell variant="head">Sidst set</TableCell>
-            <TableCell>{client.lastSeen || client.last_seen}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell variant="head">Oppetid</TableCell>
-            <TableCell>{client.uptime}</TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-      <Divider sx={{ my: 3 }} />
-      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: "bold" }}>Kiosk webadresse</Typography>
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-        <TextField
-          label="Kiosk webadresse"
-          value={kioskWebAddress}
-          onChange={e => setKioskWebAddress(e.target.value)}
-          size="small"
-          sx={{ minWidth: 300 }}
-        />
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleSaveKioskAddress}
-          disabled={saving}
-        >
-          Gem ny webadresse
-        </Button>
-      </Stack>
-      <Divider sx={{ my: 3 }} />
-      <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>Handlinger</Typography>
-      <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-        <Button
-          onClick={handleChromeShutdown}
-          variant="outlined"
-          color="error"
-          startIcon={<PowerSettingsNewIcon />}
-        >
-          Chrome shutdown
-        </Button>
-        <Button
-          onClick={() => handleClientAction("start")}
-          variant="outlined"
-          color="primary"
-          startIcon={<InfoIcon />}
-        >
-          Start klient
-        </Button>
-        <Button
-          onClick={() => handleClientAction("restart")}
-          variant="outlined"
-          color="warning"
-          startIcon={<RestartAltIcon />}
-        >
-          Genstart klient
-        </Button>
-        <Button
-          onClick={() => handleClientAction("shutdown")}
-          variant="outlined"
-          color="error"
-          startIcon={<PowerSettingsNewIcon />}
-        >
-          Shutdown klient
-        </Button>
-        <Button
-          onClick={handleOpenTerminal}
-          variant="contained"
-          startIcon={<TerminalIcon />}
-        >
-          Åbn terminal
-        </Button>
-        <Button
-          onClick={handleOpenLiveStream}
-          variant="contained"
-          color="success"
-          startIcon={<VideocamIcon />}
-        >
-          Live stream
-        </Button>
-      </Stack>
-      <Button sx={{ mt: 4 }} variant="text" onClick={() => navigate("/clients")}>
-        Tilbage til klientliste
-      </Button>
-    </Paper>
+    <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
+      <Paper sx={{ p: 3 }}>
+        {/* Klientnavn */}
+        <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+          {client.name}
+        </Typography>
+
+        {/* Lokalitet */}
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+          <Typography variant="body1" sx={{ minWidth: 110 }}>
+            Lokalitet:
+          </Typography>
+          <TextField
+            size="small"
+            value={locality}
+            onChange={e => setLocality(e.target.value)}
+            sx={{
+              width: 140,
+              '& .MuiInputBase-input': { fontSize: '1rem' },
+              '& .MuiInputBase-root': { height: 30 },
+            }}
+            disabled={savingLocality}
+          />
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={handleLocalitySave}
+            disabled={savingLocality}
+            sx={{ minWidth: 44, px: 1, height: 30 }}
+          >
+            {savingLocality ? <CircularProgress size={18} /> : "Gem"}
+          </Button>
+        </Stack>
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Klientdata */}
+        <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
+          Klientdata
+        </Typography>
+        <Stack spacing={0.5} sx={{ mb: 2 }}>
+          <Typography variant="body2">IP-adresse: <b>{client.ip_address || "ukendt"}</b></Typography>
+          <Typography variant="body2">MAC-adresse: <b>{client.mac_address || "ukendt"}</b></Typography>
+          <Typography variant="body2">Ubuntu version: <b>{client.ubuntu_version || "ukendt"}</b></Typography>
+          <Typography variant="body2">Sidst set: <b>{client.last_seen || "ukendt"}</b></Typography>
+          <Typography variant="body2">Oppetid: <b>{client.uptime || "ukendt"}</b></Typography>
+        </Stack>
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Kiosk webadresse */}
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+          <ChromeReaderModeIcon color="primary" />
+          <Typography variant="body1" sx={{ minWidth: 110 }}>
+            Kiosk webadresse:
+          </Typography>
+          <TextField
+            size="small"
+            value={kioskUrl}
+            onChange={e => setKioskUrl(e.target.value)}
+            sx={{
+              width: 250,
+              '& .MuiInputBase-input': { fontSize: '1rem' },
+              '& .MuiInputBase-root': { height: 30 },
+            }}
+            disabled={savingKioskUrl}
+          />
+          <Button
+            size="small"
+            variant="outlined"
+            color="primary"
+            onClick={handleKioskUrlSave}
+            disabled={savingKioskUrl}
+            sx={{ minWidth: 44, px: 1, height: 30 }}
+          >
+            {savingKioskUrl ? <CircularProgress size={18} /> : "Gem"}
+          </Button>
+        </Stack>
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Handlingsknapper */}
+        <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
+          Handlinger
+        </Typography>
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+          <Tooltip title="Sluk Chrome browser på klient">
+            <span>
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={<PowerSettingsNewIcon />}
+                onClick={() => handleClientAction("chrome-shutdown")}
+                disabled={actionLoading["chrome-shutdown"]}
+              >
+                Chrome shutdown
+              </Button>
+            </span>
+          </Tooltip>
+          <Tooltip title="Start klient">
+            <span>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<PlayArrowIcon />}
+                onClick={() => handleClientAction("start")}
+                disabled={actionLoading["start"]}
+              >
+                Start
+              </Button>
+            </span>
+          </Tooltip>
+          <Tooltip title="Genstart klient">
+            <span>
+              <Button
+                variant="contained"
+                color="warning"
+                startIcon={<RestartAltIcon />}
+                onClick={() => handleClientAction("restart")}
+                disabled={actionLoading["restart"]}
+              >
+                Genstart
+              </Button>
+            </span>
+          </Tooltip>
+          <Tooltip title="Sluk klient">
+            <span>
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<PowerSettingsNewIcon />}
+                onClick={() => handleClientAction("shutdown")}
+                disabled={actionLoading["shutdown"]}
+              >
+                Sluk
+              </Button>
+            </span>
+          </Tooltip>
+        </Stack>
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Terminal og remote desktop */}
+        <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
+          Fjernadgang
+        </Typography>
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+          <Tooltip title="Åbn terminal på klient">
+            <span>
+              <Button
+                variant="outlined"
+                color="inherit"
+                startIcon={<TerminalIcon />}
+                onClick={handleOpenTerminal}
+              >
+                Terminal
+              </Button>
+            </span>
+          </Tooltip>
+          <Tooltip title="Åbn fjernskrivebord på klient">
+            <span>
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<DesktopWindowsIcon />}
+                onClick={handleOpenRemoteDesktop}
+              >
+                Fjernskrivebord
+              </Button>
+            </span>
+          </Tooltip>
+        </Stack>
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Livestream */}
+        <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
+          Livestream fra klient
+        </Typography>
+        <Box sx={{ mb: 1 }}>
+          {/* Til MJPEG: <img src={getClientStream(client.id)} alt="Livestream" style={{ maxWidth: 500 }} /> */}
+          {/* Til WebRTC: <video src={getClientStream(client.id)} controls autoPlay style={{ maxWidth: 500 }} /> */}
+          <Box sx={{ p: 2, border: "1px solid #ccc", borderRadius: 2, background: "#fafafa" }}>
+            <VideocamIcon color="action" sx={{ mr: 1 }} />
+            Livestream placeholder (MJPEG/WebRTC)
+          </Box>
+        </Box>
+      </Paper>
+    </Box>
   );
 }
