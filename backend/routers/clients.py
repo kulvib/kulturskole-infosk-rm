@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import select
 from typing import List
 from datetime import datetime, timedelta
 from ..db import get_session
 from ..models import Client, ClientCreate, ClientUpdate
 from ..auth import get_current_admin_user
+from ..services.mqtt_service import push_client_command
 
 router = APIRouter()
 
@@ -13,13 +14,22 @@ def get_clients(session=Depends(get_session), user=Depends(get_current_admin_use
     clients = session.exec(select(Client)).all()
     now = datetime.utcnow()
     for client in clients:
-        # Online hvis heartbeat (last_seen) er under 2 minutter gammel
         client.isOnline = (
             client.last_seen is not None and (now - client.last_seen) < timedelta(minutes=2)
         )
-    # Sorter efter sort_order (laveste først), derefter navn
     clients.sort(key=lambda c: (c.sort_order is None, c.sort_order if c.sort_order is not None else 9999, c.name))
     return clients
+
+@router.get("/clients/{id}/", response_model=Client)
+def get_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    now = datetime.utcnow()
+    client.isOnline = (
+        client.last_seen is not None and (now - client.last_seen) < timedelta(minutes=2)
+    )
+    return client
 
 @router.post("/clients/", response_model=Client)
 def create_client(
@@ -36,7 +46,7 @@ def create_client(
         status="pending",
         isOnline=False,
         last_seen=None,
-        sort_order=client_in.sort_order,  # NYT FELT
+        sort_order=client_in.sort_order,
     )
     session.add(client)
     session.commit()
@@ -57,10 +67,52 @@ def update_client(
         client.locality = client_update.locality
     if client_update.sort_order is not None:
         client.sort_order = client_update.sort_order
+    if client_update.kiosk_url is not None:
+        client.kiosk_url = client_update.kiosk_url
+    if client_update.ubuntu_version is not None:
+        client.ubuntu_version = client_update.ubuntu_version
+    if client_update.uptime is not None:
+        client.uptime = client_update.uptime
     session.add(client)
     session.commit()
     session.refresh(client)
     return client
+
+@router.put("/clients/{id}/kiosk_url", response_model=Client)
+def update_kiosk_url(
+    id: int,
+    data: dict = Body(...),
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    kiosk_url = data.get("kiosk_url")
+    if not kiosk_url:
+        raise HTTPException(status_code=400, detail="Missing kiosk_url")
+    client.kiosk_url = kiosk_url
+    push_client_command(client.unique_id, "set-kiosk-url", {"url": kiosk_url})
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return client
+
+@router.post("/clients/{id}/action")
+def client_action(
+    id: int,
+    data: dict = Body(...),
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    action = data.get("action")
+    if not action:
+        raise HTTPException(status_code=400, detail="Missing action")
+    push_client_command(client.unique_id, action)
+    return {"ok": True, "action": action}
 
 @router.post("/clients/{id}/approve", response_model=Client)
 def approve_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
@@ -95,3 +147,16 @@ def remove_client(id: int, session=Depends(get_session), user=Depends(get_curren
     session.delete(client)
     session.commit()
     return {"ok": True}
+
+@router.get("/clients/{id}/stream")
+def client_stream(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+    # Placeholder - return stream URL
+    return {"stream_url": f"/mjpeg/{id}"}
+
+@router.get("/clients/{id}/terminal")
+def client_terminal(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+    return {"terminal_url": f"/terminal/{id}"}
+
+@router.get("/clients/{id}/remote-desktop")
+def client_remote_desktop(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+    return {"remote_desktop_url": f"/remote-desktop/{id}"}
