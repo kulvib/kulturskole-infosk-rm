@@ -34,7 +34,6 @@ export default function ClientInfoPage({
   // Lokalitet state
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
-  // Sorterings state
   const [sortOrderEditing, setSortOrderEditing] = useState({});
   const [savingSortOrder, setSavingSortOrder] = useState({});
   const [refreshing, setRefreshing] = useState(false);
@@ -139,13 +138,13 @@ export default function ClientInfoPage({
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 80,
-          height: 32,
-          borderRadius: "16px",
+          width: 48, // mindre bredde
+          height: 20, // mindre højde
+          borderRadius: "12px",
           bgcolor: isOnline ? "#43a047" : "#FF8A80",
           color: "#111",
           fontWeight: 400,
-          fontSize: 15,
+          fontSize: 15, // tekststørrelse uændret
           boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
         }}
       >
@@ -184,7 +183,7 @@ export default function ClientInfoPage({
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          Godkendte klienter (træk og slip for at sortere)
+          Godkendte klienter
         </Typography>
         <Tooltip title="Opdater klientdata">
           <span>
@@ -217,19 +216,18 @@ export default function ClientInfoPage({
                 >
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}></TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Sortering</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
+                      <TableCell sx={{ fontWeight: 700, width: 60, textAlign: "right" }}>Sortering</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {dragClients.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} align="center">
+                        <TableCell colSpan={6} align="center">
                           Ingen godkendte klienter.
                         </TableCell>
                       </TableRow>
@@ -252,12 +250,6 @@ export default function ClientInfoPage({
                               }}
                               hover
                             >
-                              <TableCell
-                                {...provided.dragHandleProps}
-                                sx={{ width: 42, cursor: "grab" }}
-                              >
-                                <span style={{ fontSize: 20 }}>☰</span>
-                              </TableCell>
                               <TableCell>{client.name}</TableCell>
                               <TableCell>
                                 <Stack direction="row" spacing={1} alignItems="center">
@@ -288,37 +280,6 @@ export default function ClientInfoPage({
                                   </Button>
                                 </Stack>
                               </TableCell>
-                              <TableCell>
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <TextField
-                                    size="small"
-                                    type="number"
-                                    value={sortOrderEditing[client.id]}
-                                    onChange={(e) =>
-                                      setSortOrderEditing((prev) => ({
-                                        ...prev,
-                                        [client.id]: e.target.value,
-                                      }))
-                                    }
-                                    disabled={savingSortOrder[client.id]}
-                                    sx={{ width: 60 }}
-                                    inputProps={{ min: 0 }}
-                                  />
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => handleSortOrderSave(client.id)}
-                                    disabled={savingSortOrder[client.id]}
-                                    sx={{ minWidth: 44, px: 1 }}
-                                  >
-                                    {savingSortOrder[client.id] ? (
-                                      <CircularProgress size={18} />
-                                    ) : (
-                                      "Gem"
-                                    )}
-                                  </Button>
-                                </Stack>
-                              </TableCell>
                               <TableCell align="center">
                                 <ClientStatusCell isOnline={client.isOnline} />
                               </TableCell>
@@ -342,6 +303,9 @@ export default function ClientInfoPage({
                                     <DeleteIcon />
                                   </IconButton>
                                 </Tooltip>
+                              </TableCell>
+                              <TableCell align="right" {...provided.dragHandleProps} sx={{ cursor: "grab", width: 60 }}>
+                                <span style={{ fontSize: 20 }}>☰</span>
                               </TableCell>
                             </TableRow>
                           )}
