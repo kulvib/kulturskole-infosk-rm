@@ -83,24 +83,16 @@ export default function ClientInfoPage({
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 70,
-          height: 28,
+          width: 80,
+          height: 32,
           borderRadius: "16px",
-          bgcolor: isOnline ? "rgba(76,175,80,0.16)" : "rgba(244,67,54,0.16)",
-          color: isOnline ? "green" : "red",
+          bgcolor: isOnline ? "#43a047" : "#e53935", // Helt grøn eller rød
+          color: "#111", // Sort tekst
           fontWeight: 700,
-          fontSize: 14,
+          fontSize: 15,
+          boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
         }}
       >
-        <Box
-          sx={{
-            width: 14,
-            height: 14,
-            borderRadius: "50%",
-            bgcolor: isOnline ? "green" : "red",
-            mr: 1.2,
-          }}
-        />
         {isOnline ? "online" : "offline"}
       </Box>
     );
@@ -197,7 +189,6 @@ export default function ClientInfoPage({
           </Table>
         </TableContainer>
       </Paper>
-
       {/* Ikke godkendte klienter */}
       <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
         Ikke godkendte klienter
