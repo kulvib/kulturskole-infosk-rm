@@ -9,6 +9,7 @@ import {
   Divider,
   CircularProgress,
   Tooltip,
+  Chip,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -95,17 +96,43 @@ export default function ClientDetailsPage({ client, fetchClient }) {
     openRemoteDesktop(client.id);
   };
 
-  // Stream (MJPEG/WebRTC)
-  // <img src={getClientStream(client.id)} alt="Livestream" style={{ maxWidth: 500 }} />
-  // <video src={getClientStream(client.id)} controls autoPlay style={{ maxWidth: 500 }} />
+  // Helper: Status chip
+  function ClientStatusChip({ status, isOnline }) {
+    let color = "default";
+    let label = status;
+    if (status === "approved") {
+      color = isOnline ? "success" : "warning";
+      label = isOnline ? "Online" : "Offline";
+    } else if (status === "pending") {
+      color = "default";
+      label = "Afventer godkendelse";
+    } else if (status === "removed") {
+      color = "error";
+      label = "Fjernet";
+    }
+    return (
+      <Chip
+        label={label}
+        color={color}
+        variant={color === "default" ? "outlined" : "filled"}
+        sx={{
+          fontWeight: 500,
+          minWidth: 80,
+        }}
+      />
+    );
+  }
 
   return (
     <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
       <Paper sx={{ p: 3 }}>
-        {/* Klientnavn */}
-        <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-          {client.name}
-        </Typography>
+        {/* Klientnavn og status */}
+        <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            {client.name}
+          </Typography>
+          <ClientStatusChip status={client.status} isOnline={client.isOnline} />
+        </Stack>
 
         {/* Lokalitet */}
         <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
