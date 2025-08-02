@@ -15,14 +15,12 @@ import {
   Tooltip,
   CircularProgress,
   Stack,
-  Chip,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
-import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { Link } from "react-router-dom";
-import { useAuth } from "../auth/authcontext"; // <-- Korrekt sti!
+import { useAuth } from "../auth/authcontext";
 
 const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
 
@@ -80,31 +78,31 @@ export default function ClientInfoPage({
 
   function ClientStatusCell({ isOnline }) {
     return (
-      <Chip
-        icon={
-          <FiberManualRecordIcon
-            sx={{
-              color: isOnline ? "green" : "red",
-              fontSize: 14,
-              ml: "4px",
-            }}
-          />
-        }
-        label={isOnline ? "online" : "offline"}
+      <Box
         sx={{
-          bgcolor: isOnline ? "rgba(76, 175, 80, 0.1)" : "rgba(244, 67, 54, 0.1)",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 70,
+          height: 28,
+          borderRadius: "16px",
+          bgcolor: isOnline ? "rgba(76,175,80,0.16)" : "rgba(244,67,54,0.16)",
           color: isOnline ? "green" : "red",
           fontWeight: 700,
-          textTransform: "lowercase",
-          minWidth: 100,
-          pl: "8px",
-          ".MuiChip-icon": {
-            marginLeft: "4px",
-            marginRight: "6px",
-          },
+          fontSize: 14,
         }}
-        size="small"
-      />
+      >
+        <Box
+          sx={{
+            width: 14,
+            height: 14,
+            borderRadius: "50%",
+            bgcolor: isOnline ? "green" : "red",
+            mr: 1.2,
+          }}
+        />
+        {isOnline ? "online" : "offline"}
+      </Box>
     );
   }
 
