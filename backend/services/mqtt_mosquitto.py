@@ -7,11 +7,11 @@ MQTT_PORT = 1883
 client = mqtt.Client()
 
 def on_connect(client, userdata, flags, rc):
-    print("Connected!", rc)
+    print("Connected to Mosquitto!", rc)
     client.subscribe("test/topic")
 
 def on_message(client, userdata, msg):
-    print(f"Modtaget: {msg.payload.decode()}")
+    print(f"Modtaget besked på {msg.topic}: {msg.payload.decode()}")
 
 client.on_connect = on_connect
 client.on_message = on_message
