@@ -110,20 +110,27 @@ export default function ClientInfoPage({
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
-      {/* Header med opdater ikon */}
-      <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+      {/* Top row med titel og opdater-knap */}
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           Godkendte klienter
         </Typography>
         <Tooltip title="Opdater klientdata">
           <span>
-            <IconButton onClick={handleRefresh} disabled={refreshing}>
-              {refreshing ? (
-                <CircularProgress size={24} />
-              ) : (
-                <RefreshIcon />
-              )}
-            </IconButton>
+            <Button
+              startIcon={
+                refreshing ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  <RefreshIcon />
+                )
+              }
+              onClick={handleRefresh}
+              disabled={refreshing}
+              sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
+            >
+              Opdater
+            </Button>
           </span>
         </Tooltip>
       </Stack>
