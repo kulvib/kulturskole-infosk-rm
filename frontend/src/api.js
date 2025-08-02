@@ -5,6 +5,24 @@ function getToken() {
   return localStorage.getItem("token");
 }
 
+/** Login og hent access token */
+export async function login(username, password) {
+  const res = await fetch(`${apiUrl}/auth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username, password }),
+  });
+  if (!res.ok) {
+    let msg = "Forkert brugernavn eller kodeord";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
 /** Hent alle klienter (kræver authentication) */
 export async function getClients() {
   const token = getToken();
@@ -83,6 +101,7 @@ export async function removeClient(id) {
   }
 }
 
+/** Hent alle helligdage (kræver authentication) */
 export async function getHolidays() {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -100,6 +119,7 @@ export async function getHolidays() {
   return await res.json();
 }
 
+/** Tilføj ny helligdag (kræver authentication) */
 export async function addHoliday(date, description) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -122,6 +142,7 @@ export async function addHoliday(date, description) {
   return await res.json();
 }
 
+/** Slet en helligdag (kræver authentication) */
 export async function deleteHoliday(id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
