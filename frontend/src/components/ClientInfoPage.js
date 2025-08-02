@@ -19,6 +19,7 @@ import {
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/authcontext";
 
@@ -35,6 +36,7 @@ export default function ClientInfoPage({
 
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
 
   const approvedClients = clients?.filter((c) => c.status === "approved") || [];
   const unapprovedClients = clients?.filter((c) => c.status !== "approved") || [];
@@ -76,6 +78,7 @@ export default function ClientInfoPage({
     setSavingLocation((prev) => ({ ...prev, [clientId]: false }));
   };
 
+  // Statusfelt med lys rød/grøn og sort, ikke fed tekst
   function ClientStatusCell({ isOnline }) {
     return (
       <Box
@@ -86,9 +89,9 @@ export default function ClientInfoPage({
           width: 80,
           height: 32,
           borderRadius: "16px",
-          bgcolor: isOnline ? "#43a047" : "#e53935", // Helt grøn eller rød
+          bgcolor: isOnline ? "#43a047" : "#FF8A80", // Lys grøn / lys rød
           color: "#111", // Sort tekst
-          fontWeight: 700,
+          fontWeight: 400, // Ikke fed
           fontSize: 15,
           boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
         }}
@@ -98,12 +101,32 @@ export default function ClientInfoPage({
     );
   }
 
+  // Håndter opdater-knap
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchClients();
+    setRefreshing(false);
+  };
+
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
-      {/* Godkendte klienter */}
-      <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
-        Godkendte klienter
-      </Typography>
+      {/* Header med opdater ikon */}
+      <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          Godkendte klienter
+        </Typography>
+        <Tooltip title="Opdater klientdata">
+          <span>
+            <IconButton onClick={handleRefresh} disabled={refreshing}>
+              {refreshing ? (
+                <CircularProgress size={24} />
+              ) : (
+                <RefreshIcon />
+              )}
+            </IconButton>
+          </span>
+        </Tooltip>
+      </Stack>
       <Paper sx={{ mb: 4 }}>
         <TableContainer>
           <Table size="small">
