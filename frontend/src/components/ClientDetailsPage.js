@@ -18,7 +18,6 @@ import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import ChromeReaderModeIcon from "@mui/icons-material/ChromeReaderMode";
 
-// For API calls, expand your api.js with relevant endpoints:
 import {
   updateClient,
   pushKioskUrl,
@@ -29,6 +28,17 @@ import {
 } from "../api";
 
 export default function ClientDetailsPage({ client, fetchClient }) {
+  // Loader hvis client mangler
+  if (!client) {
+    return (
+      <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6">Klientdata indlæses...</Typography>
+        </Paper>
+      </Box>
+    );
+  }
+
   // Local state for editable fields
   const [locality, setLocality] = useState(client.locality || "");
   const [savingLocality, setSavingLocality] = useState(false);
@@ -55,7 +65,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
   const handleKioskUrlSave = async () => {
     setSavingKioskUrl(true);
     try {
-      await pushKioskUrl(client.id, kioskUrl); // Implementér i api.js
+      await pushKioskUrl(client.id, kioskUrl);
       fetchClient();
     } catch (err) {
       alert("Kunne ikke opdatere kiosk webadresse: " + err.message);
@@ -67,7 +77,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
   const handleClientAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
-      await clientAction(client.id, action); // fx "start", "restart", "shutdown", "chrome-shutdown"
+      await clientAction(client.id, action);
       fetchClient();
     } catch (err) {
       alert("Handlingen mislykkedes: " + err.message);
@@ -77,17 +87,17 @@ export default function ClientDetailsPage({ client, fetchClient }) {
 
   // Terminal
   const handleOpenTerminal = () => {
-    openTerminal(client.id); // Implementér WebSocket shell proxy
+    openTerminal(client.id);
   };
 
   // Remote Desktop
   const handleOpenRemoteDesktop = () => {
-    openRemoteDesktop(client.id); // Implementér Ubuntu fjernskrivebord
+    openRemoteDesktop(client.id);
   };
 
   // Stream (MJPEG/WebRTC)
-  // Her vises et billede eller video fra klienten, fx <img src={getClientStream(client.id)} />
-  // For WebRTC kan du vise <video ...> og styre streamen via backend
+  // <img src={getClientStream(client.id)} alt="Livestream" style={{ maxWidth: 500 }} />
+  // <video src={getClientStream(client.id)} controls autoPlay style={{ maxWidth: 500 }} />
 
   return (
     <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
@@ -270,8 +280,10 @@ export default function ClientDetailsPage({ client, fetchClient }) {
           Livestream fra klient
         </Typography>
         <Box sx={{ mb: 1 }}>
-          {/* Til MJPEG: <img src={getClientStream(client.id)} alt="Livestream" style={{ maxWidth: 500 }} /> */}
-          {/* Til WebRTC: <video src={getClientStream(client.id)} controls autoPlay style={{ maxWidth: 500 }} /> */}
+          {/* Til MJPEG: */}
+          {/* <img src={getClientStream(client.id)} alt="Livestream" style={{ maxWidth: 500 }} /> */}
+          {/* Til WebRTC: */}
+          {/* <video src={getClientStream(client.id)} controls autoPlay style={{ maxWidth: 500 }} /> */}
           <Box sx={{ p: 2, border: "1px solid #ccc", borderRadius: 2, background: "#fafafa" }}>
             <VideocamIcon color="action" sx={{ mr: 1 }} />
             Livestream placeholder (MJPEG/WebRTC)
