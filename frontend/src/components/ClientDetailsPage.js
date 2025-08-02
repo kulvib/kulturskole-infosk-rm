@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Grid,
@@ -25,7 +25,6 @@ import MemoryIcon from "@mui/icons-material/Memory";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
-// VIGTIGT: Importér updateClient, pushKioskUrl, clientAction, openTerminal, openRemoteDesktop, getClientStream
 import {
   updateClient,
   pushKioskUrl,
@@ -33,7 +32,10 @@ import {
   openTerminal,
   openRemoteDesktop,
   getClientStream,
+  getClient,
 } from "../api";
+import { useParams } from "react-router-dom";
+import { useClientWebSocket } from "../hooks/useClientWebSocket";
 
 // Offline/Online status: meget lille, kun grøn/rød cirkel + tekst med Roboto font
 function ClientStatusIcon({ isOnline }) {
@@ -63,15 +65,36 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
-export default function ClientDetailsPage({ client, fetchClient }) {
-  const [locality, setLocality] = useState(client?.locality || "");
+export default function ClientDetailsPage() {
+  const { clientId } = useParams();
+  const [client, setClient] = useState(null);
+  const [locality, setLocality] = useState("");
   const [savingLocality, setSavingLocality] = useState(false);
 
-  const [kioskUrl, setKioskUrl] = useState(client?.kiosk_url || "");
+  const [kioskUrl, setKioskUrl] = useState("");
   const [savingKioskUrl, setSavingKioskUrl] = useState(false);
 
   const [actionLoading, setActionLoading] = useState({});
   const [refreshing, setRefreshing] = useState(false);
+
+  // Fetch client by id
+  const fetchClient = async () => {
+    try {
+      const data = await getClient(clientId);
+      setClient(data);
+      setLocality(data.locality || "");
+      setKioskUrl(data.kiosk_url || "");
+    } catch (err) {
+      setClient(null);
+    }
+  };
+
+  useEffect(() => {
+    if (clientId) fetchClient();
+    // eslint-disable-next-line
+  }, [clientId]);
+
+  useClientWebSocket(fetchClient);
 
   if (!client) {
     return (
@@ -88,7 +111,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
     setSavingLocality(true);
     try {
       await updateClient(client.id, { locality });
-      fetchClient?.();
+      fetchClient();
     } catch (err) {
       alert("Kunne ikke gemme lokalitet: " + err.message);
     }
@@ -100,7 +123,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
     setSavingKioskUrl(true);
     try {
       await pushKioskUrl(client.id, kioskUrl);
-      fetchClient?.();
+      fetchClient();
     } catch (err) {
       alert("Kunne ikke opdatere kiosk webadresse: " + err.message);
     }
@@ -112,7 +135,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
       await clientAction(client.id, action);
-      fetchClient?.();
+      fetchClient();
     } catch (err) {
       alert("Handlingen mislykkedes: " + err.message);
     }
@@ -126,7 +149,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
   const handleRefreshClient = async () => {
     setRefreshing(true);
     try {
-      await fetchClient?.();
+      await fetchClient();
     } catch (err) {
       alert("Kunne ikke opdatere klienten: " + err.message);
     }
