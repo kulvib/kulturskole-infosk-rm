@@ -4,12 +4,11 @@ from ..db import engine
 from ..models import MqttMessage
 from datetime import datetime
 
-# MQTT Konfiguration
+# Konfiguration
 MQTT_BROKER = "test.mosquitto.org"
 MQTT_PORT = 1883
 MQTT_TOPIC = "test/topic"
 
-# Initialiser klienten
 client = mqtt.Client()
 
 def on_connect(client, userdata, flags, rc):
@@ -17,7 +16,7 @@ def on_connect(client, userdata, flags, rc):
         print("Connected to Mosquitto broker!")
         client.subscribe(MQTT_TOPIC)
     else:
-        print(f"Failed to connect, return code {rc}")
+        print(f"Failed to connect to Mosquitto. Return code: {rc}")
 
 def on_message(client, userdata, msg):
     try:
@@ -62,5 +61,5 @@ def send_message(message, topic=MQTT_TOPIC):
         print(f"Fejl ved sending af besked: {e}")
 
 def push_client_command(command: str, topic: str = MQTT_TOPIC):
-    """(Ekstra) Sender kommando til klienter via MQTT."""
+    """Ekstra: sender en kommando til klient via MQTT."""
     send_message(command, topic)
