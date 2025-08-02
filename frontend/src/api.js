@@ -41,6 +41,29 @@ export async function getClients() {
   return await res.json();
 }
 
+/** Opdater en klient (fx locality eller sort_order) (kræver authentication) */
+export async function updateClient(id, updates) {
+  const token = getToken();
+  if (!token) throw new Error("Token mangler - du er ikke logget ind");
+  const res = await fetch(`${apiUrl}/api/clients/${id}/update`, {
+    method: "PUT",
+    headers: {
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) {
+    let msg = "Kunne ikke opdatere klient";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
 /** Hent alle helligdage (kræver authentication) */
 export async function getHolidays() {
   const token = getToken();
