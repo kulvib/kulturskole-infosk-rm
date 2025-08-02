@@ -30,16 +30,26 @@ function ClientStatusIcon({ isOnline }) {
   return (
     <Box
       sx={{
-        display: "inline-block",
-        width: 14,
-        height: 14,
-        borderRadius: "50%",
-        bgcolor: isOnline ? "#66FF33" : "#CC3300",
-        ml: 1,
-        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-        border: "1px solid #ddd",
+        display: "inline-flex", // NB! "inline-flex" for tekst og ikon
+        alignItems: "center",
+        fontFamily: "Roboto, Helvetica, Arial, sans-serif", // <--- HER!
+        fontSize: 13,
+        fontWeight: 400,
       }}
-    />
+    >
+      <Box
+        sx={{
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
+          bgcolor: isOnline ? "#66FF33" : "#CC3300",
+          ml: 1,
+          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+          border: "1px solid #ddd",
+        }}
+      />
+      <span style={{ marginLeft: 6 }}>{isOnline ? "online" : "offline"}</span>
+    </Box>
   );
 }
 
