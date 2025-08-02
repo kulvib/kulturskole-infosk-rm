@@ -6,6 +6,7 @@ from ..db import get_session
 from ..models import Client, ClientCreate, ClientUpdate
 from ..auth import get_current_admin_user
 from ..services.mqtt_service import push_client_command
+from ..main import notify_clients_updated  # <-- importér notify
 
 router = APIRouter()
 
@@ -32,7 +33,7 @@ def get_client(id: int, session=Depends(get_session), user=Depends(get_current_a
     return client
 
 @router.post("/clients/", response_model=Client)
-def create_client(
+async def create_client(
     client_in: ClientCreate,
     session=Depends(get_session),
     user=Depends(get_current_admin_user)
@@ -51,10 +52,11 @@ def create_client(
     session.add(client)
     session.commit()
     session.refresh(client)
+    await notify_clients_updated()  # <-- notify!
     return client
 
 @router.put("/clients/{id}/update", response_model=Client)
-def update_client(
+async def update_client(
     id: int,
     client_update: ClientUpdate,
     session=Depends(get_session),
@@ -76,10 +78,11 @@ def update_client(
     session.add(client)
     session.commit()
     session.refresh(client)
+    await notify_clients_updated()  # <-- notify!
     return client
 
 @router.put("/clients/{id}/kiosk_url", response_model=Client)
-def update_kiosk_url(
+async def update_kiosk_url(
     id: int,
     data: dict = Body(...),
     session=Depends(get_session),
@@ -96,6 +99,7 @@ def update_kiosk_url(
     session.add(client)
     session.commit()
     session.refresh(client)
+    await notify_clients_updated()  # <-- notify!
     return client
 
 @router.post("/clients/{id}/action")
@@ -115,7 +119,7 @@ def client_action(
     return {"ok": True, "action": action}
 
 @router.post("/clients/{id}/approve", response_model=Client)
-def approve_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+async def approve_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -123,6 +127,7 @@ def approve_client(id: int, session=Depends(get_session), user=Depends(get_curre
     session.add(client)
     session.commit()
     session.refresh(client)
+    await notify_clients_updated()  # <-- notify!
     return client
 
 @router.post("/clients/{id}/heartbeat", response_model=Client)
@@ -140,17 +145,17 @@ def client_heartbeat(
     return client
 
 @router.delete("/clients/{id}/remove")
-def remove_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+async def remove_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     session.delete(client)
     session.commit()
+    await notify_clients_updated()  # <-- notify!
     return {"ok": True}
 
 @router.get("/clients/{id}/stream")
 def client_stream(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
-    # Placeholder - return stream URL
     return {"stream_url": f"/mjpeg/{id}"}
 
 @router.get("/clients/{id}/terminal")
