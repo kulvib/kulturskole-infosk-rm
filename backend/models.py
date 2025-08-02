@@ -21,11 +21,17 @@ class Client(ClientBase, table=True):
     status: str = "pending"
     isOnline: bool = False
     last_seen: Optional[datetime] = None
-    sort_order: Optional[int] = Field(default=None, index=True)  # <-- NYT FELT
+    sort_order: Optional[int] = Field(default=None, index=True)
+    kiosk_url: Optional[str] = None
+    ubuntu_version: Optional[str] = None
+    uptime: Optional[str] = None
 
 class ClientCreate(ClientBase):
-    sort_order: Optional[int] = None   # <-- Mulighed for at sætte ved oprettelse
+    sort_order: Optional[int] = None
 
 class ClientUpdate(SQLModel):
     locality: Optional[str] = None
-    sort_order: Optional[int] = None   # <-- Mulighed for at opdatere sort_order
+    sort_order: Optional[int] = None
+    kiosk_url: Optional[str] = None
+    ubuntu_version: Optional[str] = None
+    uptime: Optional[str] = None
