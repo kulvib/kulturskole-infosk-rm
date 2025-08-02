@@ -7,7 +7,7 @@ import ClientDetailsPage from "./components/ClientDetailsPage";
 import LoginPage from "./components/LoginPage";
 import HomePage from "./components/HomePage";
 import ProtectedRoute from "./auth/ProtectedRoute";
-import { AuthProvider } from "./auth/authcontext"; // <-- KORREKT STED
+import { AuthProvider } from "./auth/authcontext";
 
 import {
   getClients,
@@ -31,10 +31,15 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Du er ikke logget ind.");
+      console.log("Token i fetchClients:", token);
       const data = await getClients();
+      console.log("Klienter fra API:", data);
       setClients(data);
     } catch (err) {
       setError(err.message);
+      console.log("Fejl fra getClients:", err);
     }
     setLoading(false);
   };
@@ -44,6 +49,8 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Du er ikke logget ind.");
       const data = await getHolidays();
       setHolidays(data);
     } catch (err) {
@@ -107,15 +114,23 @@ export default function App() {
     setLoading(false);
   };
 
+  // Hent data KUN hvis token findes (efter login)
   useEffect(() => {
-    fetchClients();
-    fetchHolidays();
-    // eslint-disable-next-line
+    if (localStorage.getItem("token")) {
+      fetchClients();
+      fetchHolidays();
+    }
   }, []);
 
   return (
     <AuthProvider>
       <BrowserRouter>
+        {/* Vis fejl hvis der er */}
+        {error && (
+          <div style={{ color: "red", padding: 10, fontWeight: 600 }}>
+            {error}
+          </div>
+        )}
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route
@@ -162,6 +177,8 @@ export default function App() {
               }
             />
           </Route>
+          {/* Fallback hvis path ikke findes */}
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
