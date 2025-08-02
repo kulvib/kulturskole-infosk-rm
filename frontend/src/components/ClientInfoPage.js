@@ -106,7 +106,7 @@ export default function ClientInfoPage({
           width: 48,
           height: 20,
           borderRadius: "12px",
-          bgcolor: isOnline ? "#43a047" : "#FFB4A2",
+          bgcolor: isOnline ? "#43a047" : "##FF0000",
           color: "#111",
           fontWeight: 400,
           fontSize: 13,
