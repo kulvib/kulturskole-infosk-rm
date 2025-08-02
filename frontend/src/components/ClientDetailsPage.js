@@ -11,7 +11,6 @@ import {
   Chip,
   Card,
   CardContent,
-  CardActions,
   Grid,
   TextField,
 } from "@mui/material";
@@ -55,9 +54,11 @@ function ClientStatusChip({ status, isOnline }) {
       color={color}
       variant={color === "default" ? "outlined" : "filled"}
       sx={{
-        fontWeight: 500,
-        minWidth: 80,
-        fontSize: '1rem'
+        fontWeight: 600,
+        minWidth: 90,
+        fontSize: '1rem',
+        letterSpacing: 0.5,
+        boxShadow: color === "success" ? "0 1px 5px #43a04733" : color === "warning" ? "0 1px 5px #ff704333" : "0 1px 5px #e5737333"
       }}
     />
   );
@@ -107,83 +108,89 @@ export default function ClientDetailsPage({ client, fetchClient }) {
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
+    <Box sx={{ maxWidth: 1000, mx: "auto", mt: 4 }}>
       <Stack spacing={3}>
         {/* Header */}
         <Paper
-          elevation={2}
+          elevation={3}
           sx={{
-            p: 3,
-            bgcolor: "#f5f8ff",
-            borderRadius: 3,
+            p: 4,
+            bgcolor: "linear-gradient(90deg,#e3f2fd 0%,#f8bbd0 100%)",
+            borderRadius: 4,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            boxShadow: "0 2px 12px #e3f2fd55"
           }}
         >
-          <Stack direction="row" alignItems="center" spacing={2}>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          <Stack direction="row" alignItems="center" spacing={3}>
+            <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: 1 }}>
               {client.name}
             </Typography>
             <ClientStatusChip status={client.status} isOnline={client.isOnline} />
           </Stack>
-          <Typography sx={{ color: "#888" }}>
+          <Typography sx={{ color: "#888", fontSize: 18 }}>
             ID: {client.id}
           </Typography>
         </Paper>
 
-        {/* Informationskort */}
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={7}>
-            <Card elevation={0} sx={{ bgcolor: "#fff", borderRadius: 3 }}>
+        <Grid container spacing={3}>
+          {/* Informationskort */}
+          <Grid item xs={12} md={5}>
+            <Card elevation={2} sx={{ borderRadius: 3, bgcolor: "#fff" }}>
               <CardContent>
-                <Stack spacing={1}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
+                <Stack spacing={2}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
                     <LocationOnIcon color="primary" />
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 700 }}>
                       Lokalitet:
                     </Typography>
                     <Typography variant="body1">
                       {client.locality || <span style={{ color: "#888" }}>Ingen lokalitet</span>}
                     </Typography>
                   </Stack>
-                  <Stack direction="row" alignItems="center" spacing={1}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
                     <LanIcon color="primary" />
-                    <Typography variant="body2">IP-adresse:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{client.ip_address || "ukendt"}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>IP-adresse:</Typography>
+                    <Typography variant="body2">{client.ip_address || "ukendt"}</Typography>
                   </Stack>
-                  <Stack direction="row" alignItems="center" spacing={1}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
                     <LanIcon color="primary" />
-                    <Typography variant="body2">MAC-adresse:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{client.mac_address || "ukendt"}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>MAC-adresse:</Typography>
+                    <Typography variant="body2">{client.mac_address || "ukendt"}</Typography>
                   </Stack>
-                  <Stack direction="row" alignItems="center" spacing={1}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
                     <MemoryIcon color="primary" />
-                    <Typography variant="body2">Ubuntu version:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{client.ubuntu_version || "ukendt"}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Ubuntu version:</Typography>
+                    <Typography variant="body2">{client.ubuntu_version || "ukendt"}</Typography>
                   </Stack>
-                  <Stack direction="row" alignItems="center" spacing={1}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
                     <AccessTimeIcon color="primary" />
-                    <Typography variant="body2">Sidst set:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{client.last_seen || "ukendt"}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Sidst set:</Typography>
+                    <Typography variant="body2">{client.last_seen || "ukendt"}</Typography>
                   </Stack>
-                  <Stack direction="row" alignItems="center" spacing={1}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
                     <AccessTimeIcon color="primary" />
-                    <Typography variant="body2">Oppetid:</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{client.uptime || "ukendt"}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Oppetid:</Typography>
+                    <Typography variant="body2">{client.uptime || "ukendt"}</Typography>
                   </Stack>
                 </Stack>
               </CardContent>
             </Card>
           </Grid>
+
           {/* Kiosk webadresse */}
-          <Grid item xs={12} md={5}>
-            <Card elevation={0} sx={{ bgcolor: "#fff", borderRadius: 3 }}>
+          <Grid item xs={12} md={7}>
+            <Card elevation={2} sx={{
+              borderRadius: 3,
+              bgcolor: "linear-gradient(90deg,#f8bbd033,#e3f2fd33)",
+              boxShadow: "0 2px 12px #f8bbd055"
+            }}>
               <CardContent>
                 <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                  <ChromeReaderModeIcon color="primary" />
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                    Kiosk webadresse:
+                  <ChromeReaderModeIcon color="primary" fontSize="large" />
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Kiosk webadresse
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={2} alignItems="center">
@@ -192,21 +199,21 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                     value={kioskUrl}
                     onChange={e => setKioskUrl(e.target.value)}
                     sx={{
-                      width: 200,
+                      width: 300,
                       '& .MuiInputBase-input': { fontSize: '1rem' },
-                      '& .MuiInputBase-root': { height: 30 },
+                      '& .MuiInputBase-root': { height: 37 },
                     }}
                     disabled={savingKioskUrl}
                   />
                   <Button
-                    size="small"
-                    variant="outlined"
+                    size="medium"
+                    variant="contained"
                     color="primary"
                     onClick={handleKioskUrlSave}
                     disabled={savingKioskUrl}
-                    sx={{ minWidth: 44, px: 1, height: 30 }}
+                    sx={{ minWidth: 68, px: 2, height: 37, fontWeight: 700 }}
                   >
-                    {savingKioskUrl ? <CircularProgress size={18} /> : "Gem"}
+                    {savingKioskUrl ? <CircularProgress size={20} /> : "Gem"}
                   </Button>
                 </Stack>
               </CardContent>
@@ -214,13 +221,16 @@ export default function ClientDetailsPage({ client, fetchClient }) {
           </Grid>
         </Grid>
 
-        {/* Action cards */}
-        <Grid container spacing={2}>
+        <Grid container spacing={3}>
           {/* Handlinger */}
           <Grid item xs={12} md={6}>
-            <Card elevation={0} sx={{ bgcolor: "#f8fafc", borderRadius: 3 }}>
+            <Card elevation={2} sx={{
+              borderRadius: 3,
+              bgcolor: "linear-gradient(90deg,#fffde7,#ffe0b2)",
+              boxShadow: "0 2px 8px #ffe0b255"
+            }}>
               <CardContent>
-                <Typography variant="body1" sx={{ fontWeight: 600, mb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
                   Handlinger
                 </Typography>
                 <Stack direction="row" spacing={2}>
@@ -232,6 +242,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                         startIcon={<PowerSettingsNewIcon />}
                         onClick={() => handleClientAction("chrome-shutdown")}
                         disabled={actionLoading["chrome-shutdown"]}
+                        sx={{ fontWeight: 600 }}
                       >
                         Chrome shutdown
                       </Button>
@@ -245,6 +256,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                         startIcon={<PlayArrowIcon />}
                         onClick={() => handleClientAction("start")}
                         disabled={actionLoading["start"]}
+                        sx={{ fontWeight: 600 }}
                       >
                         Start
                       </Button>
@@ -258,6 +270,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                         startIcon={<RestartAltIcon />}
                         onClick={() => handleClientAction("restart")}
                         disabled={actionLoading["restart"]}
+                        sx={{ fontWeight: 600 }}
                       >
                         Genstart
                       </Button>
@@ -271,6 +284,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                         startIcon={<PowerSettingsNewIcon />}
                         onClick={() => handleClientAction("shutdown")}
                         disabled={actionLoading["shutdown"]}
+                        sx={{ fontWeight: 600 }}
                       >
                         Sluk
                       </Button>
@@ -282,9 +296,13 @@ export default function ClientDetailsPage({ client, fetchClient }) {
           </Grid>
           {/* Fjernadgang */}
           <Grid item xs={12} md={6}>
-            <Card elevation={0} sx={{ bgcolor: "#f8fafc", borderRadius: 3 }}>
+            <Card elevation={2} sx={{
+              borderRadius: 3,
+              bgcolor: "linear-gradient(90deg,#e3f2fd,#f8bbd0)",
+              boxShadow: "0 2px 8px #e3f2fd55"
+            }}>
               <CardContent>
-                <Typography variant="body1" sx={{ fontWeight: 600, mb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
                   Fjernadgang
                 </Typography>
                 <Stack direction="row" spacing={2}>
@@ -295,6 +313,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                         color="inherit"
                         startIcon={<TerminalIcon />}
                         onClick={handleOpenTerminal}
+                        sx={{ fontWeight: 600 }}
                       >
                         Terminal
                       </Button>
@@ -307,6 +326,7 @@ export default function ClientDetailsPage({ client, fetchClient }) {
                         color="primary"
                         startIcon={<DesktopWindowsIcon />}
                         onClick={handleOpenRemoteDesktop}
+                        sx={{ fontWeight: 600 }}
                       >
                         Fjernskrivebord
                       </Button>
@@ -319,11 +339,15 @@ export default function ClientDetailsPage({ client, fetchClient }) {
         </Grid>
 
         {/* Livestream */}
-        <Card elevation={0} sx={{ bgcolor: "#fff", borderRadius: 3 }}>
+        <Card elevation={2} sx={{
+          borderRadius: 3,
+          bgcolor: "linear-gradient(90deg,#e1bee7,#bbdefb)",
+          boxShadow: "0 2px 8px #bbdefb55"
+        }}>
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-              <VideocamIcon color="action" />
-              <Typography variant="body1" sx={{ fontWeight: 600 }}>
+              <VideocamIcon color="action" fontSize="large" />
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Livestream fra klient
               </Typography>
             </Stack>
@@ -331,7 +355,15 @@ export default function ClientDetailsPage({ client, fetchClient }) {
             {/* <img src={getClientStream(client.id)} alt="Livestream" style={{ maxWidth: 500 }} /> */}
             {/* Til WebRTC: */}
             {/* <video src={getClientStream(client.id)} controls autoPlay style={{ maxWidth: 500 }} /> */}
-            <Box sx={{ p: 2, border: "1px solid #eee", borderRadius: 2, background: "#fafafa" }}>
+            <Box sx={{
+              p: 3,
+              border: "1px solid #eee",
+              borderRadius: 2,
+              background: "#fafafa",
+              textAlign: "center",
+              color: "#888",
+              fontStyle: "italic"
+            }}>
               Livestream placeholder (MJPEG/WebRTC)
             </Box>
           </CardContent>
