@@ -29,6 +29,7 @@ export default function ClientInfoPage({
   clients,
   loading,
   onApproveClient,
+  onRemoveClient,
   fetchClients,
 }) {
   const { token } = useAuth();
@@ -100,12 +101,9 @@ export default function ClientInfoPage({
   };
 
   // Slet klient og opdater listen
-  const onRemoveClient = async (clientId) => {
+  const handleRemoveClient = async (clientId) => {
     try {
-      await fetch(`${API_BASE}/api/clients/${clientId}/remove`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await onRemoveClient(clientId);
       fetchClients();
     } catch (err) {
       alert("Kunne ikke fjerne klient: " + err.message);
@@ -278,7 +276,7 @@ export default function ClientInfoPage({
                           <Tooltip title="Fjern klient">
                             <IconButton
                               color="error"
-                              onClick={() => onRemoveClient(client.id)}
+                              onClick={() => handleRemoveClient(client.id)}
                             >
                               <DeleteIcon />
                             </IconButton>
