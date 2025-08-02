@@ -108,8 +108,44 @@ export default function ClientInfoPage({
     setRefreshing(false);
   };
 
+  // Fade tekst, vises mens der loades klienter
+  const showLoadingText = loading || !clients || clients.length === 0;
+
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
+    <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, position: "relative" }}>
+      {/* Fade tekst "Vent venligst" */}
+      {showLoadingText && (
+        <Box
+          sx={{
+            position: "absolute",
+            width: "100%",
+            top: 100,
+            left: 0,
+            zIndex: 10,
+            display: "flex",
+            justifyContent: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: 28,
+              color: "#444",
+              animation: "fade 1.5s infinite alternate",
+              fontFamily: "inherit",
+              fontWeight: 400,
+              textShadow: "0 2px 10px #fff",
+              '@keyframes fade': {
+                from: { opacity: 0.2 },
+                to: { opacity: 1 },
+              },
+            }}
+          >
+            Vent venligst...
+          </Typography>
+        </Box>
+      )}
+
       {/* Top row med titel og opdater-knap */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
@@ -134,144 +170,150 @@ export default function ClientInfoPage({
           </span>
         </Tooltip>
       </Stack>
-      <Paper sx={{ mb: 4 }}>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {approvedClients.length === 0 ? (
+      {!showLoadingText && (
+        <Paper sx={{ mb: 4 }}>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    Ingen godkendte klienter.
-                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
+                  <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
+                  <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
                 </TableRow>
-              ) : (
-                approvedClients.map((client) => (
-                  <TableRow key={client.id} hover>
-                    <TableCell>
-                      {client.name}
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <TextField
-                          size="small"
-                          value={editableLocations[client.id] || ""}
-                          onChange={(e) =>
-                            setEditableLocations((prev) => ({
-                              ...prev,
-                              [client.id]: e.target.value,
-                            }))
-                          }
-                          disabled={savingLocation[client.id]}
-                          sx={{ width: 150 }}
-                        />
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => handleLocationSave(client.id)}
-                          disabled={savingLocation[client.id]}
-                          sx={{ minWidth: 44, px: 1 }}
-                        >
-                          {savingLocation[client.id] ? (
-                            <CircularProgress size={18} />
-                          ) : (
-                            "Gem"
-                          )}
-                        </Button>
-                      </Stack>
-                    </TableCell>
-                    <TableCell align="center">
-                      <ClientStatusCell isOnline={client.isOnline} />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Tooltip title="Info">
-                        <IconButton
-                          component={Link}
-                          to={`/clients/${client.id}`}
-                          color="primary"
-                        >
-                          <InfoIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Tooltip title="Fjern klient">
-                        <IconButton
-                          color="error"
-                          onClick={() => onRemoveClient(client.id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
+              </TableHead>
+              <TableBody>
+                {approvedClients.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      Ingen godkendte klienter.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                ) : (
+                  approvedClients.map((client) => (
+                    <TableRow key={client.id} hover>
+                      <TableCell>
+                        {client.name}
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <TextField
+                            size="small"
+                            value={editableLocations[client.id] || ""}
+                            onChange={(e) =>
+                              setEditableLocations((prev) => ({
+                                ...prev,
+                                [client.id]: e.target.value,
+                              }))
+                            }
+                            disabled={savingLocation[client.id]}
+                            sx={{ width: 150 }}
+                          />
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleLocationSave(client.id)}
+                            disabled={savingLocation[client.id]}
+                            sx={{ minWidth: 44, px: 1 }}
+                          >
+                            {savingLocation[client.id] ? (
+                              <CircularProgress size={18} />
+                            ) : (
+                              "Gem"
+                            )}
+                          </Button>
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="center">
+                        <ClientStatusCell isOnline={client.isOnline} />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="Info">
+                          <IconButton
+                            component={Link}
+                            to={`/clients/${client.id}`}
+                            color="primary"
+                          >
+                            <InfoIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="Fjern klient">
+                          <IconButton
+                            color="error"
+                            onClick={() => onRemoveClient(client.id)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
       {/* Ikke godkendte klienter */}
-      <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
-        Ikke godkendte klienter
-      </Typography>
-      <Paper>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>IP-adresse</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>MAC-adresse</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Tilføj</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {unapprovedClients.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    Ingen ikke-godkendte klienter.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                unapprovedClients.map((client) => (
-                  <TableRow key={client.id} hover>
-                    <TableCell>
-                      {client.name || "Ukendt navn"}
-                    </TableCell>
-                    <TableCell>
-                      <span>{client.ip_address || "ukendt"}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span>{client.mac_address || "ukendt"}</span>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Button
-                        variant="contained"
-                        color="success"
-                        size="small"
-                        startIcon={<AddIcon />}
-                        onClick={() => onApproveClient(client.id)}
-                        sx={{ minWidth: 44 }}
-                      >
-                        Tilføj
-                      </Button>
-                    </TableCell>
+      {!showLoadingText && (
+        <>
+          <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
+            Ikke godkendte klienter
+          </Typography>
+          <Paper>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>IP-adresse</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>MAC-adresse</TableCell>
+                    <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Tilføj</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                </TableHead>
+                <TableBody>
+                  {unapprovedClients.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center">
+                        Ingen ikke-godkendte klienter.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    unapprovedClients.map((client) => (
+                      <TableRow key={client.id} hover>
+                        <TableCell>
+                          {client.name || "Ukendt navn"}
+                        </TableCell>
+                        <TableCell>
+                          <span>{client.ip_address || "ukendt"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span>{client.mac_address || "ukendt"}</span>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            startIcon={<AddIcon />}
+                            onClick={() => onApproveClient(client.id)}
+                            sx={{ minWidth: 44 }}
+                          >
+                            Tilføj
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </>
+      )}
     </Box>
   );
 }
