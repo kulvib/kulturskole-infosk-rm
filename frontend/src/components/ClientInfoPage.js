@@ -10,7 +10,6 @@ import {
   TableHead,
   TableRow,
   IconButton,
-  TextField,
   Button,
   Tooltip,
   CircularProgress,
@@ -31,11 +30,7 @@ export default function ClientInfoPage({
   onRemoveClient,
   fetchClients,
 }) {
-  // Lokalitet state
-  const [editableLocations, setEditableLocations] = useState({});
-  const [savingLocation, setSavingLocation] = useState({});
-  const [sortOrderEditing, setSortOrderEditing] = useState({});
-  const [savingSortOrder, setSavingSortOrder] = useState({});
+  // Drag & drop state
   const [refreshing, setRefreshing] = useState(false);
   const [dragClients, setDragClients] = useState([]);
 
@@ -47,7 +42,7 @@ export default function ClientInfoPage({
     // eslint-disable-next-line
   }, []);
 
-  // Initialiser dragClients og edit states, når klientlisten ændres
+  // Initialiser dragClients, når klientlisten ændres
   useEffect(() => {
     const approved = (clients?.filter((c) => c.status === "approved") || []).slice();
     approved.sort((a, b) => {
@@ -64,50 +59,12 @@ export default function ClientInfoPage({
       return a.name.localeCompare(b.name);
     });
     setDragClients(approved);
-
-    const initialLocations = {};
-    const initialSortOrders = {};
-    approved.forEach((client) => {
-      initialLocations[client.id] = client.locality || "";
-      initialSortOrders[client.id] =
-        client.sort_order !== undefined && client.sort_order !== null
-          ? client.sort_order
-          : "";
-    });
-    setEditableLocations(initialLocations);
-    setSortOrderEditing(initialSortOrders);
   }, [clients]);
 
   // Ikke-godkendte klienter
   const unapprovedClients = (clients?.filter((c) => c.status !== "approved") || [])
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
-
-  // Gem lokalitet
-  const handleLocationSave = async (clientId) => {
-    setSavingLocation((prev) => ({ ...prev, [clientId]: true }));
-    try {
-      await updateClient(clientId, { locality: editableLocations[clientId] });
-      fetchClients();
-    } catch (err) {
-      alert("Kunne ikke gemme lokalitet: " + err.message);
-    }
-    setSavingLocation((prev) => ({ ...prev, [clientId]: false }));
-  };
-
-  // Gem sort_order
-  const handleSortOrderSave = async (clientId) => {
-    setSavingSortOrder((prev) => ({ ...prev, [clientId]: true }));
-    try {
-      const val = sortOrderEditing[clientId];
-      const sort_order = val === "" ? null : Number(val);
-      await updateClient(clientId, { sort_order });
-      fetchClients();
-    } catch (err) {
-      alert("Kunne ikke gemme sortering: " + err.message);
-    }
-    setSavingSortOrder((prev) => ({ ...prev, [clientId]: false }));
-  };
 
   // Slet klient
   const handleRemoveClient = async (clientId) => {
@@ -260,41 +217,7 @@ export default function ClientInfoPage({
                             >
                               <TableCell>{client.name}</TableCell>
                               <TableCell>
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <TextField
-                                    size="small"
-                                    value={editableLocations[client.id]}
-                                    onChange={(e) =>
-                                      setEditableLocations((prev) => ({
-                                        ...prev,
-                                        [client.id]: e.target.value,
-                                      }))
-                                    }
-                                    disabled={savingLocation[client.id]}
-                                    sx={{
-                                      width: 120,
-                                      '& .MuiInputBase-input': {
-                                        fontSize: '1rem', // samme som Klientnavn
-                                      },
-                                      '& .MuiInputBase-root': {
-                                        height: 30,
-                                      }
-                                    }}
-                                  />
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => handleLocationSave(client.id)}
-                                    disabled={savingLocation[client.id]}
-                                    sx={{ minWidth: 44, px: 1, height: 30 }}
-                                  >
-                                    {savingLocation[client.id] ? (
-                                      <CircularProgress size={18} />
-                                    ) : (
-                                      "Gem"
-                                    )}
-                                  </Button>
-                                </Stack>
+                                {client.locality || <span style={{ color: "#888" }}>Ingen lokalitet</span>}
                               </TableCell>
                               <TableCell align="center">
                                 <ClientStatusCell isOnline={client.isOnline} />
