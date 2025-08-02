@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import ClientInfoPage from "./components/ClientInfoPage";
 import HolidaysPage from "./components/HolidaysPage";
-import ClientDetailsPage from "./components/ClientDetailsPage";
+import ClientDetailsPageWrapper from "./components/ClientDetailsPageWrapper"; // <-- brug wrapperen!
 import LoginPage from "./components/LoginPage";
 import HomePage from "./components/HomePage";
 import ProtectedRoute from "./auth/ProtectedRoute";
@@ -148,7 +148,12 @@ export default function App() {
             />
             <Route
               path="clients/:clientId"
-              element={<ClientDetailsPage clients={clients} />}
+              element={
+                <ClientDetailsPageWrapper
+                  clients={clients}
+                  fetchClient={fetchClients}
+                />
+              }
             />
             <Route
               path="holidays"
