@@ -144,7 +144,7 @@ export default function ClientInfoPage({
           bgcolor: isOnline ? "#43a047" : "#FF8A80",
           color: "#111",
           fontWeight: 400,
-          fontSize: 13, // mindre tekst
+          fontSize: 13,
           boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
         }}
       >
@@ -265,6 +265,9 @@ export default function ClientInfoPage({
                                     disabled={savingLocation[client.id]}
                                     sx={{
                                       width: 120,
+                                      '& .MuiInputBase-input': {
+                                        fontSize: '1rem', // samme som Klientnavn
+                                      },
                                       '& .MuiInputBase-root': {
                                         height: 30,
                                       }
