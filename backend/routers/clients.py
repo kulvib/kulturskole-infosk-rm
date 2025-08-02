@@ -124,6 +124,13 @@ async def approve_client(id: int, session=Depends(get_session), user=Depends(get
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     client.status = "approved"
+    # Sæt sort_order til max sort_order blandt godkendte klienter + 1
+    max_sort_order = session.exec(
+        select(Client.sort_order)
+        .where(Client.status == "approved", Client.sort_order != None)
+        .order_by(Client.sort_order.desc())
+    ).first()
+    client.sort_order = (max_sort_order or 0) + 1
     session.add(client)
     session.commit()
     session.refresh(client)
