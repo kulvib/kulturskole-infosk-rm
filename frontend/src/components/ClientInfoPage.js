@@ -49,12 +49,28 @@ export default function ClientInfoPage({
     setEditableLocations(initialLocations);
   }, [clients]);
 
+  // Polling: check for new data every 15s, only update if data changed
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchClients();
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/clients`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const newClients = await res.json();
+          // Compare old and new data
+          const oldStr = JSON.stringify(clients);
+          const newStr = JSON.stringify(newClients);
+          if (oldStr !== newStr) {
+            fetchClients();
+          }
+        }
+      } catch (e) {
+        // Optionally handle fetch error
+      }
     }, 15000);
     return () => clearInterval(interval);
-  }, [fetchClients]);
+  }, [clients, token, fetchClients]);
 
   const handleLocationSave = async (clientId) => {
     setSavingLocation((prev) => ({ ...prev, [clientId]: true }));
