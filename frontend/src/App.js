@@ -16,7 +16,7 @@ import {
   approveClient,
   removeClient,
 } from "./api";
-import { useClientWebSocket } from "./useClientWebSocket"; // <--- tilføj
+import { useClientWebSocket } from "./hooks/useClientWebSocket";
 
 export default function App() {
   const [clients, setClients] = useState([]);
@@ -107,7 +107,7 @@ export default function App() {
     setLoading(false);
   };
 
-  useClientWebSocket(fetchClients); // <--- tilføj dette!
+  useClientWebSocket(fetchClients);
 
   useEffect(() => {
     if (localStorage.getItem("token")) {
