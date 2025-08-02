@@ -38,8 +38,14 @@ export default function ClientInfoPage({
   const [savingLocation, setSavingLocation] = useState({});
   const [refreshing, setRefreshing] = useState(false);
 
-  const approvedClients = clients?.filter((c) => c.status === "approved") || [];
-  const unapprovedClients = clients?.filter((c) => c.status !== "approved") || [];
+  // Sortér klienter alfabetisk efter navn
+  const approvedClients = (clients?.filter((c) => c.status === "approved") || [])
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const unapprovedClients = (clients?.filter((c) => c.status !== "approved") || [])
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   useEffect(() => {
     const initialLocations = {};
