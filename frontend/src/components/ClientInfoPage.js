@@ -39,6 +39,14 @@ export default function ClientInfoPage({
   const [refreshing, setRefreshing] = useState(false);
   const [dragClients, setDragClients] = useState([]);
 
+  // Hent klienter automatisk når siden vises
+  useEffect(() => {
+    if (typeof fetchClients === "function") {
+      fetchClients();
+    }
+    // eslint-disable-next-line
+  }, []);
+
   // Initialiser dragClients og edit states, når klientlisten ændres
   useEffect(() => {
     const approved = (clients?.filter((c) => c.status === "approved") || []).slice();
