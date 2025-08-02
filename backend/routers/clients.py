@@ -6,7 +6,7 @@ from ..db import get_session
 from ..models import Client, ClientCreate, ClientUpdate
 from ..auth import get_current_admin_user
 from ..services.mqtt_service import push_client_command
-from ..main import notify_clients_updated  # <-- importér notify
+from ..ws_manager import notify_clients_updated  # <--- importér fra ws_manager
 
 router = APIRouter()
 
