@@ -21,9 +21,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { Link } from "react-router-dom";
-import { useAuth } from "../auth/authcontext";
-
-const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
+import { updateClient } from "../api"; // Brug din api.js!
 
 export default function ClientInfoPage({
   clients,
@@ -32,8 +30,6 @@ export default function ClientInfoPage({
   onRemoveClient,
   fetchClients,
 }) {
-  const { token } = useAuth();
-
   // Lokalitet state
   const [editableLocations, setEditableLocations] = useState({});
   const [savingLocation, setSavingLocation] = useState({});
@@ -42,14 +38,20 @@ export default function ClientInfoPage({
   const [savingSortOrder, setSavingSortOrder] = useState({});
   const [refreshing, setRefreshing] = useState(false);
 
+  // Sortering: sort_order laveste først, derefter navn
   const approvedClients = (clients?.filter((c) => c.status === "approved") || [])
     .slice()
     .sort((a, b) => {
-      if (a.sort_order !== null && b.sort_order !== null) {
+      if (
+        a.sort_order !== null &&
+        a.sort_order !== undefined &&
+        b.sort_order !== null &&
+        b.sort_order !== undefined
+      ) {
         return a.sort_order - b.sort_order;
       }
-      if (a.sort_order !== null) return -1;
-      if (b.sort_order !== null) return 1;
+      if (a.sort_order !== null && a.sort_order !== undefined) return -1;
+      if (b.sort_order !== null && b.sort_order !== undefined) return 1;
       return a.name.localeCompare(b.name);
     });
 
@@ -57,6 +59,7 @@ export default function ClientInfoPage({
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Init state for lokalitet og sort_order når klientlisten ændres
   useEffect(() => {
     const initialLocations = {};
     const initialSortOrders = {};
@@ -71,40 +74,11 @@ export default function ClientInfoPage({
     setSortOrderEditing(initialSortOrders);
   }, [clients]);
 
-  // Polling for opdatering (valgfri)
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/clients`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const newClients = await res.json();
-          const oldStr = JSON.stringify(clients);
-          const newStr = JSON.stringify(newClients);
-          if (oldStr !== newStr) {
-            fetchClients();
-          }
-        }
-      } catch (e) { }
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [clients, token, fetchClients]);
-
   // Gem lokalitet
   const handleLocationSave = async (clientId) => {
     setSavingLocation((prev) => ({ ...prev, [clientId]: true }));
     try {
-      const res = await fetch(`${API_BASE}/api/clients/${clientId}/update`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ locality: editableLocations[clientId] }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || data.message || "Ukendt fejl");
+      await updateClient(clientId, { locality: editableLocations[clientId] });
       fetchClients();
     } catch (err) {
       alert("Kunne ikke gemme lokalitet: " + err.message);
@@ -118,16 +92,7 @@ export default function ClientInfoPage({
     try {
       const val = sortOrderEditing[clientId];
       const sort_order = val === "" ? null : Number(val);
-      const res = await fetch(`${API_BASE}/api/clients/${clientId}/update`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ sort_order }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || data.message || "Ukendt fejl");
+      await updateClient(clientId, { sort_order });
       fetchClients();
     } catch (err) {
       alert("Kunne ikke gemme sortering: " + err.message);
@@ -167,13 +132,14 @@ export default function ClientInfoPage({
     );
   }
 
+  // Refresh-knap
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchClients();
     setRefreshing(false);
   };
 
-  // KUN loading hvis loading=true
+  // Loading kun hvis loading er true
   if (loading) {
     return (
       <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
@@ -199,7 +165,6 @@ export default function ClientInfoPage({
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
-      {/* Toprow med titel og opdater-knap */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           Godkendte klienter
