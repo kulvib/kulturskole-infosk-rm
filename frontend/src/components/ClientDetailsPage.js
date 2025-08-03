@@ -25,8 +25,7 @@ import MemoryIcon from "@mui/icons-material/Memory";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { useNavigate } from "react-router-dom";
-
+import { useNavigate, useParams } from "react-router-dom";
 import {
   updateClient,
   pushKioskUrl,
@@ -36,7 +35,6 @@ import {
   getClientStream,
   getClient,
 } from "../api";
-import { useParams } from "react-router-dom";
 import { useClientWebSocket } from "../hooks/useClientWebSocket";
 
 // Offline/Online status: meget lille, kun grøn/rød cirkel + tekst med Roboto font
@@ -72,11 +70,11 @@ export default function ClientDetailsPage() {
   const [client, setClient] = useState(null);
   const [locality, setLocality] = useState("");
   const [savingLocality, setSavingLocality] = useState(false);
-  const [localitySaved, setLocalitySaved] = useState(false); // Ny state
+  const [localitySaved, setLocalitySaved] = useState(false);
 
   const [kioskUrl, setKioskUrl] = useState("");
   const [savingKioskUrl, setSavingKioskUrl] = useState(false);
-  const [kioskUrlSaved, setKioskUrlSaved] = useState(false); // Ny state
+  const [kioskUrlSaved, setKioskUrlSaved] = useState(false);
 
   const [actionLoading, setActionLoading] = useState({});
   const [refreshing, setRefreshing] = useState(false);
@@ -100,6 +98,7 @@ export default function ClientDetailsPage() {
     // eslint-disable-next-line
   }, [clientId]);
 
+  // WebSocket live-opdatering: Hent klient ved "update"
   useClientWebSocket(fetchClient);
 
   // Save locality
@@ -109,7 +108,7 @@ export default function ClientDetailsPage() {
       await updateClient(client.id, { locality });
       fetchClient();
       setLocalitySaved(true); // Vis 'Gemt'
-      setTimeout(() => setLocalitySaved(false), 3000); // Skjul efter 3 sekunder
+      setTimeout(() => setLocalitySaved(false), 3000);
     } catch (err) {
       alert("Kunne ikke gemme lokalitet: " + err.message);
     }
@@ -123,7 +122,7 @@ export default function ClientDetailsPage() {
       await pushKioskUrl(client.id, kioskUrl);
       fetchClient();
       setKioskUrlSaved(true); // Vis 'Gemt'
-      setTimeout(() => setKioskUrlSaved(false), 3000); // Skjul efter 3 sekunder
+      setTimeout(() => setKioskUrlSaved(false), 3000);
     } catch (err) {
       alert("Kunne ikke opdatere kiosk webadresse: " + err.message);
     }
@@ -156,7 +155,6 @@ export default function ClientDetailsPage() {
     setRefreshing(false);
   };
 
-  // Mindre afstand og ens afstand mellem afsnit
   const sectionSpacing = 2;
 
   if (!client) {
