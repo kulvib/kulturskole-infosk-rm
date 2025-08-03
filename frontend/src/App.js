@@ -19,6 +19,7 @@ import {
   removeClient,
 } from "./api";
 import { useClientWebSocket } from "./hooks/useClientWebSocket";
+import WebSocketClient from "./components/WebSocketClient"; // NY!
 
 function AppContent() {
   const { token } = useAuth();
@@ -118,6 +119,9 @@ function AppContent() {
 
   return (
     <>
+      {/* Debug/test WebSocket direkte i UI */}
+      <WebSocketClient />
+
       {error && (
         <div style={{ color: "red", padding: 10, fontWeight: 600 }}>
           {error}
