@@ -1,17 +1,14 @@
 import os
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import clients
-from .routers import mqtt
-from .routers import holidays
+from .routers import clients, mqtt, holidays
 from .auth import router as auth_router, get_password_hash
-from .db import create_db_and_tables, engine, get_session
+from .db import create_db_and_tables, engine
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 from .models import User
 from .services.mqtt_service import connect as mqtt_connect
-
-from .ws_manager import connected_websockets  # <--- importér fra ws_manager
+from .ws_manager import router as ws_router  # Importér APIRouter!
 
 load_dotenv()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "meget_sikkert_fallback_kodeord")
@@ -53,16 +50,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.websocket("/ws/clients")
-async def clients_ws(websocket: WebSocket):
-    await websocket.accept()
-    connected_websockets.append(websocket)
-    try:
-        while True:
-            await websocket.receive_text()  # holder forbindelsen åben
-    except WebSocketDisconnect:
-        connected_websockets.remove(websocket)
-
+# INKLUDÉR WEBSOCKET-ROUTEREN (ws_manager.py)
+app.include_router(ws_router)
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
 app.include_router(mqtt.router, prefix="/mqtt")
