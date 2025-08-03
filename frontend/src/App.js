@@ -6,6 +6,7 @@ import HolidaysPage from "./components/HolidaysPage";
 import ClientDetailsPageWrapper from "./components/ClientDetailsPageWrapper";
 import LoginPage from "./components/LoginPage";
 import HomePage from "./components/HomePage";
+import NotFound from "./components/NotFound";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import { AuthProvider, useAuth } from "./auth/authcontext";
 import CalendarView from "./components/CalendarView";
@@ -177,7 +178,7 @@ function AppContent() {
             element={<CalendarView />}
           />
         </Route>
-        <Route path="*" element={<Navigate to="/" />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );
