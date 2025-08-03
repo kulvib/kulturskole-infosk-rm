@@ -12,9 +12,7 @@ from dotenv import load_dotenv
 from .db import get_session
 from .models import User
 
-# Indlæs .env variabler
 load_dotenv()
-
 SECRET_KEY = os.getenv("SECRET_KEY", "fallback-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -58,7 +56,6 @@ def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    # Generer JWT-token
     access_token = create_access_token(data={"sub": user.username, "role": getattr(user, "role", "admin")})
     return {"access_token": access_token, "token_type": "bearer"}
 
