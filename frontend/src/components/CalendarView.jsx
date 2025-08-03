@@ -7,9 +7,9 @@ import {
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SaveIcon from "@mui/icons-material/Save";
 
-// Helper til at generere sæsoner fra 2024/25 til 2050/51
+// Helper til at generere sæsoner fra 2025/26 til 2050/51
 function getSeasons() {
-  const startYear = 2024;
+  const startYear = 2025;
   const endYear = 2050;
   const seasons = [];
   for (let y = startYear; y <= endYear; y++) {
