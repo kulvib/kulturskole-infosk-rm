@@ -26,6 +26,11 @@ const menuItems = [
     path: "/holidays",
     match: "/holidays",
   },
+  {
+    text: "Kalender",
+    path: "/calendar",
+    match: "/calendar",
+  },
 ];
 
 export default function Dashboard() {
@@ -122,7 +127,7 @@ export default function Dashboard() {
       >
         {/* Ensure content is not hidden behind AppBar */}
         <Toolbar />
-        <Outlet /> {/* <- HER! HomePage, ClientInfoPage osv. bliver vist her */}
+        <Outlet />
       </Box>
     </Box>
   );
