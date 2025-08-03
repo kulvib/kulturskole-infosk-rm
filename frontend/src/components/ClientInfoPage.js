@@ -20,7 +20,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { Link } from "react-router-dom";
-import { updateClient } from "../api";
+import { getClients, approveClient, removeClient, updateClient } from "../api";
+import { useAuth } from "../auth/authcontext";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
 // Hjælpefunktion til at formatere dato/tid
@@ -35,25 +36,34 @@ function formatTimestamp(isoDate) {
   return `${day}.${month}.${year}, Kl. ${hour}:${minute}`;
 }
 
-export default function ClientInfoPage({
-  clients,
-  loading,
-  onApproveClient,
-  onRemoveClient,
-  fetchClients,
-}) {
+export default function ClientInfoPage() {
+  const { token } = useAuth();
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dragClients, setDragClients] = useState([]);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (typeof fetchClients === "function") {
-      fetchClients();
+  // Hent klienter fra API
+  const fetchClients = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getClients(token);
+      setClients(data);
+    } catch (err) {
+      setError(err.message);
     }
-    // eslint-disable-next-line
-  }, []);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    // Sortering: laveste sort_order først, derefter id (så nye godkendte klienter altid nederst)
+    fetchClients();
+    // eslint-disable-next-line
+  }, [token]);
+
+  useEffect(() => {
+    // Sortering: laveste sort_order først, derefter id
     const approved = (clients?.filter((c) => c.status === "approved") || []).slice();
     approved.sort((a, b) => {
       if (
@@ -77,7 +87,7 @@ export default function ClientInfoPage({
 
   const handleRemoveClient = async (clientId) => {
     try {
-      await onRemoveClient(clientId);
+      await removeClient(clientId, token);
       fetchClients();
     } catch (err) {
       alert("Kunne ikke fjerne klient: " + err.message);
@@ -93,7 +103,7 @@ export default function ClientInfoPage({
     setDragClients(reordered);
     try {
       for (let i = 0; i < reordered.length; i++) {
-        await updateClient(reordered[i].id, { sort_order: i + 1 });
+        await updateClient(reordered[i].id, { sort_order: i + 1 }, token);
       }
       fetchClients();
     } catch (err) {
@@ -131,7 +141,7 @@ export default function ClientInfoPage({
 
   const handleApproveClient = async (clientId) => {
     try {
-      await onApproveClient(clientId);
+      await approveClient(clientId, token);
       fetchClients();
     } catch (err) {
       alert("Kunne ikke godkende klient: " + err.message);
@@ -158,6 +168,11 @@ export default function ClientInfoPage({
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
+      {error && (
+        <Typography sx={{ color: "red", mb: 2, fontWeight: 600 }}>
+          {error}
+        </Typography>
+      )}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           Godkendte klienter
