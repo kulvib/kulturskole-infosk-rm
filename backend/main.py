@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import clients, mqtt, holidays
+from .routers import clients, mqtt, holidays, calendar
 from .auth import router as auth_router, get_password_hash
 from .db import create_db_and_tables, engine
 from dotenv import load_dotenv
@@ -50,9 +50,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# WebSocket-router fra ws_manager.py
 app.include_router(ws_router)
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
 app.include_router(mqtt.router, prefix="/mqtt")
 app.include_router(holidays.router, prefix="/api")
+app.include_router(calendar.router, prefix="/api")
