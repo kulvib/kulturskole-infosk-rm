@@ -1,22 +1,29 @@
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import select
+from backend.models import CalendarMarking
+from backend.db import get_session
+from sqlalchemy.exc import SQLAlchemyError
 
 router = APIRouter()
 
-# Dummy storage, brug database/fil i produktion!
-MARKED_DAYS = {}
-
 @router.post("/calendar/marked-days")
-async def save_marked_days(request: Request):
-    data = await request.json()
-    marked_days = data.get('markedDays')
+def save_marked_days(data: dict, session=Depends(get_session)):
+    marked_days = data.get("markedDays")
     if not isinstance(marked_days, dict):
-        return JSONResponse(status_code=400, content={'error': 'Bad request'})
-    global MARKED_DAYS
-    MARKED_DAYS = marked_days
-    return {"ok": True}
+        raise HTTPException(status_code=400, detail="markedDays mangler eller har forkert format")
+    try:
+        existing = session.exec(select(CalendarMarking)).first()
+        if existing:
+            existing.markings = marked_days
+            session.add(existing)
+        else:
+            session.add(CalendarMarking(markings=marked_days))
+        session.commit()
+        return {"ok": True}
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/calendar/marked-days")
-async def get_marked_days():
-    global MARKED_DAYS
-    return {"markedDays": MARKED_DAYS}
+def get_marked_days(session=Depends(get_session)):
+    existing = session.exec(select(CalendarMarking)).first()
+    return {"markedDays": existing.markings if existing else {}}
