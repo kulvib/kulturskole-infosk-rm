@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from sqlmodel import Session, select
 from .models import User
 from .services.mqtt_service import connect as mqtt_connect
-from .ws_manager import router as ws_router  # Importér APIRouter!
+from .ws_manager import router as ws_router  # Importér APIRouter
 
 load_dotenv()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "meget_sikkert_fallback_kodeord")
@@ -50,7 +50,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# INKLUDÉR WEBSOCKET-ROUTEREN (ws_manager.py)
+# WebSocket-router fra ws_manager.py
 app.include_router(ws_router)
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
