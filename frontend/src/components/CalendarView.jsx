@@ -103,6 +103,37 @@ function Login({ onLogin }) {
   );
 }
 
+// WebSocket live-opdatering hook
+function useClientLiveWebSocket({ url, onUpdate }) {
+  useEffect(() => {
+    const ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      // Send besked ved åbning, så serveren holder forbindelsen åben
+      ws.send("frontend connected!");
+    };
+
+    ws.onmessage = (event) => {
+      if (event.data === "update" && typeof onUpdate === "function") {
+        onUpdate();
+      }
+    };
+
+    ws.onerror = (event) => {
+      // evt. log fejl
+    };
+
+    ws.onclose = (event) => {
+      // evt. reconnect logic
+    };
+
+    // Cleanup ved unmount
+    return () => {
+      ws.close();
+    };
+  }, [url, onUpdate]);
+}
+
 export default function CalendarView() {
   const theme = useTheme();
   const seasons = getSeasons();
@@ -130,29 +161,42 @@ export default function CalendarView() {
     else localStorage.removeItem("token");
   }, [token]);
 
-  // Hent alle godkendte klienter
-  useEffect(() => {
-    if (!token) return;
+  // Funktion til at hente klientlisten via API
+  const loadClients = async () => {
     setLoadingClients(true);
-    fetch("/api/clients/", {
-      headers: { "Authorization": "Bearer " + token }
-    })
-      .then(res => {
-        if (res.status === 401) {
-          setToken(""); // force logout
-          return [];
-        }
-        return res.json();
-      })
-      .then(data => {
-        const approvedClients = Array.isArray(data)
-          ? data.filter(cli => cli.status === "approved")
-          : [];
-        setClients(approvedClients);
-      })
-      .catch(() => setClients([]))
-      .finally(() => setLoadingClients(false));
+    try {
+      const res = await fetch("/api/clients/", {
+        headers: { Authorization: "Bearer " + token }
+      });
+      if (res.status === 401) {
+        setToken("");
+        setClients([]);
+        setLoadingClients(false);
+        return;
+      }
+      const data = await res.json();
+      const approvedClients = Array.isArray(data)
+        ? data.filter(cli => cli.status === "approved")
+        : [];
+      setClients(approvedClients);
+    } catch (err) {
+      setClients([]);
+    }
+    setLoadingClients(false);
+  };
+
+  // Hent alle godkendte klienter ved start og ved login
+  useEffect(() => {
+    if (token) loadClients();
   }, [token]);
+
+  // WebSocket live-opdatering: Hent klienter ved "update"
+  useClientLiveWebSocket({
+    url: "wss://kulturskole-infosk-rm.onrender.com/ws/clients",
+    onUpdate: () => {
+      loadClients();
+    }
+  });
 
   // Sæt første aktive klient ved load
   useEffect(() => {
