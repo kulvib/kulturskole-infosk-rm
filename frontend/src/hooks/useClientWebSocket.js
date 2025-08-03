@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 
-export function useClientLiveWebSocket({ url, onUpdate }) {
+export function useClientWebSocket(onUpdate) {
+  const url = "wss://kulturskole-infosk-rm.onrender.com/ws/clients";
   const wsRef = useRef(null);
 
   useEffect(() => {
@@ -39,5 +40,5 @@ export function useClientLiveWebSocket({ url, onUpdate }) {
       clearInterval(pingInterval);
       clearTimeout(reconnectTimeout);
     };
-  }, [url, onUpdate]);
+  }, [onUpdate]);
 }
