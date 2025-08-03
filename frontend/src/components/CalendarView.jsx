@@ -7,6 +7,8 @@ import {
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import PowerOffIcon from "@mui/icons-material/PowerOff";
 import SaveIcon from "@mui/icons-material/Save";
+import { useAuth } from "../auth/authcontext";
+import { useClientLiveWebSocket } from "../hooks/useClientWebSocket";
 
 // Helper til at generere sæsoner fra 2024/25 til 2050/51
 function getSeasons() {
@@ -50,94 +52,10 @@ const monthNames = [
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
 ];
 
-// Login-komponent (JWT)
-function Login({ onLogin }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    try {
-      const res = await fetch("/auth/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
-      });
-      if (!res.ok) throw new Error("Login fejlede");
-      const data = await res.json();
-      onLogin(data.access_token);
-    } catch (err) {
-      setError("Login fejlede!");
-    }
-  };
-  return (
-    <Box sx={{ mt: 6, maxWidth: 320, mx: "auto" }}>
-      <Card>
-        <CardContent>
-          <Typography variant="h5" sx={{ mb: 2, textAlign: "center" }}>Login (admin)</Typography>
-          <form onSubmit={handleSubmit}>
-            <TextField
-              label="Brugernavn"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              fullWidth
-              margin="normal"
-              autoComplete="username"
-            />
-            <TextField
-              label="Kodeord"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              type="password"
-              fullWidth
-              margin="normal"
-              autoComplete="current-password"
-            />
-            <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }}>Login</Button>
-            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-          </form>
-        </CardContent>
-      </Card>
-    </Box>
-  );
-}
-
-// WebSocket live-opdatering hook
-function useClientLiveWebSocket({ url, onUpdate }) {
-  useEffect(() => {
-    const ws = new WebSocket(url);
-
-    ws.onopen = () => {
-      // Send besked ved åbning, så serveren holder forbindelsen åben
-      ws.send("frontend connected!");
-    };
-
-    ws.onmessage = (event) => {
-      if (event.data === "update" && typeof onUpdate === "function") {
-        onUpdate();
-      }
-    };
-
-    ws.onerror = (event) => {
-      // evt. log fejl
-    };
-
-    ws.onclose = (event) => {
-      // evt. reconnect logic
-    };
-
-    // Cleanup ved unmount
-    return () => {
-      ws.close();
-    };
-  }, [url, onUpdate]);
-}
-
 export default function CalendarView() {
   const theme = useTheme();
+  const { token, loginUser, logoutUser } = useAuth();
   const seasons = getSeasons();
-  const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [selectedSeason, setSelectedSeason] = useState(seasons[0].value);
   const [schoolYearMonths, setSchoolYearMonths] = useState(getSchoolYearMonths(seasons[0].value));
   const [markedDaysByClient, setMarkedDaysByClient] = useState({});
@@ -155,12 +73,6 @@ export default function CalendarView() {
     setSchoolYearMonths(getSchoolYearMonths(selectedSeason));
   }, [selectedSeason]);
 
-  // Login-token gem til localStorage
-  useEffect(() => {
-    if (token) localStorage.setItem("token", token);
-    else localStorage.removeItem("token");
-  }, [token]);
-
   // Funktion til at hente klientlisten via API
   const loadClients = async () => {
     setLoadingClients(true);
@@ -169,7 +81,7 @@ export default function CalendarView() {
         headers: { Authorization: "Bearer " + token }
       });
       if (res.status === 401) {
-        setToken("");
+        logoutUser();
         setClients([]);
         setLoadingClients(false);
         return;
@@ -193,9 +105,7 @@ export default function CalendarView() {
   // WebSocket live-opdatering: Hent klienter ved "update"
   useClientLiveWebSocket({
     url: "wss://kulturskole-infosk-rm.onrender.com/ws/clients",
-    onUpdate: () => {
-      loadClients();
-    }
+    onUpdate: loadClients
   });
 
   // Sæt første aktive klient ved load
@@ -360,7 +270,8 @@ export default function CalendarView() {
   };
 
   if (!token) {
-    return <Login onLogin={setToken} />;
+    // Brug loginUser fra context
+    return <Login onLogin={loginUser} />;
   }
 
   return (
@@ -551,6 +462,59 @@ export default function CalendarView() {
           {snackError}
         </Alert>
       </Snackbar>
+    </Box>
+  );
+}
+
+// Login-komponent bruges kun hvis token mangler
+function Login({ onLogin }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    try {
+      const res = await fetch("/auth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+      });
+      if (!res.ok) throw new Error("Login fejlede");
+      const data = await res.json();
+      onLogin(data.access_token);
+    } catch (err) {
+      setError("Login fejlede!");
+    }
+  };
+  return (
+    <Box sx={{ mt: 6, maxWidth: 320, mx: "auto" }}>
+      <Card>
+        <CardContent>
+          <Typography variant="h5" sx={{ mb: 2, textAlign: "center" }}>Login (admin)</Typography>
+          <form onSubmit={handleSubmit}>
+            <TextField
+              label="Brugernavn"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              fullWidth
+              margin="normal"
+              autoComplete="username"
+            />
+            <TextField
+              label="Kodeord"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              type="password"
+              fullWidth
+              margin="normal"
+              autoComplete="current-password"
+            />
+            <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }}>Login</Button>
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          </form>
+        </CardContent>
+      </Card>
     </Box>
   );
 }
