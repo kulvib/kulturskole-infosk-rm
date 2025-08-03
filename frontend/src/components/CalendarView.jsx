@@ -56,7 +56,7 @@ export default function CalendarView() {
       try {
         const res = await fetch("/api/clients/");
         const data = await res.json();
-        setClients(data); // Save all clients
+        setClients(data); // Gem ALLE klienter
       } catch (e) {
         setClients([]);
       }
