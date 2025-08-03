@@ -68,7 +68,7 @@ export default function LoginPage() {
         <Typography variant="h5" sx={{ mb: 0.5, fontWeight: 700 }}>
           Kulturskolen Viborg
         </Typography>
-        <Typography variant="h5" sx={{ mb: 0.5, fontWeight: 700 }}>
+        <Typography variant="h6" sx={{ mb: 4, fontWeight: 500 }}>
           infoskærm administration
         </Typography>
         <Box
