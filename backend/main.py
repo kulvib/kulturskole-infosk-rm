@@ -1,14 +1,15 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import clients, mqtt, holidays, calendar
-from .auth import router as auth_router, get_password_hash
-from .db import create_db_and_tables, engine
 from dotenv import load_dotenv
 from sqlmodel import Session, select
+
+from .routers import clients, mqtt, holidays, calendar
+from .routers.websocket import router as websocket_router
+from .auth import router as auth_router, get_password_hash
+from .db import create_db_and_tables, engine
 from .models import User
 from .services.mqtt_service import connect as mqtt_connect
-from .ws_manager import router as ws_router  # Importér APIRouter fra ws_manager.py
 
 load_dotenv()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "meget_sikkert_fallback_kodeord")
@@ -42,16 +43,14 @@ def on_startup():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://inforskaerm-frontend.netlify.app"
-    ],
+    allow_origins=["https://inforskaerm-frontend.netlify.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Websocket router først, så den er klar til live connections
-app.include_router(ws_router)
+app.include_router(websocket_router)
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
 app.include_router(mqtt.router, prefix="/mqtt")
