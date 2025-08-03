@@ -48,6 +48,7 @@ export default function CalendarView() {
   const [selectedSeason, setSelectedSeason] = useState(2025);
   const [clients, setClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(true);
+  const [holidays, setHolidays] = useState([]);
   const seasons = getSeasons();
 
   // --- Fetch only approved clients from API ---
@@ -67,22 +68,57 @@ export default function CalendarView() {
     setLoadingClients(false);
   };
 
+  // --- Fetch holidays from API ---
+  const fetchHolidays = async () => {
+    try {
+      const res = await fetch("/api/holidays/");
+      const data = await res.json();
+      setHolidays(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setHolidays([]);
+    }
+  };
+
   useEffect(() => {
     fetchClients();
+    fetchHolidays();
     // eslint-disable-next-line
   }, []);
 
-  // WebSocket: lyt efter klient-ændringer fra backend
-  useClientWebSocket(fetchClients);
-
-  // Vis kun godkendte klienter
-  const visibleClients = clients || [];
+  // WebSocket: lyt efter klient- og ferie-ændringer fra backend
+  const wsStatus = useClientWebSocket({
+    onClientsChanged: fetchClients,
+    onHolidaysChanged: fetchHolidays
+  });
 
   // --- School year months ---
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
+  // Hjælper til at vise om en dag er en holiday
+  const isHoliday = (day, month, year) => {
+    return holidays.some(
+      h =>
+        // Antager holiday har {date: "YYYY-MM-DD"}
+        (() => {
+          if (!h.date) return false;
+          const d = new Date(h.date);
+          return (
+            d.getDate() === day &&
+            d.getMonth() === month &&
+            d.getFullYear() === year
+          );
+        })()
+    );
+  };
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
+      {/* WebSocket-status */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="body2" sx={{ color: "#555" }}>
+          WebSocket status: <b>{wsStatus}</b>
+        </Typography>
+      </Box>
       {/* Klientliste */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 1, fontWeight: 700, color: "#0a275c" }}>
@@ -92,10 +128,10 @@ export default function CalendarView() {
           <CircularProgress size={22} />
         ) : (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-            {visibleClients.length === 0 && (
+            {clients.length === 0 && (
               <Typography variant="body2">Ingen godkendte klienter fundet</Typography>
             )}
-            {visibleClients.map(client => (
+            {clients.map(client => (
               <Button
                 key={client.id || client._id}
                 variant="outlined"
@@ -186,35 +222,40 @@ export default function CalendarView() {
                   ));
                 })()}
                 {/* Dage */}
-                {Array(getDaysInMonth(month, year)).fill(null).map((_, dayIdx) => (
-                  <Box
-                    key={dayIdx}
-                    sx={{
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      m: "1px"
-                    }}
-                  >
+                {Array(getDaysInMonth(month, year)).fill(null).map((_, dayIdx) => {
+                  const day = dayIdx + 1;
+                  const holiday = isHoliday(day, month, year);
+                  return (
                     <Box
+                      key={dayIdx}
                       sx={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "50%",
-                        background: "#fff",
-                        border: "2px solid #ea394f",
-                        color: "#ea394f",
-                        fontWeight: 700,
-                        fontSize: "1rem",
-                        textAlign: "center",
-                        lineHeight: "32px",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.07)"
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        m: "1px"
                       }}
                     >
-                      {dayIdx + 1}
+                      <Box
+                        sx={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          background: holiday ? "#ffeaea" : "#fff",
+                          border: holiday ? "2px solid #ea394f" : "2px solid #eee",
+                          color: holiday ? "#ea394f" : "#0a275c",
+                          fontWeight: 700,
+                          fontSize: "1rem",
+                          textAlign: "center",
+                          lineHeight: "32px",
+                          boxShadow: holiday ? "0 1px 8px rgba(234,57,79,0.10)" : "0 1px 3px rgba(0,0,0,0.07)"
+                        }}
+                        title={holiday ? "Ferie/helligdag" : ""}
+                      >
+                        {day}
+                      </Box>
                     </Box>
-                  </Box>
-                ))}
+                  );
+                })}
               </Box>
             </CardContent>
           </Card>
