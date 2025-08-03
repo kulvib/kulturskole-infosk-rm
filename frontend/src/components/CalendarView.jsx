@@ -71,27 +71,13 @@ export default function CalendarView() {
     setSchoolYearMonths(getSchoolYearMonths(selectedSeason));
   }, [selectedSeason]);
 
-  useEffect(() => {
-    async function fetchMarkedDays() {
-      try {
-        const res = await fetch("/api/calendar/marked-days");
-        const json = await res.json();
-        setMarkedDays(json.markedDays || {});
-      } catch (e) {
-        setMarkedDays({});
-      }
-    }
-    fetchMarkedDays();
-  }, []);
-
-  // Hent kun klienter med status "approved" fra /api/clients/ endpoint
+  // Hent alle klienter med status "approved"
   useEffect(() => {
     async function fetchClients() {
       setLoadingClients(true);
       try {
         const res = await fetch("/api/clients/");
         const data = await res.json();
-        // Filtrer kun "approved" klienter, hvis backend ikke allerede gør det
         const approvedClients = Array.isArray(data)
           ? data.filter(cli => cli.status === "approved")
           : [];
@@ -107,6 +93,40 @@ export default function CalendarView() {
   useEffect(() => {
     setAllSelected(selectedClients.length === clients.length && clients.length > 0);
   }, [selectedClients, clients]);
+
+  // Hent markeringer for valgt sæson og valgte klienter
+  useEffect(() => {
+    async function fetchMarkedDays() {
+      if (!selectedClients.length) {
+        setMarkedDays({});
+        return;
+      }
+      try {
+        // Hent markeringer for hver klient og saml fælles markeringer
+        const allMarked = {};
+        for (const clientId of selectedClients) {
+          const query = `?season=${selectedSeason}&client_id=${clientId}`;
+          const res = await fetch("/api/calendar/marked-days" + query);
+          const json = await res.json();
+          const markings = json.markedDays || {};
+          // Saml markeringer: For første klient, brug alle. For efterfølgende, behold kun de dage hvor status er ens!
+          if (Object.keys(allMarked).length === 0) {
+            Object.assign(allMarked, markings);
+          } else {
+            for (const dayKey of Object.keys(allMarked)) {
+              if (markings[dayKey] !== allMarked[dayKey]) {
+                delete allMarked[dayKey]; // kun fælles status beholdes
+              }
+            }
+          }
+        }
+        setMarkedDays(allMarked);
+      } catch (e) {
+        setMarkedDays({});
+      }
+    }
+    fetchMarkedDays();
+  }, [selectedSeason, selectedClients]);
 
   const handleClientsChange = (event) => {
     const value = event.target.value;
@@ -165,11 +185,19 @@ export default function CalendarView() {
 
   const handleSave = async () => {
     setSnackError("");
+    if (!selectedClients.length) {
+      setSnackError("Vælg mindst én klient først!");
+      return;
+    }
     try {
       const res = await fetch("/api/calendar/marked-days", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markedDays, clients: selectedClients })
+        body: JSON.stringify({
+          markedDays,
+          clients: selectedClients,
+          season: selectedSeason
+        })
       });
       if (!res.ok) throw new Error("Kunne ikke gemme markeringer");
       setSnackOpen(true);
@@ -188,7 +216,6 @@ export default function CalendarView() {
     display: "flex",
     flexDirection: "column",
   };
-  // Tekst og dagknapper lidt større
   const dayBtnBase = {
     margin: "0.5px",
     userSelect: "none",
@@ -308,6 +335,7 @@ export default function CalendarView() {
           color="primary"
           sx={{ height: 48, fontWeight: 700, boxShadow: 2 }}
           onClick={handleSave}
+          disabled={!selectedClients.length}
         >
           Gem markeringer
         </Button>
@@ -384,7 +412,6 @@ export default function CalendarView() {
                 {Array(getDaysInMonth(month, year)).fill(null).map((_, dayIdx) => {
                   const day = dayIdx + 1;
                   const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                  // Hvis dagen ikke er valgt, skal klienten være slukket (off)
                   const status = markedDays[key] || "off";
                   return (
                     <Tooltip title={
