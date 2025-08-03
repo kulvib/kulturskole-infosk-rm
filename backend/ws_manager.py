@@ -1,10 +1,10 @@
 import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-app = FastAPI()
+router = APIRouter()
 connected_websockets = set()
 
-@app.websocket("/ws/clients")
+@router.websocket("/ws/clients")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connected_websockets.add(websocket)
