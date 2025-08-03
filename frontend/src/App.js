@@ -26,7 +26,6 @@ export default function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Fetch clients from API
   const fetchClients = async () => {
     setLoading(true);
     setError("");
@@ -39,7 +38,6 @@ export default function App() {
     setLoading(false);
   };
 
-  // Fetch holidays from API
   const fetchHolidays = async () => {
     setLoading(true);
     setError("");
@@ -52,7 +50,6 @@ export default function App() {
     setLoading(false);
   };
 
-  // Add a new holiday
   const handleAddHoliday = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     setLoading(true);
@@ -68,7 +65,6 @@ export default function App() {
     setLoading(false);
   };
 
-  // Delete a holiday
   const handleDeleteHoliday = async (id) => {
     setLoading(true);
     setError("");
@@ -81,7 +77,6 @@ export default function App() {
     setLoading(false);
   };
 
-  // Approve a client
   const handleApproveClient = async (id) => {
     setLoading(true);
     setError("");
@@ -94,7 +89,6 @@ export default function App() {
     setLoading(false);
   };
 
-  // Remove a client
   const handleRemoveClient = async (id) => {
     setLoading(true);
     setError("");
