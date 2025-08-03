@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from sqlmodel import Session, select
 
 from .routers import clients, mqtt, holidays, calendar
-from .routers.websocket import router as websocket_router
+from .ws_manager import router as websocket_router
 from .auth import router as auth_router, get_password_hash
 from .db import create_db_and_tables, engine
 from .models import User
