@@ -1,3 +1,18 @@
+.calendar-container {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 0 8px rgba(0,0,0,0.1);
+}
+
 .highlight {
   background: #ffd700 !important;
+  color: #000 !important;
+  border-radius: 50%;
+}
+
+.event-list {
+  margin-top: 1.5rem;
 }
