@@ -8,6 +8,7 @@ import LoginPage from "./components/LoginPage";
 import HomePage from "./components/HomePage";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import { AuthProvider } from "./auth/authcontext";
+import CalendarView from "./components/CalendarView";
 import {
   getClients,
   getHolidays,
@@ -166,6 +167,10 @@ export default function App() {
                   handleDeleteHoliday={handleDeleteHoliday}
                 />
               }
+            />
+            <Route
+              path="calendar"
+              element={<CalendarView />}
             />
           </Route>
           <Route path="*" element={<Navigate to="/" />} />
