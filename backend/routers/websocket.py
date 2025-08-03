@@ -16,6 +16,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 msg = await websocket.receive_text()
                 if msg == "ping":
                     await websocket.send_text("pong")
+                # Her kan du evt. håndtere andre custom beskeder
             except Exception:
                 await websocket.close()
                 break
