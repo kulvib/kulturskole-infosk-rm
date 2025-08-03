@@ -50,6 +50,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Websocket router først, så den er klar til live connections
 app.include_router(ws_router)
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
