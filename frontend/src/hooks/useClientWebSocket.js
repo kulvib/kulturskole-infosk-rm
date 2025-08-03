@@ -6,6 +6,7 @@ export function useClientWebSocket(onUpdate) {
   useEffect(() => {
     let ws;
     let reconnectTimeout;
+    let intentionalClose = false;
 
     function connect() {
       ws = new WebSocket("wss://kulturskole-infosk-rm.onrender.com/ws/clients");
@@ -20,7 +21,9 @@ export function useClientWebSocket(onUpdate) {
       };
 
       ws.onclose = () => {
-        reconnectTimeout = setTimeout(connect, 2000);
+        if (!intentionalClose) {
+          reconnectTimeout = setTimeout(connect, 2000);
+        }
       };
 
       ws.onerror = () => {};
@@ -34,8 +37,8 @@ export function useClientWebSocket(onUpdate) {
       }
     }, 30000);
 
-    // Cleanup: Luk kun hvis ikke allerede lukket eller closing.
     return () => {
+      intentionalClose = true;
       if (wsRef.current) {
         wsRef.current.onclose = null;
         if (
