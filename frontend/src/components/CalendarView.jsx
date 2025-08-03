@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card, CardContent, Typography, Box, ToggleButtonGroup, ToggleButton, Tooltip, Button, Snackbar, Alert } from "@mui/material";
+import {
+  Card, CardContent, Typography, Box, ToggleButtonGroup, ToggleButton,
+  Tooltip, Button, Snackbar, Alert, useTheme
+} from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SaveIcon from "@mui/icons-material/Save";
 import ClientSelector from "./ClientSelector";
@@ -51,6 +54,7 @@ const monthNames = [
 ];
 
 export default function CalendarView() {
+  const theme = useTheme();
   const seasons = getSeasons();
   const [selectedSeason, setSelectedSeason] = useState(seasons[0].value);
   const [schoolYearMonths, setSchoolYearMonths] = useState(getSchoolYearMonths(seasons[0].value));
@@ -146,7 +150,7 @@ export default function CalendarView() {
   };
 
   return (
-    <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4 }}>
+    <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4, fontFamily: theme.typography.fontFamily }}>
       <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
         <Card sx={{ minWidth: 260, mr: 3, background: "#e9f7fb", border: "1px solid #036" }}>
           <CardContent>
@@ -200,12 +204,22 @@ export default function CalendarView() {
       </Box>
       <ClientSelector selectedClients={selectedClients} setSelectedClients={setSelectedClients} />
       <Box sx={{ mb: 3 }}>
-        <label htmlFor="seasonSelect"><strong>Vælg sæson:</strong> </label>
+        <Typography component="label" htmlFor="seasonSelect" sx={{ fontWeight: 600 }}>
+          Vælg sæson:
+        </Typography>{" "}
         <select
           id="seasonSelect"
           value={selectedSeason}
           onChange={e => setSelectedSeason(Number(e.target.value))}
-          style={{ padding: "6px 12px", fontSize: "1rem", fontWeight: "bold", borderRadius: 4, border: "1px solid #036", background: "#e9f7fb" }}
+          style={{
+            padding: "6px 12px",
+            fontSize: "1rem",
+            fontWeight: "bold",
+            borderRadius: 4,
+            border: "1px solid #036",
+            background: "#e9f7fb",
+            fontFamily: theme.typography.fontFamily
+          }}
         >
           {seasons.map(season =>
             <option key={season.value} value={season.value}>
@@ -214,18 +228,25 @@ export default function CalendarView() {
           )}
         </select>
       </Box>
-      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 3 }}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: 3,
+        }}
+      >
         {schoolYearMonths.map(({ name, month, year }, idx) => (
           <Card
             key={name + year}
             className="month-card"
             sx={{
               mb: 2,
-              aspectRatio: "1 / 1",
               display: "flex",
               flexDirection: "column",
               justifyContent: "flex-start",
-              alignItems: "stretch"
+              alignItems: "stretch",
+              minHeight: 380, // Højden justeres, så hele måneden kan ses
+              height: "auto"
             }}
           >
             <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column", height: "100%" }}>
@@ -238,7 +259,8 @@ export default function CalendarView() {
                   display: "grid",
                   gridTemplateColumns: "repeat(7, 1fr)",
                   gap: 0.5,
-                  alignItems: "start"
+                  alignItems: "start",
+                  minHeight: 300, // Justeret minimumshøjde
                 }}
               >
                 {["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"].map(wd => (
