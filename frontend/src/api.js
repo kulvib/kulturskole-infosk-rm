@@ -1,11 +1,9 @@
 const apiUrl = process.env.REACT_APP_API_URL || "https://kulturskole-infosk-rm.onrender.com";
 
-/** Hent token fra localStorage */
 function getToken() {
   return localStorage.getItem("token");
 }
 
-/** Login og hent access token */
 export async function login(username, password) {
   const res = await fetch(`${apiUrl}/auth/token`, {
     method: "POST",
@@ -23,7 +21,6 @@ export async function login(username, password) {
   return await res.json();
 }
 
-/** Hent alle klienter (kræver authentication) */
 export async function getClients() {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -41,7 +38,6 @@ export async function getClients() {
   return await res.json();
 }
 
-/** Hent én klient (kræver authentication) */
 export async function getClient(id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -59,7 +55,6 @@ export async function getClient(id) {
   return await res.json();
 }
 
-/** Opdater en klient (fx locality eller sort_order) (kræver authentication) */
 export async function updateClient(id, updates) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -82,7 +77,6 @@ export async function updateClient(id, updates) {
   return await res.json();
 }
 
-/** Godkend en klient (kræver authentication) */
 export async function approveClient(id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -101,11 +95,9 @@ export async function approveClient(id) {
   return await res.json();
 }
 
-/** Fjern en klient (kræver authentication) */
 export async function removeClient(id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
-  // Brug DELETE på /api/clients/{id}/remove
   const res = await fetch(`${apiUrl}/api/clients/${id}/remove`, {
     method: "DELETE",
     headers: { Authorization: "Bearer " + token },
@@ -120,11 +112,9 @@ export async function removeClient(id) {
   }
 }
 
-/** Opdater kiosk webadresse på klient + push til klient */
 export async function pushKioskUrl(id, url) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
-  // Antag backend endpoint: /api/clients/{id}/kiosk_url
   const res = await fetch(`${apiUrl}/api/clients/${id}/kiosk_url`, {
     method: "PUT",
     headers: {
@@ -144,11 +134,9 @@ export async function pushKioskUrl(id, url) {
   return await res.json();
 }
 
-/** Send handling til klient (start, restart, shutdown, chrome-shutdown) */
 export async function clientAction(id, action) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
-  // Antag backend endpoint: /api/clients/{id}/action
   const res = await fetch(`${apiUrl}/api/clients/${id}/action`, {
     method: "POST",
     headers: {
@@ -168,23 +156,18 @@ export async function clientAction(id, action) {
   return await res.json();
 }
 
-/** Åbn terminal på klient (WebSocket shell proxy) */
 export function openTerminal(id) {
-  // Her skal du åbne en ny side eller modal med WebSocket shell proxy
   window.open(`${apiUrl}/api/clients/${id}/terminal`, "_blank", "noopener");
 }
 
-/** Åbn fjernskrivebord på klient (Ubuntu remote desktop) */
 export function openRemoteDesktop(id) {
   window.open(`${apiUrl}/api/clients/${id}/remote-desktop`, "_blank", "noopener");
 }
 
-/** Hent URL til livestream fra klient (MJPEG/WebRTC) */
 export function getClientStream(id) {
-  return `${apiUrl}/api/clients/${id}/stream`; // Bruges som <img src={getClientStream(id)} /> eller <video ...>
+  return `${apiUrl}/api/clients/${id}/stream`;
 }
 
-/** Hent alle helligdage (kræver authentication) */
 export async function getHolidays() {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -202,7 +185,6 @@ export async function getHolidays() {
   return await res.json();
 }
 
-/** Tilføj ny helligdag (kræver authentication) */
 export async function addHoliday(date, description) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -225,7 +207,6 @@ export async function addHoliday(date, description) {
   return await res.json();
 }
 
-/** Slet en helligdag (kræver authentication) */
 export async function deleteHoliday(id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
