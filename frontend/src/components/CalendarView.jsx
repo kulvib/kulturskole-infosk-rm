@@ -57,9 +57,9 @@ export default function CalendarView() {
     try {
       const res = await fetch("/api/clients/");
       const data = await res.json();
-      // Filtrer kun godkendte klienter
+      // Filtrer kun klienter med status === "approved"
       const approvedClients = Array.isArray(data)
-        ? data.filter(client => client.approved === true)
+        ? data.filter(client => client.status === "approved")
         : [];
       setClients(approvedClients);
     } catch (e) {
