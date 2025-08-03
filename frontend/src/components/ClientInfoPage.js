@@ -53,6 +53,7 @@ export default function ClientInfoPage({
   }, []);
 
   useEffect(() => {
+    // Sortering: laveste sort_order først, derefter id (så nye godkendte klienter altid nederst)
     const approved = (clients?.filter((c) => c.status === "approved") || []).slice();
     approved.sort((a, b) => {
       if (
@@ -65,7 +66,7 @@ export default function ClientInfoPage({
       }
       if (a.sort_order !== null && a.sort_order !== undefined) return -1;
       if (b.sort_order !== null && b.sort_order !== undefined) return 1;
-      return a.name.localeCompare(b.name);
+      return a.id - b.id;
     });
     setDragClients(approved);
   }, [clients]);
