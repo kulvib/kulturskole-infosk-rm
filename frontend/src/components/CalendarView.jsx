@@ -2,16 +2,16 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Card, CardContent, Typography, Box, ToggleButtonGroup, ToggleButton,
   Tooltip, Button, Snackbar, Alert, useTheme,
-  CircularProgress
+  CircularProgress, TextField
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import PowerOffIcon from "@mui/icons-material/PowerOff";
 import SaveIcon from "@mui/icons-material/Save";
 
-// Helper til at generere sæsoner fra 2025/26 til 2049/50
+// Helper til at generere sæsoner fra 2024/25 til 2050/51
 function getSeasons() {
-  const startYear = 2025;
-  const endYear = 2049;
+  const startYear = 2024;
+  const endYear = 2050;
   const seasons = [];
   for (let y = startYear; y <= endYear; y++) {
     seasons.push({
@@ -50,9 +50,63 @@ const monthNames = [
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
 ];
 
+// Login-komponent (JWT)
+function Login({ onLogin }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    try {
+      const res = await fetch("/auth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+      });
+      if (!res.ok) throw new Error("Login fejlede");
+      const data = await res.json();
+      onLogin(data.access_token);
+    } catch (err) {
+      setError("Login fejlede!");
+    }
+  };
+  return (
+    <Box sx={{ mt: 6, maxWidth: 320, mx: "auto" }}>
+      <Card>
+        <CardContent>
+          <Typography variant="h5" sx={{ mb: 2, textAlign: "center" }}>Login (admin)</Typography>
+          <form onSubmit={handleSubmit}>
+            <TextField
+              label="Brugernavn"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              fullWidth
+              margin="normal"
+              autoComplete="username"
+            />
+            <TextField
+              label="Kodeord"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              type="password"
+              fullWidth
+              margin="normal"
+              autoComplete="current-password"
+            />
+            <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }}>Login</Button>
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          </form>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+}
+
 export default function CalendarView() {
   const theme = useTheme();
   const seasons = getSeasons();
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [selectedSeason, setSelectedSeason] = useState(seasons[0].value);
   const [schoolYearMonths, setSchoolYearMonths] = useState(getSchoolYearMonths(seasons[0].value));
   const [markedDaysByClient, setMarkedDaysByClient] = useState({});
@@ -64,61 +118,75 @@ export default function CalendarView() {
   const [clients, setClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(true);
   const dragDaysRef = useRef(new Set());
+  const [activeClientId, setActiveClientId] = useState(null);
 
   useEffect(() => {
     setSchoolYearMonths(getSchoolYearMonths(selectedSeason));
   }, [selectedSeason]);
 
+  // Login-token gem til localStorage
+  useEffect(() => {
+    if (token) localStorage.setItem("token", token);
+    else localStorage.removeItem("token");
+  }, [token]);
+
   // Hent alle godkendte klienter
   useEffect(() => {
-    async function fetchClients() {
-      setLoadingClients(true);
-      try {
-        const res = await fetch("/api/clients/");
-        const data = await res.json();
+    if (!token) return;
+    setLoadingClients(true);
+    fetch("/api/clients/", {
+      headers: { "Authorization": "Bearer " + token }
+    })
+      .then(res => {
+        if (res.status === 401) {
+          setToken(""); // force logout
+          return [];
+        }
+        return res.json();
+      })
+      .then(data => {
         const approvedClients = Array.isArray(data)
           ? data.filter(cli => cli.status === "approved")
           : [];
         setClients(approvedClients);
-      } catch (err) {
-        setClients([]);
-      }
-      setLoadingClients(false);
-    }
-    fetchClients();
-  }, []);
+      })
+      .catch(() => setClients([]))
+      .finally(() => setLoadingClients(false));
+  }, [token]);
 
-  // Hent markeringer for valgt sæson og alle godkendte klienter
-  useEffect(() => {
-    async function fetchMarkedDaysAllClients() {
-      if (!clients.length) {
-        setMarkedDaysByClient({});
-        return;
-      }
-      try {
-        const allData = {};
-        for (const client of clients) {
-          const query = `?season=${selectedSeason}&client_id=${client.id}`;
-          const res = await fetch("/api/calendar/marked-days" + query);
-          const json = await res.json();
-          allData[client.id] = json.markedDays || {};
-        }
-        setMarkedDaysByClient(allData);
-      } catch (e) {
-        setMarkedDaysByClient({});
-      }
-    }
-    fetchMarkedDaysAllClients();
-  }, [selectedSeason, clients]);
-
-  // Markering i månedsfelter for én klient ad gangen
-  const [activeClientId, setActiveClientId] = useState(null);
-
+  // Sæt første aktive klient ved load
   useEffect(() => {
     if (clients.length > 0 && (activeClientId === null || !clients.some(c => c.id === activeClientId))) {
       setActiveClientId(clients[0].id);
     }
   }, [clients, activeClientId]);
+
+  // Hent markeringer for valgt sæson og alle godkendte klienter
+  useEffect(() => {
+    if (!token || !clients.length) {
+      setMarkedDaysByClient({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const allData = {};
+        for (const client of clients) {
+          const query = `?season=${selectedSeason}&client_id=${client.id}`;
+          const res = await fetch("/api/calendar/marked-days" + query, {
+            headers: { "Authorization": "Bearer " + token }
+          });
+          if (!res.ok) continue;
+          const json = await res.json();
+          allData[client.id] = json.markedDays || {};
+        }
+        if (!cancelled) setMarkedDaysByClient(allData);
+      } catch (e) {
+        if (!cancelled) setMarkedDaysByClient({});
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedSeason, clients, token]);
 
   const markedDays = markedDaysByClient[activeClientId] || {};
 
@@ -175,15 +243,17 @@ export default function CalendarView() {
 
   const handleSave = async () => {
     setSnackError("");
-    if (!clients.length) {
+    if (!clients.length || !activeClientId) {
       setSnackError("Ingen godkendte klienter!");
       return;
     }
     try {
-      // Gem kun for den aktive klient
       const res = await fetch("/api/calendar/marked-days", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
         body: JSON.stringify({
           markedDays: markedDays,
           clients: [activeClientId],
@@ -244,6 +314,10 @@ export default function CalendarView() {
     off: { background: "#d32f2f", borderColor: "#d32f2f" },
     default: {}
   };
+
+  if (!token) {
+    return <Login onLogin={setToken} />;
+  }
 
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4, fontFamily: theme.typography.fontFamily }}>
