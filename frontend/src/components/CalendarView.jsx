@@ -49,16 +49,14 @@ export default function CalendarView() {
   const [loadingClients, setLoadingClients] = useState(true);
   const seasons = getSeasons();
 
-  // --- Fetch approved clients ---
+  // --- Fetch all clients from API and filter approved ones for display ---
   useEffect(() => {
     async function fetchClients() {
       setLoadingClients(true);
       try {
-        const res = await fetch("/api/clients/"); // Justér evt. stien
+        const res = await fetch("/api/clients/");
         const data = await res.json();
-        // Filter kun dem med status "approved"
-        const approved = Array.isArray(data) ? data.filter(c => c.status === "approved") : [];
-        setClients(approved);
+        setClients(data); // Save all clients
       } catch (e) {
         setClients([]);
       }
@@ -66,6 +64,9 @@ export default function CalendarView() {
     }
     fetchClients();
   }, []);
+
+  // Godkendte klienter filtreres før visning (identisk med ClientInfoPage)
+  const approvedClients = (clients?.filter((c) => c.status === "approved") || []).slice();
 
   // --- School year months ---
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
@@ -81,10 +82,10 @@ export default function CalendarView() {
           <CircularProgress size={22} />
         ) : (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-            {clients.length === 0 && (
+            {approvedClients.length === 0 && (
               <Typography variant="body2">Ingen godkendte klienter</Typography>
             )}
-            {clients.map(client => (
+            {approvedClients.map(client => (
               <Button
                 key={client.id}
                 variant="outlined"
