@@ -1,66 +1,44 @@
 import { useEffect, useRef } from "react";
 
-export function useClientWebSocket(onUpdate) {
-  const wsRef = useRef(null);
+/**
+ * Lytter på WebSocket-events fra backend og kalder callback ved opdatering.
+ * @param {Function} onClientsChanged - Callback der skal køres ved klientændringer.
+ */
+export function useClientWebSocket(onClientsChanged) {
+  const ws = useRef(null);
 
   useEffect(() => {
-    let ws;
-    let reconnectTimeout;
-    let intentionalClose = false;
+    ws.current = new WebSocket("wss://kulturskole-infosk-rm.onrender.com/ws/clients");
 
-    function connect() {
-      console.debug("[WebSocket] Connecting...");
-      ws = new WebSocket("wss://kulturskole-infosk-rm.onrender.com/ws/clients");
-      wsRef.current = ws;
+    ws.current.onopen = () => {
+      // Forbindelse etableret (kan evt. sende besked)
+    };
 
-      ws.onopen = () => {
-        console.debug("[WebSocket] Connected");
-        ws.send("frontend connected!");
-      };
-
-      ws.onmessage = (event) => {
-        console.debug("[WebSocket] Message received:", event.data);
-        if (event.data === "update" && typeof onUpdate === "function") {
-          onUpdate();
+    ws.current.onmessage = (event) => {
+      try {
+        // Forsøg at parse besked som JSON
+        const data = JSON.parse(event.data);
+        if (data.type === "clients_updated") {
+          if (onClientsChanged) onClientsChanged();
         }
-      };
-
-      ws.onclose = (event) => {
-        console.debug("[WebSocket] Closed", event);
-        if (!intentionalClose) {
-          console.debug("[WebSocket] Reconnecting in 2s...");
-          reconnectTimeout = setTimeout(connect, 2000);
+      } catch (err) {
+        // Hvis ikke JSON, tjek om beskeden bare er tekst
+        if (event.data === "clients_updated") {
+          if (onClientsChanged) onClientsChanged();
         }
-      };
-
-      ws.onerror = (err) => {
-        console.error("[WebSocket] Error:", err);
-      };
-    }
-
-    connect();
-
-    const pingInterval = setInterval(() => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        console.debug("[WebSocket] Sending ping");
-        wsRef.current.send("ping");
       }
-    }, 30000);
+    };
+
+    ws.current.onerror = (error) => {
+      // Evt. håndtering/log
+    };
+
+    ws.current.onclose = () => {
+      // Evt. genopret forbindelse eller log
+    };
 
     return () => {
-      intentionalClose = true;
-      if (wsRef.current) {
-        wsRef.current.onclose = null;
-        if (
-          wsRef.current.readyState === WebSocket.OPEN ||
-          wsRef.current.readyState === WebSocket.CONNECTING
-        ) {
-          console.debug("[WebSocket] Closing connection (unmount)");
-          wsRef.current.close();
-        }
-      }
-      clearInterval(pingInterval);
-      clearTimeout(reconnectTimeout);
+      ws.current && ws.current.close();
     };
-  }, [onUpdate]);
+  }, [onClientsChanged]);
 }
