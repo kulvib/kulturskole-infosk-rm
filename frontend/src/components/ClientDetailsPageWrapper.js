@@ -1,9 +1,28 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import ClientDetailsPage from "./ClientDetailsPage";
+import { useAuth } from "../auth/authcontext";
+import { getClient } from "../api";
 
-export default function ClientDetailsPageWrapper({ clients, fetchClient }) {
+// Wrapper henter altid frisk klientdata fra API, og bruger token fra context
+export default function ClientDetailsPageWrapper({ clients }) {
   const { clientId } = useParams();
-  const client = clients.find(c => String(c.id) === String(clientId));
-  return <ClientDetailsPage client={client} fetchClient={fetchClient} />;
+  const { token } = useAuth();
+  const [client, setClient] = useState(null);
+
+  useEffect(() => {
+    async function fetchClient() {
+      if (clientId && token) {
+        try {
+          const data = await getClient(clientId, token);
+          setClient(data);
+        } catch {
+          setClient(null);
+        }
+      }
+    }
+    fetchClient();
+  }, [clientId, token]);
+
+  return <ClientDetailsPage client={client} />;
 }
