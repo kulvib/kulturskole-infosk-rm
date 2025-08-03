@@ -1,7 +1,8 @@
 import React, { useState, useRef } from "react";
-import { Card, CardContent, Typography, Box, ToggleButtonGroup, ToggleButton, Tooltip, Button } from "@mui/material";
+import { Card, CardContent, Typography, Box, ToggleButtonGroup, ToggleButton, Tooltip, Button, Snackbar, Alert } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import LockIcon from "@mui/icons-material/Lock";
+import SaveIcon from "@mui/icons-material/Save";
 import "./CalendarView.css";
 
 function getDaysInMonth(month, year) {
@@ -30,6 +31,8 @@ export default function CalendarView() {
   const [mode, setMode] = useState("on");
   const [dragging, setDragging] = useState(false);
   const [dragMode, setDragMode] = useState(null);
+  const [snackOpen, setSnackOpen] = useState(false);
+  const [snackError, setSnackError] = useState("");
   const schoolYearMonths = getSchoolYearMonths();
   const dragDaysRef = useRef(new Set());
 
@@ -72,13 +75,32 @@ export default function CalendarView() {
     setDragMode(null);
   };
 
-  // Global mouseup for drag end
   React.useEffect(() => {
     if (!dragging) return;
     const onUp = () => handleMouseUp();
     window.addEventListener("mouseup", onUp);
     return () => window.removeEventListener("mouseup", onUp);
   }, [dragging]);
+
+  // GEM MARKERING TIL BACKEND
+  const handleSave = async () => {
+    setSnackError("");
+    try {
+      // Skift URL til din backend endpoint!
+      const res = await fetch("https://kulturskole-backend.onrender.com/calendar/marked-days", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+          // Tilføj evt. Authorization header hvis API kræver token
+        },
+        body: JSON.stringify({ markedDays })
+      });
+      if (!res.ok) throw new Error("Kunne ikke gemme markeringer");
+      setSnackOpen(true);
+    } catch (err) {
+      setSnackError(err.message);
+    }
+  };
 
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4 }}>
@@ -124,6 +146,15 @@ export default function CalendarView() {
             </Typography>
           </CardContent>
         </Card>
+        <Button
+          variant="contained"
+          startIcon={<SaveIcon />}
+          color="primary"
+          sx={{ height: 48, ml: 3, fontWeight: 700, boxShadow: 2 }}
+          onClick={handleSave}
+        >
+          Gem markeringer
+        </Button>
       </Box>
 
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 3 }}>
@@ -182,6 +213,18 @@ export default function CalendarView() {
           </Card>
         ))}
       </Box>
+
+      {/* Snackbar feedback */}
+      <Snackbar open={snackOpen} autoHideDuration={2500} onClose={() => setSnackOpen(false)}>
+        <Alert severity="success" sx={{ width: '100%' }}>
+          Markeringer gemt!
+        </Alert>
+      </Snackbar>
+      <Snackbar open={!!snackError} autoHideDuration={3000} onClose={() => setSnackError("")}>
+        <Alert severity="error" sx={{ width: '100%' }}>
+          {snackError}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
