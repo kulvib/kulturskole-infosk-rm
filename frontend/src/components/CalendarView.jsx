@@ -36,6 +36,126 @@ function getDaysInMonth(month, year) {
   return new Date(year, month + 1, 0).getDate();
 }
 
+function MonthCalendar({ name, month, year, holidays }) {
+  const daysInMonth = getDaysInMonth(month, year);
+  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = søndag
+  // Juster til dansk uge (mandag=0)
+  const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+  // Opbyg array af alle celler (tomme før/efter)
+  const cells = [];
+  // Tomme celler før 1.
+  for (let i = 0; i < offset; i++) cells.push(null);
+  // Dato-celler
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  // Tomme celler efter sidste dag, så grid bliver 5 eller 6 rækker
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  // Split til uger
+  const weeks = [];
+  for (let w = 0; w < cells.length / 7; w++) {
+    weeks.push(cells.slice(w * 7, w * 7 + 7));
+  }
+
+  // Funktion til at tjekke om dag er helligdag
+  const isHoliday = (day) => {
+    return holidays.some(h => {
+      if (!h.date) return false;
+      const d = new Date(h.date);
+      return (
+        d.getDate() === day &&
+        d.getMonth() === month &&
+        d.getFullYear() === year
+      );
+    });
+  };
+
+  return (
+    <Card sx={{
+      borderRadius: "14px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+      minWidth: 0,
+      background: "#f9fafc"
+    }}>
+      <CardContent>
+        <Typography variant="h6" sx={{
+          color: "#0a275c",
+          fontWeight: 700,
+          textAlign: "center",
+          fontSize: "1.08rem",
+          mb: 1
+        }}>
+          {name} {year}
+        </Typography>
+        {/* Ugedagsrække fast */}
+        <Box sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          gap: 0.2,
+          mb: 0.5
+        }}>
+          {weekdayNames.map(wd => (
+            <Typography
+              key={wd}
+              variant="caption"
+              sx={{
+                fontWeight: 700,
+                color: "#555",
+                textAlign: "center",
+                fontSize: "0.90rem",
+                letterSpacing: "0.03em"
+              }}
+            >
+              {wd}
+            </Typography>
+          ))}
+        </Box>
+        {/* Datoer i grid */}
+        <Box sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          gap: 0.2
+        }}>
+          {cells.map((day, idx) => (
+            day ? (
+              <Box
+                key={idx}
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  p: 0.2
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 23,
+                    height: 23,
+                    borderRadius: "50%",
+                    background: isHoliday(day) ? "#ffeaea" : "#fff",
+                    border: isHoliday(day) ? "2px solid #ea394f" : "1px solid #eee",
+                    color: isHoliday(day) ? "#ea394f" : "#0a275c",
+                    fontWeight: 500,
+                    fontSize: "0.95rem",
+                    textAlign: "center",
+                    lineHeight: "23px",
+                    boxShadow: isHoliday(day) ? "0 1px 8px rgba(234,57,79,0.08)" : "0 1px 2px rgba(0,0,0,0.06)"
+                  }}
+                  title={isHoliday(day) ? "Ferie/helligdag" : ""}
+                >
+                  {day}
+                </Box>
+              </Box>
+            ) : (
+              <Box key={idx + "-empty"} />
+            )
+          ))}
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function CalendarView() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(2025);
@@ -70,20 +190,6 @@ export default function CalendarView() {
   }, [fetchClients, fetchHolidays]);
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
-
-  const isHoliday = (day, month, year) => {
-    return holidays.some(
-      h => {
-        if (!h.date) return false;
-        const d = new Date(h.date);
-        return (
-          d.getDate() === day &&
-          d.getMonth() === month &&
-          d.getFullYear() === year
-        );
-      }
-    );
-  };
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
@@ -152,91 +258,13 @@ export default function CalendarView() {
         }}
       >
         {schoolYearMonths.map(({ name, month, year }, idx) => (
-          <Card key={name + year} sx={{
-            borderRadius: "14px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-            minWidth: 0,
-            background: "#f9fafc"
-          }}>
-            <CardContent>
-              <Typography variant="h6" sx={{
-                color: "#0a275c",
-                fontWeight: 700,
-                textAlign: "center",
-                fontSize: "1.08rem",
-                mb: 1
-              }}>
-                {name} {year}
-              </Typography>
-              <Box sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(7, 1fr)",
-                gap: 0.2,
-                mb: 0.5
-              }}>
-                {weekdayNames.map(wd => (
-                  <Typography key={wd}
-                    variant="caption"
-                    sx={{
-                      fontWeight: 600,
-                      color: "#888",
-                      textAlign: "center",
-                      fontSize: "0.92rem"
-                    }}
-                  >
-                    {wd}
-                  </Typography>
-                ))}
-              </Box>
-              <Box sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(7, 1fr)",
-                gap: 0.2
-              }}>
-                {(() => {
-                  const firstDay = new Date(year, month, 1).getDay();
-                  const offset = firstDay === 0 ? 6 : firstDay - 1;
-                  return Array(offset).fill(null).map((_, i) => (
-                    <Box key={`empty-${i}`} />
-                  ));
-                })()}
-                {Array(getDaysInMonth(month, year)).fill(null).map((_, dayIdx) => {
-                  const day = dayIdx + 1;
-                  const holiday = isHoliday(day, month, year);
-                  return (
-                    <Box
-                      key={dayIdx}
-                      sx={{
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        m: "1px"
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          background: holiday ? "#ffeaea" : "#fff",
-                          border: holiday ? "2px solid #ea394f" : "2px solid #eee",
-                          color: holiday ? "#ea394f" : "#0a275c",
-                          fontWeight: 700,
-                          fontSize: "1rem",
-                          textAlign: "center",
-                          lineHeight: "32px",
-                          boxShadow: holiday ? "0 1px 8px rgba(234,57,79,0.10)" : "0 1px 3px rgba(0,0,0,0.07)"
-                        }}
-                        title={holiday ? "Ferie/helligdag" : ""}
-                      >
-                        {day}
-                      </Box>
-                    </Box>
-                  );
-                })}
-              </Box>
-            </CardContent>
-          </Card>
+          <MonthCalendar
+            key={name + year}
+            name={name}
+            month={month}
+            year={year}
+            holidays={holidays}
+          />
         ))}
       </Box>
     </Box>
