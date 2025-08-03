@@ -18,7 +18,7 @@ import {
   approveClient,
   removeClient,
 } from "./api";
-import { useClientLiveWebSocket } from "./hooks/useClientWebSocket";
+import { useClientWebSocket } from "./hooks/useClientWebSocket"; // <-- RET HER
 
 function AppContent() {
   const { token } = useAuth();
@@ -105,10 +105,8 @@ function AppContent() {
     setLoading(false);
   };
 
-  useClientLiveWebSocket({
-    url: "wss://kulturskole-infosk-rm.onrender.com/ws/clients",
-    onUpdate: fetchClients,
-  });
+  // RET HER: Brug det rigtige hook-navn og API
+  useClientWebSocket(fetchClients);
 
   useEffect(() => {
     if (token) {
