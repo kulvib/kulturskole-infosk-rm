@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket
 
-router = APIRouter()  # <--- Denne linje mangler du!
+router = APIRouter()
 
 connected_websockets = set()
 MAX_WEBSOCKETS = 50
@@ -18,7 +18,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 msg = await websocket.receive_text()
                 if msg == "ping":
                     await websocket.send_text("pong")
-                # evt. håndter andre beskeder
             except Exception:
                 await websocket.close()
                 break
@@ -31,7 +30,7 @@ async def notify_clients_updated():
     dead_websockets = set()
     for ws in list(connected_websockets):
         try:
-            await ws.send_text("update")
+            await ws.send_text("clients_updated")
         except Exception:
             dead_websockets.add(ws)
             try:
