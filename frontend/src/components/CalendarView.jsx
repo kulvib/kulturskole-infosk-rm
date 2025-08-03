@@ -1,9 +1,44 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, Typography, Box, ToggleButtonGroup, ToggleButton, Tooltip, Button, Snackbar, Alert } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import LockIcon from "@mui/icons-material/Lock";
 import SaveIcon from "@mui/icons-material/Save";
 import "./CalendarView.css";
+
+// Helper til at generere sæsoner fra 2024/25 til 2050/51
+function getSeasons() {
+  const startYear = 2024;
+  const endYear = 2050;
+  const seasons = [];
+  for (let y = startYear; y <= endYear; y++) {
+    seasons.push({
+      label: `Sæson ${y}/${(y + 1).toString().slice(-2)}`,
+      value: y,
+    });
+  }
+  return seasons;
+}
+
+// Returnerer datoer for et skoleår (august til juli)
+function getSchoolYearMonths(startYear) {
+  const months = [];
+  // August til December
+  for (let i = 0; i < 5; i++) {
+    months.push({
+      name: monthNames[i],
+      month: i + 7,
+      year: startYear
+    });
+  }
+  // Januar til Juli
+  for (let i = 5; i < 12; i++) {
+    months.push({
+      name: monthNames[i],
+      month: i - 5,
+      year: startYear + 1
+    });
+  }
+  return months;
+}
 
 function getDaysInMonth(month, year) {
   return new Date(year, month + 1, 0).getDate();
@@ -14,27 +49,35 @@ const monthNames = [
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
 ];
 
-function getSchoolYearMonths() {
-  const now = new Date();
-  const startYear = now.getMonth() < 7 ? now.getFullYear() - 1 : now.getFullYear();
-  const months = [];
-  for (let i = 0; i < 12; i++) {
-    let monthIndex = (i + 7) % 12;
-    let year = monthIndex < 7 ? startYear + 1 : startYear;
-    months.push({ name: monthNames[i], month: monthIndex, year });
-  }
-  return months;
-}
-
 export default function CalendarView() {
+  const seasons = getSeasons();
+  const [selectedSeason, setSelectedSeason] = useState(seasons[0].value);
+  const [schoolYearMonths, setSchoolYearMonths] = useState(getSchoolYearMonths(seasons[0].value));
   const [markedDays, setMarkedDays] = useState({});
   const [mode, setMode] = useState("on");
   const [dragging, setDragging] = useState(false);
   const [dragMode, setDragMode] = useState(null);
   const [snackOpen, setSnackOpen] = useState(false);
   const [snackError, setSnackError] = useState("");
-  const schoolYearMonths = getSchoolYearMonths();
   const dragDaysRef = useRef(new Set());
+
+  useEffect(() => {
+    setSchoolYearMonths(getSchoolYearMonths(selectedSeason));
+  }, [selectedSeason]);
+
+  // Hent markeringer fra backend ved load
+  useEffect(() => {
+    async function fetchMarkedDays() {
+      try {
+        const res = await fetch("/api/calendar/marked-days");
+        const json = await res.json();
+        setMarkedDays(json.markedDays || {});
+      } catch (e) {
+        setMarkedDays({});
+      }
+    }
+    fetchMarkedDays();
+  }, []);
 
   // Click handler (single day)
   const handleDayClick = (year, month, day) => {
@@ -75,7 +118,7 @@ export default function CalendarView() {
     setDragMode(null);
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!dragging) return;
     const onUp = () => handleMouseUp();
     window.addEventListener("mouseup", onUp);
@@ -86,12 +129,10 @@ export default function CalendarView() {
   const handleSave = async () => {
     setSnackError("");
     try {
-      // Skift URL til din backend endpoint!
-      const res = await fetch("https://kulturskole-backend.onrender.com/calendar/marked-days", {
+      const res = await fetch("/api/calendar/marked-days", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
-          // Tilføj evt. Authorization header hvis API kræver token
         },
         body: JSON.stringify({ markedDays })
       });
@@ -105,7 +146,6 @@ export default function CalendarView() {
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4 }}>
       <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-        <LockIcon sx={{ fontSize: 32, color: "#d32f2f", mr: 2 }} />
         <Card sx={{ minWidth: 260, mr: 3, background: "#e9f7fb", border: "1px solid #036" }}>
           <CardContent>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
@@ -156,15 +196,48 @@ export default function CalendarView() {
           Gem markeringer
         </Button>
       </Box>
-
+      <Box sx={{ mb: 3 }}>
+        <label htmlFor="seasonSelect"><strong>Vælg sæson:</strong> </label>
+        <select
+          id="seasonSelect"
+          value={selectedSeason}
+          onChange={e => setSelectedSeason(Number(e.target.value))}
+          style={{ padding: "6px 12px", fontSize: "1rem", fontWeight: "bold", borderRadius: 4, border: "1px solid #036", background: "#e9f7fb" }}
+        >
+          {seasons.map(season =>
+            <option key={season.value} value={season.value}>
+              {season.label}
+            </option>
+          )}
+        </select>
+      </Box>
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 3 }}>
         {schoolYearMonths.map(({ name, month, year }, idx) => (
-          <Card key={name} className="month-card" sx={{ mb: 2 }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ color: "#036", fontWeight: 700, mb: 1 }}>
-                {name}
+          <Card
+            key={name + year}
+            className="month-card"
+            sx={{
+              mb: 2,
+              aspectRatio: "1 / 1",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "flex-start",
+              alignItems: "stretch"
+            }}
+          >
+            <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column", height: "100%" }}>
+              <Typography variant="h6" sx={{ color: "#036", fontWeight: 700, mb: 1, textAlign: "center" }}>
+                {name} {year}
               </Typography>
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.5 }}>
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, 1fr)",
+                  gap: 0.5,
+                  alignItems: "start"
+                }}
+              >
                 {["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"].map(wd => (
                   <Typography key={wd} variant="caption" sx={{ fontWeight: 600, color: "#888", textAlign: "center" }}>
                     {wd}
@@ -213,7 +286,6 @@ export default function CalendarView() {
           </Card>
         ))}
       </Box>
-
       {/* Snackbar feedback */}
       <Snackbar open={snackOpen} autoHideDuration={2500} onClose={() => setSnackOpen(false)}>
         <Alert severity="success" sx={{ width: '100%' }}>
