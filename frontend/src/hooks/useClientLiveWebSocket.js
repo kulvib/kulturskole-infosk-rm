@@ -1,15 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
-/**
- * Custom hook til live WebSocket-opdatering.
- * @param {Object} options - { url: string, onUpdate: function }
- */
 export function useClientLiveWebSocket({ url, onUpdate }) {
+  const wsRef = useRef(null);
+
   useEffect(() => {
-    const ws = new WebSocket(url);
+    let ws = new WebSocket(url);
+    wsRef.current = ws;
 
     ws.onopen = () => {
-      // Send initial besked hvis backend forventer det (kan evt. fjernes)
       ws.send("frontend connected!");
     };
 
@@ -19,10 +17,18 @@ export function useClientLiveWebSocket({ url, onUpdate }) {
       }
     };
 
-    // Hold forbindelsen åben med ping (valgfrit)
     const pingInterval = setInterval(() => {
       if (ws.readyState === 1) ws.send("ping");
     }, 30000);
+
+    ws.onerror = (event) => {
+      // console.warn("WebSocket error", event);
+    };
+
+    ws.onclose = (event) => {
+      // Evt. reconnect logic her
+      // console.warn("WebSocket closed", event);
+    };
 
     return () => {
       ws.close();
