@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Box, Card, CardContent, Typography,
-  CircularProgress, Paper, IconButton
+  Box, Card, CardContent, Typography, Button,
+  CircularProgress, Paper, IconButton, Checkbox, FormControlLabel, FormGroup
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import { getClients } from "../api";
 import { useAuth } from "../auth/authcontext";
 
@@ -185,21 +183,54 @@ export default function CalendarView() {
   const clientIds = clients.map(c => c.id);
 
   // Vælg/fjern individuel klient
-  const handleClientChange = (_, newSelected) => {
-    setSelectedClients(newSelected);
+  const handleClientChange = (id) => {
+    setSelectedClients(selected =>
+      selected.includes(id)
+        ? selected.filter(x => x !== id)
+        : [...selected, id]
+    );
   };
 
-  // Vælg alle/ingen klienter
-  const toggleAllClients = () => {
-    if (selectedClients.length === clientIds.length) {
-      setSelectedClients([]);
-    } else {
+  // Vælg/Fjern alle
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
       setSelectedClients(clientIds);
+    } else {
+      setSelectedClients([]);
     }
   };
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
+      {/* Sæsonvælger */}
+      <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
+            Vælg Sæson:
+          </Typography>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            {seasons.map(season => (
+              <Button
+                key={season.value}
+                variant={selectedSeason === season.value ? "contained" : "outlined"}
+                color={selectedSeason === season.value ? "primary" : "inherit"}
+                onClick={() => setSelectedSeason(season.value)}
+                sx={{
+                  fontWeight: 700,
+                  borderRadius: 3,
+                  minWidth: 80,
+                  bgcolor: selectedSeason === season.value ? "#1976d2" : "#fff",
+                  color: selectedSeason === season.value ? "#fff" : "#1976d2",
+                  border: selectedSeason === season.value ? "1.5px solid #1976d2" : "1.5px solid #bbb"
+                }}
+              >
+                {season.label}
+              </Button>
+            ))}
+          </Box>
+        </Box>
+      </Paper>
+      {/* Godkendte klienter */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", flexGrow: 1 }}>
@@ -224,82 +255,33 @@ export default function CalendarView() {
         {loadingClients && clients.length === 0 ? (
           <CircularProgress size={22} />
         ) : (
-          <Box>
-            <ToggleButton
-              value="all"
-              selected={selectedClients.length === clientIds.length && clientIds.length > 0}
-              onClick={toggleAllClients}
-              sx={{
-                fontWeight: 700,
-                borderRadius: 3,
-                minWidth: 90,
-                color: selectedClients.length === clientIds.length ? "#fff" : "#1976d2",
-                bgcolor: selectedClients.length === clientIds.length ? "#1976d2" : "#fff",
-                border: selectedClients.length === clientIds.length ? "1.5px solid #1976d2" : "1.5px solid #bbb",
-                mr: 1,
-                mb: 1
-              }}
-            >
-              Vælg alle
-            </ToggleButton>
-            <ToggleButtonGroup
-              value={selectedClients}
-              onChange={handleClientChange}
-              aria-label="klientvalg"
-              multiple
-              sx={{ flexWrap: "wrap", gap: 1 }}
-            >
-              {clients.map(client => (
-                <ToggleButton
-                  key={client.id}
-                  value={client.id}
-                  sx={{
-                    fontWeight: 700,
-                    borderRadius: 3,
-                    minWidth: 90,
-                    color: selectedClients.includes(client.id) ? "#fff" : "#1976d2",
-                    bgcolor: selectedClients.includes(client.id) ? "#1976d2" : "#fff",
-                    border: selectedClients.includes(client.id) ? "1.5px solid #1976d2" : "1.5px solid #bbb"
-                  }}
-                >
-                  {client.locality || "Ingen lokalitet"}
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-          </Box>
+          <FormGroup>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={selectedClients.length === clientIds.length && clientIds.length > 0}
+                  indeterminate={selectedClients.length > 0 && selectedClients.length < clientIds.length}
+                  onChange={handleSelectAll}
+                />
+              }
+              label="Vælg alle"
+            />
+            {clients.map(client => (
+              <FormControlLabel
+                key={client.id}
+                control={
+                  <Checkbox
+                    checked={selectedClients.includes(client.id)}
+                    onChange={() => handleClientChange(client.id)}
+                  />
+                }
+                label={client.locality || "Ingen lokalitet"}
+              />
+            ))}
+          </FormGroup>
         )}
       </Paper>
-      <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-        <Typography sx={{ fontWeight: 600, color: "#0a275c", mb: 1 }}>
-          Vælg sæson:
-        </Typography>
-        <ToggleButtonGroup
-          value={selectedSeason}
-          exclusive
-          onChange={(_, value) => value && setSelectedSeason(value)}
-          sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}
-        >
-          {seasons.map(season => (
-            <ToggleButton
-              key={season.value}
-              value={season.value}
-              sx={{
-                fontWeight: 700,
-                borderRadius: 3,
-                minWidth: 80,
-                bgcolor: selectedSeason === season.value ? "#1976d2" : "#fff",
-                color: selectedSeason === season.value ? "#fff" : "#1976d2",
-                border: selectedSeason === season.value ? "1.5px solid #1976d2" : "1.5px solid #bbb",
-                '&:hover': {
-                  bgcolor: selectedSeason === season.value ? "#1565c0" : "#e3eafc"
-                }
-              }}
-            >
-              {season.label}
-            </ToggleButton>
-          ))}
-        </ToggleButtonGroup>
-      </Paper>
+      {/* Kalender */}
       <Box
         sx={{
           display: "grid",
