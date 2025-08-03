@@ -72,9 +72,11 @@ export default function ClientDetailsPage() {
   const [client, setClient] = useState(null);
   const [locality, setLocality] = useState("");
   const [savingLocality, setSavingLocality] = useState(false);
+  const [localitySaved, setLocalitySaved] = useState(false); // Ny state
 
   const [kioskUrl, setKioskUrl] = useState("");
   const [savingKioskUrl, setSavingKioskUrl] = useState(false);
+  const [kioskUrlSaved, setKioskUrlSaved] = useState(false); // Ny state
 
   const [actionLoading, setActionLoading] = useState({});
   const [refreshing, setRefreshing] = useState(false);
@@ -100,22 +102,14 @@ export default function ClientDetailsPage() {
 
   useClientWebSocket(fetchClient);
 
-  if (!client) {
-    return (
-      <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
-        <Card sx={{ p: 3 }}>
-          <Typography variant="h6">Klientdata indlæses...</Typography>
-        </Card>
-      </Box>
-    );
-  }
-
   // Save locality
   const handleLocalitySave = async () => {
     setSavingLocality(true);
     try {
       await updateClient(client.id, { locality });
       fetchClient();
+      setLocalitySaved(true); // Vis 'Gemt'
+      setTimeout(() => setLocalitySaved(false), 3000); // Skjul efter 3 sekunder
     } catch (err) {
       alert("Kunne ikke gemme lokalitet: " + err.message);
     }
@@ -128,6 +122,8 @@ export default function ClientDetailsPage() {
     try {
       await pushKioskUrl(client.id, kioskUrl);
       fetchClient();
+      setKioskUrlSaved(true); // Vis 'Gemt'
+      setTimeout(() => setKioskUrlSaved(false), 3000); // Skjul efter 3 sekunder
     } catch (err) {
       alert("Kunne ikke opdatere kiosk webadresse: " + err.message);
     }
@@ -162,6 +158,16 @@ export default function ClientDetailsPage() {
 
   // Mindre afstand og ens afstand mellem afsnit
   const sectionSpacing = 2;
+
+  if (!client) {
+    return (
+      <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
+        <Card sx={{ p: 3 }}>
+          <Typography variant="h6">Klientdata indlæses...</Typography>
+        </Card>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 3 }}>
@@ -208,7 +214,6 @@ export default function ClientDetailsPage() {
         </Tooltip>
       </Box>
       <Grid container spacing={sectionSpacing}>
-        {/* ... resten af komponenten uændret ... */}
         {/* Afsnit 1: Klient-info */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
@@ -253,6 +258,11 @@ export default function ClientDetailsPage() {
                   >
                     {savingLocality ? <CircularProgress size={16} /> : "Gem"}
                   </Button>
+                  {localitySaved && (
+                    <Typography variant="body2" color="success.main" sx={{ ml: 2 }}>
+                      Gemt
+                    </Typography>
+                  )}
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <AccessTimeIcon color="primary" />
@@ -309,16 +319,23 @@ export default function ClientDetailsPage() {
                   }}
                   disabled={savingKioskUrl}
                 />
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  onClick={handleKioskUrlSave}
-                  disabled={savingKioskUrl}
-                  sx={{ minWidth: 44, px: 1, height: 28 }}
-                >
-                  {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
-                </Button>
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    onClick={handleKioskUrlSave}
+                    disabled={savingKioskUrl}
+                    sx={{ minWidth: 44, px: 1, height: 28 }}
+                  >
+                    {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
+                  </Button>
+                  {kioskUrlSaved && (
+                    <Typography variant="body2" color="success.main" sx={{ mt: 0.5 }}>
+                      Gemt
+                    </Typography>
+                  )}
+                </Box>
                 <Tooltip title="Luk Chrome Browser på klient">
                   <span>
                     <Button
