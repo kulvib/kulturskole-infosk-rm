@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   Box, Card, CardContent, Typography, Button, Select, MenuItem, CircularProgress, Paper
 } from "@mui/material";
+import { useClientWebSocket } from "../hooks/useClientWebSocket";
 
 // -- Helper: Month names --
 const monthNames = [
@@ -49,23 +50,32 @@ export default function CalendarView() {
   const [loadingClients, setLoadingClients] = useState(true);
   const seasons = getSeasons();
 
-  // --- Fetch all clients from API ---
-  useEffect(() => {
-    async function fetchClients() {
-      setLoadingClients(true);
-      try {
-        const res = await fetch("/api/clients/");
-        const data = await res.json();
-        setClients(data); // Gem ALLE klienter
-      } catch (e) {
-        setClients([]);
-      }
-      setLoadingClients(false);
+  // --- Fetch only approved clients from API ---
+  const fetchClients = async () => {
+    setLoadingClients(true);
+    try {
+      const res = await fetch("/api/clients/");
+      const data = await res.json();
+      // Filtrer kun godkendte klienter
+      const approvedClients = Array.isArray(data)
+        ? data.filter(client => client.approved === true)
+        : [];
+      setClients(approvedClients);
+    } catch (e) {
+      setClients([]);
     }
+    setLoadingClients(false);
+  };
+
+  useEffect(() => {
     fetchClients();
+    // eslint-disable-next-line
   }, []);
 
-  // Vis ALLE klienter (drop filter midlertidigt)
+  // WebSocket: lyt efter klient-ændringer fra backend
+  useClientWebSocket(fetchClients);
+
+  // Vis kun godkendte klienter
   const visibleClients = clients || [];
 
   // --- School year months ---
@@ -76,22 +86,22 @@ export default function CalendarView() {
       {/* Klientliste */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 1, fontWeight: 700, color: "#0a275c" }}>
-          Klienter
+          Godkendte klienter
         </Typography>
         {loadingClients ? (
           <CircularProgress size={22} />
         ) : (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
             {visibleClients.length === 0 && (
-              <Typography variant="body2">Ingen klienter fundet</Typography>
+              <Typography variant="body2">Ingen godkendte klienter fundet</Typography>
             )}
             {visibleClients.map(client => (
               <Button
-                key={client.id}
+                key={client.id || client._id}
                 variant="outlined"
                 sx={{ borderRadius: 3, minWidth: 120, fontWeight: 700 }}
               >
-                {client.name}
+                {client.name || (client.firstName + " " + client.lastName)}
               </Button>
             ))}
           </Box>
