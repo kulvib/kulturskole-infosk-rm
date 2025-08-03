@@ -6,6 +6,7 @@ export default function ClientSelector({ selectedClients, setSelectedClients }) 
   const [allSelected, setAllSelected] = useState(false);
 
   useEffect(() => {
+    // Her antages at backend har /api/clients/approved - filtrering sker der!
     fetch("/api/clients/approved")
       .then(res => res.json())
       .then(data => setClients(data));
