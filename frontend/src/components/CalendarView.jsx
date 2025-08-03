@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  Box, Card, CardContent, Typography, Button, Select, MenuItem, CircularProgress, Paper, IconButton
+  Box, Card, CardContent, Typography, Button, Select, MenuItem,
+  CircularProgress, Paper, IconButton
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { useClientWebSocket } from "../hooks/useClientWebSocket";
+
+const API_BASE_URL = "https://kulturskole-infosk-rm.onrender.com";
 
 // -- Helper: Month names --
 const monthNames = [
@@ -15,7 +17,7 @@ const monthNames = [
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
 // -- Helper: Generate seasons --
-function getSeasons(start = 2025, end = 2050) {
+function getSeasons(start = 2025, end = 2040) {
   const seasons = [];
   for (let y = start; y <= end; y++) {
     seasons.push({
@@ -46,52 +48,30 @@ function getDaysInMonth(month, year) {
 export default function CalendarView() {
   const [selectedSeason, setSelectedSeason] = useState(2025);
   const [clients, setClients] = useState([]);
-  const [loadingClients, setLoadingClients] = useState(true);
-  const [refreshingClients, setRefreshingClients] = useState(false);
+  const [loadingClients, setLoadingClients] = useState(false);
   const [holidays, setHolidays] = useState([]);
   const seasons = getSeasons();
 
-  // -- Memoized callbacks --
-  const fetchClients = useCallback(async () => {
-    setRefreshingClients(true);
-    if (!loadingClients) setLoadingClients(true);
-    try {
-      const res = await fetch("/api/clients/");
-      const data = await res.json();
-      const approvedClients = Array.isArray(data)
-        ? data.filter(client => client.status === "approved")
-        : [];
-      setClients(approvedClients);
-    } catch (e) {
-      setClients([]);
-    }
-    setLoadingClients(false);
-    setRefreshingClients(false);
-  }, [loadingClients]);
-
-  const fetchHolidays = useCallback(async () => {
-    try {
-      const res = await fetch("/api/holidays/");
-      const data = await res.json();
-      setHolidays(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setHolidays([]);
-    }
+  // --- Godkendte klienter: Model som i ClientInfoPage.js ---
+  const fetchClients = useCallback(() => {
+    setLoadingClients(true);
+    fetch(`${API_BASE_URL}/api/clients/approved/`)
+      .then(res => res.json())
+      .then(data => setClients(Array.isArray(data) ? data : []))
+      .finally(() => setLoadingClients(false));
   }, []);
 
-  // -- Memoized object for WebSocket hook --
-  const wsCallbacks = useMemo(() => ({
-    onClientsChanged: fetchClients,
-    onHolidaysChanged: fetchHolidays
-  }), [fetchClients, fetchHolidays]);
+  // --- Hent helligdage ---
+  const fetchHolidays = useCallback(() => {
+    fetch(`${API_BASE_URL}/api/holidays/`)
+      .then(res => res.json())
+      .then(data => setHolidays(Array.isArray(data) ? data : []));
+  }, []);
 
   useEffect(() => {
     fetchClients();
     fetchHolidays();
-    // eslint-disable-next-line
-  }, []);
-
-  const wsStatus = useClientWebSocket(wsCallbacks);
+  }, [fetchClients, fetchHolidays]);
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
@@ -111,43 +91,41 @@ export default function CalendarView() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="body2" sx={{ color: "#555" }}>
-          WebSocket status: <b>{wsStatus}</b>
-        </Typography>
-      </Box>
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", flexGrow: 1 }}>
             Godkendte klienter
           </Typography>
-          <IconButton
-            aria-label="Opdater klienter"
-            onClick={fetchClients}
-            disabled={loadingClients || refreshingClients}
-            sx={{ position: "relative" }}
-          >
-            {refreshingClients ? (
-              <CircularProgress size={24} sx={{ position: "absolute", left: 2, top: 2 }} />
-            ) : (
+          <Box sx={{ position: "relative" }}>
+            <IconButton
+              aria-label="Opdater klienter"
+              onClick={fetchClients}
+              disabled={loadingClients}
+            >
               <RefreshIcon />
-            )}
-          </IconButton>
+              {loadingClients && (
+                <CircularProgress
+                  size={32}
+                  sx={{ color: "#1976d2", position: "absolute", left: 4, top: 4, zIndex: 1 }}
+                />
+              )}
+            </IconButton>
+          </Box>
         </Box>
-        {loadingClients ? (
+        {loadingClients && clients.length === 0 ? (
           <CircularProgress size={22} />
         ) : (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-            {clients.length === 0 && (
+            {clients.length === 0 && !loadingClients && (
               <Typography variant="body2">Ingen godkendte klienter fundet</Typography>
             )}
             {clients.map(client => (
               <Button
-                key={client.id || client._id}
+                key={client.unique_id || client.id}
                 variant="outlined"
                 sx={{ borderRadius: 3, minWidth: 120, fontWeight: 700 }}
               >
-                {client.name || (client.firstName + " " + client.lastName)}
+                {client.name}
               </Button>
             ))}
           </Box>
