@@ -54,8 +54,9 @@ export default function CalendarView() {
     async function fetchClients() {
       setLoadingClients(true);
       try {
-        const res = await fetch("/api/clients/"); // Adjust path if needed
+        const res = await fetch("/api/clients/"); // Justér evt. stien
         const data = await res.json();
+        // Filter kun dem med status "approved"
         const approved = Array.isArray(data) ? data.filter(c => c.status === "approved") : [];
         setClients(approved);
       } catch (e) {
