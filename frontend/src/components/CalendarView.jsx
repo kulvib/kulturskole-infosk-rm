@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Card, CardContent, Typography, Box, ToggleButtonGroup, ToggleButton,
   Tooltip, Button, Snackbar, Alert, useTheme,
-  FormControl, InputLabel, Select, MenuItem, Checkbox, ListItemText, OutlinedInput, CircularProgress
+  CircularProgress
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import PowerOffIcon from "@mui/icons-material/PowerOff";
@@ -55,23 +55,21 @@ export default function CalendarView() {
   const seasons = getSeasons();
   const [selectedSeason, setSelectedSeason] = useState(seasons[0].value);
   const [schoolYearMonths, setSchoolYearMonths] = useState(getSchoolYearMonths(seasons[0].value));
-  const [markedDays, setMarkedDays] = useState({});
+  const [markedDaysByClient, setMarkedDaysByClient] = useState({});
   const [mode, setMode] = useState("on");
   const [dragging, setDragging] = useState(false);
   const [dragMode, setDragMode] = useState(null);
   const [snackOpen, setSnackOpen] = useState(false);
   const [snackError, setSnackError] = useState("");
-  const [selectedClients, setSelectedClients] = useState([]);
   const [clients, setClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(true);
-  const [allSelected, setAllSelected] = useState(false);
   const dragDaysRef = useRef(new Set());
 
   useEffect(() => {
     setSchoolYearMonths(getSchoolYearMonths(selectedSeason));
   }, [selectedSeason]);
 
-  // Hent alle klienter med status "approved"
+  // Hent alle godkendte klienter
   useEffect(() => {
     async function fetchClients() {
       setLoadingClients(true);
@@ -90,62 +88,52 @@ export default function CalendarView() {
     fetchClients();
   }, []);
 
+  // Hent markeringer for valgt sæson og alle godkendte klienter
   useEffect(() => {
-    setAllSelected(selectedClients.length === clients.length && clients.length > 0);
-  }, [selectedClients, clients]);
-
-  // Hent markeringer for valgt sæson og valgte klienter
-  useEffect(() => {
-    async function fetchMarkedDays() {
-      if (!selectedClients.length) {
-        setMarkedDays({});
+    async function fetchMarkedDaysAllClients() {
+      if (!clients.length) {
+        setMarkedDaysByClient({});
         return;
       }
       try {
-        // Hent markeringer for hver klient og saml fælles markeringer
-        const allMarked = {};
-        for (const clientId of selectedClients) {
-          const query = `?season=${selectedSeason}&client_id=${clientId}`;
+        const allData = {};
+        for (const client of clients) {
+          const query = `?season=${selectedSeason}&client_id=${client.id}`;
           const res = await fetch("/api/calendar/marked-days" + query);
           const json = await res.json();
-          const markings = json.markedDays || {};
-          // Saml markeringer: For første klient, brug alle. For efterfølgende, behold kun de dage hvor status er ens!
-          if (Object.keys(allMarked).length === 0) {
-            Object.assign(allMarked, markings);
-          } else {
-            for (const dayKey of Object.keys(allMarked)) {
-              if (markings[dayKey] !== allMarked[dayKey]) {
-                delete allMarked[dayKey]; // kun fælles status beholdes
-              }
-            }
-          }
+          allData[client.id] = json.markedDays || {};
         }
-        setMarkedDays(allMarked);
+        setMarkedDaysByClient(allData);
       } catch (e) {
-        setMarkedDays({});
+        setMarkedDaysByClient({});
       }
     }
-    fetchMarkedDays();
-  }, [selectedSeason, selectedClients]);
+    fetchMarkedDaysAllClients();
+  }, [selectedSeason, clients]);
 
-  const handleClientsChange = (event) => {
-    const value = event.target.value;
-    setSelectedClients(typeof value === "string" ? value.split(',') : value);
-  };
+  // Markering i månedsfelter for én klient ad gangen
+  const [activeClientId, setActiveClientId] = useState(null);
 
-  const handleSelectAllClients = () => {
-    if (allSelected) {
-      setSelectedClients([]);
-    } else {
-      setSelectedClients(clients.map(c => c.id));
+  useEffect(() => {
+    if (clients.length > 0 && (activeClientId === null || !clients.some(c => c.id === activeClientId))) {
+      setActiveClientId(clients[0].id);
     }
+  }, [clients, activeClientId]);
+
+  const markedDays = markedDaysByClient[activeClientId] || {};
+
+  const handleClientClick = (clientId) => {
+    setActiveClientId(clientId);
   };
 
   const handleDayClick = (year, month, day) => {
     const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    setMarkedDays(prev => ({
+    setMarkedDaysByClient(prev => ({
       ...prev,
-      [key]: prev[key] === mode ? undefined : mode
+      [activeClientId]: {
+        ...prev[activeClientId],
+        [key]: prev[activeClientId]?.[key] === mode ? undefined : mode
+      }
     }));
   };
 
@@ -160,12 +148,14 @@ export default function CalendarView() {
     if (!dragging) return;
     const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     dragDaysRef.current.add(key);
-    setMarkedDays(prev => {
+    setMarkedDaysByClient(prev => {
       const updated = { ...prev };
+      const clientMarkedDays = { ...updated[activeClientId] };
       dragDaysRef.current.forEach(k => {
-        if (dragMode === "mark") updated[k] = mode;
-        else if (dragMode === "unmark") updated[k] = undefined;
+        if (dragMode === "mark") clientMarkedDays[k] = mode;
+        else if (dragMode === "unmark") clientMarkedDays[k] = undefined;
       });
+      updated[activeClientId] = clientMarkedDays;
       return updated;
     });
   };
@@ -185,17 +175,18 @@ export default function CalendarView() {
 
   const handleSave = async () => {
     setSnackError("");
-    if (!selectedClients.length) {
-      setSnackError("Vælg mindst én klient først!");
+    if (!clients.length) {
+      setSnackError("Ingen godkendte klienter!");
       return;
     }
     try {
+      // Gem kun for den aktive klient
       const res = await fetch("/api/calendar/marked-days", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          markedDays,
-          clients: selectedClients,
+          markedDays: markedDays,
+          clients: [activeClientId],
           season: selectedSeason
         })
       });
@@ -256,47 +247,37 @@ export default function CalendarView() {
 
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4, fontFamily: theme.typography.fontFamily }}>
-      {/* Top-bar: Vælg klienter, tænd/sluk klient, Gem markeringer */}
+      {/* Top-bar: Vis alle godkendte klienter som knapper */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+          Vælg klient for redigering:
+        </Typography>
+        {loadingClients && <CircularProgress size={22} sx={{ mr: 2 }} />}
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+          {clients.length === 0 && !loadingClients &&
+            <Typography>Ingen godkendte klienter</Typography>
+          }
+          {clients.map(cli => (
+            <Button
+              key={cli.id}
+              variant={cli.id === activeClientId ? "contained" : "outlined"}
+              color={cli.id === activeClientId ? "primary" : "inherit"}
+              onClick={() => handleClientClick(cli.id)}
+              sx={{
+                fontWeight: 700,
+                minWidth: 110,
+                borderRadius: 3,
+                background: cli.id === activeClientId ? "#e9f7fb" : undefined,
+                boxShadow: cli.id === activeClientId ? 2 : 0
+              }}
+            >
+              {cli.name}
+            </Button>
+          ))}
+        </Box>
+      </Box>
+      {/* Marker arbejdsdage og gem */}
       <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
-        <FormControl sx={{ minWidth: 320 }}>
-          <InputLabel id="client-select-label">Vælg klient(er)</InputLabel>
-          <Select
-            labelId="client-select-label"
-            multiple
-            value={selectedClients}
-            onChange={handleClientsChange}
-            input={<OutlinedInput label="Vælg klient(er)" />}
-            renderValue={selected =>
-              selected.length === clients.length
-                ? "Alle"
-                : selected.map(id => {
-                    const c = clients.find(cli => cli.id === id);
-                    return c ? c.name : id;
-                  }).join(", ")
-            }
-          >
-            <MenuItem value="all" onClick={handleSelectAllClients} dense>
-              <Checkbox checked={allSelected} indeterminate={selectedClients.length > 0 && !allSelected} />
-              <ListItemText primary="Vælg alle" />
-            </MenuItem>
-            {loadingClients &&
-              <MenuItem disabled>
-                <CircularProgress size={20} sx={{ mr: 2 }} /> <Typography>Indlæser...</Typography>
-              </MenuItem>
-            }
-            {!loadingClients && clients.length === 0 &&
-              <MenuItem disabled>
-                <Typography>Ingen godkendte klienter</Typography>
-              </MenuItem>
-            }
-            {clients.map(cli => (
-              <MenuItem key={cli.id} value={cli.id}>
-                <Checkbox checked={selectedClients.indexOf(cli.id) > -1} />
-                <ListItemText primary={cli.name} secondary={cli.unique_id} />
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
         <Card sx={{ minWidth: 260, background: "#e9f7fb", border: "1px solid #036" }}>
           <CardContent>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
@@ -335,7 +316,7 @@ export default function CalendarView() {
           color="primary"
           sx={{ height: 48, fontWeight: 700, boxShadow: 2 }}
           onClick={handleSave}
-          disabled={!selectedClients.length}
+          disabled={!activeClientId}
         >
           Gem markeringer
         </Button>
