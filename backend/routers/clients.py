@@ -18,7 +18,6 @@ def get_clients(session=Depends(get_session), user=Depends(get_current_admin_use
         client.isOnline = (
             client.last_seen is not None and (now - client.last_seen) < timedelta(minutes=2)
         )
-    # Sortér: sort_order først (laveste først), og hvis ingen sort_order, så efter id (så nye klienter altid nederst)
     clients.sort(key=lambda c: (c.sort_order is None, c.sort_order if c.sort_order is not None else 9999, c.id))
     return clients
 
@@ -125,7 +124,6 @@ async def approve_client(id: int, session=Depends(get_session), user=Depends(get
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     client.status = "approved"
-    # Find højeste sort_order blandt godkendte klienter
     max_sort_order = session.exec(
         select(Client.sort_order)
         .where(Client.status == "approved", Client.sort_order != None)
