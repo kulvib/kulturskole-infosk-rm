@@ -22,7 +22,6 @@ export function useClientLiveWebSocket({ url, onUpdate }) {
       };
 
       ws.onclose = () => {
-        // Reconnect efter 2 sekunder
         reconnectTimeout = setTimeout(connect, 2000);
       };
 
