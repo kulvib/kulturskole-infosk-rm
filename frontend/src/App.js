@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import ClientInfoPage from "./components/ClientInfoPage";
 import HolidaysPage from "./components/HolidaysPage";
@@ -18,7 +18,7 @@ import {
   approveClient,
   removeClient,
 } from "./api";
-import { useClientWebSocket } from "./hooks/useClientWebSocket"; // <-- RET HER
+import { useClientWebSocket } from "./hooks/useClientWebSocket";
 
 function AppContent() {
   const { token } = useAuth();
@@ -105,7 +105,7 @@ function AppContent() {
     setLoading(false);
   };
 
-  // RET HER: Brug det rigtige hook-navn og API
+  // WebSocket: lyt efter klient-ændringer fra backend
   useClientWebSocket(fetchClients);
 
   useEffect(() => {
@@ -113,6 +113,7 @@ function AppContent() {
       fetchClients();
       fetchHolidays();
     }
+    // eslint-disable-next-line
   }, [token]);
 
   return (
