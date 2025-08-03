@@ -32,7 +32,6 @@ export default function HomePage() {
           >
             Gå til klientoversigt
           </Button>
-          {/* Tilføj flere hovedhandlinger her hvis ønsket */}
         </Stack>
       </Paper>
     </Box>
