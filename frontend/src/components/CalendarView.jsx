@@ -84,14 +84,18 @@ export default function CalendarView() {
     fetchMarkedDays();
   }, []);
 
-  // Hent ALLE klienter fra din egen API og filtrer "approved"
+  // Hent kun klienter med status "approved" fra /api/clients/ endpoint
   useEffect(() => {
     async function fetchClients() {
       setLoadingClients(true);
       try {
-        const res = await fetch("/api/clients");
+        const res = await fetch("/api/clients/");
         const data = await res.json();
-        setClients(Array.isArray(data) ? data.filter(cli => cli.status === "approved") : []);
+        // Filtrer kun "approved" klienter, hvis backend ikke allerede gør det
+        const approvedClients = Array.isArray(data)
+          ? data.filter(cli => cli.status === "approved")
+          : [];
+        setClients(approvedClients);
       } catch (err) {
         setClients([]);
       }
@@ -225,51 +229,8 @@ export default function CalendarView() {
 
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", mt: 4, fontFamily: theme.typography.fontFamily }}>
-      <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-        <Card sx={{ minWidth: 260, mr: 3, background: "#e9f7fb", border: "1px solid #036" }}>
-          <CardContent>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-              Marker arbejdsdage som
-            </Typography>
-            <ToggleButtonGroup
-              exclusive
-              value={mode}
-              onChange={(e, val) => val && setMode(val)}
-              size="small"
-            >
-              <ToggleButton value="on" sx={{ color: "#388e3c", fontWeight: 700 }}>
-                <PowerSettingsNewIcon sx={{ color: "#388e3c", mr: 1 }} />
-                Tænd klient
-              </ToggleButton>
-              <ToggleButton value="off" sx={{ color: "#d32f2f", fontWeight: 700 }}>
-                <PowerOffIcon sx={{ color: "#d32f2f", mr: 1 }} />
-                Sluk klient
-              </ToggleButton>
-            </ToggleButtonGroup>
-            <Box sx={{ mt: 2 }}>
-              <Box sx={{ display: "inline-flex", alignItems: "center", mr: 2 }}>
-                <Box sx={{ ...legendDotBase, ...legendDotStatus.on }} />
-                <Typography variant="body2" sx={{ color: "#388e3c" }}>Tænd klient</Typography>
-              </Box>
-              <Box sx={{ display: "inline-flex", alignItems: "center" }}>
-                <Box sx={{ ...legendDotBase, ...legendDotStatus.off }} />
-                <Typography variant="body2" sx={{ color: "#d32f2f" }}>Sluk klient</Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-        <Button
-          variant="contained"
-          startIcon={<SaveIcon />}
-          color="primary"
-          sx={{ height: 48, ml: 3, fontWeight: 700, boxShadow: 2 }}
-          onClick={handleSave}
-        >
-          Gem markeringer
-        </Button>
-      </Box>
-      {/* Klientvælger */}
-      <Box sx={{ mb: 2 }}>
+      {/* Top-bar: Vælg klienter, tænd/sluk klient, Gem markeringer */}
+      <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
         <FormControl sx={{ minWidth: 320 }}>
           <InputLabel id="client-select-label">Vælg klient(er)</InputLabel>
           <Select
@@ -309,16 +270,49 @@ export default function CalendarView() {
             ))}
           </Select>
         </FormControl>
-        <Box sx={{ mt: 1 }}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleSelectAllClients}
-          >
-            {allSelected ? "Fravælg alle" : "Vælg alle"}
-          </Button>
-        </Box>
+        <Card sx={{ minWidth: 260, background: "#e9f7fb", border: "1px solid #036" }}>
+          <CardContent>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+              Marker arbejdsdage som
+            </Typography>
+            <ToggleButtonGroup
+              exclusive
+              value={mode}
+              onChange={(e, val) => val && setMode(val)}
+              size="small"
+            >
+              <ToggleButton value="on" sx={{ color: "#388e3c", fontWeight: 700 }}>
+                <PowerSettingsNewIcon sx={{ color: "#388e3c", mr: 1 }} />
+                Tænd klient
+              </ToggleButton>
+              <ToggleButton value="off" sx={{ color: "#d32f2f", fontWeight: 700 }}>
+                <PowerOffIcon sx={{ color: "#d32f2f", mr: 1 }} />
+                Sluk klient
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ display: "inline-flex", alignItems: "center", mr: 2 }}>
+                <Box sx={{ ...legendDotBase, ...legendDotStatus.on }} />
+                <Typography variant="body2" sx={{ color: "#388e3c" }}>Tænd klient</Typography>
+              </Box>
+              <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+                <Box sx={{ ...legendDotBase, ...legendDotStatus.off }} />
+                <Typography variant="body2" sx={{ color: "#d32f2f" }}>Sluk klient</Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+        <Button
+          variant="contained"
+          startIcon={<SaveIcon />}
+          color="primary"
+          sx={{ height: 48, fontWeight: 700, boxShadow: 2 }}
+          onClick={handleSave}
+        >
+          Gem markeringer
+        </Button>
       </Box>
+      {/* Sæsonvælger */}
       <Box sx={{ mb: 3 }}>
         <Typography component="label" htmlFor="seasonSelect" sx={{ fontWeight: 600 }}>
           Vælg sæson:
