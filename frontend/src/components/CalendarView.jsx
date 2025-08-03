@@ -1,22 +1,17 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box, Card, CardContent, Typography, Button, Select, MenuItem,
   CircularProgress, Paper, IconButton
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import { getClients } from "../api";
+import { useAuth } from "../auth/authcontext";
 
-const API_BASE_URL = "https://kulturskole-infosk-rm.onrender.com";
-
-// -- Helper: Month names --
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
 ];
-
-// -- Helper: Weekday names --
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
-
-// -- Helper: Generate seasons --
 function getSeasons(start = 2025, end = 2040) {
   const seasons = [];
   for (let y = start; y <= end; y++) {
@@ -27,8 +22,6 @@ function getSeasons(start = 2025, end = 2040) {
   }
   return seasons;
 }
-
-// -- Helper: Generate school year months array --
 function getSchoolYearMonths(seasonStart) {
   const months = [];
   for (let i = 0; i < 5; i++) {
@@ -39,31 +32,34 @@ function getSchoolYearMonths(seasonStart) {
   }
   return months;
 }
-
-// -- Helper: Days in month --
 function getDaysInMonth(month, year) {
   return new Date(year, month + 1, 0).getDate();
 }
 
 export default function CalendarView() {
+  const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(2025);
   const [clients, setClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
   const [holidays, setHolidays] = useState([]);
   const seasons = getSeasons();
 
-  // --- Godkendte klienter: Model som i ClientInfoPage.js ---
-  const fetchClients = useCallback(() => {
+  // Hent ALLE klienter og filtrér på "approved"
+  const fetchClients = useCallback(async () => {
     setLoadingClients(true);
-    fetch(`${API_BASE_URL}/api/clients/approved/`)
-      .then(res => res.json())
-      .then(data => setClients(Array.isArray(data) ? data : []))
-      .finally(() => setLoadingClients(false));
-  }, []);
+    try {
+      const data = await getClients(token);
+      const approvedClients = (data?.filter((c) => c.status === "approved") || []).slice();
+      setClients(approvedClients);
+    } catch {
+      setClients([]);
+    }
+    setLoadingClients(false);
+  }, [token]);
 
-  // --- Hent helligdage ---
+  // Hent helligdage (samme som før)
   const fetchHolidays = useCallback(() => {
-    fetch(`${API_BASE_URL}/api/holidays/`)
+    fetch("/api/holidays/")
       .then(res => res.json())
       .then(data => setHolidays(Array.isArray(data) ? data : []));
   }, []);
@@ -121,7 +117,7 @@ export default function CalendarView() {
             )}
             {clients.map(client => (
               <Button
-                key={client.unique_id || client.id}
+                key={client.id}
                 variant="outlined"
                 sx={{ borderRadius: 3, minWidth: 120, fontWeight: 700 }}
               >
