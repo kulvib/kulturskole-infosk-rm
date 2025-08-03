@@ -15,7 +15,6 @@ import {
 
 const drawerWidth = 230;
 
-// Helligdage er fjernet fra menuen
 const menuItems = [
   {
     text: "Klienter",
@@ -34,7 +33,6 @@ export default function Dashboard() {
 
   return (
     <Box sx={{ display: "flex" }}>
-      {/* AppBar for branding and log out */}
       <AppBar
         position="fixed"
         sx={{
@@ -56,7 +54,6 @@ export default function Dashboard() {
         </Toolbar>
       </AppBar>
 
-      {/* Drawer for menu */}
       <Drawer
         variant="permanent"
         sx={{
@@ -110,7 +107,6 @@ export default function Dashboard() {
         </List>
       </Drawer>
 
-      {/* Main content */}
       <Box
         component="main"
         sx={{
@@ -121,7 +117,6 @@ export default function Dashboard() {
           background: "#f6f9fb",
         }}
       >
-        {/* Ensure content is not hidden behind AppBar */}
         <Toolbar />
         <Outlet />
       </Box>
