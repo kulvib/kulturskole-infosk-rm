@@ -4,7 +4,6 @@ from ..db import engine
 from ..models import MqttMessage
 from datetime import datetime
 
-# Konfiguration
 MQTT_BROKER = "test.mosquitto.org"
 MQTT_PORT = 1883
 MQTT_TOPIC = "test/topic"
@@ -26,8 +25,6 @@ def on_message(client, userdata, msg):
         print(f"Fejl ved decoding af payload: {e}")
     topic = msg.topic
     print(f"Modtaget besked på {topic}: {payload}")
-
-    # Gem beskeden i databasen
     try:
         with Session(engine) as session:
             mqtt_msg = MqttMessage(
@@ -44,7 +41,6 @@ client.on_connect = on_connect
 client.on_message = on_message
 
 def connect():
-    """Starter MQTT-forbindelse og lytter på beskeder."""
     print("Starter MQTT-forbindelse til Mosquitto...")
     try:
         client.connect(MQTT_BROKER, MQTT_PORT)
@@ -53,7 +49,6 @@ def connect():
         print(f"Fejl ved connection til broker: {e}")
 
 def send_message(message, topic=MQTT_TOPIC):
-    """Sender besked til MQTT-topic."""
     try:
         client.publish(topic, message)
         print(f"Sendt besked til {topic}: {message}")
@@ -61,5 +56,4 @@ def send_message(message, topic=MQTT_TOPIC):
         print(f"Fejl ved sending af besked: {e}")
 
 def push_client_command(command: str, topic: str = MQTT_TOPIC):
-    """Ekstra: sender en kommando til klient via MQTT."""
     send_message(command, topic)
