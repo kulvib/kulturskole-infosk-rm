@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Box, Card, CardContent, Typography, Button, Select, MenuItem,
+  Box, Card, CardContent, Typography, Button,
   CircularProgress, Paper, IconButton
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import { getClients } from "../api";
 import { useAuth } from "../auth/authcontext";
 
@@ -12,6 +14,7 @@ const monthNames = [
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
+
 function getSeasons(start = 2025, end = 2040) {
   const seasons = [];
   for (let y = start; y <= end; y++) {
@@ -39,25 +42,13 @@ function getDaysInMonth(month, year) {
 function MonthCalendar({ name, month, year, holidays }) {
   const daysInMonth = getDaysInMonth(month, year);
   const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = søndag
-  // Juster til dansk uge (mandag=0)
   const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
 
-  // Opbyg array af alle celler (tomme før/efter)
   const cells = [];
-  // Tomme celler før 1.
   for (let i = 0; i < offset; i++) cells.push(null);
-  // Dato-celler
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  // Tomme celler efter sidste dag, så grid bliver 5 eller 6 rækker
   while (cells.length % 7 !== 0) cells.push(null);
 
-  // Split til uger
-  const weeks = [];
-  for (let w = 0; w < cells.length / 7; w++) {
-    weeks.push(cells.slice(w * 7, w * 7 + 7));
-  }
-
-  // Funktion til at tjekke om dag er helligdag
   const isHoliday = (day) => {
     return holidays.some(h => {
       if (!h.date) return false;
@@ -87,7 +78,6 @@ function MonthCalendar({ name, month, year, holidays }) {
         }}>
           {name} {year}
         </Typography>
-        {/* Ugedagsrække fast */}
         <Box sx={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
@@ -110,7 +100,6 @@ function MonthCalendar({ name, month, year, holidays }) {
             </Typography>
           ))}
         </Box>
-        {/* Datoer i grid */}
         <Box sx={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
@@ -177,7 +166,7 @@ export default function CalendarView() {
     setLoadingClients(false);
   }, [token]);
 
-  // Hent helligdage (samme som før)
+  // Hent helligdage
   const fetchHolidays = useCallback(() => {
     fetch("/api/holidays/")
       .then(res => res.json())
@@ -227,28 +216,42 @@ export default function CalendarView() {
                 variant="outlined"
                 sx={{ borderRadius: 3, minWidth: 120, fontWeight: 700 }}
               >
-                {client.name}
+                {client.locality || "Ingen lokalitet"}
               </Button>
             ))}
           </Box>
         )}
       </Paper>
-      <Paper elevation={2} sx={{ p: 2, mb: 3, display: "flex", alignItems: "center", gap: 2 }}>
-        <Typography component="label" htmlFor="seasonSelect" sx={{ fontWeight: 600, color: "#0a275c" }}>
-          Vælg skoleår:
+      <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+        <Typography sx={{ fontWeight: 600, color: "#0a275c", mb: 1 }}>
+          Vælg sæson:
         </Typography>
-        <Select
-          id="seasonSelect"
+        <ToggleButtonGroup
           value={selectedSeason}
-          onChange={e => setSelectedSeason(Number(e.target.value))}
-          sx={{ fontWeight: 700, minWidth: 110, bgcolor: "#f9fafc", borderRadius: 2 }}
+          exclusive
+          onChange={(_, value) => value && setSelectedSeason(value)}
+          sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}
         >
           {seasons.map(season => (
-            <MenuItem key={season.value} value={season.value}>
+            <ToggleButton
+              key={season.value}
+              value={season.value}
+              sx={{
+                fontWeight: 700,
+                borderRadius: 3,
+                minWidth: 80,
+                bgcolor: selectedSeason === season.value ? "#1976d2" : "#fff",
+                color: selectedSeason === season.value ? "#fff" : "#1976d2",
+                border: selectedSeason === season.value ? "1.5px solid #1976d2" : "1.5px solid #bbb",
+                '&:hover': {
+                  bgcolor: selectedSeason === season.value ? "#1565c0" : "#e3eafc"
+                }
+              }}
+            >
               {season.label}
-            </MenuItem>
+            </ToggleButton>
           ))}
-        </Select>
+        </ToggleButtonGroup>
       </Paper>
       <Box
         sx={{
