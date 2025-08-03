@@ -16,16 +16,10 @@ import {
 const drawerWidth = 230;
 
 const menuItems = [
-  {
-    text: "Klienter",
-    path: "/clients",
-    match: "/clients",
-  },
-  {
-    text: "Kalender",
-    path: "/calendar",
-    match: "/calendar",
-  },
+  { text: "Forside", path: "/", match: "/" },
+  { text: "Klienter", path: "/clients", match: "/clients" },
+  { text: "Ferie/helligdage", path: "/holidays", match: "/holidays" },
+  { text: "Kalender", path: "/calendar", match: "/calendar" },
 ];
 
 export default function Dashboard() {
@@ -74,14 +68,23 @@ export default function Dashboard() {
               <ListItemButton
                 component={Link}
                 to={item.path}
-                selected={location.pathname.startsWith(item.match)}
+                selected={
+                  item.path === "/"
+                    ? location.pathname === "/"
+                    : location.pathname.startsWith(item.match)
+                }
                 sx={{
                   borderRadius: 2,
                   mx: 1,
                   my: 0.5,
-                  backgroundColor: location.pathname.startsWith(item.match)
-                    ? "#e0f2f1"
-                    : "inherit",
+                  backgroundColor:
+                    item.path === "/"
+                      ? location.pathname === "/"
+                        ? "#e0f2f1"
+                        : "inherit"
+                      : location.pathname.startsWith(item.match)
+                        ? "#e0f2f1"
+                        : "inherit",
                   "&:hover": {
                     backgroundColor: "#b2ebf2",
                   },
@@ -91,9 +94,14 @@ export default function Dashboard() {
                   primary={
                     <Typography
                       sx={{
-                        fontWeight: location.pathname.startsWith(item.match)
-                          ? 700
-                          : 400,
+                        fontWeight:
+                          item.path === "/"
+                            ? location.pathname === "/"
+                              ? 700
+                              : 400
+                            : location.pathname.startsWith(item.match)
+                              ? 700
+                              : 400,
                         color: "#036",
                       }}
                     >
