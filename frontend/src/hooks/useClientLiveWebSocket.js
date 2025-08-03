@@ -4,35 +4,41 @@ export function useClientLiveWebSocket({ url, onUpdate }) {
   const wsRef = useRef(null);
 
   useEffect(() => {
-    let ws = new WebSocket(url);
-    wsRef.current = ws;
+    let ws;
+    let reconnectTimeout;
 
-    ws.onopen = () => {
-      ws.send("frontend connected!");
+    const connect = () => {
+      ws = new WebSocket(url);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        ws.send("frontend connected!");
+      };
+
+      ws.onmessage = (event) => {
+        if (event.data === "update" && typeof onUpdate === "function") {
+          onUpdate();
+        }
+      };
+
+      ws.onclose = () => {
+        // Reconnect efter 2 sekunder
+        reconnectTimeout = setTimeout(connect, 2000);
+      };
+
+      ws.onerror = () => {};
     };
 
-    ws.onmessage = (event) => {
-      if (event.data === "update" && typeof onUpdate === "function") {
-        onUpdate();
-      }
-    };
+    connect();
 
     const pingInterval = setInterval(() => {
-      if (ws.readyState === 1) ws.send("ping");
+      if (wsRef.current && wsRef.current.readyState === 1) wsRef.current.send("ping");
     }, 30000);
 
-    ws.onerror = (event) => {
-      // console.warn("WebSocket error", event);
-    };
-
-    ws.onclose = (event) => {
-      // Evt. reconnect logic her
-      // console.warn("WebSocket closed", event);
-    };
-
     return () => {
-      ws.close();
+      if (wsRef.current) wsRef.current.close();
       clearInterval(pingInterval);
+      clearTimeout(reconnectTimeout);
     };
   }, [url, onUpdate]);
 }
