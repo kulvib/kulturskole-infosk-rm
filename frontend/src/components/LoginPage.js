@@ -65,8 +65,11 @@ export default function LoginPage() {
           borderRadius: 3,
         }}
       >
-        <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
-          Log ind på Kulturskole
+        <Typography variant="h5" sx={{ mb: 0.5, fontWeight: 700 }}>
+          Kulturskolen Viborg
+        </Typography>
+        <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 500 }}>
+          infoskærm administration
         </Typography>
         <Box
           component="form"
