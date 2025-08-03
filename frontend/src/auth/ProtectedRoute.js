@@ -1,18 +1,16 @@
 import React from "react";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "./authcontext";
 
 /**
  * ProtectedRoute beskytter routes, så kun brugere med token får adgang.
+ * Den viser children, hvis man er logget ind.
  */
-export default function ProtectedRoute() {
+export default function ProtectedRoute({ children }) {
   const { token } = useAuth();
 
-  // Hvis ikke logget ind, redirect til login
   if (!token) {
     return <Navigate to="/login" replace />;
   }
-
-  // Ellers vis child routes
-  return <Outlet />;
+  return children;
 }
