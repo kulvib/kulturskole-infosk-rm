@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  Box, Card, CardContent, Typography, Button, Select, MenuItem, CircularProgress, Paper
+  Box, Card, CardContent, Typography, Button, Select, MenuItem, CircularProgress, Paper, IconButton
 } from "@mui/material";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import { useClientWebSocket } from "../hooks/useClientWebSocket";
 
 // -- Helper: Month names --
@@ -46,12 +47,14 @@ export default function CalendarView() {
   const [selectedSeason, setSelectedSeason] = useState(2025);
   const [clients, setClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(true);
+  const [refreshingClients, setRefreshingClients] = useState(false);
   const [holidays, setHolidays] = useState([]);
   const seasons = getSeasons();
 
   // -- Memoized callbacks --
   const fetchClients = useCallback(async () => {
-    setLoadingClients(true);
+    setRefreshingClients(true);
+    if (!loadingClients) setLoadingClients(true);
     try {
       const res = await fetch("/api/clients/");
       const data = await res.json();
@@ -63,7 +66,8 @@ export default function CalendarView() {
       setClients([]);
     }
     setLoadingClients(false);
-  }, []);
+    setRefreshingClients(false);
+  }, [loadingClients]);
 
   const fetchHolidays = useCallback(async () => {
     try {
@@ -113,9 +117,23 @@ export default function CalendarView() {
         </Typography>
       </Box>
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 1, fontWeight: 700, color: "#0a275c" }}>
-          Godkendte klienter
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", flexGrow: 1 }}>
+            Godkendte klienter
+          </Typography>
+          <IconButton
+            aria-label="Opdater klienter"
+            onClick={fetchClients}
+            disabled={loadingClients || refreshingClients}
+            sx={{ position: "relative" }}
+          >
+            {refreshingClients ? (
+              <CircularProgress size={24} sx={{ position: "absolute", left: 2, top: 2 }} />
+            ) : (
+              <RefreshIcon />
+            )}
+          </IconButton>
+        </Box>
         {loadingClients ? (
           <CircularProgress size={22} />
         ) : (
