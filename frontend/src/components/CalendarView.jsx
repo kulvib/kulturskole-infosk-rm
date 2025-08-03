@@ -4,7 +4,8 @@ import {
   Tooltip, Button, Snackbar, Alert, useTheme,
   FormControl, InputLabel, Select, MenuItem, Checkbox, ListItemText, OutlinedInput, CircularProgress
 } from "@mui/material";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
+import PowerOffIcon from "@mui/icons-material/PowerOff";
 import SaveIcon from "@mui/icons-material/Save";
 
 // Helper til at generere sæsoner fra 2024/25 til 2050/51
@@ -183,18 +184,19 @@ export default function CalendarView() {
     display: "flex",
     flexDirection: "column",
   };
+  // Tekst og dagknapper lidt større
   const dayBtnBase = {
     margin: "0.5px",
     userSelect: "none",
     minWidth: 0,
-    width: "1.5em",
-    height: "1.5em",
-    px: 0.1,
-    py: 0.1,
+    width: "1.7em",
+    height: "1.7em",
+    px: 0.2,
+    py: 0.2,
     borderRadius: "50%",
     borderWidth: 1,
     fontWeight: 600,
-    fontSize: "0.8rem",
+    fontSize: "0.9rem",
     boxShadow: 1,
     lineHeight: 1,
     m: "auto",
@@ -202,8 +204,8 @@ export default function CalendarView() {
     cursor: "pointer",
   };
   const dayBtnStatus = {
-    on: { background: "#03a9f4 !important", color: "#fff !important", borderColor: "#03a9f4" },
-    off: { background: "#4caf50 !important", color: "#fff !important", borderColor: "#4caf50" },
+    on: { background: "#e8f5e9 !important", color: "#388e3c !important", borderColor: "#388e3c" },
+    off: { background: "#ffebee !important", color: "#d32f2f !important", borderColor: "#d32f2f" },
     default: { background: "inherit", color: "#333", borderColor: "#ddd" }
   };
   const legendDotBase = {
@@ -216,8 +218,8 @@ export default function CalendarView() {
     border: "2px solid #888",
   };
   const legendDotStatus = {
-    on: { background: "#03a9f4", borderColor: "#03a9f4" },
-    off: { background: "#4caf50", borderColor: "#4caf50" },
+    on: { background: "#388e3c", borderColor: "#388e3c" },
+    off: { background: "#d32f2f", borderColor: "#d32f2f" },
     default: {}
   };
 
@@ -235,33 +237,25 @@ export default function CalendarView() {
               onChange={(e, val) => val && setMode(val)}
               size="small"
             >
-              <ToggleButton value="on" sx={{ color: "#03a9f4", fontWeight: 700 }}>
+              <ToggleButton value="on" sx={{ color: "#388e3c", fontWeight: 700 }}>
+                <PowerSettingsNewIcon sx={{ color: "#388e3c", mr: 1 }} />
                 Tænd klient
               </ToggleButton>
-              <ToggleButton value="off" sx={{ color: "#4caf50", fontWeight: 700 }}>
+              <ToggleButton value="off" sx={{ color: "#d32f2f", fontWeight: 700 }}>
+                <PowerOffIcon sx={{ color: "#d32f2f", mr: 1 }} />
                 Sluk klient
               </ToggleButton>
             </ToggleButtonGroup>
             <Box sx={{ mt: 2 }}>
               <Box sx={{ display: "inline-flex", alignItems: "center", mr: 2 }}>
                 <Box sx={{ ...legendDotBase, ...legendDotStatus.on }} />
-                <Typography variant="body2">Tænd klient</Typography>
+                <Typography variant="body2" sx={{ color: "#388e3c" }}>Tænd klient</Typography>
               </Box>
               <Box sx={{ display: "inline-flex", alignItems: "center" }}>
                 <Box sx={{ ...legendDotBase, ...legendDotStatus.off }} />
-                <Typography variant="body2">Sluk klient</Typography>
+                <Typography variant="body2" sx={{ color: "#d32f2f" }}>Sluk klient</Typography>
               </Box>
             </Box>
-          </CardContent>
-        </Card>
-        <Card sx={{ flex: 1, background: "#b3e5fc", border: "1px solid #81d4fa" }}>
-          <CardContent sx={{ display: "flex", alignItems: "center" }}>
-            <InfoOutlinedIcon sx={{ mr: 2, color: "#0288d1" }} />
-            <Typography variant="body2">
-              Træk og slip imellem dagene for at markere flere dage på én gang.<br />
-              Dage som ikke er markeret, kan betragtes som fælles afspadsering (nul-dage).<br />
-              Når du vælger "Tænd klient", vil klienten være synlig på disse dage.
-            </Typography>
           </CardContent>
         </Card>
         <Button
@@ -361,7 +355,7 @@ export default function CalendarView() {
         {schoolYearMonths.map(({ name, month, year }, idx) => (
           <Card key={name + year} sx={monthCardSx}>
             <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", p: 1 }}>
-              <Typography variant="h6" sx={{ color: "#036", fontWeight: 700, mb: 0.5, textAlign: "center", fontSize: "0.98rem" }}>
+              <Typography variant="h6" sx={{ color: "#036", fontWeight: 700, mb: 0.5, textAlign: "center", fontSize: "1.05rem" }}>
                 {name} {year}
               </Typography>
               <Box
@@ -376,7 +370,14 @@ export default function CalendarView() {
                 }}
               >
                 {["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"].map(wd => (
-                  <Typography key={wd} variant="caption" sx={{ fontWeight: 600, color: "#888", textAlign: "center", fontSize: "0.60rem" }}>
+                  <Typography key={wd} variant="caption"
+                    sx={{
+                      fontWeight: 600,
+                      color: "#888",
+                      textAlign: "center",
+                      fontSize: "0.85rem"
+                    }}
+                  >
                     {wd}
                   </Typography>
                 ))}
@@ -389,9 +390,14 @@ export default function CalendarView() {
                 {Array(getDaysInMonth(month, year)).fill(null).map((_, dayIdx) => {
                   const day = dayIdx + 1;
                   const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                  const status = markedDays[key];
+                  // Hvis dagen ikke er valgt, skal klienten være slukket (off)
+                  const status = markedDays[key] || "off";
                   return (
-                    <Tooltip title={status === "on" ? "Tænd klient" : status === "off" ? "Sluk klient" : "Ingen markering"} arrow key={key}>
+                    <Tooltip title={
+                      status === "on"
+                        ? "Tænd klient"
+                        : "Sluk klient"
+                    } arrow key={key}>
                       <Button
                         variant={status ? "contained" : "outlined"}
                         sx={{
@@ -400,7 +406,7 @@ export default function CalendarView() {
                               status === "off" ? dayBtnStatus.off :
                               dayBtnStatus.default)
                         }}
-                        onMouseDown={() => handleDayMouseDown(year, month, day, status)}
+                        onMouseDown={() => handleDayMouseDown(year, month, day, markedDays[key])}
                         onMouseOver={() => handleDayMouseOver(year, month, day)}
                         onClick={() => handleDayClick(year, month, day)}
                       >
