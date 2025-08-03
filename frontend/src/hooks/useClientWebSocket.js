@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-export function useClientLiveWebSocket({ url, onUpdate }) {
+export function useClientWebSocket(fetchClients) {
   const wsRef = useRef(null);
 
   useEffect(() => {
@@ -8,7 +8,7 @@ export function useClientLiveWebSocket({ url, onUpdate }) {
     let reconnectTimeout;
 
     const connect = () => {
-      ws = new WebSocket(url);
+      ws = new WebSocket("wss://kulturskole-infosk-rm.onrender.com/ws/clients");
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -16,13 +16,13 @@ export function useClientLiveWebSocket({ url, onUpdate }) {
       };
 
       ws.onmessage = (event) => {
-        if (event.data === "update" && typeof onUpdate === "function") {
-          onUpdate();
+        if (event.data === "update" && typeof fetchClients === "function") {
+          fetchClients();
         }
       };
 
       ws.onclose = () => {
-        // Reconnect efter 2 sekunder
+        // reconnect efter 2 sekunder
         reconnectTimeout = setTimeout(connect, 2000);
       };
 
@@ -40,5 +40,5 @@ export function useClientLiveWebSocket({ url, onUpdate }) {
       clearInterval(pingInterval);
       clearTimeout(reconnectTimeout);
     };
-  }, [url, onUpdate]);
+  }, [fetchClients]);
 }
