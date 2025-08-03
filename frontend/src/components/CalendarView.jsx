@@ -8,10 +8,10 @@ import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import PowerOffIcon from "@mui/icons-material/PowerOff";
 import SaveIcon from "@mui/icons-material/Save";
 
-// Helper til at generere sæsoner fra 2024/25 til 2050/51
+// Helper til at generere sæsoner fra 2025/26 til 2049/50
 function getSeasons() {
-  const startYear = 2024;
-  const endYear = 2050;
+  const startYear = 2025;
+  const endYear = 2049;
   const seasons = [];
   for (let y = startYear; y <= endYear; y++) {
     seasons.push({
