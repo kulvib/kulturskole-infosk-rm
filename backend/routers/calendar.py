@@ -3,7 +3,6 @@ from sqlmodel import select
 from backend.models import CalendarMarking, Client
 from backend.db import get_session
 from sqlalchemy.exc import SQLAlchemyError
-from backend.services.mqtt_publish_schedule import publish_schedule_for_client
 
 router = APIRouter()
 
@@ -32,7 +31,7 @@ def save_marked_days(
                 session.add(existing)
             else:
                 session.add(CalendarMarking(season=season, client_id=client_id, markings=marked_days))
-            publish_schedule_for_client(client_id, session)
+            # publish_schedule_for_client(client_id, session)  # Fjernet!
         session.commit()
         return {"ok": True}
     except SQLAlchemyError as e:
