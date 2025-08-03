@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Box, Card, CardContent, Typography, Button,
+  Box, Card, CardContent, Typography,
   CircularProgress, Paper, IconButton
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -149,9 +149,10 @@ export default function CalendarView() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(2025);
   const [clients, setClients] = useState([]);
+  const [selectedClients, setSelectedClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
   const [holidays, setHolidays] = useState([]);
-  const seasons = getSeasons();
+  const seasons = getSeasons(2025, 2040);
 
   // Hent ALLE klienter og filtrér på "approved"
   const fetchClients = useCallback(async () => {
@@ -180,6 +181,23 @@ export default function CalendarView() {
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
+  // Klientvalg funktioner
+  const clientIds = clients.map(c => c.id);
+
+  // Vælg/fjern individuel klient
+  const handleClientChange = (_, newSelected) => {
+    setSelectedClients(newSelected);
+  };
+
+  // Vælg alle/ingen klienter
+  const toggleAllClients = () => {
+    if (selectedClients.length === clientIds.length) {
+      setSelectedClients([]);
+    } else {
+      setSelectedClients(clientIds);
+    }
+  };
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
@@ -206,19 +224,48 @@ export default function CalendarView() {
         {loadingClients && clients.length === 0 ? (
           <CircularProgress size={22} />
         ) : (
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-            {clients.length === 0 && !loadingClients && (
-              <Typography variant="body2">Ingen godkendte klienter fundet</Typography>
-            )}
-            {clients.map(client => (
-              <Button
-                key={client.id}
-                variant="outlined"
-                sx={{ borderRadius: 3, minWidth: 120, fontWeight: 700 }}
-              >
-                {client.locality || "Ingen lokalitet"}
-              </Button>
-            ))}
+          <Box>
+            <ToggleButton
+              value="all"
+              selected={selectedClients.length === clientIds.length && clientIds.length > 0}
+              onClick={toggleAllClients}
+              sx={{
+                fontWeight: 700,
+                borderRadius: 3,
+                minWidth: 90,
+                color: selectedClients.length === clientIds.length ? "#fff" : "#1976d2",
+                bgcolor: selectedClients.length === clientIds.length ? "#1976d2" : "#fff",
+                border: selectedClients.length === clientIds.length ? "1.5px solid #1976d2" : "1.5px solid #bbb",
+                mr: 1,
+                mb: 1
+              }}
+            >
+              Vælg alle
+            </ToggleButton>
+            <ToggleButtonGroup
+              value={selectedClients}
+              onChange={handleClientChange}
+              aria-label="klientvalg"
+              multiple
+              sx={{ flexWrap: "wrap", gap: 1 }}
+            >
+              {clients.map(client => (
+                <ToggleButton
+                  key={client.id}
+                  value={client.id}
+                  sx={{
+                    fontWeight: 700,
+                    borderRadius: 3,
+                    minWidth: 90,
+                    color: selectedClients.includes(client.id) ? "#fff" : "#1976d2",
+                    bgcolor: selectedClients.includes(client.id) ? "#1976d2" : "#fff",
+                    border: selectedClients.includes(client.id) ? "1.5px solid #1976d2" : "1.5px solid #bbb"
+                  }}
+                >
+                  {client.locality || "Ingen lokalitet"}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
           </Box>
         )}
       </Paper>
