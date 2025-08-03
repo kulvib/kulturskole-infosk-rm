@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import select, Session
+from sqlmodel import select
 from backend.models import CalendarMarking, Client
 from backend.db import get_session
 from sqlalchemy.exc import SQLAlchemyError
