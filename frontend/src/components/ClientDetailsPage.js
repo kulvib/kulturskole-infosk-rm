@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
-  Box,
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Stack,
-  TextField,
-  CircularProgress,
-  Tooltip,
+  Box, Grid, Card, CardContent, Typography, Button, Stack, TextField, CircularProgress, Tooltip,
   IconButton,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
@@ -25,7 +16,7 @@ import MemoryIcon from "@mui/icons-material/Memory";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   updateClient,
   pushKioskUrl,
@@ -33,11 +24,8 @@ import {
   openTerminal,
   openRemoteDesktop,
   getClientStream,
-  getClient,
 } from "../api";
-import { useClientWebSocket } from "../hooks/useClientWebSocket";
 
-// Offline/Online status: meget lille, kun grøn/rød cirkel + tekst med Roboto font
 function ClientStatusIcon({ isOnline }) {
   return (
     <Box
@@ -65,9 +53,7 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
-export default function ClientDetailsPage() {
-  const { clientId } = useParams();
-  const [client, setClient] = useState(null);
+export default function ClientDetailsPage({ client }) {
   const [locality, setLocality] = useState("");
   const [savingLocality, setSavingLocality] = useState(false);
   const [localitySaved, setLocalitySaved] = useState(false);
@@ -81,33 +67,19 @@ export default function ClientDetailsPage() {
 
   const navigate = useNavigate();
 
-  // Fetch client by id
-  const fetchClient = async () => {
-    try {
-      const data = await getClient(clientId);
-      setClient(data);
-      setLocality(data.locality || "");
-      setKioskUrl(data.kiosk_url || "");
-    } catch (err) {
-      setClient(null);
-    }
-  };
-
   useEffect(() => {
-    if (clientId) fetchClient();
-    // eslint-disable-next-line
-  }, [clientId]);
-
-  // WebSocket live-opdatering: Hent klient ved "update"
-  useClientWebSocket(fetchClient);
+    if (client) {
+      setLocality(client.locality || "");
+      setKioskUrl(client.kiosk_url || "");
+    }
+  }, [client]);
 
   // Save locality
   const handleLocalitySave = async () => {
     setSavingLocality(true);
     try {
       await updateClient(client.id, { locality });
-      fetchClient();
-      setLocalitySaved(true); // Vis 'Gemt'
+      setLocalitySaved(true);
       setTimeout(() => setLocalitySaved(false), 3000);
     } catch (err) {
       alert("Kunne ikke gemme lokalitet: " + err.message);
@@ -120,8 +92,7 @@ export default function ClientDetailsPage() {
     setSavingKioskUrl(true);
     try {
       await pushKioskUrl(client.id, kioskUrl);
-      fetchClient();
-      setKioskUrlSaved(true); // Vis 'Gemt'
+      setKioskUrlSaved(true);
       setTimeout(() => setKioskUrlSaved(false), 3000);
     } catch (err) {
       alert("Kunne ikke opdatere kiosk webadresse: " + err.message);
@@ -134,7 +105,6 @@ export default function ClientDetailsPage() {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
       await clientAction(client.id, action);
-      fetchClient();
     } catch (err) {
       alert("Handlingen mislykkedes: " + err.message);
     }
@@ -143,17 +113,6 @@ export default function ClientDetailsPage() {
 
   const handleOpenTerminal = () => openTerminal(client.id);
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
-
-  // Opdater klient
-  const handleRefreshClient = async () => {
-    setRefreshing(true);
-    try {
-      await fetchClient();
-    } catch (err) {
-      alert("Kunne ikke opdatere klienten: " + err.message);
-    }
-    setRefreshing(false);
-  };
 
   const sectionSpacing = 2;
 
@@ -170,7 +129,6 @@ export default function ClientDetailsPage() {
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 3 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-        {/* Tilbage-knap til venstre */}
         <Button
           variant="outlined"
           startIcon={<ArrowBackIcon />}
@@ -184,27 +142,13 @@ export default function ClientDetailsPage() {
         >
           Tilbage til klientoversigt
         </Button>
-        {/* Opdater-knap til højre */}
         <Tooltip title="Opdater klient">
           <span>
             <Button
-              startIcon={
-                refreshing ? (
-                  <CircularProgress size={22} />
-                ) : (
-                  <RefreshIcon fontSize="medium" />
-                )
-              }
-              onClick={handleRefreshClient}
+              startIcon={<RefreshIcon fontSize="medium" />}
               disabled={refreshing}
               color="primary"
-              sx={{
-                fontWeight: 500,
-                textTransform: "none",
-                minWidth: 0,
-                mr: 1,
-                px: 2,
-              }}
+              sx={{ fontWeight: 500, textTransform: "none", minWidth: 0, mr: 1, px: 2 }}
             >
               Opdater
             </Button>
@@ -212,7 +156,6 @@ export default function ClientDetailsPage() {
         </Tooltip>
       </Box>
       <Grid container spacing={sectionSpacing}>
-        {/* Afsnit 1: Klient-info */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
@@ -296,8 +239,6 @@ export default function ClientDetailsPage() {
             </CardContent>
           </Card>
         </Grid>
-
-        {/* Afsnit 2: Kiosk webadresse + Luk Chrome Browser */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
@@ -352,8 +293,6 @@ export default function ClientDetailsPage() {
             </CardContent>
           </Card>
         </Grid>
-
-        {/* Afsnit 3: Fjernadgang */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
@@ -386,8 +325,6 @@ export default function ClientDetailsPage() {
             </CardContent>
           </Card>
         </Grid>
-
-        {/* Afsnit 4: Handlinger */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
@@ -435,8 +372,6 @@ export default function ClientDetailsPage() {
             </CardContent>
           </Card>
         </Grid>
-
-        {/* Afsnit 5: Livestream */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
@@ -446,10 +381,6 @@ export default function ClientDetailsPage() {
                   Livestream fra klient
                 </Typography>
               </Stack>
-              {/* Til MJPEG: */}
-              {/* <img src={getClientStream(client.id)} alt="Livestream" style={{ maxWidth: 500 }} /> */}
-              {/* Til WebRTC: */}
-              {/* <video src={getClientStream(client.id)} controls autoPlay style={{ maxWidth: 500 }} /> */}
               <Box sx={{
                 p: 2,
                 border: "1px solid #eee",
