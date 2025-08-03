@@ -27,7 +27,6 @@ function getSeasons(start = 2025, end = 2050) {
 
 // -- Helper: Generate school year months array --
 function getSchoolYearMonths(seasonStart) {
-  // August-Dec: seasonStart, Jan-Jul: seasonStart+1
   const months = [];
   for (let i = 0; i < 5; i++) {
     months.push({ name: monthNames[i], month: i + 7, year: seasonStart });
@@ -44,20 +43,17 @@ function getDaysInMonth(month, year) {
 }
 
 export default function CalendarView() {
-  // --- State ---
   const [selectedSeason, setSelectedSeason] = useState(2025);
   const [clients, setClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(true);
   const [holidays, setHolidays] = useState([]);
   const seasons = getSeasons();
 
-  // --- Fetch only approved clients from API ---
   const fetchClients = async () => {
     setLoadingClients(true);
     try {
       const res = await fetch("/api/clients/");
       const data = await res.json();
-      // Filtrer kun klienter med status === "approved"
       const approvedClients = Array.isArray(data)
         ? data.filter(client => client.status === "approved")
         : [];
@@ -68,7 +64,6 @@ export default function CalendarView() {
     setLoadingClients(false);
   };
 
-  // --- Fetch holidays from API ---
   const fetchHolidays = async () => {
     try {
       const res = await fetch("/api/holidays/");
@@ -82,44 +77,36 @@ export default function CalendarView() {
   useEffect(() => {
     fetchClients();
     fetchHolidays();
-    // eslint-disable-next-line
   }, []);
 
-  // WebSocket: lyt efter klient- og ferie-ændringer fra backend
   const wsStatus = useClientWebSocket({
     onClientsChanged: fetchClients,
     onHolidaysChanged: fetchHolidays
   });
 
-  // --- School year months ---
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
-  // Hjælper til at vise om en dag er en holiday
   const isHoliday = (day, month, year) => {
     return holidays.some(
-      h =>
-        // Antager holiday har {date: "YYYY-MM-DD"}
-        (() => {
-          if (!h.date) return false;
-          const d = new Date(h.date);
-          return (
-            d.getDate() === day &&
-            d.getMonth() === month &&
-            d.getFullYear() === year
-          );
-        })()
+      h => {
+        if (!h.date) return false;
+        const d = new Date(h.date);
+        return (
+          d.getDate() === day &&
+          d.getMonth() === month &&
+          d.getFullYear() === year
+        );
+      }
     );
   };
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* WebSocket-status */}
       <Box sx={{ mb: 2 }}>
         <Typography variant="body2" sx={{ color: "#555" }}>
           WebSocket status: <b>{wsStatus}</b>
         </Typography>
       </Box>
-      {/* Klientliste */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 1, fontWeight: 700, color: "#0a275c" }}>
           Godkendte klienter
@@ -143,7 +130,6 @@ export default function CalendarView() {
           </Box>
         )}
       </Paper>
-      {/* Sæsonvælger */}
       <Paper elevation={2} sx={{ p: 2, mb: 3, display: "flex", alignItems: "center", gap: 2 }}>
         <Typography component="label" htmlFor="seasonSelect" sx={{ fontWeight: 600, color: "#0a275c" }}>
           Vælg skoleår:
@@ -161,7 +147,6 @@ export default function CalendarView() {
           ))}
         </Select>
       </Paper>
-      {/* Kalender-grid */}
       <Box
         sx={{
           display: "grid",
@@ -186,7 +171,6 @@ export default function CalendarView() {
               }}>
                 {name} {year}
               </Typography>
-              {/* Ugedage */}
               <Box sx={{
                 display: "grid",
                 gridTemplateColumns: "repeat(7, 1fr)",
@@ -207,7 +191,6 @@ export default function CalendarView() {
                   </Typography>
                 ))}
               </Box>
-              {/* Tomme felter før første dag */}
               <Box sx={{
                 display: "grid",
                 gridTemplateColumns: "repeat(7, 1fr)",
@@ -215,13 +198,11 @@ export default function CalendarView() {
               }}>
                 {(() => {
                   const firstDay = new Date(year, month, 1).getDay();
-                  // JS: 0 = søndag, vi vil have mandag først
                   const offset = firstDay === 0 ? 6 : firstDay - 1;
                   return Array(offset).fill(null).map((_, i) => (
                     <Box key={`empty-${i}`} />
                   ));
                 })()}
-                {/* Dage */}
                 {Array(getDaysInMonth(month, year)).fill(null).map((_, dayIdx) => {
                   const day = dayIdx + 1;
                   const holiday = isHoliday(day, month, year);
