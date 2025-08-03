@@ -26,6 +26,13 @@ import {
   getClientStream,
 } from "../api";
 
+// Datoformat: 27.08.2025, Kl. 14:49
+function formatCreatedDate(dateStr) {
+  if (!dateStr) return "ukendt";
+  const d = new Date(dateStr);
+  return `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear()}, Kl. ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
 function ClientStatusIcon({ isOnline }) {
   return (
     <Box
@@ -234,6 +241,13 @@ export default function ClientDetailsPage({ client }) {
                   <MemoryIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">Ubuntu version:</Typography>
                   <Typography variant="body2">{client.ubuntu_version || "ukendt"}</Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <AccessTimeIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">Tilføjet:</Typography>
+                  <Typography variant="body2">
+                    {formatCreatedDate(client.created_at)}
+                  </Typography>
                 </Stack>
               </Stack>
             </CardContent>
