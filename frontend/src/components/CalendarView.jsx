@@ -49,7 +49,7 @@ export default function CalendarView() {
   const [loadingClients, setLoadingClients] = useState(true);
   const seasons = getSeasons();
 
-  // --- Fetch all clients from API and filter approved ones for display ---
+  // --- Fetch all clients from API ---
   useEffect(() => {
     async function fetchClients() {
       setLoadingClients(true);
@@ -65,8 +65,8 @@ export default function CalendarView() {
     fetchClients();
   }, []);
 
-  // Godkendte klienter filtreres før visning (identisk med ClientInfoPage)
-  const approvedClients = (clients?.filter((c) => c.status === "approved") || []).slice();
+  // Vis ALLE klienter (drop filter midlertidigt)
+  const visibleClients = clients || [];
 
   // --- School year months ---
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
@@ -76,16 +76,16 @@ export default function CalendarView() {
       {/* Klientliste */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 1, fontWeight: 700, color: "#0a275c" }}>
-          Godkendte klienter
+          Klienter
         </Typography>
         {loadingClients ? (
           <CircularProgress size={22} />
         ) : (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-            {approvedClients.length === 0 && (
-              <Typography variant="body2">Ingen godkendte klienter</Typography>
+            {visibleClients.length === 0 && (
+              <Typography variant="body2">Ingen klienter fundet</Typography>
             )}
-            {approvedClients.map(client => (
+            {visibleClients.map(client => (
               <Button
                 key={client.id}
                 variant="outlined"
@@ -209,13 +209,6 @@ export default function CalendarView() {
             </CardContent>
           </Card>
         ))}
-      </Box>
-      {/* Reference billede */}
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="caption" sx={{ color: "#888", mb: 1 }}>
-          Kalender layout reference:
-        </Typography>
-        <img src="![image1](image1)" alt="Kalender layout" style={{ width: "100%", maxWidth: 900, borderRadius: 12, boxShadow: "0 1px 6px rgba(0,0,0,0.08)" }} />
       </Box>
     </Box>
   );
