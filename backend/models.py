@@ -25,8 +25,6 @@ class Client(ClientBase, table=True):
     kiosk_url: Optional[str] = None
     ubuntu_version: Optional[str] = None
     uptime: Optional[str] = None
-
-    # Tilføj oprettelsestidspunktet:
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
 
 class ClientCreate(ClientBase):
