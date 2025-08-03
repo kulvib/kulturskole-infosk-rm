@@ -5,6 +5,7 @@ export default function WebSocketClient() {
   const ws = useRef(null);
 
   useEffect(() => {
+    // Opret WebSocket-forbindelse ved mount
     ws.current = new WebSocket("wss://kulturskole-infosk-rm.onrender.com/ws/clients");
 
     ws.current.onopen = () => {
