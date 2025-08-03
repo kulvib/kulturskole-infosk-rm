@@ -15,16 +15,12 @@ import {
 
 const drawerWidth = 230;
 
+// Helligdage er fjernet fra menuen
 const menuItems = [
   {
     text: "Klienter",
     path: "/clients",
     match: "/clients",
-  },
-  {
-    text: "Helligdage",
-    path: "/holidays",
-    match: "/holidays",
   },
   {
     text: "Kalender",
