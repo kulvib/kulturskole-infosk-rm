@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, Typography, Box, ToggleButtonGroup, ToggleButton, Tooltip, Button, Snackbar, Alert } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SaveIcon from "@mui/icons-material/Save";
+import ClientSelector from "./ClientSelector";
 import "./CalendarView.css";
 
 // Helper til at generere sæsoner fra 2024/25 til 2050/51
@@ -59,6 +60,7 @@ export default function CalendarView() {
   const [dragMode, setDragMode] = useState(null);
   const [snackOpen, setSnackOpen] = useState(false);
   const [snackError, setSnackError] = useState("");
+  const [selectedClients, setSelectedClients] = useState([]);
   const dragDaysRef = useRef(new Set());
 
   useEffect(() => {
@@ -125,7 +127,7 @@ export default function CalendarView() {
     return () => window.removeEventListener("mouseup", onUp);
   }, [dragging]);
 
-  // GEM MARKERING TIL BACKEND
+  // GEM MARKERING OG KLIENTVALG TIL BACKEND
   const handleSave = async () => {
     setSnackError("");
     try {
@@ -134,7 +136,7 @@ export default function CalendarView() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ markedDays })
+        body: JSON.stringify({ markedDays, clients: selectedClients })
       });
       if (!res.ok) throw new Error("Kunne ikke gemme markeringer");
       setSnackOpen(true);
@@ -196,6 +198,7 @@ export default function CalendarView() {
           Gem markeringer
         </Button>
       </Box>
+      <ClientSelector selectedClients={selectedClients} setSelectedClients={setSelectedClients} />
       <Box sx={{ mb: 3 }}>
         <label htmlFor="seasonSelect"><strong>Vælg sæson:</strong> </label>
         <select
