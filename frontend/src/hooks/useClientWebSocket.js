@@ -29,15 +29,21 @@ export function useClientWebSocket(onUpdate) {
     connect();
 
     const pingInterval = setInterval(() => {
-      if (wsRef.current && wsRef.current.readyState === 1) {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send("ping");
       }
     }, 30000);
 
+    // Cleanup: Luk kun hvis ikke allerede lukket eller closing.
     return () => {
       if (wsRef.current) {
-        wsRef.current.onclose = null; // Undgå auto-reconnect ved cleanup
-        wsRef.current.close();
+        wsRef.current.onclose = null;
+        if (
+          wsRef.current.readyState === WebSocket.OPEN ||
+          wsRef.current.readyState === WebSocket.CONNECTING
+        ) {
+          wsRef.current.close();
+        }
       }
       clearInterval(pingInterval);
       clearTimeout(reconnectTimeout);
