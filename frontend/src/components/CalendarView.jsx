@@ -7,9 +7,9 @@ import {
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SaveIcon from "@mui/icons-material/Save";
 
-// Helper til at generere sæsoner fra 2025/26 til 2050/51
+// Helper til at generere sæsoner fra 2024/25 til 2050/51
 function getSeasons() {
-  const startYear = 2025;
+  const startYear = 2024;
   const endYear = 2050;
   const seasons = [];
   for (let y = startYear; y <= endYear; y++) {
@@ -83,11 +83,12 @@ export default function CalendarView() {
     fetchMarkedDays();
   }, []);
 
+  // Hent ALLE klienter fra din egen API og filtrer "approved"
   useEffect(() => {
     async function fetchClients() {
       setLoadingClients(true);
       try {
-        const res = await fetch("https://kulturskole-infosk-rm.onrender.com/api/clients/");
+        const res = await fetch("/api/clients");
         const data = await res.json();
         setClients(Array.isArray(data) ? data.filter(cli => cli.status === "approved") : []);
       } catch (err) {
@@ -172,7 +173,7 @@ export default function CalendarView() {
     }
   };
 
-  // CSS-in-JS styling (integreret fra din .css-fil)
+  // CSS-in-JS styling
   const monthCardSx = {
     background: "#fff",
     borderRadius: "14px",
@@ -186,14 +187,14 @@ export default function CalendarView() {
     margin: "0.5px",
     userSelect: "none",
     minWidth: 0,
-    width: "2.2em",
-    height: "2.2em",
-    px: 0.2,
-    py: 0.2,
+    width: "1.5em",
+    height: "1.5em",
+    px: 0.1,
+    py: 0.1,
     borderRadius: "50%",
     borderWidth: 1,
     fontWeight: 600,
-    fontSize: "1rem",
+    fontSize: "0.8rem",
     boxShadow: 1,
     lineHeight: 1,
     m: "auto",
@@ -360,7 +361,7 @@ export default function CalendarView() {
         {schoolYearMonths.map(({ name, month, year }, idx) => (
           <Card key={name + year} sx={monthCardSx}>
             <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", p: 1 }}>
-              <Typography variant="h6" sx={{ color: "#036", fontWeight: 700, mb: 0.5, textAlign: "center", fontSize: "1.08rem" }}>
+              <Typography variant="h6" sx={{ color: "#036", fontWeight: 700, mb: 0.5, textAlign: "center", fontSize: "0.98rem" }}>
                 {name} {year}
               </Typography>
               <Box
@@ -375,7 +376,7 @@ export default function CalendarView() {
                 }}
               >
                 {["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"].map(wd => (
-                  <Typography key={wd} variant="caption" sx={{ fontWeight: 600, color: "#888", textAlign: "center", fontSize: "0.75rem" }}>
+                  <Typography key={wd} variant="caption" sx={{ fontWeight: 600, color: "#888", textAlign: "center", fontSize: "0.60rem" }}>
                     {wd}
                   </Typography>
                 ))}
