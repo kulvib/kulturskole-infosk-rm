@@ -8,7 +8,7 @@ import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import PowerOffIcon from "@mui/icons-material/PowerOff";
 import SaveIcon from "@mui/icons-material/Save";
 import { useAuth } from "../auth/authcontext";
-import { useClientLiveWebSocket } from "../hooks/useClientWebSocket";
+import { useClientWebSocket } from "../hooks/useClientWebSocket"; // RET import
 
 // Helper til at generere sæsoner fra 2024/25 til 2050/51
 function getSeasons() {
@@ -103,10 +103,7 @@ export default function CalendarView() {
   }, [token]);
 
   // WebSocket live-opdatering: Hent klienter ved "update"
-  useClientLiveWebSocket({
-    url: "wss://kulturskole-infosk-rm.onrender.com/ws/clients",
-    onUpdate: loadClients
-  });
+  useClientWebSocket(loadClients); // RET brug
 
   // Sæt første aktive klient ved load
   useEffect(() => {
