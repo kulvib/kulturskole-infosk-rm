@@ -1,15 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { FormControl, InputLabel, Select, MenuItem, Checkbox, ListItemText, OutlinedInput, Box, Button } from "@mui/material";
+import { FormControl, InputLabel, Select, MenuItem, Checkbox, ListItemText, OutlinedInput, Box, Button, Typography, CircularProgress } from "@mui/material";
 
 export default function ClientSelector({ selectedClients, setSelectedClients }) {
   const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [allSelected, setAllSelected] = useState(false);
 
   useEffect(() => {
-    // Her antages at backend har /api/clients/approved - filtrering sker der!
-    fetch("/api/clients/approved")
-      .then(res => res.json())
-      .then(data => setClients(data));
+    async function fetchClients() {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/clients/approved");
+        const data = await res.json();
+        setClients(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setClients([]);
+      }
+      setLoading(false);
+    }
+    fetchClients();
   }, []);
 
   useEffect(() => {
@@ -48,14 +57,20 @@ export default function ClientSelector({ selectedClients, setSelectedClients }) 
                 }).join(", ")
           }
         >
-          <MenuItem
-            value="all"
-            onClick={handleSelectAll}
-            dense
-          >
+          <MenuItem value="all" onClick={handleSelectAll} dense>
             <Checkbox checked={allSelected} indeterminate={selectedClients.length > 0 && !allSelected} />
             <ListItemText primary="Vælg alle" />
           </MenuItem>
+          {loading &&
+            <MenuItem disabled>
+              <CircularProgress size={20} sx={{ mr: 2 }} /> <Typography>Indlæser...</Typography>
+            </MenuItem>
+          }
+          {!loading && clients.length === 0 &&
+            <MenuItem disabled>
+              <Typography>Ingen godkendte klienter</Typography>
+            </MenuItem>
+          }
           {clients.map(cli => (
             <MenuItem key={cli.id} value={cli.id}>
               <Checkbox checked={selectedClients.indexOf(cli.id) > -1} />
