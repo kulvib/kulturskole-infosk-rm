@@ -7,7 +7,7 @@ import ClientDetailsPageWrapper from "./components/ClientDetailsPageWrapper";
 import LoginPage from "./components/LoginPage";
 import HomePage from "./components/HomePage";
 import ProtectedRoute from "./auth/ProtectedRoute";
-import { AuthProvider } from "./auth/authcontext";
+import { AuthProvider, useAuth } from "./auth/authcontext";
 import CalendarView from "./components/CalendarView";
 import {
   getClients,
@@ -17,9 +17,10 @@ import {
   approveClient,
   removeClient,
 } from "./api";
-import { useClientWebSocket } from "./hooks/useClientWebSocket";
+import { useClientLiveWebSocket } from "./hooks/useClientWebSocket";
 
-export default function App() {
+function AppContent() {
+  const { token } = useAuth();
   const [clients, setClients] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [holidayDate, setHolidayDate] = useState("");
@@ -27,11 +28,12 @@ export default function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Alle API-kald bruger token fra context
   const fetchClients = async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await getClients();
+      const data = await getClients(token);
       setClients(data);
     } catch (err) {
       setError(err.message);
@@ -43,7 +45,7 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      const data = await getHolidays();
+      const data = await getHolidays(token);
       setHolidays(data);
     } catch (err) {
       setError(err.message);
@@ -56,7 +58,7 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      await addHoliday(holidayDate, holidayDesc);
+      await addHoliday(holidayDate, holidayDesc, token);
       setHolidayDate("");
       setHolidayDesc("");
       fetchHolidays();
@@ -70,7 +72,7 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      await deleteHoliday(id);
+      await deleteHoliday(id, token);
       fetchHolidays();
     } catch (err) {
       setError(err.message);
@@ -82,7 +84,7 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      await approveClient(id);
+      await approveClient(id, token);
       fetchClients();
     } catch (err) {
       setError(err.message);
@@ -94,7 +96,7 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      await removeClient(id);
+      await removeClient(id, token);
       fetchClients();
     } catch (err) {
       setError(err.message);
@@ -102,79 +104,90 @@ export default function App() {
     setLoading(false);
   };
 
-  useClientWebSocket(fetchClients);
+  useClientLiveWebSocket({
+    url: "wss://kulturskole-infosk-rm.onrender.com/ws/clients",
+    onUpdate: fetchClients,
+  });
 
   useEffect(() => {
-    if (localStorage.getItem("token")) {
+    if (token) {
       fetchClients();
       fetchHolidays();
     }
-  }, []);
+  }, [token]);
 
+  return (
+    <>
+      {error && (
+        <div style={{ color: "red", padding: 10, fontWeight: 600 }}>
+          {error}
+        </div>
+      )}
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<HomePage />} />
+          <Route
+            path="clients"
+            element={
+              <ClientInfoPage
+                clients={clients}
+                setClients={setClients}
+                loading={loading}
+                onApproveClient={handleApproveClient}
+                onRemoveClient={handleRemoveClient}
+                fetchClients={fetchClients}
+              />
+            }
+          />
+          <Route
+            path="clients/:clientId"
+            element={
+              <ClientDetailsPageWrapper
+                clients={clients}
+                fetchClient={fetchClients}
+              />
+            }
+          />
+          <Route
+            path="holidays"
+            element={
+              <HolidaysPage
+                holidays={holidays}
+                holidayDate={holidayDate}
+                setHolidayDate={setHolidayDate}
+                holidayDesc={holidayDesc}
+                setHolidayDesc={setHolidayDesc}
+                setHolidays={setHolidays}
+                loading={loading}
+                handleAddHoliday={handleAddHoliday}
+                handleDeleteHoliday={handleDeleteHoliday}
+              />
+            }
+          />
+          <Route
+            path="calendar"
+            element={<CalendarView />}
+          />
+        </Route>
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </>
+  );
+}
+
+export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        {error && (
-          <div style={{ color: "red", padding: 10, fontWeight: 600 }}>
-            {error}
-          </div>
-        )}
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<HomePage />} />
-            <Route
-              path="clients"
-              element={
-                <ClientInfoPage
-                  clients={clients}
-                  setClients={setClients}
-                  loading={loading}
-                  onApproveClient={handleApproveClient}
-                  onRemoveClient={handleRemoveClient}
-                  fetchClients={fetchClients}
-                />
-              }
-            />
-            <Route
-              path="clients/:clientId"
-              element={
-                <ClientDetailsPageWrapper
-                  clients={clients}
-                  fetchClient={fetchClients}
-                />
-              }
-            />
-            <Route
-              path="holidays"
-              element={
-                <HolidaysPage
-                  holidays={holidays}
-                  holidayDate={holidayDate}
-                  setHolidayDate={setHolidayDate}
-                  holidayDesc={holidayDesc}
-                  setHolidayDesc={setHolidayDesc}
-                  setHolidays={setHolidays}
-                  loading={loading}
-                  handleAddHoliday={handleAddHoliday}
-                  handleDeleteHoliday={handleDeleteHoliday}
-                />
-              }
-            />
-            <Route
-              path="calendar"
-              element={<CalendarView />}
-            />
-          </Route>
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
+        <AppContent />
       </BrowserRouter>
     </AuthProvider>
   );
