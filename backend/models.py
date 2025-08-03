@@ -1,5 +1,5 @@
-from sqlmodel import SQLModel, Field
-from typing import Optional
+from sqlmodel import SQLModel, Field, Column, JSON
+from typing import Optional, Dict
 from datetime import datetime
 
 class User(SQLModel, table=True):
@@ -47,3 +47,7 @@ class Holiday(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     date: str
     description: str
+
+class CalendarMarking(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    markings: Dict[str, str] = Field(sa_column=Column(JSON))
