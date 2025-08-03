@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box, Card, CardContent, Typography, Button, Select, MenuItem, CircularProgress, Paper
 } from "@mui/material";
@@ -49,7 +49,8 @@ export default function CalendarView() {
   const [holidays, setHolidays] = useState([]);
   const seasons = getSeasons();
 
-  const fetchClients = async () => {
+  // -- Memoized callbacks --
+  const fetchClients = useCallback(async () => {
     setLoadingClients(true);
     try {
       const res = await fetch("/api/clients/");
@@ -62,9 +63,9 @@ export default function CalendarView() {
       setClients([]);
     }
     setLoadingClients(false);
-  };
+  }, []);
 
-  const fetchHolidays = async () => {
+  const fetchHolidays = useCallback(async () => {
     try {
       const res = await fetch("/api/holidays/");
       const data = await res.json();
@@ -72,17 +73,21 @@ export default function CalendarView() {
     } catch (e) {
       setHolidays([]);
     }
-  };
+  }, []);
+
+  // -- Memoized object for WebSocket hook --
+  const wsCallbacks = useMemo(() => ({
+    onClientsChanged: fetchClients,
+    onHolidaysChanged: fetchHolidays
+  }), [fetchClients, fetchHolidays]);
 
   useEffect(() => {
     fetchClients();
     fetchHolidays();
+    // eslint-disable-next-line
   }, []);
 
-  const wsStatus = useClientWebSocket({
-    onClientsChanged: fetchClients,
-    onHolidaysChanged: fetchHolidays
-  });
+  const wsStatus = useClientWebSocket(wsCallbacks);
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
