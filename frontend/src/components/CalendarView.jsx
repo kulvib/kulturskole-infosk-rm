@@ -3,7 +3,7 @@ import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import "./CalendarView.css";
 
-const API_URL = "https://kulturskole-backend.onrender.com/holidays/"; // <- Skift til din backend-url
+const API_URL = "https://kulturskole-backend.onrender.com/holidays/"; // Skift til din backend-url
 
 export default function CalendarView() {
   const [events, setEvents] = useState([]);
