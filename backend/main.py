@@ -50,7 +50,7 @@ app.add_middleware(
 )
 
 # Websocket router først, så den er klar til live connections
-app.include_router(websocket_router)
+app.include_router(websocket_router)              # <--- WebSocket integration!
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
 app.include_router(mqtt.router, prefix="/mqtt")
