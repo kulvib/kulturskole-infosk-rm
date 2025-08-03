@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from sqlmodel import Session, select
 from .models import User
 from .services.mqtt_service import connect as mqtt_connect
-from .ws_manager import router as ws_router  # Importér APIRouter
+from .ws_manager import router as ws_router  # Importér APIRouter fra ws_manager.py
 
 load_dotenv()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "meget_sikkert_fallback_kodeord")
