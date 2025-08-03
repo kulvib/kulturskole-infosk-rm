@@ -50,4 +50,6 @@ class Holiday(SQLModel, table=True):
 
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    season: int = Field(index=True)
+    client_id: int = Field(index=True)
     markings: Dict[str, str] = Field(sa_column=Column(JSON))
