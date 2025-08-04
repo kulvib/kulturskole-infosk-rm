@@ -43,7 +43,10 @@ def on_startup():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://inforskaerm-frontend.netlify.app"],
+    allow_origins=[
+        "https://infoskaerm-frontend.netlify.app",
+        # "http://localhost:3000",  # f.eks. til udvikling
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
