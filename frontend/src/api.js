@@ -1,4 +1,4 @@
-const apiUrl = process.env.REACT_APP_API_URL || "https://kulturskole-infosk-rm.onrender.com";
+export const apiUrl = process.env.REACT_APP_API_URL || "https://kulturskole-infosk-rm.onrender.com";
 
 function getToken() {
   return localStorage.getItem("token");
@@ -222,4 +222,22 @@ export async function deleteHoliday(id) {
     } catch {}
     throw new Error(msg);
   }
+}
+
+// --- WRAPPER TIL KALENDER MARKED DAYS ---
+export async function saveMarkedDays(payload) {
+  const res = await fetch(`${apiUrl}/api/calendar/marked-days`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let msg = "Kunne ikke gemme kalender";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
 }
