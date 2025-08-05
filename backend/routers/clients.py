@@ -6,7 +6,6 @@ from ..db import get_session
 from ..models import Client, ClientCreate, ClientUpdate
 from ..auth import get_current_admin_user
 from ..services.mqtt_service import push_client_command
-from ..ws_manager import notify_clients_updated
 
 router = APIRouter()
 
@@ -57,7 +56,7 @@ async def create_client(
     session.add(client)
     session.commit()
     session.refresh(client)
-    await notify_clients_updated()
+    # notify_clients_updated fjernet
     return client
 
 @router.put("/clients/{id}/update", response_model=Client)
@@ -93,7 +92,7 @@ async def update_client(
     session.add(client)
     session.commit()
     session.refresh(client)
-    await notify_clients_updated()
+    # notify_clients_updated fjernet
     return client
 
 @router.put("/clients/{id}/kiosk_url", response_model=Client)
@@ -114,7 +113,7 @@ async def update_kiosk_url(
     session.add(client)
     session.commit()
     session.refresh(client)
-    await notify_clients_updated()
+    # notify_clients_updated fjernet
     return client
 
 @router.post("/clients/{id}/action")
@@ -148,7 +147,7 @@ async def approve_client(id: int, session=Depends(get_session), user=Depends(get
     session.add(client)
     session.commit()
     session.refresh(client)
-    await notify_clients_updated()
+    # notify_clients_updated fjernet
     return client
 
 @router.post("/clients/{id}/heartbeat", response_model=Client)
@@ -172,7 +171,7 @@ async def remove_client(id: int, session=Depends(get_session), user=Depends(get_
         raise HTTPException(status_code=404, detail="Client not found")
     session.delete(client)
     session.commit()
-    await notify_clients_updated()
+    # notify_clients_updated fjernet
     return {"ok": True}
 
 @router.get("/clients/{id}/stream")
