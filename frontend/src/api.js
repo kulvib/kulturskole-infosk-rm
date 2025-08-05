@@ -247,4 +247,19 @@ export async function saveMarkedDays(payload) {
   return await res.json();
 }
 
-// Tilføj evt. nye kalender-funktioner her (fx getMarkedDays)
+export async function getMarkedDays(season) {
+  const token = getToken();
+  if (!token) throw new Error("Token mangler - du er ikke logget ind");
+  const res = await fetch(`${apiUrl}/api/calendar/marked-days?season=${season}`, {
+    headers: { Authorization: "Bearer " + token },
+  });
+  if (!res.ok) {
+    let msg = "Kunne ikke hente kalender-markeringer";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
