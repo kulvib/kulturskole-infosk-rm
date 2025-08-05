@@ -57,8 +57,13 @@ export default function ClientInfoPage() {
     setLoading(false);
   };
 
+  // Polling: hent data hvert 30. sekund
   useEffect(() => {
     fetchClients();
+    let timer = setInterval(() => {
+      fetchClients();
+    }, 30000);
+    return () => clearInterval(timer);
     // eslint-disable-next-line
   }, [token]);
 
@@ -191,7 +196,7 @@ export default function ClientInfoPage() {
               disabled={refreshing}
               sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
             >
-              Opdater
+              {refreshing ? "Opdaterer..." : "Opdater"}
             </Button>
           </span>
         </Tooltip>
