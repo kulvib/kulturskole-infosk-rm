@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Any
 from datetime import datetime
 
+# REST integration
+import requests
+
 router = APIRouter()
 
 class MarkedDaysRequest(BaseModel):
@@ -15,17 +18,32 @@ class MarkedDaysRequest(BaseModel):
     season: int
 
 def parse_iso8601_keys(d: Dict[str, Any]) -> Dict[str, Any]:
-    """Validerer at nøglerne i markedDays er ISO8601-datoer eller datoer."""
     out = {}
     for k, v in d.items():
         try:
-            # Prøv at parse som datetime, hvis muligt
             dt = datetime.fromisoformat(k)
             out[k] = v
         except Exception:
-            # Hvis ikke valid datetime, tillad dog string som fallback
             out[k] = v
     return out
+
+def publish_schedule_for_client(client: Client, markings: Dict[str, Any]):
+    """
+    Send kalender til klienten via HTTP REST.
+    Klientens endpoint antages at være http://<ip>:8000/api/update_schedule
+    """
+    # Brug klientens LAN eller WiFi IP-adresse
+    client_ip = client.lan_ip_address or client.wifi_ip_address
+    if not client_ip:
+        print(f"Klient {client.id} har ingen IP-adresse - kan ikke sende kalender")
+        return
+    url = f"http://{client_ip}:8000/api/update_schedule"
+    try:
+        resp = requests.post(url, json={"markedDays": markings}, timeout=5)
+        resp.raise_for_status()
+        print(f"Sendt kalender til klient {client.id} ({url})")
+    except Exception as e:
+        print(f"Fejl ved send til klient {client.id} ({url}): {e}")
 
 @router.post("/calendar/marked-days")
 def save_marked_days(
@@ -40,12 +58,12 @@ def save_marked_days(
     if season is None:
         raise HTTPException(status_code=400, detail="season mangler")
     try:
-        # Hent alle eksisterende CalendarMarkings for de pågældende klienter på én gang
         existing_markings = session.exec(
             select(CalendarMarking)
             .where(CalendarMarking.season == season, CalendarMarking.client_id.in_(client_ids))
         ).all()
         existing_map = {cm.client_id: cm for cm in existing_markings}
+
         for client_id in client_ids:
             if client_id in existing_map:
                 cm = existing_map[client_id]
@@ -53,7 +71,15 @@ def save_marked_days(
                 session.add(cm)
             else:
                 session.add(CalendarMarking(season=season, client_id=client_id, markings=marked_days))
+
         session.commit()
+
+        # Efter commit, send kalender til klienterne!
+        for client_id in client_ids:
+            client = session.exec(select(Client).where(Client.id == client_id)).first()
+            if client:
+                publish_schedule_for_client(client, marked_days)
+
         return {"ok": True}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -70,9 +96,7 @@ def get_marked_days(
             CalendarMarking.client_id == client_id
         )
     ).first()
-    # Returnér markings med ISO8601-nøgler, hvis muligt
     markings = existing.markings if existing else {}
-    # Sørg for at alle keys er strings (ISO 8601 hvis muligt)
     formatted_markings = {}
     for k, v in markings.items():
         try:
