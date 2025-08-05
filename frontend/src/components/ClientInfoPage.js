@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
   Typography,
@@ -36,6 +36,26 @@ function formatTimestamp(isoDate) {
   return `${day}.${month}.${year}, Kl. ${hour}:${minute}`;
 }
 
+// Sammenlign arrays af klienter (id+relevante felter)
+function isClientListEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const ca = a[i], cb = b[i];
+    // Sammenlign relevante felter - fx id, name, locality, status, sort_order, isOnline
+    if (
+      ca.id !== cb.id ||
+      ca.name !== cb.name ||
+      ca.locality !== cb.locality ||
+      ca.status !== cb.status ||
+      ca.sort_order !== cb.sort_order ||
+      ca.isOnline !== cb.isOnline
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export default function ClientInfoPage() {
   const { token } = useAuth();
   const [clients, setClients] = useState([]);
@@ -43,25 +63,29 @@ export default function ClientInfoPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [dragClients, setDragClients] = useState([]);
   const [error, setError] = useState("");
+  const lastFetchedClients = useRef([]);
 
-  // Hent klienter fra API
-  const fetchClients = async () => {
+  // Hent klienter fra API, men kun opdatér hvis der er ændringer
+  const fetchClients = async (forceUpdate = false) => {
     setLoading(true);
     setError("");
     try {
       const data = await getClients(token);
-      setClients(data);
+      if (forceUpdate || !isClientListEqual(data, lastFetchedClients.current)) {
+        setClients(data);
+        lastFetchedClients.current = data;
+      }
     } catch (err) {
       setError(err.message);
     }
     setLoading(false);
   };
 
-  // Polling: hent data hvert 30. sekund
+  // Polling: hent data hvert 30. sekund, men kun opdatér hvis ændringer
   useEffect(() => {
     fetchClients();
     let timer = setInterval(() => {
-      fetchClients();
+      fetchClients(false);
     }, 30000);
     return () => clearInterval(timer);
     // eslint-disable-next-line
@@ -93,7 +117,7 @@ export default function ClientInfoPage() {
   const handleRemoveClient = async (clientId) => {
     try {
       await removeClient(clientId, token);
-      fetchClients();
+      fetchClients(true); // force update
     } catch (err) {
       alert("Kunne ikke fjerne klient: " + err.message);
     }
@@ -110,7 +134,7 @@ export default function ClientInfoPage() {
       for (let i = 0; i < reordered.length; i++) {
         await updateClient(reordered[i].id, { sort_order: i + 1 }, token);
       }
-      fetchClients();
+      fetchClients(true); // force update
     } catch (err) {
       alert("Kunne ikke opdatere sortering: " + err.message);
     }
@@ -140,14 +164,14 @@ export default function ClientInfoPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchClients();
+    await fetchClients(true); // force update
     setRefreshing(false);
   };
 
   const handleApproveClient = async (clientId) => {
     try {
       await approveClient(clientId, token);
-      fetchClients();
+      fetchClients(true); // force update
     } catch (err) {
       alert("Kunne ikke godkende klient: " + err.message);
     }
