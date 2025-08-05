@@ -416,9 +416,9 @@ export default function CalendarPage() {
         />
         <Typography sx={{
           fontWeight: 700,
-          color: markMode === "on" ? "#1976d2" : "#ea394f"
+          color: markMode === "on" ? "#43a047" : "#ea394f" // grøn når tændt, rød når slukket
         }}>
-          {markMode === "on" ? "TÆNDT (grøn)" : "SLUKKET (rød)"}
+          {markMode === "on" ? "TÆNDT" : "SLUKKET"}
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
         <Button
