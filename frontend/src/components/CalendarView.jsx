@@ -12,17 +12,23 @@ import {
   FormControlLabel,
   FormGroup,
   Switch,
+  Select,
+  MenuItem,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients } from "../api";
 import { useAuth } from "../auth/authcontext";
 
+// Måneds- og ugedagsnavne
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
+// Hjælpefunktioner til sæson og skoleår
 function getSeasons(start = 2025, end = 2040) {
   const seasons = [];
   for (let y = start; y <= end; y++) {
@@ -52,7 +58,7 @@ function formatDate(year, month, day) {
   return `${year}-${mm}-${dd}`;
 }
 
-// Kalender-komponent med klikbare dage
+// MonthCalendar: Kalender med klikbare dage
 function MonthCalendar({
   name,
   month,
@@ -180,12 +186,14 @@ function MonthCalendar({
   );
 }
 
+// Hovedkomponent
 export default function CalendarView() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(2025);
   const [clients, setClients] = useState([]);
   const [selectedClients, setSelectedClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
 
   // Mode: hvad betyder næste klik? ("on" = tændt, "off" = slukket)
   const [markMode, setMarkMode] = useState("on");
@@ -195,25 +203,26 @@ export default function CalendarView() {
 
   const seasons = getSeasons(2025, 2040);
 
-  // Hent ALLE klienter og filtrér på "approved"
-  const fetchClients = useCallback(async () => {
-    setLoadingClients(true);
-    try {
-      const data = await getClients(token);
-      const approvedClients = (data?.filter((c) => c.status === "approved") || []).slice();
-      setClients(approvedClients);
-    } catch {
-      setClients([]);
-    }
-    setLoadingClients(false);
+  // --- POLLING LOGIK ---
+  useEffect(() => {
+    let poller;
+    const pollClients = async () => {
+      setLoadingClients(true);
+      try {
+        const data = await getClients(token);
+        const approvedClients = (data?.filter((c) => c.status === "approved") || []).slice();
+        setClients(approvedClients);
+      } catch {
+        setClients([]);
+      }
+      setLoadingClients(false);
+    };
+    pollClients();
+    poller = setInterval(pollClients, 30000); // Poll hvert 30. sekund
+    return () => clearInterval(poller);
   }, [token]);
 
-  useEffect(() => {
-    fetchClients();
-  }, [fetchClients]);
-
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
-
   const clientIds = clients.map(c => c.id);
 
   // Vælg/fjern individuel klient
@@ -257,37 +266,54 @@ export default function CalendarView() {
     });
   };
 
+  // Gem funktion
+  const handleSave = async () => {
+    if (selectedClients.length === 0) {
+      setSnackbar({ open: true, message: "Ingen klienter valgt", severity: "warning" });
+      return;
+    }
+    try {
+      const res = await fetch("/api/push-calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clients: selectedClients,
+          markedDays,
+        }),
+      });
+      if (res.ok) {
+        setSnackbar({ open: true, message: "Gemt!", severity: "success" });
+      } else {
+        setSnackbar({ open: true, message: "Kunne ikke gemme!", severity: "error" });
+      }
+    } catch (e) {
+      setSnackbar({ open: true, message: "Netværksfejl!", severity: "error" });
+    }
+  };
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* Sæsonvælger */}
+      {/* Mere kompakt sæsonvælger */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-        <Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c" }}>
             Vælg Sæson:
           </Typography>
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <Select
+            size="small"
+            value={selectedSeason}
+            onChange={e => setSelectedSeason(e.target.value)}
+            sx={{ minWidth: 120, fontWeight: 700, background: "#fff" }}
+          >
             {seasons.map(season => (
-              <Button
-                key={season.value}
-                variant={selectedSeason === season.value ? "contained" : "outlined"}
-                color={selectedSeason === season.value ? "primary" : "inherit"}
-                onClick={() => setSelectedSeason(season.value)}
-                sx={{
-                  fontWeight: 700,
-                  borderRadius: 3,
-                  minWidth: 80,
-                  bgcolor: selectedSeason === season.value ? "#1976d2" : "#fff",
-                  color: selectedSeason === season.value ? "#fff" : "#1976d2",
-                  border: selectedSeason === season.value ? "1.5px solid #1976d2" : "1.5px solid #bbb"
-                }}
-              >
+              <MenuItem key={season.value} value={season.value}>
                 {season.label}
-              </Button>
+              </MenuItem>
             ))}
-          </Box>
+          </Select>
         </Box>
       </Paper>
-      {/* Godkendte klienter */}
+      {/* Godkendte klienter med polling */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", flexGrow: 1 }}>
@@ -296,7 +322,6 @@ export default function CalendarView() {
           <Box sx={{ position: "relative" }}>
             <IconButton
               aria-label="Opdater klienter"
-              onClick={fetchClients}
               disabled={loadingClients}
             >
               <RefreshIcon />
@@ -338,8 +363,8 @@ export default function CalendarView() {
           </FormGroup>
         )}
       </Paper>
-      {/* Switch/kontakt for markering */}
-      <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+      {/* Switch/kontakt for markering og GEM-knap på samme række */}
+      <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
         <Typography sx={{ mr: 1 }}>
           Markering betyder:
         </Typography>
@@ -354,6 +379,14 @@ export default function CalendarView() {
         }}>
           {markMode === "on" ? "TÆNDT (grøn)" : "SLUKKET (rød)"}
         </Typography>
+        <Box sx={{ flexGrow: 1 }} />
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSave}
+        >
+          Gem kalender for valgte klienter
+        </Button>
       </Box>
       {/* Kalender */}
       <Box
@@ -376,6 +409,15 @@ export default function CalendarView() {
           />
         ))}
       </Box>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+      >
+        <Alert severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
