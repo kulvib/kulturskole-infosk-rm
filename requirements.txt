@@ -10,3 +10,4 @@ python-multipart
 psycopg2-binary
 paho-mqtt
 alembic
+netifaces
