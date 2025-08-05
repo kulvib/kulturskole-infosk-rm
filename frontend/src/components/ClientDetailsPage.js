@@ -229,13 +229,23 @@ export default function ClientDetailsPage({ client }) {
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">IP-adresse:</Typography>
-                  <Typography variant="body2">{client.ip_address || "ukendt"}</Typography>
+                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">IP-adresse WLAN / Wi-Fi:</Typography>
+                  <Typography variant="body2">{client.wifi_ip_address || "ukendt"}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">MAC-adresse:</Typography>
-                  <Typography variant="body2">{client.mac_address || "ukendt"}</Typography>
+                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">MAC-adresse WLAN / Wi-Fi:</Typography>
+                  <Typography variant="body2">{client.wifi_mac_address || "ukendt"}</Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <LanIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">IP-adresse LAN:</Typography>
+                  <Typography variant="body2">{client.lan_ip_address || "ukendt"}</Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <LanIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">MAC-adresse LAN:</Typography>
+                  <Typography variant="body2">{client.lan_mac_address || "ukendt"}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <MemoryIcon color="primary" />
@@ -281,7 +291,7 @@ export default function ClientDetailsPage({ client }) {
                     disabled={savingKioskUrl}
                     sx={{ minWidth: 44, px: 1, height: 28 }}
                   >
-                    {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
+                    {kioskUrlSaved ? <CircularProgress size={16} /> : "Gem"}
                   </Button>
                   {kioskUrlSaved && (
                     <Typography variant="body2" color="success.main" sx={{ mt: 0.5 }}>
