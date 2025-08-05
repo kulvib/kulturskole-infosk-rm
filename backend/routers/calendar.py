@@ -6,14 +6,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel, Field
 from typing import Dict, List, Any
 from datetime import datetime
-
-# REST integration
 import requests
 
 router = APIRouter()
 
 class MarkedDaysRequest(BaseModel):
-    markedDays: Dict[str, Any]  # F.eks. {"2025-08-05": true, "2025-08-06T08:00:00": false}
+    markedDays: Dict[str, Dict[str, Any]]  # {"1": {...}, "2": {...}}
     clients: List[int]
     season: int
 
@@ -28,11 +26,6 @@ def parse_iso8601_keys(d: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 def publish_schedule_for_client(client: Client, markings: Dict[str, Any]):
-    """
-    Send kalender til klienten via HTTP REST.
-    Klientens endpoint antages at være http://<ip>:8000/api/update_schedule
-    """
-    # Brug klientens LAN eller WiFi IP-adresse
     client_ip = client.lan_ip_address or client.wifi_ip_address
     if not client_ip:
         print(f"Klient {client.id} har ingen IP-adresse - kan ikke sende kalender")
@@ -50,36 +43,26 @@ def save_marked_days(
     data: MarkedDaysRequest,
     session=Depends(get_session)
 ):
-    marked_days = parse_iso8601_keys(data.markedDays)
     client_ids = data.clients
     season = data.season
-    if not isinstance(marked_days, dict):
-        raise HTTPException(status_code=400, detail="markedDays mangler eller har forkert format")
-    if season is None:
-        raise HTTPException(status_code=400, detail="season mangler")
     try:
-        existing_markings = session.exec(
-            select(CalendarMarking)
-            .where(CalendarMarking.season == season, CalendarMarking.client_id.in_(client_ids))
-        ).all()
-        existing_map = {cm.client_id: cm for cm in existing_markings}
-
         for client_id in client_ids:
-            if client_id in existing_map:
-                cm = existing_map[client_id]
-                cm.markings = marked_days
-                session.add(cm)
+            markings = data.markedDays.get(str(client_id), {})
+            markings = parse_iso8601_keys(markings)
+            existing = session.exec(
+                select(CalendarMarking)
+                .where(CalendarMarking.season == season, CalendarMarking.client_id == client_id)
+            ).first()
+            if existing:
+                existing.markings = markings
+                session.add(existing)
             else:
-                session.add(CalendarMarking(season=season, client_id=client_id, markings=marked_days))
-
+                session.add(CalendarMarking(season=season, client_id=client_id, markings=markings))
         session.commit()
-
-        # Efter commit, send kalender til klienterne!
         for client_id in client_ids:
             client = session.exec(select(Client).where(Client.id == client_id)).first()
             if client:
-                publish_schedule_for_client(client, marked_days)
-
+                publish_schedule_for_client(client, data.markedDays.get(str(client_id), {}))
         return {"ok": True}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=str(e))
