@@ -1,41 +1,38 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  CircularProgress,
-  Paper,
-  IconButton,
-  Checkbox,
-  FormControlLabel,
-  FormGroup,
-  Switch,
-  Select,
-  MenuItem,
-  Snackbar,
-  Alert,
+  Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
+  Checkbox, FormControlLabel, FormGroup, Switch, Select, MenuItem, Snackbar, Alert
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients } from "../api";
 import { useAuth } from "../auth/authcontext";
+import DateTimeEditDialog from "./DateTimeEditDialog";
 
-// Måneds- og ugedagsnavne
+// Hjælpefunktion: returnerer standard tænd/sluk-tider for en dato
+function getDefaultTimes(dateStr) {
+  const date = new Date(dateStr);
+  const day = date.getDay(); // 0=søndag, 6=lørdag
+  if (day === 0 || day === 6) {
+    // Weekend
+    return { onTime: "08:00", offTime: "18:00" };
+  } else {
+    // Hverdag
+    return { onTime: "09:00", offTime: "22:30" };
+  }
+}
+
+// ... monthNames, weekdayNames, getSeasons, getSchoolYearMonths, getDaysInMonth, formatDate ...
+
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
-// Hjælpefunktioner til sæson og skoleår
 function getSeasons(start = 2025, end = 2040) {
   const seasons = [];
   for (let y = start; y <= end; y++) {
-    seasons.push({
-      label: `${y}/${(y + 1).toString().slice(-2)}`,
-      value: y
-    });
+    seasons.push({ label: `${y}/${(y + 1).toString().slice(-2)}`, value: y });
   }
   return seasons;
 }
@@ -58,22 +55,14 @@ function formatDate(year, month, day) {
   return `${year}-${mm}-${dd}`;
 }
 
-// Drag-to-select kalender-komponent
 function MonthCalendar({
-  name,
-  month,
-  year,
-  clientIds,
-  markedDays,
-  markMode,
-  onDayClick,
+  name, month, year, clientIds, markedDays, markMode, onDayClick, onDateRightClick
 }) {
-  // Drag-select state
   const [isDragging, setIsDragging] = useState(false);
   const draggedDates = useRef(new Set());
 
   const daysInMonth = getDaysInMonth(month, year);
-  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = søndag
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
   const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
 
   const cells = [];
@@ -102,7 +91,6 @@ function MonthCalendar({
     draggedDates.current = new Set();
   };
 
-  // Support mouseup anywhere in window
   useEffect(() => {
     if (!isDragging) return;
     const handleUp = () => handleMouseUp();
@@ -131,8 +119,8 @@ function MonthCalendar({
             // Find markering for alle valgte klienter
             let color = "default";
             clientIds.forEach(cid => {
-              if (markedDays?.[cid]?.[dateString] === "on") color = "on";
-              if (markedDays?.[cid]?.[dateString] === "off") color = "off";
+              if (markedDays?.[cid]?.[dateString]?.status === "on") color = "on";
+              if (markedDays?.[cid]?.[dateString]?.status === "off") color = "off";
             });
             let bg = "#fff";
             if (color === "on") bg = "#b4eeb4";
@@ -140,28 +128,15 @@ function MonthCalendar({
 
             return (
               <Box key={idx}
-                sx={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  p: 0.2
-                }}>
+                sx={{ display: "flex", justifyContent: "center", alignItems: "center", p: 0.2 }}>
                 <Box
                   sx={{
-                    width: 23,
-                    height: 23,
-                    borderRadius: "50%",
-                    background: bg,
-                    border: "1px solid #eee",
-                    color: "#0a275c",
-                    fontWeight: 500,
-                    fontSize: "0.95rem",
-                    textAlign: "center",
-                    lineHeight: "23px",
+                    width: 23, height: 23, borderRadius: "50%", background: bg,
+                    border: "1px solid #eee", color: "#0a275c", fontWeight: 500,
+                    fontSize: "0.95rem", textAlign: "center", lineHeight: "23px",
                     boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
                     cursor: clientIds.length > 0 ? "pointer" : "default",
-                    transition: "background 0.2s",
-                    opacity: clientIds.length > 0 ? 1 : 0.55,
+                    transition: "background 0.2s", opacity: clientIds.length > 0 ? 1 : 0.55,
                     ":hover": { boxShadow: "0 0 0 2px #1976d2" }
                   }}
                   title={
@@ -173,6 +148,13 @@ function MonthCalendar({
                   }
                   onMouseDown={() => handleMouseDown(dateString)}
                   onMouseEnter={() => handleMouseEnter(dateString)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (clientIds.length === 1 && color === "on") {
+                      // KUN 1 klient valgt og dagen tændt
+                      onDateRightClick(clientIds[0], dateString);
+                    }
+                  }}
                 >
                   {day}
                 </Box>
@@ -185,7 +167,6 @@ function MonthCalendar({
   );
 }
 
-// Hovedkomponent uden polling, kun refresh-knap/side-load
 export default function CalendarPage() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(2025);
@@ -193,16 +174,18 @@ export default function CalendarPage() {
   const [selectedClients, setSelectedClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
-
-  // Mode: hvad betyder næste klik? ("on" = tændt, "off" = slukket)
   const [markMode, setMarkMode] = useState("on");
-
-  // Markeringer: { [clientId]: { [dateString]: "on"|"off" } }
+  // { [clientId]: { [dateString]: {status: "on"|"off", onTime?: "HH:mm", offTime?: "HH:mm"} } }
   const [markedDays, setMarkedDays] = useState({});
+
+  // Dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editDialogDate, setEditDialogDate] = useState(null);
+  const [editDialogClient, setEditDialogClient] = useState(null);
 
   const seasons = getSeasons(2025, 2040);
 
-  // Henter klienter kun på load og ved klik på refresh-knap
+  // Hent klienter
   const fetchClients = useCallback(async () => {
     setLoadingClients(true);
     try {
@@ -245,7 +228,7 @@ export default function CalendarPage() {
     setMarkedDays(prev => {
       const updated = { ...prev };
       clientIds.forEach(cid => {
-        const current = updated?.[cid]?.[dateString];
+        const current = updated?.[cid]?.[dateString]?.status;
         if (current === mode) {
           // Fjern markering
           delete updated[cid][dateString];
@@ -254,14 +237,36 @@ export default function CalendarPage() {
           }
         } else {
           // Sæt markering
-          updated[cid] = { ...(updated[cid] || {}), [dateString]: mode };
+          updated[cid] = { ...(updated[cid] || {}), [dateString]: { status: mode } };
         }
       });
       return updated;
     });
   };
 
-  // GEM sender ALLE datoer for valgte klienter, ikke markeret = "on"
+  // Højreklik på dato: åbn dialog for custom tid
+  const handleDateRightClick = (clientId, date) => {
+    setEditDialogClient(clientId);
+    setEditDialogDate(date);
+    setEditDialogOpen(true);
+  };
+
+  // Gem custom tid for en specifik dato/klient
+  const handleSaveDateTime = ({ clientId, date, onTime, offTime }) => {
+    setMarkedDays(prev => {
+      const updated = { ...prev };
+      if (!updated[clientId]) updated[clientId] = {};
+      updated[clientId][date] = {
+        ...(updated[clientId][date] || { status: "on" }),
+        onTime,
+        offTime
+      };
+      return updated;
+    });
+    setSnackbar({ open: true, message: "Tider opdateret!", severity: "success" });
+  };
+
+  // GEM sender ALLE datoer for valgte klienter, med status og tid
   const handleSave = async () => {
     if (selectedClients.length === 0) {
       setSnackbar({ open: true, message: "Ingen klienter valgt", severity: "warning" });
@@ -277,15 +282,26 @@ export default function CalendarPage() {
       }
     });
 
-    // Byg markedDays for hver klient: hvis dato er markeret, brug dens værdi, ellers "on"
+    // Byg markedDays for hver klient: hvis dato er markeret, brug dens status/tid, ellers standard "on" med default tid
     const payloadMarkedDays = {};
     selectedClients.forEach(cid => {
       payloadMarkedDays[cid] = {};
       allDates.forEach(dateStr => {
         if (markedDays[cid] && markedDays[cid][dateStr]) {
-          payloadMarkedDays[cid][dateStr] = markedDays[cid][dateStr];
+          const md = markedDays[cid][dateStr];
+          if (md.status === "on") {
+            // custom tid eller default tid
+            const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
+            const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
+            payloadMarkedDays[cid][dateStr] = { status: "on", onTime, offTime };
+          } else {
+            // Slukket
+            payloadMarkedDays[cid][dateStr] = { status: "off" };
+          }
         } else {
-          payloadMarkedDays[cid][dateStr] = "on";
+          // Ikke markeret = tændt med default tid
+          const { onTime, offTime } = getDefaultTimes(dateStr);
+          payloadMarkedDays[cid][dateStr] = { status: "on", onTime, offTime };
         }
       });
     });
@@ -313,7 +329,7 @@ export default function CalendarPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* Mere kompakt sæsonvælger */}
+      {/* Sæsonvælger */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c" }}>
@@ -333,7 +349,7 @@ export default function CalendarPage() {
           </Select>
         </Box>
       </Paper>
-      {/* Godkendte klienter med refresh-knap */}
+      {/* Klienter med refresh-knap */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", flexGrow: 1 }}>
@@ -384,7 +400,7 @@ export default function CalendarPage() {
           </FormGroup>
         )}
       </Paper>
-      {/* Switch/kontakt for markering og GEM-knap på samme række */}
+      {/* Switch/kontakt for markering og GEM-knap */}
       <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
         <Typography sx={{ mr: 1 }}>
           Markering betyder:
@@ -427,9 +443,29 @@ export default function CalendarPage() {
             markedDays={markedDays}
             markMode={markMode}
             onDayClick={handleDayClick}
+            onDateRightClick={handleDateRightClick}
           />
         ))}
       </Box>
+      {/* Dialog til redigering af tid */}
+      <DateTimeEditDialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        date={editDialogDate}
+        clientId={editDialogClient}
+        // Send custom tid hvis den findes, ellers null
+        customTime={
+          editDialogClient && editDialogDate && markedDays[editDialogClient]?.[editDialogDate]
+            ? markedDays[editDialogClient][editDialogDate]
+            : null
+        }
+        defaultTimes={
+          editDialogDate 
+            ? getDefaultTimes(editDialogDate)
+            : { onTime: "09:00", offTime: "22:30" }
+        }
+        onSave={handleSaveDateTime}
+      />
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
