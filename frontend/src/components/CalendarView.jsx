@@ -17,12 +17,14 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients } from "../api";
 import { useAuth } from "../auth/authcontext";
 
+// Måneds- og ugedagsnavne
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
+// Hjælpefunktioner til sæson og skoleår
 function getSeasons(start = 2025, end = 2040) {
   const seasons = [];
   for (let y = start; y <= end; y++) {
@@ -52,14 +54,14 @@ function formatDate(year, month, day) {
   return `${year}-${mm}-${dd}`;
 }
 
-// MonthCalendar
+// MonthCalendar: Kalender med klikbare dage
 function MonthCalendar({
   name,
   month,
   year,
   clientIds,
-  markMode,
   markedDays,
+  markMode,
   onDayClick,
 }) {
   const daysInMonth = getDaysInMonth(month, year);
@@ -120,7 +122,7 @@ function MonthCalendar({
             const dateString = formatDate(year, month, day);
 
             // Status for alle valgte klienter
-            // Hvis mindst én har "off" => rød, ellers grøn
+            // Hvis mindst én er slukket, vis rød. Ellers grøn.
             let hasOff = false;
             clientIds.forEach(cid => {
               if (markedDays?.[cid]?.[dateString] === "off") hasOff = true;
@@ -176,6 +178,7 @@ function MonthCalendar({
   );
 }
 
+// Hovedkomponent
 export default function CalendarView() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(2025);
@@ -183,8 +186,8 @@ export default function CalendarView() {
   const [selectedClients, setSelectedClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
 
-  // Tænd/sluk switch for markering
-  const [markMode, setMarkMode] = useState("on"); // "on" = tændt, "off" = slukket
+  // Mode: hvad betyder næste klik? ("on" = tændt, "off" = slukket)
+  const [markMode, setMarkMode] = useState("on");
 
   // Markeringer: { [clientId]: { [dateString]: "off" } } (ikke markeret = "on")
   const [markedDays, setMarkedDays] = useState({});
@@ -348,7 +351,7 @@ export default function CalendarView() {
           fontWeight: 700,
           color: markMode === "on" ? "#1976d2" : "#ea394f"
         }}>
-          {markMode === "on" ? "Klient TÆNDT (grøn)" : "Klient SLUKKET (rød)"}
+          {markMode === "on" ? "TÆNDT (grøn)" : "SLUKKET (rød)"}
         </Typography>
       </Box>
       {/* Kalender */}
@@ -366,8 +369,8 @@ export default function CalendarView() {
             month={month}
             year={year}
             clientIds={selectedClients}
-            markMode={markMode}
             markedDays={markedDays}
+            markMode={markMode}
             onDayClick={handleDayClick}
           />
         ))}
