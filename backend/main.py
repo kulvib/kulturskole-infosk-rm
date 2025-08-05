@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from sqlmodel import Session, select
 
 from .routers import clients, mqtt, holidays, calendar
-from .ws_manager import router as websocket_router
 from .auth import router as auth_router, get_password_hash
 from .db import create_db_and_tables, engine
 from .models import User
@@ -52,8 +51,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Websocket router først, så den er klar til live connections
-app.include_router(websocket_router)              # <--- WebSocket integration!
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
 app.include_router(mqtt.router, prefix="/mqtt")
