@@ -14,7 +14,7 @@ export default function ClientDetailsPageWrapper() {
     async function fetchClient() {
       if (clientId && token) {
         try {
-          const data = await getClient(clientId, token);
+          const data = await getClient(clientId); // KUN clientId som argument!
           setClient(data);
         } catch {
           setClient(null);
