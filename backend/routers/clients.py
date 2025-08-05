@@ -8,8 +8,52 @@ from ..auth import get_current_admin_user
 from ..services.mqtt_service import push_client_command
 from ..ws_manager import notify_clients_updated
 
+import netifaces
+
 router = APIRouter()
 
+# --- Network endpoints for serverens egne interfaces ---
+def get_interface_ip(interface_name: str) -> str:
+    try:
+        return netifaces.ifaddresses(interface_name)[netifaces.AF_INET][0]['addr']
+    except Exception:
+        return None
+
+def get_interface_mac(interface_name: str) -> str:
+    try:
+        return netifaces.ifaddresses(interface_name)[netifaces.AF_LINK][0]['addr']
+    except Exception:
+        return None
+
+@router.get("/network/ip-address-wifi", response_model=str)
+def ip_address_wifi(user=Depends(get_current_admin_user)):
+    ip = get_interface_ip("wlo1")
+    if not ip:
+        raise HTTPException(status_code=404, detail="Ingen WIFI IP-adresse fundet")
+    return ip
+
+@router.get("/network/mac-address-wifi", response_model=str)
+def mac_address_wifi(user=Depends(get_current_admin_user)):
+    mac = get_interface_mac("wlo1")
+    if not mac:
+        raise HTTPException(status_code=404, detail="Ingen WIFI MAC-adresse fundet")
+    return mac
+
+@router.get("/network/ip-address-lan", response_model=str)
+def ip_address_lan(user=Depends(get_current_admin_user)):
+    ip = get_interface_ip("enp2s0")
+    if not ip:
+        raise HTTPException(status_code=404, detail="Ingen LAN IP-adresse fundet")
+    return ip
+
+@router.get("/network/mac-address-lan", response_model=str)
+def mac_address_lan(user=Depends(get_current_admin_user)):
+    mac = get_interface_mac("enp2s0")
+    if not mac:
+        raise HTTPException(status_code=404, detail="Ingen LAN MAC-adresse fundet")
+    return mac
+
+# --- CRUD for klienter ---
 @router.get("/clients/", response_model=List[Client])
 def get_clients(session=Depends(get_session), user=Depends(get_current_admin_user)):
     clients = session.exec(select(Client)).all()
@@ -42,12 +86,17 @@ async def create_client(
         name=client_in.name,
         unique_id=client_in.unique_id,
         locality=client_in.locality,
-        ip_address=client_in.ip_address,
-        mac_address=client_in.mac_address,
+        wifi_ip_address=client_in.wifi_ip_address,
+        wifi_mac_address=client_in.wifi_mac_address,
+        lan_ip_address=client_in.lan_ip_address,
+        lan_mac_address=client_in.lan_mac_address,
         status="pending",
         isOnline=False,
         last_seen=None,
-        sort_order=None,
+        sort_order=client_in.sort_order,
+        kiosk_url=getattr(client_in, "kiosk_url", None),
+        ubuntu_version=getattr(client_in, "ubuntu_version", None),
+        uptime=getattr(client_in, "uptime", None),
     )
     session.add(client)
     session.commit()
@@ -75,6 +124,16 @@ async def update_client(
         client.ubuntu_version = client_update.ubuntu_version
     if client_update.uptime is not None:
         client.uptime = client_update.uptime
+    # NYT: Opdater netværksfelter
+    if client_update.wifi_ip_address is not None:
+        client.wifi_ip_address = client_update.wifi_ip_address
+    if client_update.wifi_mac_address is not None:
+        client.wifi_mac_address = client_update.wifi_mac_address
+    if client_update.lan_ip_address is not None:
+        client.lan_ip_address = client_update.lan_ip_address
+    if client_update.lan_mac_address is not None:
+        client.lan_mac_address = client_update.lan_mac_address
+
     session.add(client)
     session.commit()
     session.refresh(client)
