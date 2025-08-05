@@ -12,37 +12,30 @@ export default function ClientDetailsPageWrapper() {
 
   // Funktion til manuel opdatering (knap)
   const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchClient();
+    setRefreshing(false);
+  };
+
+  // Funktion til at hente klientdata
+  const fetchClient = async () => {
     if (clientId && token) {
-      setRefreshing(true);
       try {
-        const data = await getClient(clientId);
+        const data = await getClient(clientId, token); // Husk at sende token hvis det kræves!
         setClient(data);
       } catch {
         setClient(null);
       }
-      setRefreshing(false);
     }
   };
 
+  // Polling: hent data hvert 5. sekund
   useEffect(() => {
-    let timer;
-    // Automatisk polling
-    async function fetchClient() {
-      if (clientId && token) {
-        try {
-          const data = await getClient(clientId);
-          setClient(data);
-        } catch {
-          setClient(null);
-        }
-      }
-    }
     fetchClient();
-    timer = setInterval(fetchClient, 30000);
+    const timer = setInterval(fetchClient, 5000);
     return () => clearInterval(timer);
   }, [clientId, token]);
 
-  // Send refreshing og handleRefresh med til ClientDetailsPage
   return (
     <ClientDetailsPage
       client={client}
