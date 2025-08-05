@@ -4,11 +4,11 @@ import {
   Checkbox, FormControlLabel, FormGroup, Switch, Select, MenuItem, Snackbar, Alert
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { getClients } from "../api";
+import { getClients, saveMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
 
-// Helper functions
+// --------------------- Helper Functions ---------------------
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
@@ -22,6 +22,7 @@ function getSeasons(start = 2025, end = 2040) {
   }
   return seasons;
 }
+
 function getSchoolYearMonths(seasonStart) {
   const months = [];
   for (let i = 0; i < 5; i++) {
@@ -32,14 +33,17 @@ function getSchoolYearMonths(seasonStart) {
   }
   return months;
 }
+
 function getDaysInMonth(month, year) {
   return new Date(year, month + 1, 0).getDate();
 }
+
 function formatDate(year, month, day) {
   const mm = String(month + 1).padStart(2, '0');
   const dd = String(day).padStart(2, '0');
   return `${year}-${mm}-${dd}`;
 }
+
 function getDefaultTimes(dateStr) {
   const date = new Date(dateStr);
   const day = date.getDay(); // 0=søndag, 6=lørdag
@@ -51,6 +55,7 @@ function getDefaultTimes(dateStr) {
     return { onTime: "09:00", offTime: "22:30" };
   }
 }
+// ------------------------------------------------------------
 
 // --- INTEGRERET MonthCalendar ---
 function MonthCalendar({
@@ -179,7 +184,6 @@ export default function CalendarPage() {
   const [loadingClients, setLoadingClients] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
   const [markMode, setMarkMode] = useState("on");
-  // { [clientId]: { [dateString]: {status: "on"|"off", onTime?: "HH:mm", offTime?: "HH:mm"} } }
   const [markedDays, setMarkedDays] = useState({});
 
   // Dialog state
@@ -317,18 +321,10 @@ export default function CalendarPage() {
     };
 
     try {
-      const res = await fetch("/api/calendar/marked-days", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        setSnackbar({ open: true, message: "Gemt!", severity: "success" });
-      } else {
-        setSnackbar({ open: true, message: "Kunne ikke gemme!", severity: "error" });
-      }
+      await saveMarkedDays(payload);
+      setSnackbar({ open: true, message: "Gemt!", severity: "success" });
     } catch (e) {
-      setSnackbar({ open: true, message: "Netværksfejl!", severity: "error" });
+      setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
     }
   };
 
