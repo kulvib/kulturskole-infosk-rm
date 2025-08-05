@@ -5,7 +5,7 @@ import {
   Dialog, DialogTitle, DialogContent, List, ListItem
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { getClients, saveMarkedDays } from "../api";
+import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
 
@@ -214,6 +214,19 @@ export default function CalendarPage() {
     fetchClients();
   }, [fetchClients]);
 
+  // Hent markeringer fra backend ved sæsonskift eller reload
+  useEffect(() => {
+    async function fetchMarkedDays() {
+      try {
+        const data = await getMarkedDays(selectedSeason);
+        setMarkedDays(data.markedDays || {});
+      } catch (e) {
+        setMarkedDays({});
+      }
+    }
+    fetchMarkedDays();
+  }, [selectedSeason, token]);
+
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
   const clientIds = clients.map(c => c.id);
 
@@ -327,6 +340,9 @@ export default function CalendarPage() {
     try {
       await saveMarkedDays(payload);
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
+      // Genindlæs markeringer fra backend
+      const data = await getMarkedDays(selectedSeason);
+      setMarkedDays(data.markedDays || {});
     } catch (e) {
       setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
     }
