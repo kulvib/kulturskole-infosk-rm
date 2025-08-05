@@ -313,10 +313,11 @@ export default function CalendarPage() {
     const payload = {
       clients: selectedClients,
       markedDays: payloadMarkedDays,
+      season: selectedSeason
     };
 
     try {
-      const res = await fetch("/api/push-calendar", {
+      const res = await fetch("/api/calendar/marked-days", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -398,7 +399,7 @@ export default function CalendarPage() {
                     onChange={() => handleClientChange(client.id)}
                   />
                 }
-                label={client.locality || "Ingen lokalitet"}
+                label={client.locality || client.name || "Ingen lokalitet"}
               />
             ))}
           </FormGroup>
@@ -416,7 +417,7 @@ export default function CalendarPage() {
         />
         <Typography sx={{
           fontWeight: 700,
-          color: markMode === "on" ? "#43a047" : "#ea394f" // grøn når tændt, rød når slukket
+          color: markMode === "on" ? "#43a047" : "#ea394f"
         }}>
           {markMode === "on" ? "TÆNDT" : "SLUKKET"}
         </Typography>
