@@ -225,6 +225,7 @@ export async function deleteHoliday(id) {
 }
 
 // --- Kalender endpoints ---
+// Gem markeringer for flere klienter
 export async function saveMarkedDays(payload) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -247,10 +248,11 @@ export async function saveMarkedDays(payload) {
   return await res.json();
 }
 
-export async function getMarkedDays(season) {
+// Hent markeringer for EN klient og sæson
+export async function getMarkedDays(season, client_id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
-  const res = await fetch(`${apiUrl}/api/calendar/marked-days?season=${season}`, {
+  const res = await fetch(`${apiUrl}/api/calendar/marked-days?season=${season}&client_id=${client_id}`, {
     headers: { Authorization: "Bearer " + token },
   });
   if (!res.ok) {
