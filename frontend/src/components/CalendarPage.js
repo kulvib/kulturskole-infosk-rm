@@ -390,7 +390,7 @@ export default function CalendarPage() {
               <Button
                 key={client.id}
                 variant={selectedClients.includes(client.id) ? "contained" : "outlined"}
-                color={activeClient === client.id ? "primary" : "default"}
+                color={activeClient === client.id ? "primary" : "inherit"} // <--- Rettet her!
                 onClick={() => {
                   handleClientToggle(client.id);
                 }}
