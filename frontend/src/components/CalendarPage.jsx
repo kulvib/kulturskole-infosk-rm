@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box,
   Card,
@@ -58,7 +58,7 @@ function formatDate(year, month, day) {
   return `${year}-${mm}-${dd}`;
 }
 
-// MonthCalendar: Kalender med klikbare dage
+// Drag-to-select kalender-komponent
 function MonthCalendar({
   name,
   month,
@@ -68,6 +68,10 @@ function MonthCalendar({
   markMode,
   onDayClick,
 }) {
+  // Drag-select state
+  const [isDragging, setIsDragging] = useState(false);
+  const draggedDates = useRef(new Set());
+
   const daysInMonth = getDaysInMonth(month, year);
   const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = søndag
   const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
@@ -77,55 +81,54 @@ function MonthCalendar({
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
 
+  // Mouse event handlers
+  const handleMouseDown = (dateString) => {
+    setIsDragging(true);
+    draggedDates.current = new Set([dateString]);
+    if (clientIds.length > 0) {
+      onDayClick(clientIds, dateString, markMode, markedDays);
+    }
+  };
+
+  const handleMouseEnter = (dateString) => {
+    if (isDragging && clientIds.length > 0 && !draggedDates.current.has(dateString)) {
+      draggedDates.current.add(dateString);
+      onDayClick(clientIds, dateString, markMode, markedDays);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    draggedDates.current = new Set();
+  };
+
+  // Support mouseup anywhere in window
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleUp = () => handleMouseUp();
+    window.addEventListener("mouseup", handleUp);
+    return () => window.removeEventListener("mouseup", handleUp);
+  }, [isDragging]);
+
   return (
-    <Card sx={{
-      borderRadius: "14px",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-      minWidth: 0,
-      background: "#f9fafc"
-    }}>
+    <Card sx={{ borderRadius: "14px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", minWidth: 0, background: "#f9fafc" }}>
       <CardContent>
-        <Typography variant="h6" sx={{
-          color: "#0a275c",
-          fontWeight: 700,
-          textAlign: "center",
-          fontSize: "1.08rem",
-          mb: 1
-        }}>
+        <Typography variant="h6" sx={{ color: "#0a275c", fontWeight: 700, textAlign: "center", fontSize: "1.08rem", mb: 1 }}>
           {name} {year}
         </Typography>
-        <Box sx={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 0.2,
-          mb: 0.5
-        }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.2, mb: 0.5 }}>
           {weekdayNames.map(wd => (
-            <Typography
-              key={wd}
-              variant="caption"
-              sx={{
-                fontWeight: 700,
-                color: "#555",
-                textAlign: "center",
-                fontSize: "0.90rem",
-                letterSpacing: "0.03em"
-              }}
-            >
+            <Typography key={wd} variant="caption" sx={{ fontWeight: 700, color: "#555", textAlign: "center", fontSize: "0.90rem", letterSpacing: "0.03em" }}>
               {wd}
             </Typography>
           ))}
         </Box>
-        <Box sx={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 0.2
-        }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.2 }}>
           {cells.map((day, idx) => {
             if (!day) return <Box key={idx + "-empty"} />;
             const dateString = formatDate(year, month, day);
 
-            // Hvis mindst én klient har markeret dag, brug farve
+            // Find markering for alle valgte klienter
             let color = "default";
             clientIds.forEach(cid => {
               if (markedDays?.[cid]?.[dateString] === "on") color = "on";
@@ -136,15 +139,13 @@ function MonthCalendar({
             if (color === "off") bg = "#ffb7b7";
 
             return (
-              <Box
-                key={idx}
+              <Box key={idx}
                 sx={{
                   display: "flex",
                   justifyContent: "center",
                   alignItems: "center",
                   p: 0.2
-                }}
-              >
+                }}>
                 <Box
                   sx={{
                     width: 23,
@@ -161,6 +162,7 @@ function MonthCalendar({
                     cursor: clientIds.length > 0 ? "pointer" : "default",
                     transition: "background 0.2s",
                     opacity: clientIds.length > 0 ? 1 : 0.55,
+                    ":hover": { boxShadow: "0 0 0 2px #1976d2" }
                   }}
                   title={
                     color === "on"
@@ -169,11 +171,8 @@ function MonthCalendar({
                       ? "Slukket"
                       : ""
                   }
-                  onClick={() => {
-                    if (clientIds.length > 0) {
-                      onDayClick(clientIds, dateString, markMode, markedDays);
-                    }
-                  }}
+                  onMouseDown={() => handleMouseDown(dateString)}
+                  onMouseEnter={() => handleMouseEnter(dateString)}
                 >
                   {day}
                 </Box>
@@ -186,8 +185,8 @@ function MonthCalendar({
   );
 }
 
-// Hovedkomponent
-export default function CalendarView() {
+// Hovedkomponent uden polling, kun refresh-knap/side-load
+export default function CalendarPage() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(2025);
   const [clients, setClients] = useState([]);
@@ -203,24 +202,22 @@ export default function CalendarView() {
 
   const seasons = getSeasons(2025, 2040);
 
-  // --- POLLING LOGIK ---
-  useEffect(() => {
-    let poller;
-    const pollClients = async () => {
-      setLoadingClients(true);
-      try {
-        const data = await getClients(token);
-        const approvedClients = (data?.filter((c) => c.status === "approved") || []).slice();
-        setClients(approvedClients);
-      } catch {
-        setClients([]);
-      }
-      setLoadingClients(false);
-    };
-    pollClients();
-    poller = setInterval(pollClients, 30000); // Poll hvert 30. sekund
-    return () => clearInterval(poller);
+  // Henter klienter kun på load og ved klik på refresh-knap
+  const fetchClients = useCallback(async () => {
+    setLoadingClients(true);
+    try {
+      const data = await getClients(token);
+      const approvedClients = (data?.filter((c) => c.status === "approved") || []).slice();
+      setClients(approvedClients);
+    } catch {
+      setClients([]);
+    }
+    setLoadingClients(false);
   }, [token]);
+
+  useEffect(() => {
+    fetchClients();
+  }, [fetchClients]);
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
   const clientIds = clients.map(c => c.id);
@@ -243,9 +240,7 @@ export default function CalendarView() {
     }
   };
 
-  // Når en dag klikkes:
-  // Hvis ikke markeret, marker med mode ("on"/"off")
-  // Hvis allerede markeret, fjern markering
+  // Drag-to-select markering
   const handleDayClick = (clientIds, dateString, mode, markedDays) => {
     setMarkedDays(prev => {
       const updated = { ...prev };
@@ -266,20 +261,45 @@ export default function CalendarView() {
     });
   };
 
-  // Gem funktion
+  // GEM sender ALLE datoer for valgte klienter, ikke markeret = "on"
   const handleSave = async () => {
     if (selectedClients.length === 0) {
       setSnackbar({ open: true, message: "Ingen klienter valgt", severity: "warning" });
       return;
     }
+
+    // Saml ALLE datoer i skoleåret
+    const allDates = [];
+    schoolYearMonths.forEach(({ month, year }) => {
+      const daysInMonth = getDaysInMonth(month, year);
+      for (let d = 1; d <= daysInMonth; d++) {
+        allDates.push(formatDate(year, month, d));
+      }
+    });
+
+    // Byg markedDays for hver klient: hvis dato er markeret, brug dens værdi, ellers "on"
+    const payloadMarkedDays = {};
+    selectedClients.forEach(cid => {
+      payloadMarkedDays[cid] = {};
+      allDates.forEach(dateStr => {
+        if (markedDays[cid] && markedDays[cid][dateStr]) {
+          payloadMarkedDays[cid][dateStr] = markedDays[cid][dateStr];
+        } else {
+          payloadMarkedDays[cid][dateStr] = "on";
+        }
+      });
+    });
+
+    const payload = {
+      clients: selectedClients,
+      markedDays: payloadMarkedDays,
+    };
+
     try {
       const res = await fetch("/api/push-calendar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clients: selectedClients,
-          markedDays,
-        }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setSnackbar({ open: true, message: "Gemt!", severity: "success" });
@@ -313,7 +333,7 @@ export default function CalendarView() {
           </Select>
         </Box>
       </Paper>
-      {/* Godkendte klienter med polling */}
+      {/* Godkendte klienter med refresh-knap */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", flexGrow: 1 }}>
@@ -322,6 +342,7 @@ export default function CalendarView() {
           <Box sx={{ position: "relative" }}>
             <IconButton
               aria-label="Opdater klienter"
+              onClick={fetchClients}
               disabled={loadingClients}
             >
               <RefreshIcon />
