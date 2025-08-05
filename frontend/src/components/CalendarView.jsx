@@ -17,14 +17,12 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients } from "../api";
 import { useAuth } from "../auth/authcontext";
 
-// Måneds- og ugedagsnavne
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
-// Hjælpefunktioner til sæson og skoleår
 function getSeasons(start = 2025, end = 2040) {
   const seasons = [];
   for (let y = start; y <= end; y++) {
@@ -54,7 +52,7 @@ function formatDate(year, month, day) {
   return `${year}-${mm}-${dd}`;
 }
 
-// MonthCalendar: Kalender med klikbare dage
+// Kalender-komponent med klikbare dage
 function MonthCalendar({
   name,
   month,
@@ -121,8 +119,7 @@ function MonthCalendar({
             if (!day) return <Box key={idx + "-empty"} />;
             const dateString = formatDate(year, month, day);
 
-            // Status for alle valgte klienter
-            // Hvis mindst én er slukket, vis rød. Ellers grøn.
+            // Hvis mindst én klient har "off" -> rød, ellers grøn
             let hasOff = false;
             clientIds.forEach(cid => {
               if (markedDays?.[cid]?.[dateString] === "off") hasOff = true;
@@ -178,7 +175,6 @@ function MonthCalendar({
   );
 }
 
-// Hovedkomponent
 export default function CalendarView() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(2025);
