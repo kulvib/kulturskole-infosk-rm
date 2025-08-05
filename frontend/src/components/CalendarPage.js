@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Checkbox, Switch, Select, MenuItem, Snackbar, Alert,
+  Checkbox, Snackbar, Alert,
   Dialog, DialogTitle, DialogContent, List, ListItem
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -9,7 +9,6 @@ import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
 
-// --------------------- Helper Functions ---------------------
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
@@ -49,21 +48,17 @@ function getDefaultTimes(dateStr) {
   const date = new Date(dateStr);
   const day = date.getDay(); // 0=søndag, 6=lørdag
   if (day === 0 || day === 6) {
-    // Weekend
     return { onTime: "08:00", offTime: "18:00" };
   } else {
-    // Hverdag
     return { onTime: "09:00", offTime: "22:30" };
   }
 }
-// ------------------------------------------------------------
 
-// --- INTEGRERET MonthCalendar ---
 function MonthCalendar({
   name,
   month,
   year,
-  clientIds,
+  clientId,
   markedDays,
   markMode,
   onDayClick,
@@ -81,19 +76,18 @@ function MonthCalendar({
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
 
-  // Mouse event handlers
   const handleMouseDown = (dateString) => {
     setIsDragging(true);
     draggedDates.current = new Set([dateString]);
-    if (clientIds.length > 0) {
-      onDayClick(clientIds, dateString, markMode, markedDays);
+    if (clientId) {
+      onDayClick([clientId], dateString, markMode, markedDays);
     }
   };
 
   const handleMouseEnter = (dateString) => {
-    if (isDragging && clientIds.length > 0 && !draggedDates.current.has(dateString)) {
+    if (isDragging && clientId && !draggedDates.current.has(dateString)) {
       draggedDates.current.add(dateString);
-      onDayClick(clientIds, dateString, markMode, markedDays);
+      onDayClick([clientId], dateString, markMode, markedDays);
     }
   };
 
@@ -126,17 +120,12 @@ function MonthCalendar({
           {cells.map((day, idx) => {
             if (!day) return <Box key={idx + "-empty"} />;
             const dateString = formatDate(year, month, day);
-
-            // Find markering for alle valgte klienter
             let color = "default";
-            clientIds.forEach(cid => {
-              if (markedDays?.[cid]?.[dateString]?.status === "on") color = "on";
-              if (markedDays?.[cid]?.[dateString]?.status === "off") color = "off";
-            });
+            if (markedDays?.[clientId]?.[dateString]?.status === "on") color = "on";
+            if (markedDays?.[clientId]?.[dateString]?.status === "off") color = "off";
             let bg = "#fff";
             if (color === "on") bg = "#b4eeb4";
             if (color === "off") bg = "#ffb7b7";
-
             return (
               <Box key={idx}
                 sx={{ display: "flex", justifyContent: "center", alignItems: "center", p: 0.2, position: "relative" }}>
@@ -146,8 +135,8 @@ function MonthCalendar({
                     border: "1px solid #eee", color: "#0a275c", fontWeight: 500,
                     fontSize: "0.95rem", textAlign: "center", lineHeight: "23px",
                     boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                    cursor: clientIds.length > 0 ? "pointer" : "default",
-                    transition: "background 0.2s", opacity: clientIds.length > 0 ? 1 : 0.55,
+                    cursor: clientId ? "pointer" : "default",
+                    transition: "background 0.2s", opacity: clientId ? 1 : 0.55,
                     ":hover": { boxShadow: "0 0 0 2px #1976d2" }
                   }}
                   title={
@@ -160,8 +149,8 @@ function MonthCalendar({
                   onMouseDown={() => handleMouseDown(dateString)}
                   onMouseEnter={() => handleMouseEnter(dateString)}
                   onDoubleClick={() => {
-                    if (clientIds.length === 1 && markedDays?.[clientIds[0]]?.[dateString]?.status === "on") {
-                      onDateDoubleClick(clientIds[0], dateString);
+                    if (clientId && markedDays?.[clientId]?.[dateString]?.status === "on") {
+                      onDateDoubleClick(clientId, dateString);
                     }
                   }}
                 >
@@ -175,13 +164,13 @@ function MonthCalendar({
     </Card>
   );
 }
-// --- SLUT INTEGRERET MonthCalendar ---
 
 export default function CalendarPage() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(2025);
   const [clients, setClients] = useState([]);
   const [selectedClients, setSelectedClients] = useState([]);
+  const [activeClient, setActiveClient] = useState(null);
   const [loadingClients, setLoadingClients] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
   const [markMode, setMarkMode] = useState("on");
@@ -214,34 +203,47 @@ export default function CalendarPage() {
     fetchClients();
   }, [fetchClients]);
 
-  // Hent markeringer fra backend ved sæsonskift eller reload
+  // Hent markeringer for alle markerede klienter
   useEffect(() => {
-    async function fetchMarkedDays() {
-      try {
-        const data = await getMarkedDays(selectedSeason);
-        setMarkedDays(data.markedDays || {});
-      } catch (e) {
-        setMarkedDays({});
+    async function fetchMarkedDaysForAll() {
+      if (selectedClients.length === 0) return;
+      for (const clientId of selectedClients) {
+        try {
+          const data = await getMarkedDays(selectedSeason, clientId);
+          setMarkedDays(prev => ({
+            ...prev,
+            [clientId]: data.markedDays || {}
+          }));
+        } catch (e) {
+          setMarkedDays(prev => ({
+            ...prev,
+            [clientId]: {}
+          }));
+        }
       }
     }
-    fetchMarkedDays();
-  }, [selectedSeason, token]);
-
-  const schoolYearMonths = getSchoolYearMonths(selectedSeason);
-  const clientIds = clients.map(c => c.id);
+    fetchMarkedDaysForAll();
+  }, [selectedSeason, selectedClients, token]);
 
   // Vælg/fjern individuel klient
   const handleClientToggle = (id) => {
-    setSelectedClients(selected =>
-      selected.includes(id)
-        ? selected.filter(x => x !== id)
-        : [...selected, id]
-    );
+    setSelectedClients(prev => {
+      if (prev.includes(id)) {
+        const filtered = prev.filter(x => x !== id);
+        setActiveClient(filtered.length > 0 ? filtered[filtered.length - 1] : null);
+        return filtered;
+      } else {
+        setActiveClient(id);
+        return [...prev, id];
+      }
+    });
   };
 
-  // Vælg/Fjern alle
+  // Vælg alle
   const selectAllClients = () => {
-    setSelectedClients(clientIds);
+    const ids = clients.map(c => c.id);
+    setSelectedClients(ids);
+    if (ids.length > 0) setActiveClient(ids[ids.length - 1]);
   };
 
   // Dialog kontrol
@@ -255,13 +257,11 @@ export default function CalendarPage() {
       clientIds.forEach(cid => {
         const current = updated?.[cid]?.[dateString]?.status;
         if (current === mode) {
-          // Fjern markering
           delete updated[cid][dateString];
           if (Object.keys(updated[cid]).length === 0) {
             delete updated[cid];
           }
         } else {
-          // Sæt markering
           updated[cid] = { ...(updated[cid] || {}), [dateString]: { status: mode } };
         }
       });
@@ -292,13 +292,14 @@ export default function CalendarPage() {
   };
 
   // GEM sender ALLE datoer for valgte klienter, med status og tid
+  const schoolYearMonths = getSchoolYearMonths(selectedSeason);
+
   const handleSave = async () => {
     if (selectedClients.length === 0) {
       setSnackbar({ open: true, message: "Ingen klienter valgt", severity: "warning" });
       return;
     }
 
-    // Saml ALLE datoer i skoleåret
     const allDates = [];
     schoolYearMonths.forEach(({ month, year }) => {
       const daysInMonth = getDaysInMonth(month, year);
@@ -307,7 +308,6 @@ export default function CalendarPage() {
       }
     });
 
-    // Byg markedDays for hver klient: hvis dato er markeret, brug dens status/tid, ellers standard "on" med default tid
     const payloadMarkedDays = {};
     selectedClients.forEach(cid => {
       payloadMarkedDays[cid] = {};
@@ -315,16 +315,13 @@ export default function CalendarPage() {
         if (markedDays[cid] && markedDays[cid][dateStr]) {
           const md = markedDays[cid][dateStr];
           if (md.status === "on") {
-            // custom tid eller default tid
             const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
             const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
             payloadMarkedDays[cid][dateStr] = { status: "on", onTime, offTime };
           } else {
-            // Slukket
             payloadMarkedDays[cid][dateStr] = { status: "off" };
           }
         } else {
-          // Ikke markeret = tændt med default tid
           const { onTime, offTime } = getDefaultTimes(dateStr);
           payloadMarkedDays[cid][dateStr] = { status: "on", onTime, offTime };
         }
@@ -340,14 +337,26 @@ export default function CalendarPage() {
     try {
       await saveMarkedDays(payload);
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
-      // Genindlæs markeringer fra backend
-      const data = await getMarkedDays(selectedSeason);
-      setMarkedDays(data.markedDays || {});
+      for (const clientId of selectedClients) {
+        try {
+          const data = await getMarkedDays(selectedSeason, clientId);
+          setMarkedDays(prev => ({
+            ...prev,
+            [clientId]: data.markedDays || {}
+          }));
+        } catch (e) {
+          setMarkedDays(prev => ({
+            ...prev,
+            [clientId]: {}
+          }));
+        }
+      }
     } catch (e) {
       setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
     }
   };
 
+  // --- UI ---
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
       {/* Sæsonvælger */}
@@ -356,77 +365,99 @@ export default function CalendarPage() {
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c" }}>
             Vælg Sæson:
           </Typography>
-          <Select
-            size="small"
+          <select
             value={selectedSeason}
-            onChange={e => setSelectedSeason(e.target.value)}
-            sx={{ minWidth: 120, fontWeight: 700, background: "#fff" }}
+            onChange={e => setSelectedSeason(Number(e.target.value))}
+            style={{ minWidth: 120, fontWeight: 700, background: "#fff", fontSize: "1rem", padding: "2px 8px" }}
           >
             {seasons.map(season => (
-              <MenuItem key={season.value} value={season.value}>
+              <option key={season.value} value={season.value}>
                 {season.label}
-              </MenuItem>
+              </option>
             ))}
-          </Select>
+          </select>
         </Box>
       </Paper>
-      {/* Klienter med dialog og vælg alle */}
+
+      {/* Klienter med knapper og vælg alle */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 1, gap: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", flexGrow: 1 }}>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
             Godkendte klienter
           </Typography>
-          <Button variant="outlined" onClick={openClientDialog}>Vælg klienter</Button>
-          <Button variant="text" onClick={selectAllClients}>Vælg alle</Button>
-          <IconButton
-            aria-label="Opdater klienter"
-            onClick={fetchClients}
-            disabled={loadingClients}
-          >
-            <RefreshIcon />
-            {loadingClients && (
-              <CircularProgress
-                size={32}
-                sx={{ color: "#1976d2", position: "absolute", left: 4, top: 4, zIndex: 1 }}
-              />
-            )}
-          </IconButton>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1 }}>
+            {clients.map(client => (
+              <Button
+                key={client.id}
+                variant={selectedClients.includes(client.id) ? "contained" : "outlined"}
+                color={activeClient === client.id ? "primary" : "default"}
+                onClick={() => {
+                  handleClientToggle(client.id);
+                }}
+                sx={{
+                  borderRadius: "20px",
+                  minWidth: "120px",
+                  fontWeight: activeClient === client.id ? 700 : 400,
+                  boxShadow: activeClient === client.id ? "0 0 0 2px #1976d2" : "none"
+                }}
+              >
+                <Checkbox
+                  checked={selectedClients.includes(client.id)}
+                  onChange={() => handleClientToggle(client.id)}
+                  sx={{ p: 0.5 }}
+                />
+                {client.locality || client.name || "Ingen lokalitet"}
+              </Button>
+            ))}
+            <Button
+              variant="outlined"
+              onClick={selectAllClients}
+              sx={{ borderRadius: "20px", minWidth: "120px", fontWeight: 700, ml: 2 }}
+            >
+              Vælg alle
+            </Button>
+            <IconButton
+              aria-label="Opdater klienter"
+              onClick={fetchClients}
+              disabled={loadingClients}
+              sx={{ ml: 2 }}
+            >
+              <RefreshIcon />
+              {loadingClients && (
+                <CircularProgress
+                  size={32}
+                  sx={{ color: "#1976d2", position: "absolute", left: 4, top: 4, zIndex: 1 }}
+                />
+              )}
+            </IconButton>
+          </Box>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            Viser kalender for: <b>{clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Ingen valgt"}</b>
+          </Typography>
         </Box>
-        <Dialog open={clientDialogOpen} onClose={closeClientDialog}>
-          <DialogTitle>Vælg klienter</DialogTitle>
-          <DialogContent>
-            <List>
-              {clients.map(client => (
-                <ListItem key={client.id} button onClick={() => handleClientToggle(client.id)}>
-                  <Checkbox checked={selectedClients.includes(client.id)} />
-                  {client.locality || client.name || "Ingen lokalitet"}
-                </ListItem>
-              ))}
-            </List>
-            <Button onClick={selectAllClients} sx={{ mt: 1, mr: 1 }}>Vælg alle</Button>
-            <Button onClick={closeClientDialog} sx={{ mt: 1 }}>Luk</Button>
-          </DialogContent>
-        </Dialog>
-        <Typography variant="body2" sx={{ mt: 1 }}>
-          Valgte klienter: {selectedClients.length}
-        </Typography>
       </Paper>
+
       {/* Switch/kontakt for markering og GEM-knap */}
       <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
         <Typography sx={{ mr: 1 }}>
           Markering betyder:
         </Typography>
-        <Switch
-          checked={markMode === "on"}
-          onChange={() => setMarkMode(markMode === "on" ? "off" : "on")}
-          color="primary"
-        />
-        <Typography sx={{
-          fontWeight: 700,
-          color: markMode === "on" ? "#43a047" : "#ea394f"
-        }}>
-          {markMode === "on" ? "TÆNDT" : "SLUKKET"}
-        </Typography>
+        <Button
+          variant={markMode === "on" ? "contained" : "outlined"}
+          color="success"
+          onClick={() => setMarkMode("on")}
+          sx={{ fontWeight: markMode === "on" ? 700 : 400 }}
+        >
+          TÆNDT
+        </Button>
+        <Button
+          variant={markMode === "off" ? "contained" : "outlined"}
+          color="error"
+          onClick={() => setMarkMode("off")}
+          sx={{ fontWeight: markMode === "off" ? 700 : 400 }}
+        >
+          SLUKKET
+        </Button>
         <Box sx={{ flexGrow: 1 }} />
         <Button
           variant="contained"
@@ -436,7 +467,8 @@ export default function CalendarPage() {
           Gem kalender for valgte klienter
         </Button>
       </Box>
-      {/* Kalender */}
+
+      {/* Kalender for én (sidst markeret) klient */}
       <Box
         sx={{
           display: "grid",
@@ -444,20 +476,22 @@ export default function CalendarPage() {
           gap: 3,
         }}
       >
-        {schoolYearMonths.map(({ name, month, year }, idx) => (
-          <MonthCalendar
-            key={name + year}
-            name={name}
-            month={month}
-            year={year}
-            clientIds={selectedClients}
-            markedDays={markedDays}
-            markMode={markMode}
-            onDayClick={handleDayClick}
-            onDateDoubleClick={handleDateDoubleClick}
-          />
-        ))}
+        {activeClient &&
+          schoolYearMonths.map(({ name, month, year }, idx) => (
+            <MonthCalendar
+              key={name + year}
+              name={name}
+              month={month}
+              year={year}
+              clientId={activeClient}
+              markedDays={markedDays}
+              markMode={markMode}
+              onDayClick={handleDayClick}
+              onDateDoubleClick={handleDateDoubleClick}
+            />
+          ))}
       </Box>
+
       {/* Dialog til redigering af tid */}
       <DateTimeEditDialog
         open={editDialogOpen}
@@ -476,6 +510,7 @@ export default function CalendarPage() {
         }
         onSave={handleSaveDateTime}
       />
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
