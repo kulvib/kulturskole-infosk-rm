@@ -224,11 +224,16 @@ export async function deleteHoliday(id) {
   }
 }
 
-// --- WRAPPER TIL KALENDER MARKED DAYS ---
+// --- Kalender endpoints ---
 export async function saveMarkedDays(payload) {
+  const token = getToken();
+  if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/calendar/marked-days`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -241,3 +246,5 @@ export async function saveMarkedDays(payload) {
   }
   return await res.json();
 }
+
+// Tilføj evt. nye kalender-funktioner her (fx getMarkedDays)
