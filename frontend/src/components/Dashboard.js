@@ -15,11 +15,12 @@ import {
 
 const drawerWidth = 230;
 
-// Ferie/helligdage er fjernet fra menuItems
+// Tilføjet Administration til menuItems
 const menuItems = [
   { text: "Forside", path: "/", match: "/" },
   { text: "Klienter", path: "/clients", match: "/clients" },
   { text: "Kalender", path: "/calendar", match: "/calendar" },
+  { text: "Administration", path: "/administration", match: "/administration" }, // NYT
 ];
 
 export default function Dashboard() {
