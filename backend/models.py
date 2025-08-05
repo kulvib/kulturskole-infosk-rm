@@ -13,8 +13,12 @@ class ClientBase(SQLModel):
     name: str
     unique_id: str
     locality: str
-    ip_address: str
-    mac_address: str
+
+    # NYE FELTER!
+    wifi_ip_address: Optional[str] = None
+    wifi_mac_address: Optional[str] = None
+    lan_ip_address: Optional[str] = None
+    lan_mac_address: Optional[str] = None
 
 class Client(ClientBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -36,6 +40,12 @@ class ClientUpdate(SQLModel):
     kiosk_url: Optional[str] = None
     ubuntu_version: Optional[str] = None
     uptime: Optional[str] = None
+
+    # NYE FELTER!
+    wifi_ip_address: Optional[str] = None
+    wifi_mac_address: Optional[str] = None
+    lan_ip_address: Optional[str] = None
+    lan_mac_address: Optional[str] = None
 
 class MqttMessage(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
