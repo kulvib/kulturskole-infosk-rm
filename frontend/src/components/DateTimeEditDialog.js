@@ -9,6 +9,17 @@ import {
   Typography,
 } from "@mui/material";
 
+function formatDateLong(dateStr) {
+  if (!dateStr) return "";
+  const months = [
+    "januar", "februar", "marts", "april", "maj", "juni",
+    "juli", "august", "september", "oktober", "november", "december"
+  ];
+  const [year, month, day] = dateStr.split("-");
+  const monthName = months[parseInt(month, 10) - 1];
+  return `${parseInt(day, 10)}. ${monthName} ${year}`;
+}
+
 export default function DateTimeEditDialog({
   open,
   onClose,
@@ -34,7 +45,9 @@ export default function DateTimeEditDialog({
 
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Tilpas tænd/sluk-tid for {date}</DialogTitle>
+      <DialogTitle>
+        Tilpas tænd/sluk-tid for {formatDateLong(date)}
+      </DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="textSecondary" mb={2}>
           Standard: {defaultTimes.onTime} - {defaultTimes.offTime}
