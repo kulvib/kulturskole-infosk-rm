@@ -14,7 +14,6 @@ class ClientBase(SQLModel):
     unique_id: str
     locality: str
 
-    # NYE FELTER!
     wifi_ip_address: Optional[str] = None
     wifi_mac_address: Optional[str] = None
     lan_ip_address: Optional[str] = None
@@ -40,8 +39,6 @@ class ClientUpdate(SQLModel):
     kiosk_url: Optional[str] = None
     ubuntu_version: Optional[str] = None
     uptime: Optional[str] = None
-
-    # NYE FELTER!
     wifi_ip_address: Optional[str] = None
     wifi_mac_address: Optional[str] = None
     lan_ip_address: Optional[str] = None
