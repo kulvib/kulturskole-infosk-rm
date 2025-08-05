@@ -8,21 +8,7 @@ import { getClients } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
 
-// Hjælpefunktion: returnerer standard tænd/sluk-tider for en dato
-function getDefaultTimes(dateStr) {
-  const date = new Date(dateStr);
-  const day = date.getDay(); // 0=søndag, 6=lørdag
-  if (day === 0 || day === 6) {
-    // Weekend
-    return { onTime: "08:00", offTime: "18:00" };
-  } else {
-    // Hverdag
-    return { onTime: "09:00", offTime: "22:30" };
-  }
-}
-
-// ... monthNames, weekdayNames, getSeasons, getSchoolYearMonths, getDaysInMonth, formatDate ...
-
+// Helper functions
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
@@ -54,9 +40,28 @@ function formatDate(year, month, day) {
   const dd = String(day).padStart(2, '0');
   return `${year}-${mm}-${dd}`;
 }
+function getDefaultTimes(dateStr) {
+  const date = new Date(dateStr);
+  const day = date.getDay(); // 0=søndag, 6=lørdag
+  if (day === 0 || day === 6) {
+    // Weekend
+    return { onTime: "08:00", offTime: "18:00" };
+  } else {
+    // Hverdag
+    return { onTime: "09:00", offTime: "22:30" };
+  }
+}
 
+// --- INTEGRERET MonthCalendar ---
 function MonthCalendar({
-  name, month, year, clientIds, markedDays, markMode, onDayClick, onDateRightClick
+  name,
+  month,
+  year,
+  clientIds,
+  markedDays,
+  markMode,
+  onDayClick,
+  onDateDoubleClick
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const draggedDates = useRef(new Set());
@@ -128,7 +133,7 @@ function MonthCalendar({
 
             return (
               <Box key={idx}
-                sx={{ display: "flex", justifyContent: "center", alignItems: "center", p: 0.2 }}>
+                sx={{ display: "flex", justifyContent: "center", alignItems: "center", p: 0.2, position: "relative" }}>
                 <Box
                   sx={{
                     width: 23, height: 23, borderRadius: "50%", background: bg,
@@ -141,18 +146,16 @@ function MonthCalendar({
                   }}
                   title={
                     color === "on"
-                      ? "Tændt"
+                      ? "Tændt (dobbeltklik for tid)"
                       : color === "off"
-                      ? "Slukket"
-                      : ""
+                        ? "Slukket"
+                        : ""
                   }
                   onMouseDown={() => handleMouseDown(dateString)}
                   onMouseEnter={() => handleMouseEnter(dateString)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    if (clientIds.length === 1 && color === "on") {
-                      // KUN 1 klient valgt og dagen tændt
-                      onDateRightClick(clientIds[0], dateString);
+                  onDoubleClick={() => {
+                    if (clientIds.length === 1 && markedDays?.[clientIds[0]]?.[dateString]?.status === "on") {
+                      onDateDoubleClick(clientIds[0], dateString);
                     }
                   }}
                 >
@@ -166,6 +169,7 @@ function MonthCalendar({
     </Card>
   );
 }
+// --- SLUT INTEGRERET MonthCalendar ---
 
 export default function CalendarPage() {
   const { token } = useAuth();
@@ -244,8 +248,8 @@ export default function CalendarPage() {
     });
   };
 
-  // Højreklik på dato: åbn dialog for custom tid
-  const handleDateRightClick = (clientId, date) => {
+  // Dobbeltklik på dato: åbn dialog for custom tid
+  const handleDateDoubleClick = (clientId, date) => {
     setEditDialogClient(clientId);
     setEditDialogDate(date);
     setEditDialogOpen(true);
@@ -443,7 +447,7 @@ export default function CalendarPage() {
             markedDays={markedDays}
             markMode={markMode}
             onDayClick={handleDayClick}
-            onDateRightClick={handleDateRightClick}
+            onDateDoubleClick={handleDateDoubleClick}
           />
         ))}
       </Box>
@@ -453,7 +457,6 @@ export default function CalendarPage() {
         onClose={() => setEditDialogOpen(false)}
         date={editDialogDate}
         clientId={editDialogClient}
-        // Send custom tid hvis den findes, ellers null
         customTime={
           editDialogClient && editDialogDate && markedDays[editDialogClient]?.[editDialogDate]
             ? markedDays[editDialogClient][editDialogDate]
