@@ -15,10 +15,10 @@ import {
 
 const drawerWidth = 230;
 
+// Ferie/helligdage er fjernet fra menuItems
 const menuItems = [
   { text: "Forside", path: "/", match: "/" },
   { text: "Klienter", path: "/clients", match: "/clients" },
-  { text: "Ferie/helligdage", path: "/holidays", match: "/holidays" },
   { text: "Kalender", path: "/calendar", match: "/calendar" },
 ];
 
