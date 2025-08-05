@@ -14,7 +14,6 @@ export function AuthProvider({ children }) {
   const inactivityTimer = useRef();
   const warningTimer = useRef();
 
-  // Synkroniser token med localStorage
   useEffect(() => {
     if (token) {
       localStorage.setItem("token", token);
@@ -23,25 +22,23 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
-  // Login-funktion
   const loginUser = (newToken) => {
     setToken(newToken);
   };
 
-  // Logout-funktion
   const logoutUser = () => {
     setToken("");
     localStorage.removeItem("token");
-    window.location.href = "/login"; // redirect til login
+    window.location.href = "/login";
   };
 
-  // Inaktivitetshåndtering
+  // Nulstil (start ny) 5 min periode ved aktivitet
   const resetInactivityTimer = () => {
     setShowWarning(false);
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     if (warningTimer.current) clearTimeout(warningTimer.current);
 
-    // Advarsel efter 4 min, logout efter 5 min
+    // Advarsel efter 4 min (240.000 ms), logout efter 5 min (300.000 ms)
     warningTimer.current = setTimeout(() => {
       setShowWarning(true);
       inactivityTimer.current = setTimeout(() => {
@@ -72,7 +69,7 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   const handleContinueSession = () => {
-    resetInactivityTimer();
+    resetInactivityTimer(); // Starter ny 5 min periode
   };
 
   return (
@@ -84,7 +81,7 @@ export function AuthProvider({ children }) {
           <Typography>
             Du har været inaktiv i 4 minutter.<br />
             Du bliver automatisk logget ud om 1 minut.<br />
-            Klik "Fortsæt session" for at blive.
+            Klik "Fortsæt session" for at starte en ny periode.
           </Typography>
         </DialogContent>
         <DialogActions>
