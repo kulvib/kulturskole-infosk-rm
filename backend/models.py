@@ -12,7 +12,7 @@ class User(SQLModel, table=True):
 class ClientBase(SQLModel):
     name: str
     unique_id: str
-    locality: str
+    locality: Optional[str] = None
 
     wifi_ip_address: Optional[str] = None
     wifi_mac_address: Optional[str] = None
@@ -21,17 +21,24 @@ class ClientBase(SQLModel):
 
 class Client(ClientBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    status: str = "pending"
-    isOnline: bool = False
+    status: Optional[str] = "pending"
+    isOnline: Optional[bool] = False
     last_seen: Optional[datetime] = None
     sort_order: Optional[int] = Field(default=None, index=True)
     kiosk_url: Optional[str] = None
     ubuntu_version: Optional[str] = None
     uptime: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, nullable=False)
 
 class ClientCreate(ClientBase):
     sort_order: Optional[int] = None
+    kiosk_url: Optional[str] = None
+    ubuntu_version: Optional[str] = None
+    uptime: Optional[str] = None
+    wifi_ip_address: Optional[str] = None
+    wifi_mac_address: Optional[str] = None
+    lan_ip_address: Optional[str] = None
+    lan_mac_address: Optional[str] = None
 
 class ClientUpdate(SQLModel):
     locality: Optional[str] = None
