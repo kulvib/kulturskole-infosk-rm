@@ -1,7 +1,17 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Box, Card, CardContent, Typography, Button,
-  CircularProgress, Paper, IconButton, Checkbox, FormControlLabel, FormGroup
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  CircularProgress,
+  Paper,
+  IconButton,
+  Checkbox,
+  FormControlLabel,
+  FormGroup,
+  Switch,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients } from "../api";
@@ -36,8 +46,22 @@ function getSchoolYearMonths(seasonStart) {
 function getDaysInMonth(month, year) {
   return new Date(year, month + 1, 0).getDate();
 }
+function formatDate(year, month, day) {
+  const mm = String(month + 1).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  return `${year}-${mm}-${dd}`;
+}
 
-function MonthCalendar({ name, month, year, holidays }) {
+// MonthCalendar
+function MonthCalendar({
+  name,
+  month,
+  year,
+  clientIds,
+  markMode,
+  markedDays,
+  onDayClick,
+}) {
   const daysInMonth = getDaysInMonth(month, year);
   const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = søndag
   const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
@@ -46,18 +70,6 @@ function MonthCalendar({ name, month, year, holidays }) {
   for (let i = 0; i < offset; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
-
-  const isHoliday = (day) => {
-    return holidays.some(h => {
-      if (!h.date) return false;
-      const d = new Date(h.date);
-      return (
-        d.getDate() === day &&
-        d.getMonth() === month &&
-        d.getFullYear() === year
-      );
-    });
-  };
 
   return (
     <Card sx={{
@@ -103,8 +115,19 @@ function MonthCalendar({ name, month, year, holidays }) {
           gridTemplateColumns: "repeat(7, 1fr)",
           gap: 0.2
         }}>
-          {cells.map((day, idx) => (
-            day ? (
+          {cells.map((day, idx) => {
+            if (!day) return <Box key={idx + "-empty"} />;
+            const dateString = formatDate(year, month, day);
+
+            // Status for alle valgte klienter
+            // Hvis mindst én har "off" => rød, ellers grøn
+            let hasOff = false;
+            clientIds.forEach(cid => {
+              if (markedDays?.[cid]?.[dateString] === "off") hasOff = true;
+            });
+            let bg = hasOff ? "#ffb7b7" : "#b4eeb4";
+
+            return (
               <Box
                 key={idx}
                 sx={{
@@ -119,24 +142,34 @@ function MonthCalendar({ name, month, year, holidays }) {
                     width: 23,
                     height: 23,
                     borderRadius: "50%",
-                    background: isHoliday(day) ? "#ffeaea" : "#fff",
-                    border: isHoliday(day) ? "2px solid #ea394f" : "1px solid #eee",
-                    color: isHoliday(day) ? "#ea394f" : "#0a275c",
+                    background: bg,
+                    border: "1px solid #eee",
+                    color: "#0a275c",
                     fontWeight: 500,
                     fontSize: "0.95rem",
                     textAlign: "center",
                     lineHeight: "23px",
-                    boxShadow: isHoliday(day) ? "0 1px 8px rgba(234,57,79,0.08)" : "0 1px 2px rgba(0,0,0,0.06)"
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                    cursor: clientIds.length > 0 ? "pointer" : "default",
+                    transition: "background 0.2s",
+                    opacity: clientIds.length > 0 ? 1 : 0.55,
                   }}
-                  title={isHoliday(day) ? "Ferie/helligdag" : ""}
+                  title={
+                    hasOff
+                      ? "Klient SLUKKET"
+                      : "Klient TÆNDT"
+                  }
+                  onClick={() => {
+                    if (clientIds.length > 0) {
+                      onDayClick(clientIds, dateString, markMode);
+                    }
+                  }}
                 >
                   {day}
                 </Box>
               </Box>
-            ) : (
-              <Box key={idx + "-empty"} />
-            )
-          ))}
+            );
+          })}
         </Box>
       </CardContent>
     </Card>
@@ -149,7 +182,13 @@ export default function CalendarView() {
   const [clients, setClients] = useState([]);
   const [selectedClients, setSelectedClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
-  const [holidays, setHolidays] = useState([]);
+
+  // Tænd/sluk switch for markering
+  const [markMode, setMarkMode] = useState("on"); // "on" = tændt, "off" = slukket
+
+  // Markeringer: { [clientId]: { [dateString]: "off" } } (ikke markeret = "on")
+  const [markedDays, setMarkedDays] = useState({});
+
   const seasons = getSeasons(2025, 2040);
 
   // Hent ALLE klienter og filtrér på "approved"
@@ -165,21 +204,12 @@ export default function CalendarView() {
     setLoadingClients(false);
   }, [token]);
 
-  // Hent helligdage
-  const fetchHolidays = useCallback(() => {
-    fetch("/api/holidays/")
-      .then(res => res.json())
-      .then(data => setHolidays(Array.isArray(data) ? data : []));
-  }, []);
-
   useEffect(() => {
     fetchClients();
-    fetchHolidays();
-  }, [fetchClients, fetchHolidays]);
+  }, [fetchClients]);
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
-  // Klientvalg funktioner
   const clientIds = clients.map(c => c.id);
 
   // Vælg/fjern individuel klient
@@ -198,6 +228,29 @@ export default function CalendarView() {
     } else {
       setSelectedClients([]);
     }
+  };
+
+  // Når en dag klikkes: marker for alle valgte klienter
+  const handleDayClick = (clientIds, dateString, mode) => {
+    setMarkedDays(prev => {
+      const updated = { ...prev };
+      clientIds.forEach(cid => {
+        if (mode === "off") {
+          // Sæt dag til slukket
+          updated[cid] = { ...(updated[cid] || {}), [dateString]: "off" };
+        } else if (mode === "on") {
+          // Fjern dag (tilbage til "on")
+          if (updated[cid]) {
+            delete updated[cid][dateString];
+            // Fjern tomme objekter
+            if (Object.keys(updated[cid]).length === 0) {
+              delete updated[cid];
+            }
+          }
+        }
+      });
+      return updated;
+    });
   };
 
   return (
@@ -281,6 +334,23 @@ export default function CalendarView() {
           </FormGroup>
         )}
       </Paper>
+      {/* Switch/kontakt for markering */}
+      <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+        <Typography sx={{ mr: 1 }}>
+          Markering betyder:
+        </Typography>
+        <Switch
+          checked={markMode === "on"}
+          onChange={() => setMarkMode(markMode === "on" ? "off" : "on")}
+          color="primary"
+        />
+        <Typography sx={{
+          fontWeight: 700,
+          color: markMode === "on" ? "#1976d2" : "#ea394f"
+        }}>
+          {markMode === "on" ? "Klient TÆNDT (grøn)" : "Klient SLUKKET (rød)"}
+        </Typography>
+      </Box>
       {/* Kalender */}
       <Box
         sx={{
@@ -295,7 +365,10 @@ export default function CalendarView() {
             name={name}
             month={month}
             year={year}
-            holidays={holidays}
+            clientIds={selectedClients}
+            markMode={markMode}
+            markedDays={markedDays}
+            onDayClick={handleDayClick}
           />
         ))}
       </Box>
