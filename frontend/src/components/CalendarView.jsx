@@ -119,12 +119,15 @@ function MonthCalendar({
             if (!day) return <Box key={idx + "-empty"} />;
             const dateString = formatDate(year, month, day);
 
-            // Hvis mindst én klient har "off" -> rød, ellers grøn
-            let hasOff = false;
+            // Hvis mindst én klient har markeret dag, brug farve
+            let color = "default";
             clientIds.forEach(cid => {
-              if (markedDays?.[cid]?.[dateString] === "off") hasOff = true;
+              if (markedDays?.[cid]?.[dateString] === "on") color = "on";
+              if (markedDays?.[cid]?.[dateString] === "off") color = "off";
             });
-            let bg = hasOff ? "#ffb7b7" : "#b4eeb4";
+            let bg = "#fff";
+            if (color === "on") bg = "#b4eeb4";
+            if (color === "off") bg = "#ffb7b7";
 
             return (
               <Box
@@ -154,13 +157,15 @@ function MonthCalendar({
                     opacity: clientIds.length > 0 ? 1 : 0.55,
                   }}
                   title={
-                    hasOff
-                      ? "Klient SLUKKET"
-                      : "Klient TÆNDT"
+                    color === "on"
+                      ? "Tændt"
+                      : color === "off"
+                      ? "Slukket"
+                      : ""
                   }
                   onClick={() => {
                     if (clientIds.length > 0) {
-                      onDayClick(clientIds, dateString, markMode);
+                      onDayClick(clientIds, dateString, markMode, markedDays);
                     }
                   }}
                 >
@@ -185,7 +190,7 @@ export default function CalendarView() {
   // Mode: hvad betyder næste klik? ("on" = tændt, "off" = slukket)
   const [markMode, setMarkMode] = useState("on");
 
-  // Markeringer: { [clientId]: { [dateString]: "off" } } (ikke markeret = "on")
+  // Markeringer: { [clientId]: { [dateString]: "on"|"off" } }
   const [markedDays, setMarkedDays] = useState({});
 
   const seasons = getSeasons(2025, 2040);
@@ -229,23 +234,23 @@ export default function CalendarView() {
     }
   };
 
-  // Når en dag klikkes: marker for alle valgte klienter
-  const handleDayClick = (clientIds, dateString, mode) => {
+  // Når en dag klikkes:
+  // Hvis ikke markeret, marker med mode ("on"/"off")
+  // Hvis allerede markeret, fjern markering
+  const handleDayClick = (clientIds, dateString, mode, markedDays) => {
     setMarkedDays(prev => {
       const updated = { ...prev };
       clientIds.forEach(cid => {
-        if (mode === "off") {
-          // Sæt dag til slukket
-          updated[cid] = { ...(updated[cid] || {}), [dateString]: "off" };
-        } else if (mode === "on") {
-          // Fjern dag (tilbage til "on")
-          if (updated[cid]) {
-            delete updated[cid][dateString];
-            // Fjern tomme objekter
-            if (Object.keys(updated[cid]).length === 0) {
-              delete updated[cid];
-            }
+        const current = updated?.[cid]?.[dateString];
+        if (current === mode) {
+          // Fjern markering
+          delete updated[cid][dateString];
+          if (Object.keys(updated[cid]).length === 0) {
+            delete updated[cid];
           }
+        } else {
+          // Sæt markering
+          updated[cid] = { ...(updated[cid] || {}), [dateString]: mode };
         }
       });
       return updated;
