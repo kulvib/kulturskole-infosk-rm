@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Checkbox, FormControlLabel, FormGroup, Switch, Select, MenuItem, Snackbar, Alert
+  Checkbox, Switch, Select, MenuItem, Snackbar, Alert,
+  Dialog, DialogTitle, DialogContent, List, ListItem
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays } from "../api";
@@ -186,10 +187,13 @@ export default function CalendarPage() {
   const [markMode, setMarkMode] = useState("on");
   const [markedDays, setMarkedDays] = useState({});
 
-  // Dialog state
+  // Dialog state for tid
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editDialogDate, setEditDialogDate] = useState(null);
   const [editDialogClient, setEditDialogClient] = useState(null);
+
+  // Dialog state for klientvalg
+  const [clientDialogOpen, setClientDialogOpen] = useState(false);
 
   const seasons = getSeasons(2025, 2040);
 
@@ -214,7 +218,7 @@ export default function CalendarPage() {
   const clientIds = clients.map(c => c.id);
 
   // Vælg/fjern individuel klient
-  const handleClientChange = (id) => {
+  const handleClientToggle = (id) => {
     setSelectedClients(selected =>
       selected.includes(id)
         ? selected.filter(x => x !== id)
@@ -223,13 +227,13 @@ export default function CalendarPage() {
   };
 
   // Vælg/Fjern alle
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedClients(clientIds);
-    } else {
-      setSelectedClients([]);
-    }
+  const selectAllClients = () => {
+    setSelectedClients(clientIds);
   };
+
+  // Dialog kontrol
+  const openClientDialog = () => setClientDialogOpen(true);
+  const closeClientDialog = () => setClientDialogOpen(false);
 
   // Drag-to-select markering
   const handleDayClick = (clientIds, dateString, mode, markedDays) => {
@@ -350,56 +354,46 @@ export default function CalendarPage() {
           </Select>
         </Box>
       </Paper>
-      {/* Klienter med refresh-knap */}
+      {/* Klienter med dialog og vælg alle */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 1, gap: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", flexGrow: 1 }}>
             Godkendte klienter
           </Typography>
-          <Box sx={{ position: "relative" }}>
-            <IconButton
-              aria-label="Opdater klienter"
-              onClick={fetchClients}
-              disabled={loadingClients}
-            >
-              <RefreshIcon />
-              {loadingClients && (
-                <CircularProgress
-                  size={32}
-                  sx={{ color: "#1976d2", position: "absolute", left: 4, top: 4, zIndex: 1 }}
-                />
-              )}
-            </IconButton>
-          </Box>
-        </Box>
-        {loadingClients && clients.length === 0 ? (
-          <CircularProgress size={22} />
-        ) : (
-          <FormGroup>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={selectedClients.length === clientIds.length && clientIds.length > 0}
-                  indeterminate={selectedClients.length > 0 && selectedClients.length < clientIds.length}
-                  onChange={handleSelectAll}
-                />
-              }
-              label="Vælg alle"
-            />
-            {clients.map(client => (
-              <FormControlLabel
-                key={client.id}
-                control={
-                  <Checkbox
-                    checked={selectedClients.includes(client.id)}
-                    onChange={() => handleClientChange(client.id)}
-                  />
-                }
-                label={client.locality || client.name || "Ingen lokalitet"}
+          <Button variant="outlined" onClick={openClientDialog}>Vælg klienter</Button>
+          <Button variant="text" onClick={selectAllClients}>Vælg alle</Button>
+          <IconButton
+            aria-label="Opdater klienter"
+            onClick={fetchClients}
+            disabled={loadingClients}
+          >
+            <RefreshIcon />
+            {loadingClients && (
+              <CircularProgress
+                size={32}
+                sx={{ color: "#1976d2", position: "absolute", left: 4, top: 4, zIndex: 1 }}
               />
-            ))}
-          </FormGroup>
-        )}
+            )}
+          </IconButton>
+        </Box>
+        <Dialog open={clientDialogOpen} onClose={closeClientDialog}>
+          <DialogTitle>Vælg klienter</DialogTitle>
+          <DialogContent>
+            <List>
+              {clients.map(client => (
+                <ListItem key={client.id} button onClick={() => handleClientToggle(client.id)}>
+                  <Checkbox checked={selectedClients.includes(client.id)} />
+                  {client.locality || client.name || "Ingen lokalitet"}
+                </ListItem>
+              ))}
+            </List>
+            <Button onClick={selectAllClients} sx={{ mt: 1, mr: 1 }}>Vælg alle</Button>
+            <Button onClick={closeClientDialog} sx={{ mt: 1 }}>Luk</Button>
+          </DialogContent>
+        </Dialog>
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          Valgte klienter: {selectedClients.length}
+        </Typography>
       </Paper>
       {/* Switch/kontakt for markering og GEM-knap */}
       <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
