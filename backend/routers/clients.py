@@ -5,10 +5,19 @@ from datetime import datetime, timedelta
 from ..db import get_session
 from ..models import Client, ClientCreate, ClientUpdate
 from ..auth import get_current_admin_user
-from ..services.mqtt_service import push_client_command
 
 router = APIRouter()
 
+# Public endpoint til frontend
+@router.get("/clients/public")
+def get_clients_public(session=Depends(get_session)):
+    # Returner kun godkendte klienter
+    clients = session.exec(select(Client).where(Client.status == "approved")).all()
+    return {
+        "clients": [{"id": c.id, "name": c.name} for c in clients]
+    }
+
+# Admin endpoint – returnerer hele Client-objekter
 @router.get("/clients/", response_model=List[Client])
 def get_clients(session=Depends(get_session), user=Depends(get_current_admin_user)):
     clients = session.exec(select(Client)).all()
@@ -56,7 +65,6 @@ async def create_client(
     session.add(client)
     session.commit()
     session.refresh(client)
-    # notify_clients_updated fjernet
     return client
 
 @router.put("/clients/{id}/update", response_model=Client)
@@ -92,7 +100,6 @@ async def update_client(
     session.add(client)
     session.commit()
     session.refresh(client)
-    # notify_clients_updated fjernet
     return client
 
 @router.put("/clients/{id}/kiosk_url", response_model=Client)
@@ -109,11 +116,9 @@ async def update_kiosk_url(
     if not kiosk_url:
         raise HTTPException(status_code=400, detail="Missing kiosk_url")
     client.kiosk_url = kiosk_url
-    push_client_command(client.unique_id, "set-kiosk-url", {"url": kiosk_url})
     session.add(client)
     session.commit()
     session.refresh(client)
-    # notify_clients_updated fjernet
     return client
 
 @router.post("/clients/{id}/action")
@@ -129,7 +134,7 @@ def client_action(
     action = data.get("action")
     if not action:
         raise HTTPException(status_code=400, detail="Missing action")
-    push_client_command(client.unique_id, action)
+    # push_client_command(client.unique_id, action) # Hvis relevant
     return {"ok": True, "action": action}
 
 @router.post("/clients/{id}/approve", response_model=Client)
@@ -147,7 +152,6 @@ async def approve_client(id: int, session=Depends(get_session), user=Depends(get
     session.add(client)
     session.commit()
     session.refresh(client)
-    # notify_clients_updated fjernet
     return client
 
 @router.post("/clients/{id}/heartbeat", response_model=Client)
@@ -171,7 +175,6 @@ async def remove_client(id: int, session=Depends(get_session), user=Depends(get_
         raise HTTPException(status_code=404, detail="Client not found")
     session.delete(client)
     session.commit()
-    # notify_clients_updated fjernet
     return {"ok": True}
 
 @router.get("/clients/{id}/stream")
