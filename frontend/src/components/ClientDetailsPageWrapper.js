@@ -38,7 +38,7 @@ export default function ClientDetailsPageWrapper() {
       }
     }
     fetchClient();
-    timer = setInterval(fetchClient, 5000);
+    timer = setInterval(fetchClient, 30000);
     return () => clearInterval(timer);
   }, [clientId, token]);
 
