@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 
-from .routers import clients, holidays, calendar  # mqtt fjernet
+from .routers import clients, calendar  # holidays fjernet!
 from .auth import router as auth_router, get_password_hash
 from .db import create_db_and_tables, engine
 from .models import User
@@ -37,7 +37,6 @@ def ensure_admin_user():
 def on_startup():
     create_db_and_tables()
     ensure_admin_user()
-    # mqtt_connect() fjernet
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,5 +51,4 @@ app.add_middleware(
 
 app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
-app.include_router(holidays.router, prefix="/api")
 app.include_router(calendar.router, prefix="/api")
