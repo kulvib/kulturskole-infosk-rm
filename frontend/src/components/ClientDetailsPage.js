@@ -70,10 +70,12 @@ function ClientStatusIcon({ isOnline }) {
 
 export default function ClientDetailsPage({ client, refreshing, handleRefresh }) {
   const [locality, setLocality] = useState("");
+  const [localityDirty, setLocalityDirty] = useState(false);
   const [savingLocality, setSavingLocality] = useState(false);
   const [localitySaved, setLocalitySaved] = useState(false);
 
   const [kioskUrl, setKioskUrl] = useState("");
+  const [kioskUrlDirty, setKioskUrlDirty] = useState(false);
   const [savingKioskUrl, setSavingKioskUrl] = useState(false);
   const [kioskUrlSaved, setKioskUrlSaved] = useState(false);
 
@@ -82,18 +84,25 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Kun opdater hvis der ikke er unsaved ændringer (dirty) i locality/kioskUrl
     if (client) {
-      setLocality(client.locality || "");
-      setKioskUrl(client.kiosk_url || "");
+      if (!localityDirty) setLocality(client.locality || "");
+      if (!kioskUrlDirty) setKioskUrl(client.kiosk_url || "");
     }
+    // eslint-disable-next-line
   }, [client]);
 
-  // Save locality
+  // Lokalitet
+  const handleLocalityChange = (e) => {
+    setLocality(e.target.value);
+    setLocalityDirty(true);
+  };
   const handleLocalitySave = async () => {
     setSavingLocality(true);
     try {
       await updateClient(client.id, { locality });
       setLocalitySaved(true);
+      setLocalityDirty(false); // Nu er den ikke dirty mere!
       setTimeout(() => setLocalitySaved(false), 3000);
     } catch (err) {
       alert("Kunne ikke gemme lokalitet: " + err.message);
@@ -101,12 +110,17 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setSavingLocality(false);
   };
 
-  // Save Kiosk URL
+  // Kiosk URL
+  const handleKioskUrlChange = (e) => {
+    setKioskUrl(e.target.value);
+    setKioskUrlDirty(true);
+  };
   const handleKioskUrlSave = async () => {
     setSavingKioskUrl(true);
     try {
       await pushKioskUrl(client.id, kioskUrl);
       setKioskUrlSaved(true);
+      setKioskUrlDirty(false); // Nu er den ikke dirty mere!
       setTimeout(() => setKioskUrlSaved(false), 3000);
     } catch (err) {
       alert("Kunne ikke opdatere kiosk webadresse: " + err.message);
@@ -199,7 +213,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   <TextField
                     size="small"
                     value={locality}
-                    onChange={e => setLocality(e.target.value)}
+                    onChange={handleLocalityChange}
                     sx={{
                       width: 140,
                       "& .MuiInputBase-input": { fontSize: "0.95rem" },
@@ -284,7 +298,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   <TextField
                     size="small"
                     value={kioskUrl}
-                    onChange={e => setKioskUrl(e.target.value)}
+                    onChange={handleKioskUrlChange}
                     sx={{
                       width: 440,
                       "& .MuiInputBase-input": { fontSize: "0.95rem" },
