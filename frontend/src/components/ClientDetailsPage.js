@@ -60,7 +60,7 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
-export default function ClientDetailsPage({ client }) {
+export default function ClientDetailsPage({ client, refreshing, handleRefresh }) {
   const [locality, setLocality] = useState("");
   const [savingLocality, setSavingLocality] = useState(false);
   const [localitySaved, setLocalitySaved] = useState(false);
@@ -70,7 +70,6 @@ export default function ClientDetailsPage({ client }) {
   const [kioskUrlSaved, setKioskUrlSaved] = useState(false);
 
   const [actionLoading, setActionLoading] = useState({});
-  const [refreshing, setRefreshing] = useState(false);
 
   const navigate = useNavigate();
 
@@ -152,12 +151,13 @@ export default function ClientDetailsPage({ client }) {
         <Tooltip title="Opdater klient">
           <span>
             <Button
-              startIcon={<RefreshIcon fontSize="medium" />}
+              startIcon={refreshing ? <CircularProgress size={18} /> : <RefreshIcon fontSize="medium" />}
               disabled={refreshing}
               color="primary"
+              onClick={handleRefresh}
               sx={{ fontWeight: 500, textTransform: "none", minWidth: 0, mr: 1, px: 2 }}
             >
-              Opdater
+              {refreshing ? "Opdaterer..." : "Opdater"}
             </Button>
           </span>
         </Tooltip>
