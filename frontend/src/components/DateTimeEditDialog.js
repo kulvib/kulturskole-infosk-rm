@@ -11,8 +11,8 @@ import {
 
 /**
  * Props:
- * - open: boolean (om dialogen vises)
- * - onClose: function (lukker dialogen)
+ * - open: boolean
+ * - onClose: function
  * - date: string (YYYY-MM-DD)
  * - clientId: id for klienten (valgfrit)
  * - customTime: { onTime, offTime, status } eller null
@@ -31,6 +31,7 @@ export default function DateTimeEditDialog({
   const [onTime, setOnTime] = useState(defaultTimes?.onTime || "");
   const [offTime, setOffTime] = useState(defaultTimes?.offTime || "");
 
+  // Opdater visning når dialogen åbner eller data ændrer sig
   useEffect(() => {
     setOnTime(
       customTime && customTime.onTime
