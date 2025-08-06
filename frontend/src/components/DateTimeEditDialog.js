@@ -48,18 +48,15 @@ export default function DateTimeEditDialog({
         return res.json();
       })
       .then(data => {
-        // data.markedDays kan have nøgler med både "YYYY-MM-DD" og "YYYY-MM-DDT00:00:00"
         const allKeys = Object.keys(data.markedDays || {});
-        // Prøv at finde præcis match
         let found = data.markedDays[date];
-        // Hvis ikke, prøv at matche på dato uden tid
         if (!found) {
           const matchKey = allKeys.find(k => stripTimeFromDateKey(k) === date);
           if (matchKey) found = data.markedDays[matchKey];
         }
         if (found && found.status === "on") {
-          setOnTime(found.onTime ? found.onTime.replace(/\./g, ":") : getDefaultTimes(date).onTime);
-          setOffTime(found.offTime ? found.offTime.replace(/\./g, ":") : getDefaultTimes(date).offTime);
+          setOnTime((found.onTime || getDefaultTimes(date).onTime).replace(/\./g, ":"));
+          setOffTime((found.offTime || getDefaultTimes(date).offTime).replace(/\./g, ":"));
         } else {
           const defaults = getDefaultTimes(date);
           setOnTime(defaults.onTime);
@@ -90,15 +87,19 @@ export default function DateTimeEditDialog({
   };
 
   const handleSave = async () => {
+    // auto-formatter evt. punktum til kolon!
+    const normOnTime = onTime.replace(/\./g, ":");
+    const normOffTime = offTime.replace(/\./g, ":");
     if (!validate()) return;
     setSaving(true);
     setError("");
     try {
+      const normalizedDate = date.length === 10 ? date + "T00:00:00" : date;
       const payload = {
-        date,
+        date: normalizedDate,
         clientId,
-        onTime,
-        offTime,
+        onTime: normOnTime,
+        offTime: normOffTime,
       };
       const res = await fetch(
         "https://kulturskole-infosk-rm.onrender.com/api/calendar/marked-days",
@@ -109,7 +110,7 @@ export default function DateTimeEditDialog({
         }
       );
       if (!res.ok) throw new Error("Fejl ved gem");
-      if (onSaved) onSaved({ date, clientId, onTime, offTime });
+      if (onSaved) onSaved({ date: normalizedDate, clientId, onTime: normOnTime, offTime: normOffTime });
       onClose();
     } catch {
       setError("Kunne ikke gemme tid til serveren.");
@@ -117,6 +118,7 @@ export default function DateTimeEditDialog({
     setSaving(false);
   };
 
+  // Format date for display
   const displayDate = (() => {
     try {
       const d = new Date(date);
