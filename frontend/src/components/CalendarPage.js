@@ -7,7 +7,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
-import ClientSelector from "./ClientSelector"; // Integreret
+import ClientSelector from "./ClientSelector"; // Kun checkboxes og søgning
 
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
