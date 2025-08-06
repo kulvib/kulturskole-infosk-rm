@@ -9,16 +9,10 @@ import {
   Typography,
   CircularProgress,
   Box,
-  Alert,
-  Chip
+  Alert
 } from "@mui/material";
 
-// Helper to strip time from ISO date key
-const stripTimeFromDateKey = (key) => key.split("T")[0];
-
 const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
-
-// Hent token fra localStorage
 function getToken() {
   return localStorage.getItem("token");
 }
@@ -29,111 +23,62 @@ export default function DateTimeEditDialog({
   date,
   clientId,
   onSaved,
-  localMarkedDays,
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [showTopError, setShowTopError] = useState(false);
-  const [showSaved, setShowSaved] = useState(false);
+  const [status, setStatus] = useState(""); // "success" | "error" | ""
 
-  // Hent tider fra API når dialog åbner eller localMarkedDays opdateres (fx efter save i parent)
+  // Hent tider fra API hver gang dialogen åbnes
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
-    setError("");
-    setShowTopError(false);
-    setShowSaved(false);
-
+    setStatus("");
+    setOnTime("");
+    setOffTime("");
     const token = getToken();
     fetch(
-      `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${date.substring(0, 4)}`,
-      token
-        ? { headers: { Authorization: "Bearer " + token } }
-        : undefined
+      `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${date.slice(0, 4)}`,
+      token ? { headers: { Authorization: "Bearer " + token } } : undefined
     )
-      .then(res => {
-        if (!res.ok) throw new Error("Fejl ved hentning");
-        return res.json();
-      })
+      .then(res => res.json())
       .then(data => {
-        const allKeys = Object.keys(data.markedDays || {});
-        let found = data.markedDays[date];
-        if (!found) {
-          const matchKey = allKeys.find(k => stripTimeFromDateKey(k) === date);
-          if (matchKey) found = data.markedDays[matchKey];
-        }
-        // Brug evt. lokal cache hvis ikke fundet
-        if (!found && localMarkedDays && localMarkedDays[date]) {
-          found = localMarkedDays[date];
-        }
-        setOnTime(found?.onTime?.replace(/\./g, ":") || "");
-        setOffTime(found?.offTime?.replace(/\./g, ":") || "");
+        // Find korrekt dag
+        const normDate = date.split("T")[0];
+        const dayObj = data.markedDays?.[normDate] || {};
+        setOnTime(dayObj.onTime || "");
+        setOffTime(dayObj.offTime || "");
       })
       .catch(() => {
-        let fallback = undefined;
-        if (localMarkedDays && localMarkedDays[date]) {
-          fallback = localMarkedDays[date];
-        }
-        setOnTime(fallback?.onTime?.replace(/\./g, ":") || "");
-        setOffTime(fallback?.offTime?.replace(/\./g, ":") || "");
-        setError("Kunne ikke hente tider fra serveren.");
-        setShowTopError(true);
+        setStatus("error");
       })
       .finally(() => setLoading(false));
-  }, [open, date, clientId, localMarkedDays]);
-
-  // Hvis localMarkedDays ændrer sig mens dialogen er åben, opdater felterne
-  useEffect(() => {
-    if (!open || !date || !clientId) return;
-    if (localMarkedDays && localMarkedDays[date]) {
-      setOnTime(localMarkedDays[date]?.onTime?.replace(/\./g, ":") || "");
-      setOffTime(localMarkedDays[date]?.offTime?.replace(/\./g, ":") || "");
-    }
-  }, [localMarkedDays, date, clientId, open]);
-
-  // Luk dialogen automatisk 1 sekund efter "Gemt" vises
-  useEffect(() => {
-    if (!showSaved) return;
-    const t = setTimeout(() => {
-      setShowSaved(false);
-      onClose();
-    }, 1000);
-    return () => clearTimeout(t);
-  }, [showSaved, onClose]);
+  }, [open, date, clientId]);
 
   const validate = () => {
     if (!onTime || !offTime) {
-      setError("Begge tidspunkter skal udfyldes.");
-      setShowTopError(true);
+      setStatus("error");
       return false;
     }
     const timeRegex = /^\d{2}:\d{2}$/;
     if (!timeRegex.test(onTime) || !timeRegex.test(offTime)) {
-      setError("Tid skal være i formatet 08:00 eller 18:30.");
-      setShowTopError(true);
+      setStatus("error");
       return false;
     }
-    setError("");
-    setShowTopError(false);
     return true;
   };
 
-  // Merge ændring ind i eksisterende objekt for klienten
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
-    setError("");
-    setShowTopError(false);
-
+    setStatus("");
     try {
       const token = getToken();
-      const normalizedDate = date.split("T")[0]; // Altid YYYY-MM-DD!
-      const season = normalizedDate.substring(0, 4);
+      const normDate = date.split("T")[0];
+      const season = normDate.substring(0, 4);
 
-      // 1. Hent eksisterende markedDays for klienten/sæsonen
+      // Hent eksisterende markedDays for klienten/sæsonen
       const resGet = await fetch(
         `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
         token ? { headers: { Authorization: "Bearer " + token } } : undefined
@@ -143,19 +88,17 @@ export default function DateTimeEditDialog({
         const data = await resGet.json();
         serverData = data.markedDays || {};
       }
-
-      // 2. Merge: opdater/tilføj den ene dag, bevar resten
-      const updatedClientDays = { ...serverData };
-      updatedClientDays[normalizedDate] = {
+      // Merge denne dag
+      const updatedDays = { ...serverData };
+      updatedDays[normDate] = {
         status: "on",
-        onTime: onTime.replace(/\./g, ":"),
-        offTime: offTime.replace(/\./g, ":")
+        onTime,
+        offTime
       };
 
-      // 3. Send ALT for klienten/sæsonen
       const payload = {
         markedDays: {
-          [String(clientId)]: updatedClientDays
+          [String(clientId)]: updatedDays
         },
         clients: [clientId],
         season: Number(season)
@@ -173,74 +116,30 @@ export default function DateTimeEditDialog({
           body: JSON.stringify(payload),
         }
       );
-      const resTxt = await res.text();
-      if (!res.ok) {
-        setError(resTxt || "Kunne ikke gemme tid til serveren.");
-        setShowTopError(true);
-        setSaving(false);
-        setShowSaved(false);
-        return;
-      }
-      if (onSaved) await onSaved({ date: normalizedDate, clientId });
-      setShowSaved(true);
-    } catch (e) {
-      setError(e.message || "Kunne ikke gemme tid til serveren.");
-      setShowTopError(true);
-      setShowSaved(false);
+      if (!res.ok) throw new Error();
+      setStatus("success");
+      if (onSaved) onSaved({ date: normDate, clientId });
+    } catch {
+      setStatus("error");
     }
     setSaving(false);
   };
 
-  // Formatér dato til visning
-  const displayDate = (() => {
-    try {
-      const d = new Date(date);
-      if (!isNaN(d)) {
-        const weekday = d.toLocaleDateString("da-DK", { weekday: "long" });
-        const day = d.getDate();
-        const month = d.toLocaleDateString("da-DK", { month: "long" });
-        const year = d.getFullYear();
-        return `${weekday} d. ${day}. ${month} ${year}`;
-      }
-    } catch {}
-    return date;
-  })();
-
-  const handleOnTimeChange = (e) => {
-    const value = e.target.value.replace(/\./g, ":");
-    setOnTime(value);
-  };
-  const handleOffTimeChange = (e) => {
-    const value = e.target.value.replace(/\./g, ":");
-    setOffTime(value);
-  };
-
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>
-        Redigér tid for {displayDate}
-      </DialogTitle>
+      <DialogTitle>Redigér tid for {date}</DialogTitle>
       <DialogContent>
-        {showTopError && error && (
-          <Box sx={{ mb: 2 }}>
-            <Alert severity="error">{error}</Alert>
-          </Box>
-        )}
         {loading ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 120 }}>
-            <CircularProgress size={29} />
-            <span>Henter tider...</span>
-          </div>
+          <Box sx={{ minHeight: 80, display: "flex", alignItems: "center" }}>
+            <CircularProgress sx={{ mr: 2 }} /> Henter tider...
+          </Box>
         ) : (
           <>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              Indstil tænd/sluk-tidspunkt for denne dag.
-            </Typography>
             <TextField
               label="Tænd tid"
               type="time"
               value={onTime}
-              onChange={handleOnTimeChange}
+              onChange={e => setOnTime(e.target.value)}
               fullWidth
               sx={{ mb: 2 }}
               inputProps={{ step: 300 }}
@@ -249,10 +148,16 @@ export default function DateTimeEditDialog({
               label="Sluk tid"
               type="time"
               value={offTime}
-              onChange={handleOffTimeChange}
+              onChange={e => setOffTime(e.target.value)}
               fullWidth
               inputProps={{ step: 300 }}
             />
+            {status === "success" && (
+              <Typography sx={{ color: "#388e3c", fontWeight: 600, mt: 1 }}>Gemt</Typography>
+            )}
+            {status === "error" && (
+              <Alert severity="error" sx={{ mt: 1 }}>Fejl ved gemning eller hentning!</Alert>
+            )}
           </>
         )}
       </DialogContent>
@@ -260,24 +165,14 @@ export default function DateTimeEditDialog({
         <Button onClick={onClose} color="inherit" disabled={saving || loading}>
           Annullér
         </Button>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Button
-            onClick={handleSave}
-            color="primary"
-            variant="contained"
-            disabled={saving || loading || !onTime || !offTime}
-          >
-            {saving ? <CircularProgress size={20} /> : "Gem"}
-          </Button>
-          {showSaved && (
-            <Chip
-              label="Gemt"
-              color="success"
-              size="small"
-              sx={{ ml: 1 }}
-            />
-          )}
-        </Box>
+        <Button
+          onClick={handleSave}
+          color="primary"
+          variant="contained"
+          disabled={saving || loading}
+        >
+          {saving ? <CircularProgress size={20} /> : "Gem"}
+        </Button>
       </DialogActions>
     </Dialog>
   );
