@@ -7,6 +7,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
+import ClientSelector from "./ClientSelector"; // <-- NY import
 
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
@@ -234,28 +235,12 @@ export default function CalendarPage() {
     return () => { isCurrent = false; };
   }, [selectedSeason, activeClient, token]);
 
-  // Vælg/fjern individuel klient (tillad flere markeret, kun én aktiv)
-  const handleClientToggle = (id) => {
-    setSelectedClients(prev => {
-      let newArr;
-      if (prev.includes(id)) {
-        newArr = prev.filter(x => x !== id);
-        if (activeClient === id) {
-          setActiveClient(newArr.length > 0 ? newArr[newArr.length - 1] : null);
-        }
-      } else {
-        newArr = [...prev, id];
-        setActiveClient(id);
-      }
-      return newArr;
-    });
-  };
-
-  // Vælg alle
-  const selectAllClients = () => {
-    const ids = clients.map(c => c.id);
-    setSelectedClients(ids);
-    if (ids.length > 0) setActiveClient(ids[ids.length - 1]);
+  // Vælg/fjern klienter (nu med checkboxes)
+  const handleClientSelectorChange = (newSelected) => {
+    setSelectedClients(newSelected);
+    if (!newSelected.includes(activeClient)) {
+      setActiveClient(newSelected.length > 0 ? newSelected[newSelected.length - 1] : null);
+    }
   };
 
   // Drag-to-select markering for kun activeClient
@@ -409,56 +394,33 @@ export default function CalendarPage() {
         </Box>
       </Paper>
 
-      {/* Klienter med knapper og vælg alle */}
+      {/* Klientvælger med søg og checkboxes */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
-            Godkendte klienter
-          </Typography>
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1 }}>
-            {clients.map(client => (
-              <Button
-                key={client.id}
-                variant={selectedClients.includes(client.id) ? "contained" : "outlined"}
-                color={activeClient === client.id ? "primary" : "inherit"}
-                onClick={() => {
-                  handleClientToggle(client.id);
-                }}
-                sx={{
-                  borderRadius: "20px",
-                  minWidth: "120px",
-                  fontWeight: activeClient === client.id ? 700 : 400,
-                  boxShadow: activeClient === client.id ? "0 0 0 2px #1976d2" : "none"
-                }}
-              >
-                {client.locality || client.name || "Ingen lokalitet"}
-              </Button>
-            ))}
-            <Button
-              variant="outlined"
-              onClick={selectAllClients}
-              sx={{ borderRadius: "20px", minWidth: "120px", fontWeight: 700, ml: 2 }}
-            >
-              Vælg alle
-            </Button>
-            <IconButton
-              aria-label="Opdater klienter"
-              onClick={fetchClients}
-              disabled={loadingClients}
-              sx={{ ml: 2 }}
-            >
-              <RefreshIcon />
-              {loadingClients && (
-                <CircularProgress
-                  size={32}
-                  sx={{ color: "#1976d2", position: "absolute", left: 4, top: 4, zIndex: 1 }}
-                />
-              )}
-            </IconButton>
-          </Box>
-          <Typography variant="body2" sx={{ mt: 1 }}>
-            Viser kalender for: <b>{clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Ingen valgt"}</b>
-          </Typography>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
+          Godkendte klienter
+        </Typography>
+        <ClientSelector
+          clients={clients}
+          selected={selectedClients}
+          onChange={handleClientSelectorChange}
+        />
+        <Typography variant="body2" sx={{ mt: 2 }}>
+          Viser kalender for: <b>{clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Ingen valgt"}</b>
+        </Typography>
+        <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
+          <IconButton
+            aria-label="Opdater klienter"
+            onClick={fetchClients}
+            disabled={loadingClients}
+          >
+            <RefreshIcon />
+            {loadingClients && (
+              <CircularProgress
+                size={32}
+                sx={{ color: "#1976d2", position: "absolute", left: 4, top: 4, zIndex: 1 }}
+              />
+            )}
+          </IconButton>
         </Box>
       </Paper>
 
