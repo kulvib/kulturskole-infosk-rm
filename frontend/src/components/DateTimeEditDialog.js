@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -9,17 +9,16 @@ import {
   Typography,
 } from "@mui/material";
 
-function formatDateLong(dateStr) {
-  if (!dateStr) return "";
-  const months = [
-    "januar", "februar", "marts", "april", "maj", "juni",
-    "juli", "august", "september", "oktober", "november", "december"
-  ];
-  const [year, month, day] = dateStr.split("-");
-  const monthName = months[parseInt(month, 10) - 1];
-  return `${parseInt(day, 10)}. ${monthName} ${year}`;
-}
-
+/**
+ * Props:
+ * - open: boolean (om dialogen vises)
+ * - onClose: function (lukker dialogen)
+ * - date: string (YYYY-MM-DD)
+ * - clientId: id for klienten (valgfrit)
+ * - customTime: { onTime, offTime, status } eller null
+ * - defaultTimes: { onTime, offTime }
+ * - onSave: function({ clientId, date, onTime, offTime })
+ */
 export default function DateTimeEditDialog({
   open,
   onClose,
@@ -29,51 +28,89 @@ export default function DateTimeEditDialog({
   defaultTimes,
   onSave,
 }) {
-  const [onTime, setOnTime] = React.useState(customTime?.onTime || defaultTimes.onTime);
-  const [offTime, setOffTime] = React.useState(customTime?.offTime || defaultTimes.offTime);
+  // Brug customTime hvis sat, ellers defaultTimes:
+  const [onTime, setOnTime] = useState(defaultTimes?.onTime || "");
+  const [offTime, setOffTime] = useState(defaultTimes?.offTime || "");
 
-  React.useEffect(() => {
-    setOnTime(customTime?.onTime || defaultTimes.onTime);
-    setOffTime(customTime?.offTime || defaultTimes.offTime);
-    // eslint-disable-next-line
-  }, [open, date, customTime, defaultTimes]);
+  // Reset state når dialogen åbnes eller dato ændres
+  useEffect(() => {
+    setOnTime(
+      customTime && customTime.onTime
+        ? customTime.onTime
+        : defaultTimes?.onTime || ""
+    );
+    setOffTime(
+      customTime && customTime.offTime
+        ? customTime.offTime
+        : defaultTimes?.offTime || ""
+    );
+  }, [customTime, defaultTimes, date, open]);
+
+  if (!date) return null;
 
   const handleSave = () => {
-    onSave({ clientId, date, onTime, offTime });
-    onClose();
+    if (onTime && offTime) {
+      onSave({
+        clientId,
+        date,
+        onTime,
+        offTime,
+      });
+      onClose();
+    }
   };
 
+  // Dansk dato-format eller YYYY-MM-DD
+  const displayDate = (() => {
+    try {
+      const d = new Date(date);
+      if (!isNaN(d)) {
+        return d.toLocaleDateString("da-DK", {
+          weekday: "short",
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      }
+    } catch {}
+    return date;
+  })();
+
   return (
-    <Dialog open={open} onClose={onClose}>
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>
-        Tilpas tænd/sluk-tid for {formatDateLong(date)}
+        Redigér tid for {displayDate}
       </DialogTitle>
       <DialogContent>
-        <Typography variant="body2" color="textSecondary" mb={2}>
-          Standard: {defaultTimes.onTime} - {defaultTimes.offTime}
+        <Typography variant="body2" sx={{ mb: 2 }}>
+          Indstil tænd/sluk-tidspunkt for denne dag.<br />
+          Standard: {defaultTimes?.onTime} – {defaultTimes?.offTime}
         </Typography>
         <TextField
-          label="Tænd-tid"
+          label="Tænd tid"
           type="time"
           value={onTime}
           onChange={e => setOnTime(e.target.value)}
           fullWidth
-          margin="normal"
-          InputProps={{ inputProps: { step: 300 } }}
+          sx={{ mb: 2 }}
+          inputProps={{ step: 300 }}
         />
         <TextField
-          label="Sluk-tid"
+          label="Sluk tid"
           type="time"
           value={offTime}
           onChange={e => setOffTime(e.target.value)}
           fullWidth
-          margin="normal"
-          InputProps={{ inputProps: { step: 300 } }}
+          inputProps={{ step: 300 }}
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Annuller</Button>
-        <Button onClick={handleSave} variant="contained">Gem</Button>
+        <Button onClick={onClose} color="inherit">
+          Annullér
+        </Button>
+        <Button onClick={handleSave} color="primary" variant="contained" disabled={!onTime || !offTime}>
+          Gem
+        </Button>
       </DialogActions>
     </Dialog>
   );
