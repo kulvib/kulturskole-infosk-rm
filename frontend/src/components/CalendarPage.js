@@ -220,7 +220,6 @@ function MonthCalendar({
                   onMouseDown={() => handleMouseDown(dateString)}
                   onMouseEnter={() => handleMouseEnter(dateString)}
                   onDoubleClick={() => {
-                    // Åben dialog KUN hvis status er "on"
                     if (clientId && markedDays?.[clientId]?.[dateString]?.status === "on") {
                       onDateDoubleClick(clientId, dateString);
                     }
@@ -308,17 +307,16 @@ export default function CalendarPage() {
   // ClientSelector integration
   const handleClientSelectorChange = (newSelected) => {
     setSelectedClients(newSelected);
-    // Sæt aktiv klient til den senest valgte, hvis den forrige ikke længere er valgt
     if (!newSelected.includes(activeClient)) {
       setActiveClient(newSelected.length > 0 ? newSelected[newSelected.length - 1] : null);
     }
   };
 
-  // Drag-to-select markering for kun activeClient
+  // Drag-to-select markering for ALLE valgte klienter
   const handleDayClick = (clientIds, dateString, mode, markedDays) => {
     setMarkedDays(prev => {
       const updated = { ...prev };
-      clientIds.forEach(cid => {
+      selectedClients.forEach(cid => {
         const current = updated?.[cid]?.[dateString]?.status;
         if (current === mode) {
           delete updated[cid][dateString];
@@ -340,32 +338,34 @@ export default function CalendarPage() {
     setEditDialogOpen(true);
   };
 
-  // Når tid gemmes i dialogen: kun opdater den pågældende dag i markedDays
+  // Når tid gemmes i dialogen: opdater den pågældende dag i markedDays for ALLE valgte klienter
   const handleSaveDateTime = async ({ date, clientId }) => {
     try {
       const data = await getMarkedDays(selectedSeason, clientId);
       const rawDays = data.markedDays || {};
-      // Find kun den dag du har ændret
       const changedDayKey = Object.keys(rawDays).find(
         key => stripTimeFromDateKey(key) === date
       );
       if (!changedDayKey) return;
       const changedDay = rawDays[changedDayKey];
 
-      setMarkedDays(prev => ({
-        ...prev,
-        [clientId]: {
-          ...prev[clientId],
-          [date]: changedDay
-        }
-      }));
+      setMarkedDays(prev => {
+        const updated = { ...prev };
+        selectedClients.forEach(cid => {
+          updated[cid] = {
+            ...updated[cid],
+            [date]: changedDay
+          };
+        });
+        return updated;
+      });
       setSnackbar({ open: true, message: "Tid opdateret", severity: "success" });
     } catch {
       setSnackbar({ open: true, message: "Kunne ikke hente nyeste tider", severity: "error" });
     }
   };
 
-  // GEM: Gem den viste kalender (activeClient) på ALLE markerede klienter
+  // GEM: Gem hele kalenderen på ALLE markerede klienter
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
   const handleSave = useCallback(async () => {
@@ -386,13 +386,11 @@ export default function CalendarPage() {
       }
     });
 
-    // Byg markedDays som { "1": { "2025-08-01": {...}, ... }, ... }
     const payloadMarkedDays = {};
     selectedClients.forEach(cid => {
       const clientKey = String(cid);
       payloadMarkedDays[clientKey] = {};
       allDates.forEach(dateStr => {
-        // Brug markedDays[cid] hvis du har marking for hver, ellers markedDays[activeClient]
         const md = markedDays[cid]?.[dateStr] || markedDays[activeClient]?.[dateStr];
         if (md && md.status === "on") {
           const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
@@ -407,7 +405,6 @@ export default function CalendarPage() {
             status: "off"
           };
         } else {
-          // Alle ikke-markerede dage får status off (så der ALTID er noget for alle dage)
           payloadMarkedDays[clientKey][dateStr] = {
             status: "off"
           };
@@ -465,6 +462,21 @@ export default function CalendarPage() {
   const clientMarkedDays = markedDays[activeClient];
   const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
 
+  // Tekst: "Viser kalender for: ..." og evt. ekstra tekst hvis flere klienter valgt
+  let kalenderTekst = "";
+  if (activeClient) {
+    const navn = clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Ingen valgt";
+    if (selectedClients.length > 1) {
+      const andre = clients.filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
+                           .map(c => c.locality || c.name)
+                           .filter(Boolean)
+                           .join(", ");
+      kalenderTekst = `Viser kalender for: ${navn} - ændringerne slår også igennem i (${andre})`;
+    } else {
+      kalenderTekst = `Viser kalender for: ${navn}`;
+    }
+  }
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
       {/* Sæsonvælger */}
@@ -492,7 +504,6 @@ export default function CalendarPage() {
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
           Godkendte klienter
         </Typography>
-        {/* Refresh-knap oppe i højre hjørne */}
         <IconButton
           aria-label="Opdater klienter"
           onClick={fetchClients}
@@ -520,9 +531,11 @@ export default function CalendarPage() {
           selected={selectedClients}
           onChange={handleClientSelectorChange}
         />
-        <Typography variant="body2" sx={{ mt: 2 }}>
-          Viser kalender for: <b>{clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Ingen valgt"}</b>
-        </Typography>
+        {kalenderTekst && (
+          <Typography variant="body2" sx={{ mt: 2 }}>
+            {kalenderTekst}
+          </Typography>
+        )}
       </Paper>
 
       {/* Switch/kontakt for markering og GEM-knap */}
@@ -599,6 +612,7 @@ export default function CalendarPage() {
         date={editDialogDate}
         clientId={editDialogClient}
         onSaved={handleSaveDateTime}
+        localMarkedDays={markedDays[editDialogClient]}
       />
 
       <Snackbar
