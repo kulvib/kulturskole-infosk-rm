@@ -53,6 +53,11 @@ function getDefaultTimes(dateStr) {
   }
 }
 
+function stripTimeFromDateKey(key) {
+  // Stripper "T00:00:00" hvis det findes
+  return key.split("T")[0];
+}
+
 function MonthCalendar({
   name,
   month,
@@ -207,9 +212,15 @@ export default function CalendarPage() {
     getMarkedDays(selectedSeason, activeClient)
       .then(data => {
         if (isCurrent) {
+          // Map keys to strip time-part, so "2025-08-06T00:00:00" -> "2025-08-06"
+          const rawDays = data.markedDays || {};
+          const mapped = {};
+          Object.keys(rawDays).forEach(key => {
+            mapped[stripTimeFromDateKey(key)] = rawDays[key];
+          });
           setMarkedDays(prev => ({
             ...prev,
-            [activeClient]: data.markedDays || {}
+            [activeClient]: mapped
           }));
         }
       })
@@ -349,9 +360,15 @@ export default function CalendarPage() {
       if (activeClient) {
         try {
           const data = await getMarkedDays(selectedSeason, activeClient);
+          // Map keys to strip time-part:
+          const rawDays = data.markedDays || {};
+          const mapped = {};
+          Object.keys(rawDays).forEach(key => {
+            mapped[stripTimeFromDateKey(key)] = rawDays[key];
+          });
           setMarkedDays(prev => ({
             ...prev,
-            [activeClient]: data.markedDays || {}
+            [activeClient]: mapped
           }));
         } catch (e) {
           setMarkedDays(prev => ({
@@ -484,27 +501,32 @@ export default function CalendarPage() {
           gap: 3,
         }}
       >
-        {activeClient &&
-          (loadingMarkedDays ? (
-            <Box sx={{ textAlign: "center", mt: 6, gridColumn: "1/-1" }}>
-              <CircularProgress />
-              <Typography variant="body2" sx={{ mt: 2 }}>Henter kalender...</Typography>
-            </Box>
-          ) : (
-            schoolYearMonths.map(({ name, month, year }, idx) => (
-              <MonthCalendar
-                key={name + year}
-                name={name}
-                month={month}
-                year={year}
-                clientId={activeClient}
-                markedDays={markedDays}
-                markMode={markMode}
-                onDayClick={handleDayClick}
-                onDateDoubleClick={handleDateDoubleClick}
-              />
-            ))
-          ))}
+        {!activeClient && (
+          <Typography sx={{ mt: 4, textAlign: "center", gridColumn: "1/-1" }}>
+            Vælg en klient for at se kalenderen.
+          </Typography>
+        )}
+        {activeClient && loadingMarkedDays && (
+          <Box sx={{ textAlign: "center", mt: 6, gridColumn: "1/-1" }}>
+            <CircularProgress />
+            <Typography variant="body2" sx={{ mt: 2 }}>Henter kalender...</Typography>
+          </Box>
+        )}
+        {activeClient && !loadingMarkedDays &&
+          schoolYearMonths.map(({ name, month, year }, idx) => (
+            <MonthCalendar
+              key={name + year}
+              name={name}
+              month={month}
+              year={year}
+              clientId={activeClient}
+              markedDays={markedDays}
+              markMode={markMode}
+              onDayClick={handleDayClick}
+              onDateDoubleClick={handleDateDoubleClick}
+            />
+          ))
+        }
       </Box>
 
       {/* Dialog til redigering af tid */}
