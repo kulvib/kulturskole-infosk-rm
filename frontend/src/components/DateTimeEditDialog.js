@@ -39,7 +39,7 @@ export default function DateTimeEditDialog({
   const [showTopError, setShowTopError] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
 
-  // Hent tider fra API når dialog åbner
+  // Hent tider fra API når dialog åbner eller localMarkedDays opdateres (fx efter save i parent)
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
@@ -65,6 +65,7 @@ export default function DateTimeEditDialog({
           const matchKey = allKeys.find(k => stripTimeFromDateKey(k) === date);
           if (matchKey) found = data.markedDays[matchKey];
         }
+        // Brug evt. lokal cache hvis ikke fundet
         if (!found && localMarkedDays && localMarkedDays[date]) {
           found = localMarkedDays[date];
         }
@@ -83,6 +84,15 @@ export default function DateTimeEditDialog({
       })
       .finally(() => setLoading(false));
   }, [open, date, clientId, localMarkedDays]);
+
+  // Hvis localMarkedDays ændrer sig mens dialogen er åben, opdater felterne
+  useEffect(() => {
+    if (!open || !date || !clientId) return;
+    if (localMarkedDays && localMarkedDays[date]) {
+      setOnTime(localMarkedDays[date]?.onTime?.replace(/\./g, ":") || "");
+      setOffTime(localMarkedDays[date]?.offTime?.replace(/\./g, ":") || "");
+    }
+  }, [localMarkedDays, date, clientId, open]);
 
   // Luk dialogen automatisk 1 sekund efter "Gemt" vises
   useEffect(() => {
@@ -111,7 +121,7 @@ export default function DateTimeEditDialog({
     return true;
   };
 
-  // VIGTIG: Merge ændring ind, bevar øvrige dage!
+  // Merge ændring ind i eksisterende objekt for klienten
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
@@ -172,7 +182,7 @@ export default function DateTimeEditDialog({
         return;
       }
       if (onSaved) await onSaved({ date: normalizedDate, clientId });
-      setShowSaved(true); // Vis gemt-indikator
+      setShowSaved(true);
     } catch (e) {
       setError(e.message || "Kunne ikke gemme tid til serveren.");
       setShowTopError(true);
