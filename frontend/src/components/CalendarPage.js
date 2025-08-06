@@ -7,7 +7,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
-import ClientSelector from "./ClientSelector"; // Integreret komponent
+import ClientSelector from "./ClientSelector"; // Integreret
 
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
@@ -232,7 +232,7 @@ export default function CalendarPage() {
     return () => { isCurrent = false; };
   }, [selectedSeason, activeClient, token]);
 
-  // Integreret ClientSelector: valg af flere klienter
+  // ClientSelector integration
   const handleClientSelectorChange = (newSelected) => {
     setSelectedClients(newSelected);
     // Sæt aktiv klient til den senest valgte, hvis den forrige ikke længere er valgt
