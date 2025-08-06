@@ -10,17 +10,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 
-// Helper to get default times based on weekday/weekend
-const getDefaultTimes = (dateStr) => {
-  const dateObj = new Date(dateStr);
-  const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-  return {
-    onTime: isWeekend ? "08:00" : "09:00",
-    offTime: isWeekend ? "18:00" : "22:30",
-  };
-};
-
-// Helper to strip time-part from a possible ISO date string
+// Hjælpefunktion til at strippe tid fra dato
 const stripTimeFromDateKey = (key) => key.split("T")[0];
 
 export default function DateTimeEditDialog({
@@ -36,38 +26,33 @@ export default function DateTimeEditDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Hent tider fra API når dialog åbner
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
     setError("");
     fetch(
-      `https://kulturskole-infosk-rm.onrender.com/api/calendar/marked-days?clientId=${encodeURIComponent(clientId)}&season=${date.substring(0,4)}`
+      `/api/calendar/marked-days?clientId=${encodeURIComponent(clientId)}&season=${date.substring(0, 4)}`
     )
       .then(res => {
         if (!res.ok) throw new Error("Fejl ved hentning");
         return res.json();
       })
       .then(data => {
+        // Find dagens entry (både med og uden tid-del)
         const allKeys = Object.keys(data.markedDays || {});
         let found = data.markedDays[date];
         if (!found) {
           const matchKey = allKeys.find(k => stripTimeFromDateKey(k) === date);
           if (matchKey) found = data.markedDays[matchKey];
         }
-        if (found && found.status === "on") {
-          setOnTime((found.onTime || getDefaultTimes(date).onTime).replace(/\./g, ":"));
-          setOffTime((found.offTime || getDefaultTimes(date).offTime).replace(/\./g, ":"));
-        } else {
-          const defaults = getDefaultTimes(date);
-          setOnTime(defaults.onTime);
-          setOffTime(defaults.offTime);
-        }
+        setOnTime(found?.onTime?.replace(/\./g, ":") || "");
+        setOffTime(found?.offTime?.replace(/\./g, ":") || "");
       })
       .catch(() => {
-        const defaults = getDefaultTimes(date);
-        setOnTime(defaults.onTime);
-        setOffTime(defaults.offTime);
-        setError("Kunne ikke hente tider. Viser standardtidspunkter.");
+        setOnTime("");
+        setOffTime("");
+        setError("Kunne ikke hente tider fra serveren.");
       })
       .finally(() => setLoading(false));
   }, [open, date, clientId]);
@@ -87,9 +72,6 @@ export default function DateTimeEditDialog({
   };
 
   const handleSave = async () => {
-    // auto-formatter evt. punktum til kolon!
-    const normOnTime = onTime.replace(/\./g, ":");
-    const normOffTime = offTime.replace(/\./g, ":");
     if (!validate()) return;
     setSaving(true);
     setError("");
@@ -98,11 +80,11 @@ export default function DateTimeEditDialog({
       const payload = {
         date: normalizedDate,
         clientId,
-        onTime: normOnTime,
-        offTime: normOffTime,
+        onTime: onTime.replace(/\./g, ":"),
+        offTime: offTime.replace(/\./g, ":"),
       };
       const res = await fetch(
-        "https://kulturskole-infosk-rm.onrender.com/api/calendar/marked-days",
+        "/api/calendar/marked-days",
         {
           method: "POST",
           headers: { "Content-Type": "application/json", accept: "application/json" },
@@ -110,7 +92,7 @@ export default function DateTimeEditDialog({
         }
       );
       if (!res.ok) throw new Error("Fejl ved gem");
-      if (onSaved) onSaved({ date: normalizedDate, clientId, onTime: normOnTime, offTime: normOffTime });
+      if (onSaved) await onSaved({ date: normalizedDate, clientId });
       onClose();
     } catch {
       setError("Kunne ikke gemme tid til serveren.");
@@ -118,7 +100,7 @@ export default function DateTimeEditDialog({
     setSaving(false);
   };
 
-  // Format date for display
+  // Formatér dato til visning
   const displayDate = (() => {
     try {
       const d = new Date(date);
