@@ -378,29 +378,26 @@ export default function CalendarPage() {
       }
     });
 
-    const baseMarked = markedDays[activeClient] || {};
-
-    // Byg et array med både client_id og dato for hver entry
-    const payloadMarkedDays = [];
-    allDates.forEach(dateStr => {
-      selectedClients.forEach(cid => {
-        const md = baseMarked[dateStr];
+    // Byg markedDays som { "1": { "2025-08-01": {...}, ... }, ... }
+    const payloadMarkedDays = {};
+    selectedClients.forEach(cid => {
+      const clientKey = String(cid);
+      payloadMarkedDays[clientKey] = {};
+      allDates.forEach(dateStr => {
+        // Brug markedDays[cid] hvis du har marking for hver, ellers markedDays[activeClient]
+        const md = markedDays[cid]?.[dateStr] || markedDays[activeClient]?.[dateStr];
         if (md && md.status === "on") {
           const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
           const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
-          payloadMarkedDays.push({
-            client_id: cid,
-            date: dateStr,
+          payloadMarkedDays[clientKey][dateStr] = {
             status: "on",
             onTime,
             offTime
-          });
-        } else {
-          payloadMarkedDays.push({
-            client_id: cid,
-            date: dateStr,
+          };
+        } else if (md && md.status === "off") {
+          payloadMarkedDays[clientKey][dateStr] = {
             status: "off"
-          });
+          };
         }
       });
     });
@@ -410,6 +407,9 @@ export default function CalendarPage() {
       markedDays: payloadMarkedDays,
       season: selectedSeason
     };
+
+    // FEJLDEBUG: se hvad der sendes til API
+    console.log("Payload til saveMarkedDays", payload);
 
     try {
       await saveMarkedDays(payload);
