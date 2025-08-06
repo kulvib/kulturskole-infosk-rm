@@ -10,7 +10,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 
-// Hjælpefunktion til at strippe tid fra dato
+// Helper to strip time from ISO date key
 const stripTimeFromDateKey = (key) => key.split("T")[0];
 
 export default function DateTimeEditDialog({
@@ -26,7 +26,7 @@ export default function DateTimeEditDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Hent tider fra API når dialog åbner
+  // Fetch times from API when dialog opens
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
@@ -39,7 +39,7 @@ export default function DateTimeEditDialog({
         return res.json();
       })
       .then(data => {
-        // Find dagens entry (både med og uden tid-del)
+        // Find entry for day (with or without time part)
         const allKeys = Object.keys(data.markedDays || {});
         let found = data.markedDays[date];
         if (!found) {
@@ -100,7 +100,7 @@ export default function DateTimeEditDialog({
     setSaving(false);
   };
 
-  // Formatér dato til visning
+  // Format date for display
   const displayDate = (() => {
     try {
       const d = new Date(date);
