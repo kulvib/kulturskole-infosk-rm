@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Snackbar, Alert,
+  Snackbar, Alert, Checkbox, List, ListItem, ListItemText, TextField
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
-import ClientSelector from "./ClientSelector";
 
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
@@ -56,6 +55,55 @@ function getDefaultTimes(dateStr) {
 
 function stripTimeFromDateKey(key) {
   return key.split("T")[0];
+}
+
+// ClientSelector inline (uden separat fil)
+function ClientSelectorInline({ clients, selected, onChange }) {
+  const [search, setSearch] = useState("");
+
+  const filteredClients = clients.filter(c =>
+    (c.locality || c.name || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleToggle = (id) => {
+    if (selected.includes(id)) {
+      onChange(selected.filter(sid => sid !== id));
+    } else {
+      onChange([...selected, id]);
+    }
+  };
+
+  return (
+    <Box>
+      <TextField
+        label="Søg klient"
+        variant="outlined"
+        size="small"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        sx={{ mb: 2 }}
+      />
+      <List dense>
+        {filteredClients.map(client => (
+          <ListItem
+            key={client.id}
+            button
+            onClick={() => handleToggle(client.id)}
+          >
+            <Checkbox
+              edge="start"
+              checked={selected.includes(client.id)}
+              tabIndex={-1}
+              disableRipple
+            />
+            <ListItemText
+              primary={client.locality || client.name || "Ingen lokalitet"}
+            />
+          </ListItem>
+        ))}
+      </List>
+    </Box>
+  );
 }
 
 function MonthCalendar({
@@ -383,12 +431,12 @@ export default function CalendarPage() {
         </Box>
       </Paper>
 
-      {/* Klientvælger med checkboxes og søgning */}
+      {/* Klientvælger inline */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
           Godkendte klienter
         </Typography>
-        <ClientSelector
+        <ClientSelectorInline
           clients={clients}
           selected={selectedClients}
           onChange={handleClientSelectorChange}
