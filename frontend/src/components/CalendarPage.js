@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Checkbox, Snackbar, Alert,
-  Dialog, DialogTitle, DialogContent, List, ListItem
+  Snackbar, Alert,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
@@ -181,9 +180,6 @@ export default function CalendarPage() {
   const [editDialogDate, setEditDialogDate] = useState(null);
   const [editDialogClient, setEditDialogClient] = useState(null);
 
-  // Dialog state for klientvalg
-  const [clientDialogOpen, setClientDialogOpen] = useState(false);
-
   const seasons = getSeasons(2025, 2040);
 
   // Hent klienter
@@ -246,12 +242,9 @@ export default function CalendarPage() {
     if (ids.length > 0) setActiveClient(ids[ids.length - 1]);
   };
 
-  // Dialog kontrol
-  const openClientDialog = () => setClientDialogOpen(true);
-  const closeClientDialog = () => setClientDialogOpen(false);
-
-  // Drag-to-select markering
+  // Drag-to-select markering for kun activeClient
   const handleDayClick = (clientIds, dateString, mode, markedDays) => {
+    // clientIds er altid kun [activeClient] nu
     setMarkedDays(prev => {
       const updated = { ...prev };
       clientIds.forEach(cid => {
@@ -276,7 +269,7 @@ export default function CalendarPage() {
     setEditDialogOpen(true);
   };
 
-  // Gem custom tid for en specifik dato/klient
+  // Gem custom tid for en specifik dato/klient (kun for activeClient)
   const handleSaveDateTime = ({ clientId, date, onTime, offTime }) => {
     setMarkedDays(prev => {
       const updated = { ...prev };
@@ -291,7 +284,7 @@ export default function CalendarPage() {
     setSnackbar({ open: true, message: "Tider opdateret!", severity: "success" });
   };
 
-  // GEM sender ALLE datoer for valgte klienter, med status og tid
+  // GEM: Gem den viste kalender (activeClient) på ALLE markerede klienter
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
   const handleSave = async () => {
@@ -299,7 +292,12 @@ export default function CalendarPage() {
       setSnackbar({ open: true, message: "Ingen klienter valgt", severity: "warning" });
       return;
     }
+    if (!activeClient) {
+      setSnackbar({ open: true, message: "Ingen aktiv klient valgt", severity: "warning" });
+      return;
+    }
 
+    // Find alle datoer i skoleåret
     const allDates = [];
     schoolYearMonths.forEach(({ month, year }) => {
       const daysInMonth = getDaysInMonth(month, year);
@@ -308,12 +306,16 @@ export default function CalendarPage() {
       }
     });
 
+    // Brug kun markedDays[activeClient] som skabelon
+    const baseMarked = markedDays[activeClient] || {};
+
+    // Lav payload til alle markerede klienter
     const payloadMarkedDays = {};
     selectedClients.forEach(cid => {
       payloadMarkedDays[cid] = {};
       allDates.forEach(dateStr => {
-        if (markedDays[cid] && markedDays[cid][dateStr]) {
-          const md = markedDays[cid][dateStr];
+        if (baseMarked[dateStr]) {
+          const md = baseMarked[dateStr];
           if (md.status === "on") {
             const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
             const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
@@ -322,6 +324,7 @@ export default function CalendarPage() {
             payloadMarkedDays[cid][dateStr] = { status: "off" };
           }
         } else {
+          // Hvis ikke markeret specifikt, brug default on
           const { onTime, offTime } = getDefaultTimes(dateStr);
           payloadMarkedDays[cid][dateStr] = { status: "on", onTime, offTime };
         }
@@ -337,6 +340,7 @@ export default function CalendarPage() {
     try {
       await saveMarkedDays(payload);
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
+      // Hent opdaterede markeringer for alle markerede klienter (så alt vises korrekt næste gang)
       for (const clientId of selectedClients) {
         try {
           const data = await getMarkedDays(selectedSeason, clientId);
@@ -390,7 +394,7 @@ export default function CalendarPage() {
               <Button
                 key={client.id}
                 variant={selectedClients.includes(client.id) ? "contained" : "outlined"}
-                color={activeClient === client.id ? "primary" : "inherit"} // <--- Rettet her!
+                color={activeClient === client.id ? "primary" : "inherit"}
                 onClick={() => {
                   handleClientToggle(client.id);
                 }}
@@ -401,11 +405,6 @@ export default function CalendarPage() {
                   boxShadow: activeClient === client.id ? "0 0 0 2px #1976d2" : "none"
                 }}
               >
-                <Checkbox
-                  checked={selectedClients.includes(client.id)}
-                  onChange={() => handleClientToggle(client.id)}
-                  sx={{ p: 0.5 }}
-                />
                 {client.locality || client.name || "Ingen lokalitet"}
               </Button>
             ))}
