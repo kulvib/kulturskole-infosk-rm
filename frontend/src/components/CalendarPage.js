@@ -157,7 +157,7 @@ function MonthCalendar({
   markedDays,
   markMode,
   onDayClick,
-  onDateDoubleClick,
+  onDateRightClick,
   loadingDialogDate,
   loadingDialogClient
 }) {
@@ -241,20 +241,21 @@ function MonthCalendar({
                   }}
                   title={
                     cellStatus === "on"
-                      ? "Tændt (dobbeltklik for tid)"
+                      ? "Tændt (højreklik for tid)"
                       : cellStatus === "off"
                         ? "Slukket"
                         : ""
                   }
                   onMouseDown={() => handleMouseDown(dateString)}
                   onMouseEnter={() => handleMouseEnter(dateString)}
-                  onDoubleClick={() => {
+                  onContextMenu={e => {
+                    e.preventDefault();
                     if (
                       clientId &&
                       markedDays?.[clientId]?.[dateString]?.status === "on" &&
                       !isLoading
                     ) {
-                      onDateDoubleClick(clientId, dateString);
+                      onDateRightClick(clientId, dateString);
                     }
                   }}
                 >
@@ -395,14 +396,12 @@ export default function CalendarPage() {
     });
   };
 
-  // Dobbeltklik på dato: stop autosave og åbn dialogen STRAKS
-  const handleDateDoubleClick = (clientId, date) => {
-    // Stop autosave
+  // HØJREKLIK handler
+  const handleDateRightClick = (clientId, date) => {
     if (autoSaveTimer.current) {
       clearTimeout(autoSaveTimer.current);
       autoSaveTimer.current = null;
     }
-    // Åbn dialogen direkte (ingen delay)
     setLoadingDialogDate(null);
     setLoadingDialogClient(null);
     setEditDialogClient(clientId);
@@ -428,7 +427,6 @@ export default function CalendarPage() {
       lastDialogSavedMarkedDays.current = { ...markedDays, [clientId]: mapped };
       lastDialogSavedTimestamp.current = Date.now();
 
-      // Synlig feedback i kalenderen (grøn "Gemt" i 2 sek)
       setSaveStatus({ status: "success", message: "Gemt" });
       if (saveIndicatorTimer.current) clearTimeout(saveIndicatorTimer.current);
       saveIndicatorTimer.current = setTimeout(() => {
@@ -685,7 +683,7 @@ export default function CalendarPage() {
               markedDays={markedDays}
               markMode={markMode}
               onDayClick={handleDayClick}
-              onDateDoubleClick={handleDateDoubleClick}
+              onDateRightClick={handleDateRightClick}
               loadingDialogDate={loadingDialogDate}
               loadingDialogClient={loadingDialogClient}
             />
