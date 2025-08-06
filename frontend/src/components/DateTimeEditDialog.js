@@ -16,131 +16,83 @@ import {
  * - onClose: function
  * - date: string (YYYY-MM-DD)
  * - clientId: string
- * - defaultTimes: { onTime, offTime }
- * - season: string (f.eks. "2025")
- *
- * Denne komponent henter selv data fra din backend når den åbnes,
- * og gemmer data til din backend når du trykker "Gem".
  */
 export default function DateTimeEditDialog({
   open,
   onClose,
   date,
   clientId,
-  defaultTimes = { onTime: "08:00", offTime: "18:00" },
-  season = "",
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [apiError, setApiError] = useState("");
 
   // Robust: erstatter ALLE punktummer med kolon
   const formatTime = t =>
     t && typeof t === "string" ? t.replace(/\./g, ":") : "";
 
-  // Hent eksisterende tider fra backend når dialogen åbnes
+  // Hent tider fra backend når dialogen åbnes
   useEffect(() => {
     if (!open || !date || !clientId) return;
-    let ignore = false;
-    async function fetchTime() {
-      setLoading(true);
-      setApiError("");
-      setError("");
-      try {
-        const res = await fetch(
-          `/api/times?date=${encodeURIComponent(date)}&clientId=${encodeURIComponent(clientId)}`
-        );
-        if (!res.ok) throw new Error("Kunne ikke hente tid fra serveren");
-        const data = await res.json();
-        setOnTime(
-          data && data.onTime ? formatTime(data.onTime) : formatTime(defaultTimes.onTime)
-        );
-        setOffTime(
-          data && data.offTime ? formatTime(data.offTime) : formatTime(defaultTimes.offTime)
-        );
-      } catch (err) {
-        setOnTime(formatTime(defaultTimes.onTime));
-        setOffTime(formatTime(defaultTimes.offTime));
-        setApiError("Kunne ikke hente tid fra serveren.");
-      }
-      setLoading(false);
-    }
-    fetchTime();
-    return () => {
-      ignore = true;
-    };
-    // eslint-disable-next-line
-  }, [open, date, clientId, defaultTimes.onTime, defaultTimes.offTime]);
+    setLoading(true);
+    setError("");
+    fetch(`/api/times?date=${encodeURIComponent(date)}&clientId=${encodeURIComponent(clientId)}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Fejl ved hentning af tider");
+        return res.json();
+      })
+      .then(data => {
+        setOnTime(data.onTime ? formatTime(data.onTime) : "");
+        setOffTime(data.offTime ? formatTime(data.offTime) : "");
+      })
+      .catch(() => {
+        setOnTime("");
+        setOffTime("");
+        setError("Kunne ikke hente tider.");
+      })
+      .finally(() => setLoading(false));
+  }, [open, date, clientId]);
 
-  // Ekstra validering: Tider skal være gyldige og onTime < offTime
+  // Validering
   const validate = () => {
     if (!onTime || !offTime) {
       setError("Begge tidspunkter skal udfyldes.");
       return false;
     }
-    // Tjek format (skal være HH:MM og 00 ≤ MM < 60)
     const timeRegex = /^\d{2}:\d{2}$/;
     if (!timeRegex.test(onTime) || !timeRegex.test(offTime)) {
       setError("Tid skal være i formatet 08:00 eller 18:30.");
-      return false;
-    }
-    // Sammenlign tider
-    const [onH, onM] = onTime.split(":").map(Number);
-    const [offH, offM] = offTime.split(":").map(Number);
-    if (onH > 23 || offH > 23 || onM > 59 || offM > 59) {
-      setError("Tid skal være gyldig (00:00 - 23:59).");
-      return false;
-    }
-    if (onH > offH || (onH === offH && onM >= offM)) {
-      setError("Tænd-tid skal være før sluk-tid.");
       return false;
     }
     setError("");
     return true;
   };
 
-  // Gem tider til backend
+  // POST til backend
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
-    setApiError("");
+    setError("");
     try {
-      // Byg payload til backend
       const payload = {
-        markedDays: {
-          [date]: {
-            onTime,
-            offTime,
-            status: "on",
-          },
-        },
-        clients: [clientId],
-        season: season || (date ? date.split("-")[0] : ""),
+        date,
+        clientId,
+        onTime,
+        offTime,
       };
-      const res = await fetch("/api/times", {
-        method: "POST", // eller "PUT" alt efter din backend
+      const res = await fetch(`/api/times`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) {
-        let msg = "Kunne ikke gemme tid til serveren.";
-        try {
-          const err = await res.json();
-          if (err && err.detail) msg += " " + JSON.stringify(err.detail);
-        } catch {}
-        throw new Error(msg);
-      }
-      setSaving(false);
+      if (!res.ok) throw new Error("Fejl ved gem");
       onClose();
-    } catch (err) {
-      setApiError(
-        err?.message || "Kunne ikke gemme tid til serveren."
-      );
-      setSaving(false);
+    } catch {
+      setError("Kunne ikke gemme tid til serveren.");
     }
+    setSaving(false);
   };
 
   // Dansk format: lørdag d. 2. august 2025 (aldrig forkortet)
@@ -172,8 +124,7 @@ export default function DateTimeEditDialog({
         ) : (
           <>
             <Typography variant="body2" sx={{ mb: 2 }}>
-              Indstil tænd/sluk-tidspunkt for denne dag.<br />
-              Standard: {formatTime(defaultTimes?.onTime)} – {formatTime(defaultTimes?.offTime)}
+              Indstil tænd/sluk-tidspunkt for denne dag.
             </Typography>
             <TextField
               label="Tænd tid"
@@ -195,8 +146,8 @@ export default function DateTimeEditDialog({
               error={Boolean(error)}
               helperText={error}
             />
-            {apiError && (
-              <Typography sx={{ color: "red", mt: 1 }}>{apiError}</Typography>
+            {error && (
+              <Typography sx={{ color: "red", mt: 1 }}>{error}</Typography>
             )}
           </>
         )}
