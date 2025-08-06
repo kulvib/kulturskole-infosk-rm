@@ -199,27 +199,30 @@ export default function CalendarPage() {
     fetchClients();
   }, [fetchClients]);
 
-  // Hent markeringer for alle markerede klienter
+  // Hent markeringer for KUN activeClient og selectedSeason
   useEffect(() => {
-    async function fetchMarkedDaysForAll() {
-      if (selectedClients.length === 0) return;
-      for (const clientId of selectedClients) {
-        try {
-          const data = await getMarkedDays(selectedSeason, clientId);
+    if (!activeClient) return;
+    setMarkedDays(prev => ({ ...prev, [activeClient]: undefined })); // Nulstil mens vi loader
+    let isCurrent = true;
+    getMarkedDays(selectedSeason, activeClient)
+      .then(data => {
+        if (isCurrent) {
           setMarkedDays(prev => ({
             ...prev,
-            [clientId]: data.markedDays || {}
-          }));
-        } catch (e) {
-          setMarkedDays(prev => ({
-            ...prev,
-            [clientId]: {}
+            [activeClient]: data.markedDays || {}
           }));
         }
-      }
-    }
-    fetchMarkedDaysForAll();
-  }, [selectedSeason, selectedClients, token]);
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setMarkedDays(prev => ({
+            ...prev,
+            [activeClient]: {}
+          }));
+        }
+      });
+    return () => { isCurrent = false; };
+  }, [selectedSeason, activeClient, token]);
 
   // Vælg/fjern individuel klient
   const handleClientToggle = (id) => {
@@ -244,7 +247,6 @@ export default function CalendarPage() {
 
   // Drag-to-select markering for kun activeClient
   const handleDayClick = (clientIds, dateString, mode, markedDays) => {
-    // clientIds er altid kun [activeClient] nu
     setMarkedDays(prev => {
       const updated = { ...prev };
       clientIds.forEach(cid => {
@@ -340,18 +342,18 @@ export default function CalendarPage() {
     try {
       await saveMarkedDays(payload);
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
-      // Hent opdaterede markeringer for alle markerede klienter (så alt vises korrekt næste gang)
-      for (const clientId of selectedClients) {
+      // Hent opdaterede markeringer for den aktive klient (så alt vises korrekt næste gang)
+      if (activeClient) {
         try {
-          const data = await getMarkedDays(selectedSeason, clientId);
+          const data = await getMarkedDays(selectedSeason, activeClient);
           setMarkedDays(prev => ({
             ...prev,
-            [clientId]: data.markedDays || {}
+            [activeClient]: data.markedDays || {}
           }));
         } catch (e) {
           setMarkedDays(prev => ({
             ...prev,
-            [clientId]: {}
+            [activeClient]: {}
           }));
         }
       }
@@ -359,6 +361,10 @@ export default function CalendarPage() {
       setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
     }
   };
+
+  // Kalender loading state for aktiv klient
+  const clientMarkedDays = markedDays[activeClient];
+  const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
 
   // --- UI ---
   return (
@@ -476,18 +482,25 @@ export default function CalendarPage() {
         }}
       >
         {activeClient &&
-          schoolYearMonths.map(({ name, month, year }, idx) => (
-            <MonthCalendar
-              key={name + year}
-              name={name}
-              month={month}
-              year={year}
-              clientId={activeClient}
-              markedDays={markedDays}
-              markMode={markMode}
-              onDayClick={handleDayClick}
-              onDateDoubleClick={handleDateDoubleClick}
-            />
+          (loadingMarkedDays ? (
+            <Box sx={{ textAlign: "center", mt: 6, gridColumn: "1/-1" }}>
+              <CircularProgress />
+              <Typography variant="body2" sx={{ mt: 2 }}>Henter kalender...</Typography>
+            </Box>
+          ) : (
+            schoolYearMonths.map(({ name, month, year }, idx) => (
+              <MonthCalendar
+                key={name + year}
+                name={name}
+                month={month}
+                year={year}
+                clientId={activeClient}
+                markedDays={markedDays}
+                markMode={markMode}
+                onDayClick={handleDayClick}
+                onDateDoubleClick={handleDateDoubleClick}
+              />
+            ))
           ))}
       </Box>
 
