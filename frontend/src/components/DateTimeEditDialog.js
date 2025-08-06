@@ -15,6 +15,11 @@ const stripTimeFromDateKey = (key) => key.split("T")[0];
 
 const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
 
+// Hent token fra localStorage (samme metode som i api.js)
+function getToken() {
+  return localStorage.getItem("token");
+}
+
 export default function DateTimeEditDialog({
   open,
   onClose,
@@ -33,8 +38,13 @@ export default function DateTimeEditDialog({
     if (!open || !date || !clientId) return;
     setLoading(true);
     setError("");
+
+    const token = getToken();
     fetch(
-      `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${date.substring(0, 4)}`
+      `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${date.substring(0, 4)}`,
+      token
+        ? { headers: { Authorization: "Bearer " + token } }
+        : undefined
     )
       .then(res => {
         if (!res.ok) throw new Error("Fejl ved hentning");
@@ -64,7 +74,6 @@ export default function DateTimeEditDialog({
       setError("Begge tidspunkter skal udfyldes.");
       return false;
     }
-    // Only allow ":" as separator for type="time"
     const timeRegex = /^\d{2}:\d{2}$/;
     if (!timeRegex.test(onTime) || !timeRegex.test(offTime)) {
       setError("Tid skal være i formatet 08:00 eller 18:30.");
@@ -74,12 +83,12 @@ export default function DateTimeEditDialog({
     return true;
   };
 
-  // Normalize to "HH:mm" with colon before saving
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
     setError("");
     try {
+      const token = getToken();
       const normalizedDate = date.length === 10 ? date + "T00:00:00" : date;
       const payload = {
         date: normalizedDate,
@@ -91,15 +100,26 @@ export default function DateTimeEditDialog({
         `${API_BASE}/api/calendar/marked-days`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json", accept: "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            accept: "application/json",
+            ...(token ? { Authorization: "Bearer " + token } : {}),
+          },
           body: JSON.stringify(payload),
         }
       );
-      if (!res.ok) throw new Error("Fejl ved gem");
+      if (!res.ok) {
+        let msg = "Fejl ved gem";
+        try {
+          const data = await res.json();
+          msg = data.detail || data.message || msg;
+        } catch {}
+        throw new Error(msg);
+      }
       if (onSaved) await onSaved({ date: normalizedDate, clientId });
       onClose();
-    } catch {
-      setError("Kunne ikke gemme tid til serveren.");
+    } catch (e) {
+      setError(e.message || "Kunne ikke gemme tid til serveren.");
     }
     setSaving(false);
   };
@@ -119,7 +139,6 @@ export default function DateTimeEditDialog({
     return date;
   })();
 
-  // Only allow ":" as separator in the input (and auto-convert "." to ":")
   const handleOnTimeChange = (e) => {
     const value = e.target.value.replace(/\./g, ":");
     setOnTime(value);
