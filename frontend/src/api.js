@@ -255,13 +255,9 @@ export async function getMarkedDays(season, client_id) {
   const res = await fetch(`${apiUrl}/api/calendar/marked-days?season=${season}&client_id=${client_id}`, {
     headers: { Authorization: "Bearer " + token },
   });
+  // ÆNDRING: Returner altid {markedDays: {}} hvis fejl, så loader aldrig fryser!
   if (!res.ok) {
-    let msg = "Kunne ikke hente kalender-markeringer";
-    try {
-      const data = await res.json();
-      msg = data.detail || data.message || msg;
-    } catch {}
-    throw new Error(msg);
+    return { markedDays: {} };
   }
   return await res.json();
 }
