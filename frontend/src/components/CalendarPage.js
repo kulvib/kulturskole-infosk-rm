@@ -398,6 +398,11 @@ export default function CalendarPage() {
           payloadMarkedDays[clientKey][dateStr] = {
             status: "off"
           };
+        } else {
+          // Alle ikke-markerede dage får status off (så der ALTID er noget for alle dage)
+          payloadMarkedDays[clientKey][dateStr] = {
+            status: "off"
+          };
         }
       });
     });
@@ -407,9 +412,6 @@ export default function CalendarPage() {
       markedDays: payloadMarkedDays,
       season: selectedSeason
     };
-
-    // FEJLDEBUG: se hvad der sendes til API
-    console.log("Payload til saveMarkedDays", payload);
 
     try {
       await saveMarkedDays(payload);
