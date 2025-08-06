@@ -282,6 +282,8 @@ export default function CalendarPage() {
   const [editDialogClient, setEditDialogClient] = useState(null);
   const [loadingDialogDate, setLoadingDialogDate] = useState(null);
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
+
+  // Feedback state for gemt/fejl
   const [saveStatus, setSaveStatus] = useState({ status: "idle", message: "" });
   const saveIndicatorTimer = useRef(null);
 
@@ -383,6 +385,7 @@ export default function CalendarPage() {
     }, 1000);
   };
 
+  // Opdater localMarkedDays for dialogen efter gem
   const handleSaveDateTime = async ({ date, clientId }) => {
     try {
       const data = await getMarkedDays(selectedSeason, clientId);
@@ -395,6 +398,12 @@ export default function CalendarPage() {
         ...prev,
         [clientId]: mapped
       }));
+      // Synlig feedback i kalenderen (grøn "Gemt" i 2 sek)
+      setSaveStatus({ status: "success", message: "Gemt" });
+      if (saveIndicatorTimer.current) clearTimeout(saveIndicatorTimer.current);
+      saveIndicatorTimer.current = setTimeout(() => {
+        setSaveStatus({ status: "idle", message: "" });
+      }, 2000);
     } catch {
       setSaveStatus({ status: "error", message: "Kunne ikke hente nyeste tider" });
     }
