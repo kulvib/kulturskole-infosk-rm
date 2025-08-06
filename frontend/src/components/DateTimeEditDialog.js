@@ -28,18 +28,18 @@ export default function DateTimeEditDialog({
   defaultTimes,
   onSave,
 }) {
-  const [onTime, setOnTime] = useState(defaultTimes?.onTime || "");
-  const [offTime, setOffTime] = useState(defaultTimes?.offTime || "");
+  const [onTime, setOnTime] = useState("");
+  const [offTime, setOffTime] = useState("");
 
   // Opdater visning når dialogen åbner eller data ændrer sig
   useEffect(() => {
     setOnTime(
-      customTime && customTime.onTime
+      customTime && typeof customTime.onTime === "string"
         ? customTime.onTime
         : defaultTimes?.onTime || ""
     );
     setOffTime(
-      customTime && customTime.offTime
+      customTime && typeof customTime.offTime === "string"
         ? customTime.offTime
         : defaultTimes?.offTime || ""
     );
@@ -58,6 +58,17 @@ export default function DateTimeEditDialog({
       onClose();
     }
   };
+
+  // Placeholder skal ALTID afspejle den aktuelle værdi fra databasen (altså customTime hvis den findes, ellers default)
+  const onTimePlaceholder =
+    customTime && typeof customTime.onTime === "string" && customTime.onTime
+      ? customTime.onTime
+      : defaultTimes?.onTime || "";
+
+  const offTimePlaceholder =
+    customTime && typeof customTime.offTime === "string" && customTime.offTime
+      ? customTime.offTime
+      : defaultTimes?.offTime || "";
 
   // Dansk dato-format eller YYYY-MM-DD fallback
   const displayDate = (() => {
@@ -92,12 +103,10 @@ export default function DateTimeEditDialog({
           onChange={e => setOnTime(e.target.value)}
           fullWidth
           sx={{ mb: 2 }}
-          inputProps={{ step: 300 }}
-          placeholder={
-            customTime && customTime.onTime
-              ? customTime.onTime
-              : defaultTimes?.onTime || ""
-          }
+          inputProps={{
+            step: 300,
+            placeholder: onTimePlaceholder,
+          }}
         />
         <TextField
           label="Sluk tid"
@@ -105,12 +114,10 @@ export default function DateTimeEditDialog({
           value={offTime}
           onChange={e => setOffTime(e.target.value)}
           fullWidth
-          inputProps={{ step: 300 }}
-          placeholder={
-            customTime && customTime.offTime
-              ? customTime.offTime
-              : defaultTimes?.offTime || ""
-          }
+          inputProps={{
+            step: 300,
+            placeholder: offTimePlaceholder,
+          }}
         />
       </DialogContent>
       <DialogActions>
