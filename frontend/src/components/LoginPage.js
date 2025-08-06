@@ -11,6 +11,7 @@ import {
   Paper,
   IconButton,
   InputAdornment,
+  CircularProgress,
 } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
@@ -23,6 +24,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState(""); // <- status tilføjet
 
   useEffect(() => {
     if (token) {
@@ -33,12 +35,15 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setStatus("Tjekker brugernavn og kodeord...");
     setLoading(true);
     try {
       const data = await login(username, password);
+      setStatus("Login gennemført. Omdirigerer...");
       loginUser(data.access_token);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Ukendt fejl.");
+      setStatus("Login mislykkedes.");
     }
     setLoading(false);
   };
@@ -112,9 +117,29 @@ export default function LoginPage() {
             disabled={loading}
             sx={{ mt: 1, fontWeight: 600 }}
           >
-            {loading ? "Logger ind..." : "Log ind"}
+            {loading ? (
+              <>
+                <CircularProgress size={22} sx={{ mr: 1, verticalAlign: "middle" }} />
+                Logger ind...
+              </>
+            ) : (
+              "Log ind"
+            )}
           </Button>
-          {error && <Alert severity="error">{error}</Alert>}
+          {/* Status vises her */}
+          {(status || error) && (
+            <Typography
+              sx={{
+                mt: 2,
+                color: error ? "error.main" : "text.secondary",
+                fontWeight: 500,
+                minHeight: 24,
+              }}
+              variant="body2"
+            >
+              {error ? error : status}
+            </Typography>
+          )}
         </Box>
       </Paper>
     </Box>
