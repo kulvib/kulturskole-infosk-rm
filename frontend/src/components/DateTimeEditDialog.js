@@ -93,6 +93,7 @@ export default function DateTimeEditDialog({
       const payload = {
         date: normalizedDate,
         client_id: clientId,
+        status: "on", // ALLTID med status
         onTime: onTime.replace(/\./g, ":"),
         offTime: offTime.replace(/\./g, ":"),
       };
