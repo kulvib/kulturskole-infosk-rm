@@ -224,17 +224,20 @@ export default function CalendarPage() {
     return () => { isCurrent = false; };
   }, [selectedSeason, activeClient, token]);
 
-  // Vælg/fjern individuel klient
+  // Vælg/fjern individuel klient (tillad flere markeret, kun én aktiv)
   const handleClientToggle = (id) => {
     setSelectedClients(prev => {
+      let newArr;
       if (prev.includes(id)) {
-        const filtered = prev.filter(x => x !== id);
-        setActiveClient(filtered.length > 0 ? filtered[filtered.length - 1] : null);
-        return filtered;
+        newArr = prev.filter(x => x !== id);
+        if (activeClient === id) {
+          setActiveClient(newArr.length > 0 ? newArr[newArr.length - 1] : null);
+        }
       } else {
+        newArr = [...prev, id];
         setActiveClient(id);
-        return [...prev, id];
       }
+      return newArr;
     });
   };
 
@@ -342,7 +345,7 @@ export default function CalendarPage() {
     try {
       await saveMarkedDays(payload);
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
-      // Hent opdaterede markeringer for den aktive klient (så alt vises korrekt næste gang)
+      // Hent opdaterede markeringer for AKTIV klient (så alt vises korrekt næste gang)
       if (activeClient) {
         try {
           const data = await getMarkedDays(selectedSeason, activeClient);
