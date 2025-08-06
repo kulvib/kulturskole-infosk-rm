@@ -26,6 +26,7 @@ export default function DateTimeEditDialog({
   date,
   clientId,
   onSaved,
+  localMarkedDays, // NYT: modtag markedDays for denne klient
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
@@ -58,16 +59,24 @@ export default function DateTimeEditDialog({
           const matchKey = allKeys.find(k => stripTimeFromDateKey(k) === date);
           if (matchKey) found = data.markedDays[matchKey];
         }
+        // Hvis IKKE fundet i backend, brug localMarkedDays fra frontend!
+        if (!found && localMarkedDays && localMarkedDays[date]) {
+          found = localMarkedDays[date];
+        }
         setOnTime(found?.onTime?.replace(/\./g, ":") || "");
         setOffTime(found?.offTime?.replace(/\./g, ":") || "");
       })
       .catch(() => {
-        setOnTime("");
-        setOffTime("");
+        let fallback = undefined;
+        if (localMarkedDays && localMarkedDays[date]) {
+          fallback = localMarkedDays[date];
+        }
+        setOnTime(fallback?.onTime?.replace(/\./g, ":") || "");
+        setOffTime(fallback?.offTime?.replace(/\./g, ":") || "");
         setError("Kunne ikke hente tider fra serveren.");
       })
       .finally(() => setLoading(false));
-  }, [open, date, clientId]);
+  }, [open, date, clientId, localMarkedDays]);
 
   const validate = () => {
     if (!onTime || !offTime) {
