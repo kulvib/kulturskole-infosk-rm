@@ -7,6 +7,7 @@ import {
   Button,
   TextField,
   Typography,
+  CircularProgress,
 } from "@mui/material";
 
 /**
@@ -14,45 +15,66 @@ import {
  * - open: boolean
  * - onClose: function
  * - date: string (YYYY-MM-DD)
- * - clientId: id for klienten (valgfrit)
- * - customTime: { onTime, offTime, status } eller null
+ * - clientId: string
  * - defaultTimes: { onTime, offTime }
- * - onSave: function({ clientId, date, onTime, offTime })
+ * - season: string (f.eks. "2025")
+ *
+ * Denne komponent henter selv data fra din backend når den åbnes,
+ * og gemmer data til din backend når du trykker "Gem".
  */
 export default function DateTimeEditDialog({
   open,
   onClose,
   date,
   clientId,
-  customTime,
-  defaultTimes,
-  onSave,
+  defaultTimes = { onTime: "08:00", offTime: "18:00" },
+  season = "",
 }) {
-  // Hjælpefunktion for sikkert format (punktum eller kolon -> kolon)
-  const formatTime = t =>
-    t && typeof t === "string"
-      ? t.replace(".", ":")
-      : "";
-
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
-  const [error, setError] = useState(""); // For valideringsfejl
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [apiError, setApiError] = useState("");
 
+  // Hjælpefunktion for sikkert format (punktum eller kolon -> kolon)
+  const formatTime = t =>
+    t && typeof t === "string" ? t.replace(".", ":") : "";
+
+  // Hent eksisterende tider fra backend når dialogen åbnes
   useEffect(() => {
-    setOnTime(
-      customTime && typeof customTime.onTime === "string" && customTime.onTime
-        ? formatTime(customTime.onTime)
-        : formatTime(defaultTimes?.onTime)
-    );
-    setOffTime(
-      customTime && typeof customTime.offTime === "string" && customTime.offTime
-        ? formatTime(customTime.offTime)
-        : formatTime(defaultTimes?.offTime)
-    );
-    setError("");
-  }, [customTime, defaultTimes, date, open]);
-
-  if (!date) return null;
+    if (!open || !date || !clientId) return;
+    let ignore = false;
+    async function fetchTime() {
+      setLoading(true);
+      setApiError("");
+      setError("");
+      try {
+        const res = await fetch(
+          `/api/times?date=${encodeURIComponent(date)}&clientId=${encodeURIComponent(clientId)}`
+        );
+        if (!res.ok) throw new Error("Kunne ikke hente tid fra serveren");
+        const data = await res.json();
+        // Sørg for at tider er i HH:MM format
+        setOnTime(
+          data && data.onTime ? formatTime(data.onTime) : formatTime(defaultTimes.onTime)
+        );
+        setOffTime(
+          data && data.offTime ? formatTime(data.offTime) : formatTime(defaultTimes.offTime)
+        );
+      } catch (err) {
+        setOnTime(formatTime(defaultTimes.onTime));
+        setOffTime(formatTime(defaultTimes.offTime));
+        setApiError("Kunne ikke hente tid fra serveren.");
+      }
+      setLoading(false);
+    }
+    fetchTime();
+    return () => {
+      ignore = true;
+    };
+    // eslint-disable-next-line
+  }, [open, date, clientId, defaultTimes.onTime, defaultTimes.offTime]);
 
   // Ekstra validering: Tider skal være gyldige og onTime < offTime
   const validate = () => {
@@ -81,15 +103,45 @@ export default function DateTimeEditDialog({
     return true;
   };
 
-  const handleSave = () => {
+  // Gem tider til backend
+  const handleSave = async () => {
     if (!validate()) return;
-    onSave({
-      clientId,
-      date,
-      onTime,
-      offTime,
-    });
-    onClose();
+    setSaving(true);
+    setApiError("");
+    try {
+      // Byg payload til backend
+      const payload = {
+        markedDays: {
+          [date]: {
+            onTime,
+            offTime,
+            status: "on",
+          },
+        },
+        clients: [clientId],
+        season: season || (date ? date.split("-")[0] : ""),
+      };
+      const res = await fetch("/api/times", {
+        method: "POST", // eller "PUT" alt efter din backend
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        let msg = "Kunne ikke gemme tid til serveren.";
+        try {
+          const err = await res.json();
+          if (err && err.detail) msg += " " + JSON.stringify(err.detail);
+        } catch {}
+        throw new Error(msg);
+      }
+      setSaving(false);
+      onClose();
+    } catch (err) {
+      setApiError(
+        err?.message || "Kunne ikke gemme tid til serveren."
+      );
+      setSaving(false);
+    }
   };
 
   // Dansk format: lørdag d. 2. august 2025
@@ -113,37 +165,54 @@ export default function DateTimeEditDialog({
         Redigér tid for {displayDate}
       </DialogTitle>
       <DialogContent>
-        <Typography variant="body2" sx={{ mb: 2 }}>
-          Indstil tænd/sluk-tidspunkt for denne dag.<br />
-          Standard: {formatTime(defaultTimes?.onTime)} – {formatTime(defaultTimes?.offTime)}
-        </Typography>
-        <TextField
-          label="Tænd tid"
-          type="time"
-          value={onTime}
-          onChange={e => setOnTime(formatTime(e.target.value))}
-          fullWidth
-          sx={{ mb: 2 }}
-          inputProps={{ step: 300 }}
-          error={Boolean(error)}
-        />
-        <TextField
-          label="Sluk tid"
-          type="time"
-          value={offTime}
-          onChange={e => setOffTime(formatTime(e.target.value))}
-          fullWidth
-          inputProps={{ step: 300 }}
-          error={Boolean(error)}
-          helperText={error}
-        />
+        {loading ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 120 }}>
+            <CircularProgress size={29} />
+            <span>Henter tider...</span>
+          </div>
+        ) : (
+          <>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Indstil tænd/sluk-tidspunkt for denne dag.<br />
+              Standard: {formatTime(defaultTimes?.onTime)} – {formatTime(defaultTimes?.offTime)}
+            </Typography>
+            <TextField
+              label="Tænd tid"
+              type="time"
+              value={onTime}
+              onChange={e => setOnTime(formatTime(e.target.value))}
+              fullWidth
+              sx={{ mb: 2 }}
+              inputProps={{ step: 300 }}
+              error={Boolean(error)}
+            />
+            <TextField
+              label="Sluk tid"
+              type="time"
+              value={offTime}
+              onChange={e => setOffTime(formatTime(e.target.value))}
+              fullWidth
+              inputProps={{ step: 300 }}
+              error={Boolean(error)}
+              helperText={error}
+            />
+            {apiError && (
+              <Typography sx={{ color: "red", mt: 1 }}>{apiError}</Typography>
+            )}
+          </>
+        )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} color="inherit">
+        <Button onClick={onClose} color="inherit" disabled={saving || loading}>
           Annullér
         </Button>
-        <Button onClick={handleSave} color="primary" variant="contained" disabled={!onTime || !offTime}>
-          Gem
+        <Button
+          onClick={handleSave}
+          color="primary"
+          variant="contained"
+          disabled={saving || loading || !onTime || !offTime}
+        >
+          {saving ? <CircularProgress size={20} /> : "Gem"}
         </Button>
       </DialogActions>
     </Dialog>
