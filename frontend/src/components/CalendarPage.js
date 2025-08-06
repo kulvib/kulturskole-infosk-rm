@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Snackbar, Alert, Checkbox, TextField
+  Alert, Checkbox, TextField, Chip
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
@@ -159,7 +159,9 @@ function MonthCalendar({
   markedDays,
   markMode,
   onDayClick,
-  onDateDoubleClick
+  onDateDoubleClick,
+  loadingDialogDate,
+  loadingDialogClient
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const draggedDates = useRef(new Set());
@@ -221,9 +223,14 @@ function MonthCalendar({
             let bg = "#fff";
             if (cellStatus === "on") bg = "#b4eeb4";
             if (cellStatus === "off") bg = "#ffb7b7";
+            const isLoading =
+              loadingDialogDate === dateString && loadingDialogClient === clientId;
+
             return (
               <Box key={idx}
-                sx={{ display: "flex", justifyContent: "center", alignItems: "center", p: 0.2, position: "relative" }}>
+                sx={{
+                  display: "flex", justifyContent: "center", alignItems: "center", p: 0.2, position: "relative"
+                }}>
                 <Box
                   sx={{
                     width: 23, height: 23, borderRadius: "50%", background: bg,
@@ -232,7 +239,7 @@ function MonthCalendar({
                     boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
                     cursor: clientId ? "pointer" : "default",
                     transition: "background 0.2s", opacity: clientId ? 1 : 0.55,
-                    ":hover": { boxShadow: "0 0 0 2px #1976d2" }
+                    position: "relative"
                   }}
                   title={
                     cellStatus === "on"
@@ -244,12 +251,20 @@ function MonthCalendar({
                   onMouseDown={() => handleMouseDown(dateString)}
                   onMouseEnter={() => handleMouseEnter(dateString)}
                   onDoubleClick={() => {
-                    if (clientId && markedDays?.[clientId]?.[dateString]?.status === "on") {
+                    if (
+                      clientId &&
+                      markedDays?.[clientId]?.[dateString]?.status === "on" &&
+                      !isLoading
+                    ) {
                       onDateDoubleClick(clientId, dateString);
                     }
                   }}
                 >
-                  {day}
+                  {isLoading ? (
+                    <CircularProgress size={18} sx={{ position: "absolute", top: 2, left: 2 }} />
+                  ) : (
+                    day
+                  )}
                 </Box>
               </Box>
             );
@@ -268,16 +283,20 @@ export default function CalendarPage() {
   const [selectedClients, setSelectedClients] = useState([]);
   const [activeClient, setActiveClient] = useState(null);
   const [loadingClients, setLoadingClients] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
   const [markMode, setMarkMode] = useState("on");
   const [markedDays, setMarkedDays] = useState({});
-
-  // Dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editDialogDate, setEditDialogDate] = useState(null);
   const [editDialogClient, setEditDialogClient] = useState(null);
 
-  const [autoSaveTimer, setAutoSaveTimer] = useState(null);
+  // Loader state til dobbeltklik
+  const [loadingDialogDate, setLoadingDialogDate] = useState(null);
+  const [loadingDialogClient, setLoadingDialogClient] = useState(null);
+
+  // FEEDBACK STATE
+  const [saveStatus, setSaveStatus] = useState({ status: "idle", message: "" });
+
+  const autoSaveTimer = useRef(null);
 
   const seasons = getSeasons(2025, 2040);
 
@@ -328,6 +347,20 @@ export default function CalendarPage() {
     return () => { isCurrent = false; };
   }, [selectedSeason, activeClient, token]);
 
+  // AUTOSAVE (kun hvis dialog ikke åben)
+  useEffect(() => {
+    if (editDialogOpen) return;
+    if (selectedClients.length === 0 || !activeClient) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      handleSave(); // autosave: vis kun feedback hvis fejler
+    }, 1000);
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+    // eslint-disable-next-line
+  }, [markedDays, selectedClients, activeClient, selectedSeason, editDialogOpen]);
+
   // ClientSelector integration
   const handleClientSelectorChange = (newSelected) => {
     setSelectedClients(newSelected);
@@ -355,11 +388,17 @@ export default function CalendarPage() {
     });
   };
 
-  // Dobbeltklik på dato: åbn dialog for custom tid
+  // Dobbeltklik på dato: loader, så dialog
   const handleDateDoubleClick = (clientId, date) => {
-    setEditDialogClient(clientId);
-    setEditDialogDate(date);
-    setEditDialogOpen(true);
+    setLoadingDialogDate(date);
+    setLoadingDialogClient(clientId);
+    setTimeout(() => {
+      setLoadingDialogDate(null);
+      setLoadingDialogClient(null);
+      setEditDialogClient(clientId);
+      setEditDialogDate(date);
+      setEditDialogOpen(true);
+    }, 1000);
   };
 
   // Når tid gemmes i dialogen: opdater den pågældende dag i markedDays for ALLE valgte klienter
@@ -385,7 +424,7 @@ export default function CalendarPage() {
       });
       // Ingen snackbar her!
     } catch {
-      setSnackbar({ open: true, message: "Kunne ikke hente nyeste tider", severity: "error" });
+      setSaveStatus({ status: "error", message: "Kunne ikke hente nyeste tider" });
     }
   };
 
@@ -393,29 +432,15 @@ export default function CalendarPage() {
   // acceptér et parameter: showSnackbar - skal kun være true ved manuelt klik!
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
-  // ----------- AUTOSAVE (kun hvis dialog IKKE er åben) -----------
-  useEffect(() => {
-    if (editDialogOpen) return; // AUTOSAVE DEAKTIVERET når dialogen er åben
-    if (selectedClients.length === 0 || !activeClient) return;
-    if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    setAutoSaveTimer(setTimeout(() => {
-      handleSave(false); // auto-gem: vis ikke snackbar!
-    }, 1000));
-    return () => {
-      if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    };
-    // eslint-disable-next-line
-  }, [markedDays, selectedClients, activeClient, selectedSeason, editDialogOpen]);
-  // ---------------------------------------------------------------
-
   const handleSave = useCallback(
-    async (showSnackbar = false) => {
+    async () => {
+      setSaveStatus({ status: "idle", message: "" });
       if (selectedClients.length === 0) {
-        if (showSnackbar) setSnackbar({ open: true, message: "Ingen klienter valgt", severity: "warning" });
+        setSaveStatus({ status: "error", message: "Ingen klienter valgt" });
         return;
       }
       if (!activeClient) {
-        if (showSnackbar) setSnackbar({ open: true, message: "Ingen aktiv klient valgt", severity: "warning" });
+        setSaveStatus({ status: "error", message: "Ingen aktiv klient valgt" });
         return;
       }
 
@@ -461,7 +486,7 @@ export default function CalendarPage() {
 
       try {
         await saveMarkedDays(payload);
-        if (showSnackbar) setSnackbar({ open: true, message: "Gemt!", severity: "success" });
+        setSaveStatus({ status: "success", message: "Gemt!" });
         if (activeClient) {
           try {
             const data = await getMarkedDays(selectedSeason, activeClient);
@@ -482,10 +507,10 @@ export default function CalendarPage() {
           }
         }
       } catch (e) {
-        if (showSnackbar) setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
+        setSaveStatus({ status: "error", message: e.message || "Kunne ikke gemme!" });
       }
-      // eslint-disable-next-line
-    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]);
+    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]
+  );
 
   const clientMarkedDays = markedDays[activeClient];
   const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
@@ -591,10 +616,21 @@ export default function CalendarPage() {
           SLUKKET
         </Button>
         <Box sx={{ flexGrow: 1 }} />
+        {/* GEMT/FEJL PROMPT VED SIDEN AF GEM-KNAP */}
+        <Box sx={{ display: "flex", alignItems: "center", mr: 2 }}>
+          {saveStatus.status === "success" && (
+            <Chip label="Gemt" color="success" sx={{ mr: 1 }} />
+          )}
+          {saveStatus.status === "error" && (
+            <Alert severity="error" sx={{ mr: 1, py: 0.5, px: 2, fontSize: 14 }}>
+              {saveStatus.message}
+            </Alert>
+          )}
+        </Box>
         <Button
           variant="contained"
           color="primary"
-          onClick={() => handleSave(true)} // Kun vis snackbar ved klik!
+          onClick={handleSave}
         >
           Gem kalender for valgte klienter
         </Button>
@@ -631,6 +667,8 @@ export default function CalendarPage() {
               markMode={markMode}
               onDayClick={handleDayClick}
               onDateDoubleClick={handleDateDoubleClick}
+              loadingDialogDate={loadingDialogDate}
+              loadingDialogClient={loadingDialogClient}
             />
           ))
         }
@@ -645,17 +683,6 @@ export default function CalendarPage() {
         onSaved={handleSaveDateTime}
         localMarkedDays={markedDays[editDialogClient]}
       />
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-      >
-        <Alert severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }
