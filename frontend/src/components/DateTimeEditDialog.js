@@ -10,13 +10,6 @@ import {
   CircularProgress,
 } from "@mui/material";
 
-/**
- * Props:
- * - open: boolean
- * - onClose: function
- * - date: string (YYYY-MM-DD)
- * - clientId: string
- */
 export default function DateTimeEditDialog({
   open,
   onClose,
@@ -29,23 +22,21 @@ export default function DateTimeEditDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Robust: erstatter ALLE punktummer med kolon
-  const formatTime = t =>
-    t && typeof t === "string" ? t.replace(/\./g, ":") : "";
-
   // Hent tider fra backend når dialogen åbnes
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
     setError("");
-    fetch(`/api/times?date=${encodeURIComponent(date)}&clientId=${encodeURIComponent(clientId)}`)
+    fetch(
+      `https://kulturskole-infosk-rm.onrender.com/api/calendar/marked-days?date=${encodeURIComponent(date)}&clientId=${encodeURIComponent(clientId)}`
+    )
       .then(res => {
         if (!res.ok) throw new Error("Fejl ved hentning af tider");
         return res.json();
       })
       .then(data => {
-        setOnTime(data.onTime ? formatTime(data.onTime) : "");
-        setOffTime(data.offTime ? formatTime(data.offTime) : "");
+        setOnTime(data.onTime ? data.onTime.replace(/\./g, ":") : "");
+        setOffTime(data.offTime ? data.offTime.replace(/\./g, ":") : "");
       })
       .catch(() => {
         setOnTime("");
@@ -82,11 +73,14 @@ export default function DateTimeEditDialog({
         onTime,
         offTime,
       };
-      const res = await fetch(`/api/times`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        "https://kulturskole-infosk-rm.onrender.com/api/calendar/marked-days",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", accept: "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
       if (!res.ok) throw new Error("Fejl ved gem");
       onClose();
     } catch {
@@ -130,7 +124,7 @@ export default function DateTimeEditDialog({
               label="Tænd tid"
               type="time"
               value={onTime}
-              onChange={e => setOnTime(formatTime(e.target.value))}
+              onChange={e => setOnTime(e.target.value.replace(/\./g, ":"))}
               fullWidth
               sx={{ mb: 2 }}
               inputProps={{ step: 300 }}
@@ -140,7 +134,7 @@ export default function DateTimeEditDialog({
               label="Sluk tid"
               type="time"
               value={offTime}
-              onChange={e => setOffTime(formatTime(e.target.value))}
+              onChange={e => setOffTime(e.target.value.replace(/\./g, ":"))}
               fullWidth
               inputProps={{ step: 300 }}
               error={Boolean(error)}
