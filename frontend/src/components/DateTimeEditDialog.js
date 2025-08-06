@@ -15,6 +15,7 @@ export default function DateTimeEditDialog({
   onClose,
   date,
   clientId,
+  onSaved, // valgfri callback hvis du vil opdatere kalenderen efter gem
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
@@ -22,7 +23,6 @@ export default function DateTimeEditDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Hent tider fra backend når dialogen åbnes
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
@@ -46,7 +46,6 @@ export default function DateTimeEditDialog({
       .finally(() => setLoading(false));
   }, [open, date, clientId]);
 
-  // Validering
   const validate = () => {
     if (!onTime || !offTime) {
       setError("Begge tidspunkter skal udfyldes.");
@@ -61,7 +60,6 @@ export default function DateTimeEditDialog({
     return true;
   };
 
-  // POST til backend
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
@@ -82,6 +80,7 @@ export default function DateTimeEditDialog({
         }
       );
       if (!res.ok) throw new Error("Fejl ved gem");
+      if (onSaved) onSaved({ date, clientId, onTime, offTime });
       onClose();
     } catch {
       setError("Kunne ikke gemme tid til serveren.");
@@ -89,7 +88,6 @@ export default function DateTimeEditDialog({
     setSaving(false);
   };
 
-  // Dansk format: lørdag d. 2. august 2025 (aldrig forkortet)
   const displayDate = (() => {
     try {
       const d = new Date(date);
