@@ -338,42 +338,22 @@ export default function CalendarPage() {
     setEditDialogOpen(true);
   };
 
-  // GEM direkte i databasen og state når tid redigeres på EN DAG for ALLE valgte klienter (OG GENHENT NYESTE FRA BACKEND)
-  const handleSaveDateTime = async ({ date, onTime, offTime }) => {
-    const payloadMarkedDays = {};
-    selectedClients.forEach(clientId => {
-      payloadMarkedDays[clientId] = { ...(markedDays[clientId] || {}) };
-      payloadMarkedDays[clientId][date] = {
-        status: "on",
-        onTime,
-        offTime
-      };
-    });
-
+  // Når tid gemmes i dialogen: hent ALTID nyeste markedDays fra backend for klienten
+  const handleSaveDateTime = async ({ date, clientId }) => {
     try {
-      await saveMarkedDays({
-        clients: selectedClients,
-        markedDays: payloadMarkedDays,
-        season: selectedSeason
+      const data = await getMarkedDays(selectedSeason, clientId);
+      const rawDays = data.markedDays || {};
+      const mapped = {};
+      Object.keys(rawDays).forEach(key => {
+        mapped[stripTimeFromDateKey(key)] = rawDays[key];
       });
-
-      // GENHENT markedDays for den relevante klient
-      if (editDialogClient) {
-        const data = await getMarkedDays(selectedSeason, editDialogClient);
-        const rawDays = data.markedDays || {};
-        const mapped = {};
-        Object.keys(rawDays).forEach(key => {
-          mapped[stripTimeFromDateKey(key)] = rawDays[key];
-        });
-        setMarkedDays(prev => ({
-          ...prev,
-          [editDialogClient]: mapped
-        }));
-      }
-
-      setSnackbar({ open: true, message: "Tid gemt i databasen for alle valgte klienter!", severity: "success" });
-    } catch (e) {
-      setSnackbar({ open: true, message: "Kunne ikke gemme i databasen!", severity: "error" });
+      setMarkedDays(prev => ({
+        ...prev,
+        [clientId]: mapped
+      }));
+      setSnackbar({ open: true, message: "Tid opdateret", severity: "success" });
+    } catch {
+      setSnackbar({ open: true, message: "Kunne ikke hente nyeste tider", severity: "error" });
     }
   };
 
@@ -407,6 +387,7 @@ export default function CalendarPage() {
         if (baseMarked[dateStr]) {
           const md = baseMarked[dateStr];
           if (md.status === "on") {
+            // Bruges altid den aktuelle tid fra state, som er opdateret fra backend efter evt. dialog-redigering
             const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
             const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
             payloadMarkedDays[cid][dateStr] = { status: "on", onTime, offTime };
