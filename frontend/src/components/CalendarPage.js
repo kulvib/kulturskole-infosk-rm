@@ -359,99 +359,101 @@ export default function CalendarPage() {
         });
         return updated;
       });
-      setSnackbar({ open: true, message: "Tid opdateret", severity: "success" });
+      // Ingen snackbar her!
     } catch {
       setSnackbar({ open: true, message: "Kunne ikke hente nyeste tider", severity: "error" });
     }
   };
 
-  // GEM: Gem hele kalenderen på ALLE markerede klienter
+  // GEM: Gem hele kalenderen på ALLE markerede klienter.
+  // acceptér et parameter: showSnackbar - skal kun være true ved manuelt klik!
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
-  const handleSave = useCallback(async () => {
-    if (selectedClients.length === 0) {
-      setSnackbar({ open: true, message: "Ingen klienter valgt", severity: "warning" });
-      return;
-    }
-    if (!activeClient) {
-      setSnackbar({ open: true, message: "Ingen aktiv klient valgt", severity: "warning" });
-      return;
-    }
-
-    const allDates = [];
-    schoolYearMonths.forEach(({ month, year }) => {
-      const daysInMonth = getDaysInMonth(month, year);
-      for (let d = 1; d <= daysInMonth; d++) {
-        allDates.push(formatDate(year, month, d));
+  const handleSave = useCallback(
+    async (showSnackbar = false) => {
+      if (selectedClients.length === 0) {
+        if (showSnackbar) setSnackbar({ open: true, message: "Ingen klienter valgt", severity: "warning" });
+        return;
       }
-    });
+      if (!activeClient) {
+        if (showSnackbar) setSnackbar({ open: true, message: "Ingen aktiv klient valgt", severity: "warning" });
+        return;
+      }
 
-    const payloadMarkedDays = {};
-    selectedClients.forEach(cid => {
-      const clientKey = String(cid);
-      payloadMarkedDays[clientKey] = {};
-      allDates.forEach(dateStr => {
-        const md = markedDays[cid]?.[dateStr] || markedDays[activeClient]?.[dateStr];
-        if (md && md.status === "on") {
-          const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
-          const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
-          payloadMarkedDays[clientKey][dateStr] = {
-            status: "on",
-            onTime,
-            offTime
-          };
-        } else if (md && md.status === "off") {
-          payloadMarkedDays[clientKey][dateStr] = {
-            status: "off"
-          };
-        } else {
-          payloadMarkedDays[clientKey][dateStr] = {
-            status: "off"
-          };
+      const allDates = [];
+      schoolYearMonths.forEach(({ month, year }) => {
+        const daysInMonth = getDaysInMonth(month, year);
+        for (let d = 1; d <= daysInMonth; d++) {
+          allDates.push(formatDate(year, month, d));
         }
       });
-    });
 
-    const payload = {
-      clients: selectedClients,
-      markedDays: payloadMarkedDays,
-      season: selectedSeason
-    };
+      const payloadMarkedDays = {};
+      selectedClients.forEach(cid => {
+        const clientKey = String(cid);
+        payloadMarkedDays[clientKey] = {};
+        allDates.forEach(dateStr => {
+          const md = markedDays[cid]?.[dateStr] || markedDays[activeClient]?.[dateStr];
+          if (md && md.status === "on") {
+            const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
+            const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
+            payloadMarkedDays[clientKey][dateStr] = {
+              status: "on",
+              onTime,
+              offTime
+            };
+          } else if (md && md.status === "off") {
+            payloadMarkedDays[clientKey][dateStr] = {
+              status: "off"
+            };
+          } else {
+            payloadMarkedDays[clientKey][dateStr] = {
+              status: "off"
+            };
+          }
+        });
+      });
 
-    try {
-      await saveMarkedDays(payload);
-      setSnackbar({ open: true, message: "Gemt!", severity: "success" });
-      if (activeClient) {
-        try {
-          const data = await getMarkedDays(selectedSeason, activeClient);
-          const rawDays = data.markedDays || {};
-          const mapped = {};
-          Object.keys(rawDays).forEach(key => {
-            mapped[stripTimeFromDateKey(key)] = rawDays[key];
-          });
-          setMarkedDays(prev => ({
-            ...prev,
-            [activeClient]: mapped
-          }));
-        } catch (e) {
-          setMarkedDays(prev => ({
-            ...prev,
-            [activeClient]: {}
-          }));
+      const payload = {
+        clients: selectedClients,
+        markedDays: payloadMarkedDays,
+        season: selectedSeason
+      };
+
+      try {
+        await saveMarkedDays(payload);
+        if (showSnackbar) setSnackbar({ open: true, message: "Gemt!", severity: "success" });
+        if (activeClient) {
+          try {
+            const data = await getMarkedDays(selectedSeason, activeClient);
+            const rawDays = data.markedDays || {};
+            const mapped = {};
+            Object.keys(rawDays).forEach(key => {
+              mapped[stripTimeFromDateKey(key)] = rawDays[key];
+            });
+            setMarkedDays(prev => ({
+              ...prev,
+              [activeClient]: mapped
+            }));
+          } catch (e) {
+            setMarkedDays(prev => ({
+              ...prev,
+              [activeClient]: {}
+            }));
+          }
         }
+      } catch (e) {
+        if (showSnackbar) setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
       }
-    } catch (e) {
-      setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
-    }
-    // eslint-disable-next-line
-  }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]);
+      // eslint-disable-next-line
+    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]);
 
   // --- AUTO-GEM funktion (debounce 1 sekund) ---
   useEffect(() => {
     if (selectedClients.length === 0 || !activeClient) return;
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
     setAutoSaveTimer(setTimeout(() => {
-      handleSave();
+      handleSave(false); // auto-gem: vis ikke snackbar!
     }, 1000));
     return () => {
       if (autoSaveTimer) clearTimeout(autoSaveTimer);
@@ -563,7 +565,7 @@ export default function CalendarPage() {
         <Button
           variant="contained"
           color="primary"
-          onClick={handleSave}
+          onClick={() => handleSave(true)} // Kun vis snackbar ved klik!
         >
           Gem kalender for valgte klienter
         </Button>
@@ -619,6 +621,7 @@ export default function CalendarPage() {
         open={snackbar.open}
         autoHideDuration={3000}
         onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
         <Alert severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
