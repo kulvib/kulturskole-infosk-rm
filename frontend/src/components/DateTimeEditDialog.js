@@ -37,9 +37,9 @@ export default function DateTimeEditDialog({
   const [error, setError] = useState("");
   const [apiError, setApiError] = useState("");
 
-  // Hjælpefunktion for sikkert format (punktum eller kolon -> kolon)
+  // Robust: erstatter ALLE punktummer med kolon
   const formatTime = t =>
-    t && typeof t === "string" ? t.replace(".", ":") : "";
+    t && typeof t === "string" ? t.replace(/\./g, ":") : "";
 
   // Hent eksisterende tider fra backend når dialogen åbnes
   useEffect(() => {
@@ -55,7 +55,6 @@ export default function DateTimeEditDialog({
         );
         if (!res.ok) throw new Error("Kunne ikke hente tid fra serveren");
         const data = await res.json();
-        // Sørg for at tider er i HH:MM format
         setOnTime(
           data && data.onTime ? formatTime(data.onTime) : formatTime(defaultTimes.onTime)
         );
@@ -144,7 +143,7 @@ export default function DateTimeEditDialog({
     }
   };
 
-  // Dansk format: lørdag d. 2. august 2025
+  // Dansk format: lørdag d. 2. august 2025 (aldrig forkortet)
   const displayDate = (() => {
     try {
       const d = new Date(date);
