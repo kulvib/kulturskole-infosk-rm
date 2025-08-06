@@ -97,6 +97,7 @@ export default function DateTimeEditDialog({
         onTime: onTime.replace(/\./g, ":"),
         offTime: offTime.replace(/\./g, ":"),
       };
+      console.log("Payload der sendes:", payload);
       const res = await fetch(
         `${API_BASE}/api/calendar/marked-days`,
         {
