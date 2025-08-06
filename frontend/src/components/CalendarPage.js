@@ -640,12 +640,6 @@ export default function CalendarPage() {
             Vælg en klient for at se kalenderen.
           </Typography>
         )}
-        {activeClient && loadingMarkedDays && (
-          <Box sx={{ textAlign: "center", mt: 6, gridColumn: "1/-1" }}>
-            <CircularProgress />
-            <Typography variant="body2" sx={{ mt: 2 }}>Henter kalender...</Typography>
-          </Box>
-        )}
         {activeClient && !loadingMarkedDays &&
           getSchoolYearMonths(selectedSeason).map(({ name, month, year }) => (
             <MonthCalendar
@@ -663,6 +657,12 @@ export default function CalendarPage() {
             />
           ))
         }
+        {activeClient && loadingMarkedDays && (
+          <Box sx={{ textAlign: "center", mt: 6, gridColumn: "1/-1" }}>
+            <CircularProgress />
+            <Typography variant="body2" sx={{ mt: 2 }}>Henter kalender...</Typography>
+          </Box>
+        )}
       </Box>
 
       {/* Dialog til redigering af tid */}
