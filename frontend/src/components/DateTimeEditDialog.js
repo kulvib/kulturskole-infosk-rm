@@ -90,12 +90,19 @@ export default function DateTimeEditDialog({
     try {
       const token = getToken();
       const normalizedDate = date.length === 10 ? date + "T00:00:00" : date;
+      // Byg payload som backend forventer!
+      const season = normalizedDate.substring(0, 4);
       const payload = {
-        date: normalizedDate,
-        client_id: clientId, // sendes som tal
-        status: "on",
-        onTime: onTime.replace(/\./g, ":"),
-        offTime: offTime.replace(/\./g, ":"),
+        markedDays: {
+          [normalizedDate]: {
+            client_id: clientId,
+            status: "on",
+            onTime: onTime.replace(/\./g, ":"),
+            offTime: offTime.replace(/\./g, ":")
+          }
+        },
+        clients: [clientId],
+        season: season
       };
       console.log("Payload der sendes:", payload);
 
