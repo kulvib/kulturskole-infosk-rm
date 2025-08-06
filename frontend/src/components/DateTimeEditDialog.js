@@ -111,24 +111,41 @@ export default function DateTimeEditDialog({
     return true;
   };
 
+  // VIGTIG: Merge ændring ind, bevar øvrige dage!
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
     setError("");
     setShowTopError(false);
+
     try {
       const token = getToken();
       const normalizedDate = date.split("T")[0]; // Altid YYYY-MM-DD!
       const season = normalizedDate.substring(0, 4);
+
+      // 1. Hent eksisterende markedDays for klienten/sæsonen
+      const resGet = await fetch(
+        `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
+        token ? { headers: { Authorization: "Bearer " + token } } : undefined
+      );
+      let serverData = {};
+      if (resGet.ok) {
+        const data = await resGet.json();
+        serverData = data.markedDays || {};
+      }
+
+      // 2. Merge: opdater/tilføj den ene dag, bevar resten
+      const updatedClientDays = { ...serverData };
+      updatedClientDays[normalizedDate] = {
+        status: "on",
+        onTime: onTime.replace(/\./g, ":"),
+        offTime: offTime.replace(/\./g, ":")
+      };
+
+      // 3. Send ALT for klienten/sæsonen
       const payload = {
         markedDays: {
-          [String(clientId)]: {
-            [normalizedDate]: {
-              status: "on",
-              onTime: onTime.replace(/\./g, ":"),
-              offTime: offTime.replace(/\./g, ":")
-            }
-          }
+          [String(clientId)]: updatedClientDays
         },
         clients: [clientId],
         season: Number(season)
@@ -156,7 +173,6 @@ export default function DateTimeEditDialog({
       }
       if (onSaved) await onSaved({ date: normalizedDate, clientId });
       setShowSaved(true); // Vis gemt-indikator
-      // Dialogen lukkes nu automatisk via useEffect ovenfor
     } catch (e) {
       setError(e.message || "Kunne ikke gemme tid til serveren.");
       setShowTopError(true);
