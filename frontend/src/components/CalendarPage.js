@@ -69,23 +69,41 @@ function ClientSelectorInline({ clients, selected, onChange }) {
   const filteredClients = sortedClients.filter(c =>
     (c.locality || c.name || "").toLowerCase().includes(search.toLowerCase())
   );
-  const handleToggle = (id) => {
-    if (selected.includes(id)) {
-      onChange(selected.filter(sid => sid !== id));
+
+  // NY funktion: Markér alle eller fjern alle
+  const allVisibleIds = filteredClients.map(c => c.id);
+  const allMarked = allVisibleIds.length > 0 && allVisibleIds.every(id => selected.includes(id));
+
+  const handleToggleAll = () => {
+    if (allMarked) {
+      // Fjern alle synlige fra valgt
+      onChange(selected.filter(id => !allVisibleIds.includes(id)));
     } else {
-      onChange([...selected, id]);
+      // Tilføj alle synlige til valgt
+      const newSelected = Array.from(new Set([...selected, ...allVisibleIds]));
+      onChange(newSelected);
     }
   };
+
   return (
     <Box>
-      <TextField
-        label="Søg klient"
-        variant="outlined"
-        size="small"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        sx={{ mb: 2 }}
-      />
+      <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+        <TextField
+          label="Søg klient"
+          variant="outlined"
+          size="small"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <Button
+          sx={{ ml: 2, minWidth: 0, px: 2 }}
+          variant={allMarked ? "contained" : "outlined"}
+          color={allMarked ? "success" : "primary"}
+          onClick={handleToggleAll}
+        >
+          {allMarked ? "Fjern alle" : "Markér alle"}
+        </Button>
+      </Box>
       <Box
         sx={{
           display: "grid",
@@ -106,7 +124,13 @@ function ClientSelectorInline({ clients, selected, onChange }) {
               cursor: "pointer",
               ":hover": { background: "#f3f6fa" }
             }}
-            onClick={() => handleToggle(client.id)}
+            onClick={() => {
+              if (selected.includes(client.id)) {
+                onChange(selected.filter(sid => sid !== client.id));
+              } else {
+                onChange([...selected, client.id]);
+              }
+            }}
           >
             <Checkbox
               edge="start"
@@ -369,6 +393,21 @@ export default function CalendarPage() {
   // acceptér et parameter: showSnackbar - skal kun være true ved manuelt klik!
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
+  // ----------- AUTOSAVE (kun hvis dialog IKKE er åben) -----------
+  useEffect(() => {
+    if (editDialogOpen) return; // AUTOSAVE DEAKTIVERET når dialogen er åben
+    if (selectedClients.length === 0 || !activeClient) return;
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    setAutoSaveTimer(setTimeout(() => {
+      handleSave(false); // auto-gem: vis ikke snackbar!
+    }, 1000));
+    return () => {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    };
+    // eslint-disable-next-line
+  }, [markedDays, selectedClients, activeClient, selectedSeason, editDialogOpen]);
+  // ---------------------------------------------------------------
+
   const handleSave = useCallback(
     async (showSnackbar = false) => {
       if (selectedClients.length === 0) {
@@ -448,37 +487,20 @@ export default function CalendarPage() {
       // eslint-disable-next-line
     }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]);
 
-  // --- AUTO-GEM funktion (debounce 1 sekund) ---
-  useEffect(() => {
-    if (selectedClients.length === 0 || !activeClient) return;
-    if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    setAutoSaveTimer(setTimeout(() => {
-      handleSave(false); // auto-gem: vis ikke snackbar!
-    }, 1000));
-    return () => {
-      if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    };
-    // eslint-disable-next-line
-  }, [markedDays, selectedClients, activeClient, selectedSeason]);
-
   const clientMarkedDays = markedDays[activeClient];
   const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
 
-  // Tekst: "Viser kalender for: ..." og evt. ekstra tekst hvis flere klienter valgt
-  let kalenderTekst = "";
-  if (activeClient) {
-    const navn = clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Ingen valgt";
-    if (selectedClients.length > 1) {
-      const andre = clients
+  // Find navn og andre klienter til kalenderteksten
+  const navn = activeClient
+    ? clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Ingen valgt"
+    : "";
+  const andre = selectedClients.length > 1
+    ? clients
         .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
         .map(c => c.locality || c.name)
         .filter(Boolean)
-        .join(", ");
-      kalenderTekst = `Viser kalender for: ${navn} - ændringerne slår også igennem på klienterne: ${andre}`;
-    } else {
-      kalenderTekst = `Viser kalender for: ${navn}`;
-    }
-  }
+        .join(", ")
+    : "";
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
@@ -534,9 +556,15 @@ export default function CalendarPage() {
           selected={selectedClients}
           onChange={handleClientSelectorChange}
         />
-        {kalenderTekst && (
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            {kalenderTekst}
+        {activeClient && (
+          <Typography variant="body1" sx={{ mt: 2, fontSize: "1.15rem" }}>
+            <Box component="span" fontWeight={700}>
+              Viser kalender for: {navn}
+              {selectedClients.length > 1 && " - "}
+            </Box>
+            {selectedClients.length > 1 &&
+              <>ændringerne slår også igennem på klienterne: {andre}</>
+            }
           </Typography>
         )}
       </Paper>
@@ -622,7 +650,7 @@ export default function CalendarPage() {
         open={snackbar.open}
         autoHideDuration={3000}
         onClose={() => setSnackbar(s => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
       >
         <Alert severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
