@@ -93,6 +93,11 @@ export default function DateTimeEditDialog({
           fullWidth
           sx={{ mb: 2 }}
           inputProps={{ step: 300 }}
+          placeholder={
+            customTime && customTime.onTime
+              ? customTime.onTime
+              : defaultTimes?.onTime || ""
+          }
         />
         <TextField
           label="Sluk tid"
@@ -101,6 +106,11 @@ export default function DateTimeEditDialog({
           onChange={e => setOffTime(e.target.value)}
           fullWidth
           inputProps={{ step: 300 }}
+          placeholder={
+            customTime && customTime.offTime
+              ? customTime.offTime
+              : defaultTimes?.offTime || ""
+          }
         />
       </DialogContent>
       <DialogActions>
