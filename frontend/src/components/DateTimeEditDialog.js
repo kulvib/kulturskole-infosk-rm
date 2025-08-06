@@ -26,6 +26,8 @@ export default function DateTimeEditDialog({
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
+  const [apiOnTime, setApiOnTime] = useState("");
+  const [apiOffTime, setApiOffTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(""); // "success" | "error" | ""
@@ -36,8 +38,8 @@ export default function DateTimeEditDialog({
     if (!open || !date || !clientId) return;
     setLoading(true);
     setStatus("");
-    setOnTime("");
-    setOffTime("");
+    setOnTime(""); setOffTime("");
+    setApiOnTime(""); setApiOffTime("");
     const token = getToken();
     fetch(
       `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${date.slice(0, 4)}`,
@@ -45,11 +47,10 @@ export default function DateTimeEditDialog({
     )
       .then(res => res.json())
       .then(data => {
-        // Find korrekt dag
         const normDate = date.split("T")[0];
         const dayObj = data.markedDays?.[normDate] || {};
-        setOnTime(dayObj.onTime || "");
-        setOffTime(dayObj.offTime || "");
+        setApiOnTime(dayObj.onTime || "");
+        setApiOffTime(dayObj.offTime || "");
       })
       .catch(() => {
         setStatus("error");
@@ -61,7 +62,7 @@ export default function DateTimeEditDialog({
   useEffect(() => {
     if (status === "success") {
       closeTimer.current = setTimeout(() => {
-        setStatus(""); // Clear feedback
+        setStatus("");
         if (onClose) onClose();
       }, 1000);
     }
@@ -71,17 +72,26 @@ export default function DateTimeEditDialog({
   }, [status, onClose]);
 
   const validate = () => {
-    if (!onTime || !offTime) {
+    // Skal bruge enten bruger-indtastet eller API-tid
+    if (!onTime && !apiOnTime) {
+      setStatus("error");
+      return false;
+    }
+    if (!offTime && !apiOffTime) {
       setStatus("error");
       return false;
     }
     const timeRegex = /^\d{2}:\d{2}$/;
-    if (!timeRegex.test(onTime) || !timeRegex.test(offTime)) {
+    if ((onTime && !timeRegex.test(onTime)) || (offTime && !timeRegex.test(offTime))) {
       setStatus("error");
       return false;
     }
     return true;
   };
+
+  // Brug API-tider som fallback hvis brugeren ikke har skrevet noget
+  const getFinalOnTime = () => onTime || apiOnTime || "";
+  const getFinalOffTime = () => offTime || apiOffTime || "";
 
   const fetchLatestTimes = async (clientId, normDate, season) => {
     const token = getToken();
@@ -92,8 +102,9 @@ export default function DateTimeEditDialog({
     if (resGet.ok) {
       const data = await resGet.json();
       const dayObj = data.markedDays?.[normDate] || {};
-      setOnTime(dayObj.onTime || "");
-      setOffTime(dayObj.offTime || "");
+      setApiOnTime(dayObj.onTime || "");
+      setApiOffTime(dayObj.offTime || "");
+      setOnTime(""); setOffTime("");
     }
   };
 
@@ -120,8 +131,8 @@ export default function DateTimeEditDialog({
       const updatedDays = { ...serverData };
       updatedDays[normDate] = {
         status: "on",
-        onTime,
-        offTime
+        onTime: getFinalOnTime(),
+        offTime: getFinalOffTime()
       };
 
       const payload = {
@@ -194,23 +205,44 @@ export default function DateTimeEditDialog({
           </Box>
         ) : (
           <>
-            <TextField
-              label="Tænd tid"
-              type="time"
-              value={onTime}
-              onChange={e => setOnTime(e.target.value)}
-              fullWidth
-              sx={{ mb: 2 }}
-              inputProps={{ step: 300 }}
-            />
-            <TextField
-              label="Sluk tid"
-              type="time"
-              value={offTime}
-              onChange={e => setOffTime(e.target.value)}
-              fullWidth
-              inputProps={{ step: 300 }}
-            />
+            <Box sx={{ mb: 2 }}>
+              <Typography
+                variant="subtitle2"
+                sx={{ mb: 0.5, fontWeight: 500 }}
+              >
+                Tænd tid
+              </Typography>
+              <TextField
+                type="time"
+                fullWidth
+                value={onTime}
+                onChange={e => setOnTime(e.target.value)}
+                placeholder={apiOnTime}
+                InputProps={{
+                  style: { backgroundColor: "#f6f6f6" }
+                }}
+                inputProps={{ step: 300 }}
+              />
+            </Box>
+            <Box sx={{ mb: 2 }}>
+              <Typography
+                variant="subtitle2"
+                sx={{ mb: 0.5, fontWeight: 500 }}
+              >
+                Sluk tid
+              </Typography>
+              <TextField
+                type="time"
+                fullWidth
+                value={offTime}
+                onChange={e => setOffTime(e.target.value)}
+                placeholder={apiOffTime}
+                InputProps={{
+                  style: { backgroundColor: "#f6f6f6" }
+                }}
+                inputProps={{ step: 300 }}
+              />
+            </Box>
             {status === "error" && (
               <Alert severity="error" sx={{ mt: 1 }}>
                 Fejl ved gemning eller hentning!
