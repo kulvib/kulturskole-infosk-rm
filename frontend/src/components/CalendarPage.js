@@ -57,6 +57,11 @@ function stripTimeFromDateKey(key) {
   return key.split("T")[0];
 }
 
+// Helper for deep comparison of markedDays objects
+function deepEqual(obj1, obj2) {
+  return JSON.stringify(obj1) === JSON.stringify(obj2);
+}
+
 function ClientSelectorInline({ clients, selected, onChange }) {
   const [search, setSearch] = useState("");
   const sortedClients = [...clients].sort((a, b) => {
@@ -289,6 +294,10 @@ export default function CalendarPage() {
 
   const autoSaveTimer = useRef(null);
 
+  // Holder den sidst gemte markedDays fra dialogen
+  const lastDialogSavedMarkedDays = useRef({});
+  const lastDialogSavedTimestamp = useRef(0);
+
   const seasons = getSeasons(2025, 2040);
 
   const fetchClients = useCallback(async () => {
@@ -336,16 +345,29 @@ export default function CalendarPage() {
     return () => { isCurrent = false; };
   }, [selectedSeason, activeClient, token]);
 
+  // AUTOSAVE: kør ikke mens dialogen er åben og kun hvis ændret siden sidste dialog-gem
   useEffect(() => {
-    if (editDialogOpen) return;
+    if (editDialogOpen) return; // Stop autosave mens dialogen er åben
     if (selectedClients.length === 0 || !activeClient) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+
+    // Kun gem hvis der ER ændringer siden sidst dialog-gem
+    const changedSinceDialog =
+      !deepEqual(
+        markedDays,
+        lastDialogSavedMarkedDays.current
+      );
+
+    if (!changedSinceDialog) return;
+
     autoSaveTimer.current = setTimeout(() => {
-      handleSave(false);
+      handleSave(false); // autosave: vis kun fejl, ikke "Gemt!"
     }, 1000);
+
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
+    // eslint-disable-next-line
   }, [markedDays, selectedClients, activeClient, selectedSeason, editDialogOpen]);
 
   const handleClientSelectorChange = (newSelected) => {
@@ -373,16 +395,19 @@ export default function CalendarPage() {
     });
   };
 
+  // Dobbeltklik på dato: stop autosave og åbn dialogen STRAKS
   const handleDateDoubleClick = (clientId, date) => {
-    setLoadingDialogDate(date);
-    setLoadingDialogClient(clientId);
-    setTimeout(() => {
-      setLoadingDialogDate(null);
-      setLoadingDialogClient(null);
-      setEditDialogClient(clientId);
-      setEditDialogDate(date);
-      setEditDialogOpen(true);
-    }, 1000);
+    // Stop autosave
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
+    }
+    // Åbn dialogen direkte (ingen delay)
+    setLoadingDialogDate(null);
+    setLoadingDialogClient(null);
+    setEditDialogClient(clientId);
+    setEditDialogDate(date);
+    setEditDialogOpen(true);
   };
 
   // Opdater localMarkedDays for dialogen efter gem
@@ -398,6 +423,11 @@ export default function CalendarPage() {
         ...prev,
         [clientId]: mapped
       }));
+
+      // Gem den aktuelle markedDays som "sidst gemt via dialog"
+      lastDialogSavedMarkedDays.current = { ...markedDays, [clientId]: mapped };
+      lastDialogSavedTimestamp.current = Date.now();
+
       // Synlig feedback i kalenderen (grøn "Gemt" i 2 sek)
       setSaveStatus({ status: "success", message: "Gemt" });
       if (saveIndicatorTimer.current) clearTimeout(saveIndicatorTimer.current);
