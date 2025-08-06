@@ -157,7 +157,7 @@ function MonthCalendar({
   markedDays,
   markMode,
   onDayClick,
-  onDateRightClick,
+  onDateShiftLeftClick,
   loadingDialogDate,
   loadingDialogClient
 }) {
@@ -173,7 +173,20 @@ function MonthCalendar({
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const handleMouseDown = (dateString) => {
+  const handleMouseDown = (e, dateString) => {
+    // SHIFT+VENSTRE klik åbner dialogen (hvis status "on")
+    if (e.shiftKey && e.button === 0) {
+      e.preventDefault();
+      if (
+        clientId &&
+        markedDays?.[clientId]?.[dateString]?.status === "on" &&
+        !loadingDialogDate
+      ) {
+        onDateShiftLeftClick(clientId, dateString);
+        return;
+      }
+    }
+    // Ellers start drag markering
     setIsDragging(true);
     draggedDates.current = new Set([dateString]);
     if (clientId) {
@@ -181,7 +194,7 @@ function MonthCalendar({
     }
   };
 
-  const handleMouseEnter = (dateString) => {
+  const handleMouseEnter = (e, dateString) => {
     if (isDragging && clientId && !draggedDates.current.has(dateString)) {
       draggedDates.current.add(dateString);
       onDayClick([clientId], dateString, markMode, markedDays);
@@ -241,23 +254,13 @@ function MonthCalendar({
                   }}
                   title={
                     cellStatus === "on"
-                      ? "Tændt (højreklik for tid)"
+                      ? "Tændt (shift+klik for tid)"
                       : cellStatus === "off"
                         ? "Slukket"
                         : ""
                   }
-                  onMouseDown={() => handleMouseDown(dateString)}
-                  onMouseEnter={() => handleMouseEnter(dateString)}
-                  onContextMenu={e => {
-                    e.preventDefault();
-                    if (
-                      clientId &&
-                      markedDays?.[clientId]?.[dateString]?.status === "on" &&
-                      !isLoading
-                    ) {
-                      onDateRightClick(clientId, dateString);
-                    }
-                  }}
+                  onMouseDown={e => handleMouseDown(e, dateString)}
+                  onMouseEnter={e => handleMouseEnter(e, dateString)}
                 >
                   {isLoading ? (
                     <CircularProgress size={18} sx={{ position: "absolute", top: 2, left: 2 }} />
@@ -396,8 +399,8 @@ export default function CalendarPage() {
     });
   };
 
-  // HØJREKLIK handler
-  const handleDateRightClick = (clientId, date) => {
+  // SHIFT+VENSTRE klik handler
+  const handleDateShiftLeftClick = (clientId, date) => {
     if (autoSaveTimer.current) {
       clearTimeout(autoSaveTimer.current);
       autoSaveTimer.current = null;
@@ -683,7 +686,7 @@ export default function CalendarPage() {
               markedDays={markedDays}
               markMode={markMode}
               onDayClick={handleDayClick}
-              onDateRightClick={handleDateRightClick}
+              onDateShiftLeftClick={handleDateShiftLeftClick}
               loadingDialogDate={loadingDialogDate}
               loadingDialogClient={loadingDialogClient}
             />
