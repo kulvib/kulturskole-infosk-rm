@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -29,6 +29,7 @@ export default function DateTimeEditDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(""); // "success" | "error" | ""
+  const closeTimer = useRef(null);
 
   // Hent tider fra API hver gang dialogen åbnes
   useEffect(() => {
@@ -56,6 +57,19 @@ export default function DateTimeEditDialog({
       .finally(() => setLoading(false));
   }, [open, date, clientId]);
 
+  // Luk dialogen automatisk efter 1 sekund ved succes
+  useEffect(() => {
+    if (status === "success") {
+      closeTimer.current = setTimeout(() => {
+        setStatus(""); // Clear feedback
+        if (onClose) onClose();
+      }, 1000);
+    }
+    return () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
+  }, [status, onClose]);
+
   const validate = () => {
     if (!onTime || !offTime) {
       setStatus("error");
@@ -67,6 +81,20 @@ export default function DateTimeEditDialog({
       return false;
     }
     return true;
+  };
+
+  const fetchLatestTimes = async (clientId, normDate, season) => {
+    const token = getToken();
+    const resGet = await fetch(
+      `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
+      token ? { headers: { Authorization: "Bearer " + token } } : undefined
+    );
+    if (resGet.ok) {
+      const data = await resGet.json();
+      const dayObj = data.markedDays?.[normDate] || {};
+      setOnTime(dayObj.onTime || "");
+      setOffTime(dayObj.offTime || "");
+    }
   };
 
   const handleSave = async () => {
@@ -119,6 +147,9 @@ export default function DateTimeEditDialog({
       if (!res.ok) throw new Error();
       setStatus("success");
       if (onSaved) onSaved({ date: normDate, clientId });
+
+      // HENT FRISKE TIDER EFTER GEM
+      await fetchLatestTimes(clientId, normDate, season);
     } catch {
       setStatus("error");
     }
@@ -126,8 +157,36 @@ export default function DateTimeEditDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Redigér tid for {date}</DialogTitle>
+    <Dialog
+      open={open}
+      onClose={status === "error" ? onClose : undefined}
+      maxWidth="xs"
+      fullWidth
+    >
+      <DialogTitle sx={{ pb: 0 }}>
+        <Box sx={{ display: "flex", alignItems: "center", position: "relative" }}>
+          {/* “Gemt” indikationen i venstre hjørne */}
+          {status === "success" && (
+            <Typography
+              sx={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                color: "#388e3c",
+                fontWeight: "normal",
+                fontSize: "1rem",
+                pl: 0.5,
+                pt: 0.5
+              }}
+            >
+              Gemt
+            </Typography>
+          )}
+          <span style={{ margin: "0 auto" }}>
+            Redigér tid for {date}
+          </span>
+        </Box>
+      </DialogTitle>
       <DialogContent>
         {loading ? (
           <Box sx={{ minHeight: 80, display: "flex", alignItems: "center" }}>
@@ -152,11 +211,10 @@ export default function DateTimeEditDialog({
               fullWidth
               inputProps={{ step: 300 }}
             />
-            {status === "success" && (
-              <Typography sx={{ color: "#388e3c", fontWeight: 600, mt: 1 }}>Gemt</Typography>
-            )}
             {status === "error" && (
-              <Alert severity="error" sx={{ mt: 1 }}>Fejl ved gemning eller hentning!</Alert>
+              <Alert severity="error" sx={{ mt: 1 }}>
+                Fejl ved gemning eller hentning!
+              </Alert>
             )}
           </>
         )}
