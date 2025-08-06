@@ -41,7 +41,6 @@ function isClientListEqual(a, b) {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     const ca = a[i], cb = b[i];
-    // Sammenlign relevante felter - fx id, name, locality, status, sort_order, isOnline
     if (
       ca.id !== cb.id ||
       ca.name !== cb.name ||
@@ -177,20 +176,37 @@ export default function ClientInfoPage() {
     }
   };
 
+  // Moderne Vent venligst-dialog
   if (loading) {
     return (
-      <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
-        <Typography
-          variant="h5"
+      <Box
+        sx={{
+          minHeight: "60vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "transparent",
+        }}
+      >
+        <Paper
+          elevation={5}
           sx={{
-            color: "#444",
-            fontWeight: 700,
-            textTransform: "none",
-            fontFamily: "inherit",
+            p: 4,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            minWidth: 320,
+            borderRadius: 3,
           }}
         >
-          vent venligst...
-        </Typography>
+          <CircularProgress color="primary" size={48} sx={{ mb: 2 }} />
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+            Vent venligst
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 0 }}>
+            Henter klientdata...
+          </Typography>
+        </Paper>
       </Box>
     );
   }
