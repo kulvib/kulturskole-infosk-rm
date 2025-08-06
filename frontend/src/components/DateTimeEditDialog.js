@@ -13,6 +13,8 @@ import {
 // Helper to strip time from ISO date key
 const stripTimeFromDateKey = (key) => key.split("T")[0];
 
+const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
+
 export default function DateTimeEditDialog({
   open,
   onClose,
@@ -32,7 +34,7 @@ export default function DateTimeEditDialog({
     setLoading(true);
     setError("");
     fetch(
-      `/api/calendar/marked-days?clientId=${encodeURIComponent(clientId)}&season=${date.substring(0, 4)}`
+      `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${date.substring(0, 4)}`
     )
       .then(res => {
         if (!res.ok) throw new Error("Fejl ved hentning");
@@ -62,6 +64,7 @@ export default function DateTimeEditDialog({
       setError("Begge tidspunkter skal udfyldes.");
       return false;
     }
+    // Only allow ":" as separator for type="time"
     const timeRegex = /^\d{2}:\d{2}$/;
     if (!timeRegex.test(onTime) || !timeRegex.test(offTime)) {
       setError("Tid skal være i formatet 08:00 eller 18:30.");
@@ -71,6 +74,7 @@ export default function DateTimeEditDialog({
     return true;
   };
 
+  // Normalize to "HH:mm" with colon before saving
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
@@ -79,12 +83,12 @@ export default function DateTimeEditDialog({
       const normalizedDate = date.length === 10 ? date + "T00:00:00" : date;
       const payload = {
         date: normalizedDate,
-        clientId,
+        client_id: clientId,
         onTime: onTime.replace(/\./g, ":"),
         offTime: offTime.replace(/\./g, ":"),
       };
       const res = await fetch(
-        "/api/calendar/marked-days",
+        `${API_BASE}/api/calendar/marked-days`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json", accept: "application/json" },
@@ -115,6 +119,16 @@ export default function DateTimeEditDialog({
     return date;
   })();
 
+  // Only allow ":" as separator in the input (and auto-convert "." to ":")
+  const handleOnTimeChange = (e) => {
+    const value = e.target.value.replace(/\./g, ":");
+    setOnTime(value);
+  };
+  const handleOffTimeChange = (e) => {
+    const value = e.target.value.replace(/\./g, ":");
+    setOffTime(value);
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>
@@ -135,7 +149,7 @@ export default function DateTimeEditDialog({
               label="Tænd tid"
               type="time"
               value={onTime}
-              onChange={e => setOnTime(e.target.value.replace(/\./g, ":"))}
+              onChange={handleOnTimeChange}
               fullWidth
               sx={{ mb: 2 }}
               inputProps={{ step: 300 }}
@@ -145,7 +159,7 @@ export default function DateTimeEditDialog({
               label="Sluk tid"
               type="time"
               value={offTime}
-              onChange={e => setOffTime(e.target.value.replace(/\./g, ":"))}
+              onChange={handleOffTimeChange}
               fullWidth
               inputProps={{ step: 300 }}
               error={Boolean(error)}
