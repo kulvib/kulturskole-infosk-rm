@@ -118,7 +118,7 @@ export default function DateTimeEditDialog({
     setShowTopError(false);
     try {
       const token = getToken();
-      const normalizedDate = date.length === 10 ? date + "T00:00:00" : date;
+      const normalizedDate = date.split("T")[0]; // Altid YYYY-MM-DD!
       const season = normalizedDate.substring(0, 4);
       const payload = {
         markedDays: {
@@ -146,9 +146,9 @@ export default function DateTimeEditDialog({
           body: JSON.stringify(payload),
         }
       );
+      const resTxt = await res.text();
       if (!res.ok) {
-        const errText = await res.text();
-        setError(errText || "Kunne ikke gemme tid til serveren.");
+        setError(resTxt || "Kunne ikke gemme tid til serveren.");
         setShowTopError(true);
         setSaving(false);
         setShowSaved(false);
