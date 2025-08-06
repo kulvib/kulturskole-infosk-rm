@@ -37,7 +37,7 @@ export default function DateTimeEditDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showTopError, setShowTopError] = useState(false);
-  const [showSaved, setShowSaved] = useState(false); // Ny: gemt-indikator
+  const [showSaved, setShowSaved] = useState(false);
 
   // Hent tider fra API når dialog åbner
   useEffect(() => {
@@ -59,14 +59,12 @@ export default function DateTimeEditDialog({
         return res.json();
       })
       .then(data => {
-        // Find entry for dag (med eller uden tid)
         const allKeys = Object.keys(data.markedDays || {});
         let found = data.markedDays[date];
         if (!found) {
           const matchKey = allKeys.find(k => stripTimeFromDateKey(k) === date);
           if (matchKey) found = data.markedDays[matchKey];
         }
-        // Hvis IKKE fundet i backend, brug localMarkedDays fra frontend!
         if (!found && localMarkedDays && localMarkedDays[date]) {
           found = localMarkedDays[date];
         }
@@ -85,6 +83,16 @@ export default function DateTimeEditDialog({
       })
       .finally(() => setLoading(false));
   }, [open, date, clientId, localMarkedDays]);
+
+  // Luk dialogen automatisk 1 sekund efter "Gemt" vises
+  useEffect(() => {
+    if (!showSaved) return;
+    const t = setTimeout(() => {
+      setShowSaved(false);
+      onClose();
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [showSaved, onClose]);
 
   const validate = () => {
     if (!onTime || !offTime) {
@@ -148,8 +156,7 @@ export default function DateTimeEditDialog({
       }
       if (onSaved) await onSaved({ date: normalizedDate, clientId });
       setShowSaved(true); // Vis gemt-indikator
-      setTimeout(() => setShowSaved(false), 2200);
-      onClose();
+      // Dialogen lukkes nu automatisk via useEffect ovenfor
     } catch (e) {
       setError(e.message || "Kunne ikke gemme tid til serveren.");
       setShowTopError(true);
@@ -188,7 +195,6 @@ export default function DateTimeEditDialog({
         Redigér tid for {displayDate}
       </DialogTitle>
       <DialogContent>
-        {/* Hvis der er fejl, vis Alert i toppen */}
         {showTopError && error && (
           <Box sx={{ mb: 2 }}>
             <Alert severity="error">{error}</Alert>
