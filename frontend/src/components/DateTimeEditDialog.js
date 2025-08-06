@@ -8,6 +8,9 @@ import {
   TextField,
   Typography,
   CircularProgress,
+  Box,
+  Alert,
+  Chip
 } from "@mui/material";
 
 // Helper to strip time from ISO date key
@@ -26,19 +29,23 @@ export default function DateTimeEditDialog({
   date,
   clientId,
   onSaved,
-  localMarkedDays, // NYT: modtag markedDays for denne klient
+  localMarkedDays,
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showTopError, setShowTopError] = useState(false);
+  const [showSaved, setShowSaved] = useState(false); // Ny: gemt-indikator
 
   // Hent tider fra API når dialog åbner
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
     setError("");
+    setShowTopError(false);
+    setShowSaved(false);
 
     const token = getToken();
     fetch(
@@ -74,6 +81,7 @@ export default function DateTimeEditDialog({
         setOnTime(fallback?.onTime?.replace(/\./g, ":") || "");
         setOffTime(fallback?.offTime?.replace(/\./g, ":") || "");
         setError("Kunne ikke hente tider fra serveren.");
+        setShowTopError(true);
       })
       .finally(() => setLoading(false));
   }, [open, date, clientId, localMarkedDays]);
@@ -81,14 +89,17 @@ export default function DateTimeEditDialog({
   const validate = () => {
     if (!onTime || !offTime) {
       setError("Begge tidspunkter skal udfyldes.");
+      setShowTopError(true);
       return false;
     }
     const timeRegex = /^\d{2}:\d{2}$/;
     if (!timeRegex.test(onTime) || !timeRegex.test(offTime)) {
       setError("Tid skal være i formatet 08:00 eller 18:30.");
+      setShowTopError(true);
       return false;
     }
     setError("");
+    setShowTopError(false);
     return true;
   };
 
@@ -96,11 +107,11 @@ export default function DateTimeEditDialog({
     if (!validate()) return;
     setSaving(true);
     setError("");
+    setShowTopError(false);
     try {
       const token = getToken();
       const normalizedDate = date.length === 10 ? date + "T00:00:00" : date;
       const season = normalizedDate.substring(0, 4);
-      // Korrekt struktur: klient-id som string, så backend accepterer det!
       const payload = {
         markedDays: {
           [String(clientId)]: {
@@ -129,12 +140,20 @@ export default function DateTimeEditDialog({
       );
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(errText);
+        setError(errText || "Kunne ikke gemme tid til serveren.");
+        setShowTopError(true);
+        setSaving(false);
+        setShowSaved(false);
+        return;
       }
       if (onSaved) await onSaved({ date: normalizedDate, clientId });
+      setShowSaved(true); // Vis gemt-indikator
+      setTimeout(() => setShowSaved(false), 2200);
       onClose();
     } catch (e) {
       setError(e.message || "Kunne ikke gemme tid til serveren.");
+      setShowTopError(true);
+      setShowSaved(false);
     }
     setSaving(false);
   };
@@ -169,6 +188,12 @@ export default function DateTimeEditDialog({
         Redigér tid for {displayDate}
       </DialogTitle>
       <DialogContent>
+        {/* Hvis der er fejl, vis Alert i toppen */}
+        {showTopError && error && (
+          <Box sx={{ mb: 2 }}>
+            <Alert severity="error">{error}</Alert>
+          </Box>
+        )}
         {loading ? (
           <div style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 120 }}>
             <CircularProgress size={29} />
@@ -187,7 +212,6 @@ export default function DateTimeEditDialog({
               fullWidth
               sx={{ mb: 2 }}
               inputProps={{ step: 300 }}
-              error={Boolean(error)}
             />
             <TextField
               label="Sluk tid"
@@ -196,8 +220,6 @@ export default function DateTimeEditDialog({
               onChange={handleOffTimeChange}
               fullWidth
               inputProps={{ step: 300 }}
-              error={Boolean(error)}
-              helperText={error}
             />
           </>
         )}
@@ -206,14 +228,24 @@ export default function DateTimeEditDialog({
         <Button onClick={onClose} color="inherit" disabled={saving || loading}>
           Annullér
         </Button>
-        <Button
-          onClick={handleSave}
-          color="primary"
-          variant="contained"
-          disabled={saving || loading || !onTime || !offTime}
-        >
-          {saving ? <CircularProgress size={20} /> : "Gem"}
-        </Button>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Button
+            onClick={handleSave}
+            color="primary"
+            variant="contained"
+            disabled={saving || loading || !onTime || !offTime}
+          >
+            {saving ? <CircularProgress size={20} /> : "Gem"}
+          </Button>
+          {showSaved && (
+            <Chip
+              label="Gemt"
+              color="success"
+              size="small"
+              sx={{ ml: 1 }}
+            />
+          )}
+        </Box>
       </DialogActions>
     </Dialog>
   );
