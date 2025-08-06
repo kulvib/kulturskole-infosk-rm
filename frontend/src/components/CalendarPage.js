@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Snackbar, Alert, Checkbox, List, ListItem, ListItemText, TextField
+  Snackbar, Alert, Checkbox, List, ListItem, ListItemText, TextField, Dialog,
+  DialogTitle, DialogContent, DialogActions
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
@@ -293,6 +294,7 @@ function MonthCalendar({
                   onMouseDown={() => handleMouseDown(dateString)}
                   onMouseEnter={() => handleMouseEnter(dateString)}
                   onDoubleClick={() => {
+                    // Åben dialog KUN hvis status er "on"
                     if (clientId && markedDays?.[clientId]?.[dateString]?.status === "on") {
                       onDateDoubleClick(clientId, dateString);
                     }
@@ -630,8 +632,8 @@ export default function CalendarPage() {
         onClose={() => setEditDialogOpen(false)}
         date={editDialogDate}
         customTime={
-          activeClient && editDialogDate && markedDays[activeClient]?.[editDialogDate]
-            ? markedDays[activeClient][editDialogDate]
+          editDialogClient && editDialogDate && markedDays[editDialogClient]?.[editDialogDate]
+            ? markedDays[editDialogClient][editDialogDate]
             : null
         }
         defaultTimes={
