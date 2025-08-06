@@ -90,21 +90,21 @@ export default function DateTimeEditDialog({
     try {
       const token = getToken();
       const normalizedDate = date.length === 10 ? date + "T00:00:00" : date;
-      // Byg payload som backend forventer!
       const season = normalizedDate.substring(0, 4);
+      // Korrekt struktur: klient-id som string, så backend accepterer det!
       const payload = {
         markedDays: {
-          [normalizedDate]: {
-            client_id: clientId,
-            status: "on",
-            onTime: onTime.replace(/\./g, ":"),
-            offTime: offTime.replace(/\./g, ":")
+          [String(clientId)]: {
+            [normalizedDate]: {
+              status: "on",
+              onTime: onTime.replace(/\./g, ":"),
+              offTime: offTime.replace(/\./g, ":")
+            }
           }
         },
         clients: [clientId],
-        season: season
+        season: Number(season)
       };
-      console.log("Payload der sendes:", payload);
 
       const res = await fetch(
         `${API_BASE}/api/calendar/marked-days`,
@@ -120,7 +120,6 @@ export default function DateTimeEditDialog({
       );
       if (!res.ok) {
         const errText = await res.text();
-        console.error("Fejl fra serveren:", errText);
         throw new Error(errText);
       }
       if (onSaved) await onSaved({ date: normalizedDate, clientId });
