@@ -412,7 +412,7 @@ export default function CalendarPage() {
       });
       setMarkedDays(prev => ({
         ...prev,
-        [clientId]: mapped
+        [clientId]: mapped // kun denne klient opdateres!
       }));
     } catch {
       setSaveStatus({ status: "error", message: "Kunne ikke hente nyeste tider" });
