@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Alert, Checkbox, TextField, Chip
+  Alert, Checkbox, TextField
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
 
-// ---------- Hjælpefunktioner ----------
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
@@ -58,7 +57,6 @@ function stripTimeFromDateKey(key) {
   return key.split("T")[0];
 }
 
-// ---------- ClientSelector ----------
 function ClientSelectorInline({ clients, selected, onChange }) {
   const [search, setSearch] = useState("");
   const sortedClients = [...clients].sort((a, b) => {
@@ -69,17 +67,13 @@ function ClientSelectorInline({ clients, selected, onChange }) {
   const filteredClients = sortedClients.filter(c =>
     (c.locality || c.name || "").toLowerCase().includes(search.toLowerCase())
   );
-
-  // NY funktion: Markér alle eller fjern alle
   const allVisibleIds = filteredClients.map(c => c.id);
   const allMarked = allVisibleIds.length > 0 && allVisibleIds.every(id => selected.includes(id));
 
   const handleToggleAll = () => {
     if (allMarked) {
-      // Fjern alle synlige fra valgt
       onChange(selected.filter(id => !allVisibleIds.includes(id)));
     } else {
-      // Tilføj alle synlige til valgt
       const newSelected = Array.from(new Set([...selected, ...allVisibleIds]));
       onChange(newSelected);
     }
@@ -150,7 +144,6 @@ function ClientSelectorInline({ clients, selected, onChange }) {
   );
 }
 
-// ---------- MonthCalendar ----------
 function MonthCalendar({
   name,
   month,
@@ -275,7 +268,6 @@ function MonthCalendar({
   );
 }
 
-// ---------- CalendarPage ----------
 export default function CalendarPage() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(2025);
@@ -288,19 +280,15 @@ export default function CalendarPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editDialogDate, setEditDialogDate] = useState(null);
   const [editDialogClient, setEditDialogClient] = useState(null);
-
-  // Loader state til dobbeltklik
   const [loadingDialogDate, setLoadingDialogDate] = useState(null);
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
-
-  // FEEDBACK STATE
   const [saveStatus, setSaveStatus] = useState({ status: "idle", message: "" });
+  const saveIndicatorTimer = useRef(null);
 
   const autoSaveTimer = useRef(null);
 
   const seasons = getSeasons(2025, 2040);
 
-  // Hent klienter
   const fetchClients = useCallback(async () => {
     setLoadingClients(true);
     try {
@@ -317,10 +305,9 @@ export default function CalendarPage() {
     fetchClients();
   }, [fetchClients]);
 
-  // Hent markeringer for KUN activeClient og selectedSeason
   useEffect(() => {
     if (!activeClient) return;
-    setMarkedDays(prev => ({ ...prev, [activeClient]: undefined })); // Nulstil mens vi loader
+    setMarkedDays(prev => ({ ...prev, [activeClient]: undefined }));
     let isCurrent = true;
     getMarkedDays(selectedSeason, activeClient)
       .then(data => {
@@ -347,21 +334,18 @@ export default function CalendarPage() {
     return () => { isCurrent = false; };
   }, [selectedSeason, activeClient, token]);
 
-  // AUTOSAVE (kun hvis dialog ikke åben)
   useEffect(() => {
     if (editDialogOpen) return;
     if (selectedClients.length === 0 || !activeClient) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => {
-      handleSave(false); // autosave: vis kun fejl, ikke "Gemt!"
+      handleSave(false);
     }, 1000);
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-    // eslint-disable-next-line
   }, [markedDays, selectedClients, activeClient, selectedSeason, editDialogOpen]);
 
-  // ClientSelector integration
   const handleClientSelectorChange = (newSelected) => {
     setSelectedClients(newSelected);
     if (!newSelected.includes(activeClient)) {
@@ -369,7 +353,6 @@ export default function CalendarPage() {
     }
   };
 
-  // Drag-to-select markering for ALLE valgte klienter
   const handleDayClick = (clientIds, dateString, mode, markedDays) => {
     setMarkedDays(prev => {
       const updated = { ...prev };
@@ -388,7 +371,6 @@ export default function CalendarPage() {
     });
   };
 
-  // Dobbeltklik på dato: loader, så dialog
   const handleDateDoubleClick = (clientId, date) => {
     setLoadingDialogDate(date);
     setLoadingDialogClient(clientId);
@@ -401,7 +383,6 @@ export default function CalendarPage() {
     }, 1000);
   };
 
-  // Når tid gemmes i dialogen: opdater den pågældende dag i markedDays for ALLE valgte klienter
   const handleSaveDateTime = async ({ date, clientId }) => {
     try {
       const data = await getMarkedDays(selectedSeason, clientId);
@@ -412,15 +393,13 @@ export default function CalendarPage() {
       });
       setMarkedDays(prev => ({
         ...prev,
-        [clientId]: mapped // kun denne klient opdateres!
+        [clientId]: mapped
       }));
     } catch {
       setSaveStatus({ status: "error", message: "Kunne ikke hente nyeste tider" });
     }
   };
 
-  // GEM: Gem hele kalenderen på ALLE markerede klienter.
-  // acceptér et parameter: showSuccessFeedback - kun true ved klik på knap!
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
   const handleSave = useCallback(
@@ -477,7 +456,13 @@ export default function CalendarPage() {
 
       try {
         await saveMarkedDays(payload);
-        if (showSuccessFeedback) setSaveStatus({ status: "success", message: "Gemt!" });
+        if (showSuccessFeedback) {
+          setSaveStatus({ status: "success", message: "Gemt" });
+          if (saveIndicatorTimer.current) clearTimeout(saveIndicatorTimer.current);
+          saveIndicatorTimer.current = setTimeout(() => {
+            setSaveStatus({ status: "idle", message: "" });
+          }, 2000);
+        }
         if (activeClient) {
           try {
             const data = await getMarkedDays(selectedSeason, activeClient);
@@ -503,10 +488,15 @@ export default function CalendarPage() {
     }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]
   );
 
+  useEffect(() => {
+    return () => {
+      if (saveIndicatorTimer.current) clearTimeout(saveIndicatorTimer.current);
+    };
+  }, []);
+
   const clientMarkedDays = markedDays[activeClient];
   const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
 
-  // Find navn og andre klienter til kalenderteksten
   const navn = activeClient
     ? clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Ingen valgt"
     : "";
@@ -520,7 +510,6 @@ export default function CalendarPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* Sæsonvælger */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c" }}>
@@ -540,7 +529,6 @@ export default function CalendarPage() {
         </Box>
       </Paper>
 
-      {/* Klientvælger inline med Refresh-knap i hjørnet */}
       <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative" }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
           Godkendte klienter
@@ -585,7 +573,6 @@ export default function CalendarPage() {
         )}
       </Paper>
 
-      {/* Switch/kontakt for markering og GEM-knap */}
       <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
         <Typography sx={{ mr: 1 }}>
           Markering betyder:
@@ -607,10 +594,19 @@ export default function CalendarPage() {
           SLUKKET
         </Button>
         <Box sx={{ flexGrow: 1 }} />
-        {/* GEMT/FEJL PROMPT VED SIDEN AF GEM-KNAP */}
-        <Box sx={{ display: "flex", alignItems: "center", mr: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", mr: 2, minWidth: 55 }}>
           {saveStatus.status === "success" && (
-            <Chip label="Gemt" color="success" sx={{ mr: 1 }} />
+            <Typography
+              sx={{
+                color: "#388e3c",
+                fontWeight: 600,
+                fontSize: "1rem",
+                transition: "opacity 0.3s",
+                opacity: 1
+              }}
+            >
+              Gemt
+            </Typography>
           )}
           {saveStatus.status === "error" && (
             <Alert severity="error" sx={{ mr: 1, py: 0.5, px: 2, fontSize: 14 }}>
@@ -621,13 +617,12 @@ export default function CalendarPage() {
         <Button
           variant="contained"
           color="primary"
-          onClick={() => handleSave(true)} // Kun vis "Gemt" ved klik!
+          onClick={() => handleSave(true)}
         >
           Gem kalender for valgte klienter
         </Button>
       </Box>
 
-      {/* Kalender for én (sidst markeret) klient */}
       <Box
         sx={{
           display: "grid",
@@ -665,7 +660,6 @@ export default function CalendarPage() {
         )}
       </Box>
 
-      {/* Dialog til redigering af tid */}
       <DateTimeEditDialog
         open={editDialogOpen}
         onClose={() => setEditDialogOpen(false)}
