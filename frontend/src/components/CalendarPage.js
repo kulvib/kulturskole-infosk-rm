@@ -124,12 +124,11 @@ function MonthCalendar({
           {cells.map((day, idx) => {
             if (!day) return <Box key={idx + "-empty"} />;
             const dateString = formatDate(year, month, day);
-            let color = "default";
-            if (markedDays?.[clientId]?.[dateString]?.status === "on") color = "on";
-            if (markedDays?.[clientId]?.[dateString]?.status === "off") color = "off";
+            // Hvis datoen ikke er markeret, er den OFF!
+            const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
             let bg = "#fff";
-            if (color === "on") bg = "#b4eeb4";
-            if (color === "off") bg = "#ffb7b7";
+            if (cellStatus === "on") bg = "#b4eeb4";
+            if (cellStatus === "off") bg = "#ffb7b7";
             return (
               <Box key={idx}
                 sx={{ display: "flex", justifyContent: "center", alignItems: "center", p: 0.2, position: "relative" }}>
@@ -144,9 +143,9 @@ function MonthCalendar({
                     ":hover": { boxShadow: "0 0 0 2px #1976d2" }
                   }}
                   title={
-                    color === "on"
+                    cellStatus === "on"
                       ? "Tændt (dobbeltklik for tid)"
-                      : color === "off"
+                      : cellStatus === "off"
                         ? "Slukket"
                         : ""
                   }
@@ -266,6 +265,7 @@ export default function CalendarPage() {
       clientIds.forEach(cid => {
         const current = updated?.[cid]?.[dateString]?.status;
         if (current === mode) {
+          // Hvis brugeren klikker igen for at fjerne markeringen, så slet den – datoen bliver OFF!
           delete updated[cid][dateString];
           if (Object.keys(updated[cid]).length === 0) {
             delete updated[cid];
@@ -292,6 +292,7 @@ export default function CalendarPage() {
       if (!updated[clientId]) updated[clientId] = {};
       updated[clientId][date] = {
         ...(updated[clientId][date] || { status: "on" }),
+        status: "on",
         onTime,
         offTime
       };
@@ -340,9 +341,8 @@ export default function CalendarPage() {
             payloadMarkedDays[cid][dateStr] = { status: "off" };
           }
         } else {
-          // Hvis ikke markeret specifikt, brug default on
-          const { onTime, offTime } = getDefaultTimes(dateStr);
-          payloadMarkedDays[cid][dateStr] = { status: "on", onTime, offTime };
+          // Hvis ikke markeret specifikt, så SLUK (off)
+          payloadMarkedDays[cid][dateStr] = { status: "off" };
         }
       });
     });
