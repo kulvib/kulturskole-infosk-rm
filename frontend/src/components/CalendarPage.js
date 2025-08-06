@@ -469,11 +469,12 @@ export default function CalendarPage() {
   if (activeClient) {
     const navn = clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Ingen valgt";
     if (selectedClients.length > 1) {
-      const andre = clients.filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
-                           .map(c => c.locality || c.name)
-                           .filter(Boolean)
-                           .join(", ");
-      kalenderTekst = `Viser kalender for: ${navn} - ændringerne slår også igennem i (${andre})`;
+      const andre = clients
+        .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
+        .map(c => c.locality || c.name)
+        .filter(Boolean)
+        .join(", ");
+      kalenderTekst = `Viser kalender for: ${navn} - ændringerne slår også igennem på klienterne: ${andre}`;
     } else {
       kalenderTekst = `Viser kalender for: ${navn}`;
     }
