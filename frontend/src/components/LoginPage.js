@@ -23,27 +23,67 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState(""); // <- status tilføjet
 
   useEffect(() => {
     if (token) {
-      navigate("/", { replace: true });
+      setStatus("Login gennemført. Omdirigerer...");
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 800);
     }
   }, [token, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    setStatus("Tjekker brugernavn og kodeord...");
+    setStatus("Forbinder til server...");
     setLoading(true);
+
+    // Simulér netværksforsinkelse (kun til test/demo - kan fjernes)
+    // await new Promise((r) => setTimeout(r, 500));
+
     try {
+      setStatus("Tjekker brugernavn og kodeord...");
       const data = await login(username, password);
-      setStatus("Login gennemført. Omdirigerer...");
-      loginUser(data.access_token);
+
+      if (data && data.access_token) {
+        setStatus("Login gennemført. Omdirigerer...");
+        loginUser(data.access_token);
+      } else {
+        setError("Uventet svar fra serveren.");
+        setStatus("Login mislykkedes.");
+      }
     } catch (err) {
-      setError(err.message || "Ukendt fejl.");
-      setStatus("Login mislykkedes.");
+      // Ekstra: Netværksfejl eller 401-Unauthorized
+      if (err && err.message) {
+        if (
+          err.message.toLowerCase().includes("network") ||
+          err.message.toLowerCase().includes("failed to fetch")
+        ) {
+          setStatus("Forbindelse til serveren mislykkedes.");
+          setError("Kunne ikke oprette forbindelse til serveren. Prøv igen senere.");
+        } else if (
+          err.message.toLowerCase().includes("unauthorized") ||
+          err.message.toLowerCase().includes("401")
+        ) {
+          setStatus("Forkert brugernavn eller kodeord.");
+          setError("Brugernavn eller kodeord er forkert.");
+        } else if (
+          err.message.toLowerCase().includes("locked") ||
+          err.message.toLowerCase().includes("spærret")
+        ) {
+          setStatus("Din konto er spærret.");
+          setError("Din konto er spærret. Kontakt administrator.");
+        } else {
+          setStatus("Login mislykkedes.");
+          setError(err.message);
+        }
+      } else {
+        setStatus("Login mislykkedes.");
+        setError("Ukendt fejl.");
+      }
     }
     setLoading(false);
   };
@@ -126,7 +166,7 @@ export default function LoginPage() {
               "Log ind"
             )}
           </Button>
-          {/* Status vises her */}
+          {/* Statusbesked */}
           {(status || error) && (
             <Typography
               sx={{
@@ -137,8 +177,14 @@ export default function LoginPage() {
               }}
               variant="body2"
             >
-              {error ? error : status}
+              {status}
             </Typography>
+          )}
+          {/* Fejl vises med Alert for mere synlighed */}
+          {error && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {error}
+            </Alert>
           )}
         </Box>
       </Paper>
