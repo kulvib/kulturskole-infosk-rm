@@ -15,7 +15,7 @@ const stripTimeFromDateKey = (key) => key.split("T")[0];
 
 const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
 
-// Hent token fra localStorage (samme metode som i api.js)
+// Hent token fra localStorage
 function getToken() {
   return localStorage.getItem("token");
 }
@@ -33,7 +33,7 @@ export default function DateTimeEditDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Fetch times from API when dialog opens
+  // Hent tider fra API når dialog åbner
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
@@ -51,7 +51,7 @@ export default function DateTimeEditDialog({
         return res.json();
       })
       .then(data => {
-        // Find entry for day (with or without time part)
+        // Find entry for dag (med eller uden tid)
         const allKeys = Object.keys(data.markedDays || {});
         let found = data.markedDays[date];
         if (!found) {
@@ -92,12 +92,13 @@ export default function DateTimeEditDialog({
       const normalizedDate = date.length === 10 ? date + "T00:00:00" : date;
       const payload = {
         date: normalizedDate,
-        client_id: clientId,
-        status: "on", // ALLTID med status
+        client_id: clientId, // sendes som tal
+        status: "on",
         onTime: onTime.replace(/\./g, ":"),
         offTime: offTime.replace(/\./g, ":"),
       };
       console.log("Payload der sendes:", payload);
+
       const res = await fetch(
         `${API_BASE}/api/calendar/marked-days`,
         {
@@ -111,12 +112,9 @@ export default function DateTimeEditDialog({
         }
       );
       if (!res.ok) {
-        let msg = "Fejl ved gem";
-        try {
-          const data = await res.json();
-          msg = data.detail || data.message || msg;
-        } catch {}
-        throw new Error(msg);
+        const errText = await res.text();
+        console.error("Fejl fra serveren:", errText);
+        throw new Error(errText);
       }
       if (onSaved) await onSaved({ date: normalizedDate, clientId });
       onClose();
@@ -126,7 +124,7 @@ export default function DateTimeEditDialog({
     setSaving(false);
   };
 
-  // Format date for display
+  // Formatér dato til visning
   const displayDate = (() => {
     try {
       const d = new Date(date);
