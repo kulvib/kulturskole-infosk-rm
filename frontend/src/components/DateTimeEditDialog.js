@@ -28,11 +28,9 @@ export default function DateTimeEditDialog({
   defaultTimes,
   onSave,
 }) {
-  // Brug customTime hvis sat, ellers defaultTimes:
   const [onTime, setOnTime] = useState(defaultTimes?.onTime || "");
   const [offTime, setOffTime] = useState(defaultTimes?.offTime || "");
 
-  // Reset state når dialogen åbnes eller dato ændres
   useEffect(() => {
     setOnTime(
       customTime && customTime.onTime
@@ -60,7 +58,7 @@ export default function DateTimeEditDialog({
     }
   };
 
-  // Dansk dato-format eller YYYY-MM-DD
+  // Dansk dato-format eller YYYY-MM-DD fallback
   const displayDate = (() => {
     try {
       const d = new Date(date);
