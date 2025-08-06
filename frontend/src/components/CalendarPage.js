@@ -380,26 +380,27 @@ export default function CalendarPage() {
 
     const baseMarked = markedDays[activeClient] || {};
 
-    // VIGTIGT: Dato som nøgle, client_id indeni
-    const payloadMarkedDays = {};
+    // Byg et array med både client_id og dato for hver entry
+    const payloadMarkedDays = [];
     allDates.forEach(dateStr => {
-      // Til hver dato, lav en entry for hver valgt klient
       selectedClients.forEach(cid => {
         const md = baseMarked[dateStr];
         if (md && md.status === "on") {
           const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
           const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
-          payloadMarkedDays[dateStr] = {
+          payloadMarkedDays.push({
             client_id: cid,
+            date: dateStr,
             status: "on",
             onTime,
             offTime
-          };
+          });
         } else {
-          payloadMarkedDays[dateStr] = {
+          payloadMarkedDays.push({
             client_id: cid,
+            date: dateStr,
             status: "off"
-          };
+          });
         }
       });
     });
