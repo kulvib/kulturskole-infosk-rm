@@ -1,108 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Snackbar, Alert, Checkbox, TextField, Dialog,
-  DialogTitle, DialogContent, DialogActions
+  Snackbar, Alert, Checkbox, TextField
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
+import DateTimeEditDialog from "./DateTimeEditDialog";
 
-// ----- DateTimeEditDialog direkte i filen -----
-function DateTimeEditDialog({
-  open,
-  onClose,
-  date,
-  customTime,
-  defaultTimes,
-  onSave,
-}) {
-  const [onTime, setOnTime] = useState(defaultTimes?.onTime || "");
-  const [offTime, setOffTime] = useState(defaultTimes?.offTime || "");
-
-  useEffect(() => {
-    setOnTime(
-      customTime && customTime.onTime
-        ? customTime.onTime
-        : defaultTimes?.onTime || ""
-    );
-    setOffTime(
-      customTime && customTime.offTime
-        ? customTime.offTime
-        : defaultTimes?.offTime || ""
-    );
-  }, [customTime, defaultTimes, date, open]);
-
-  if (!date) return null;
-
-  const handleSave = () => {
-    if (onTime && offTime) {
-      onSave({
-        date,
-        onTime,
-        offTime,
-      });
-      onClose();
-    }
-  };
-
-  // Dansk dato-format eller YYYY-MM-DD fallback
-  const displayDate = (() => {
-    try {
-      const d = new Date(date);
-      if (!isNaN(d)) {
-        return d.toLocaleDateString("da-DK", {
-          weekday: "short",
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        });
-      }
-    } catch {}
-    return date;
-  })();
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>
-        Redigér tid for {displayDate}
-      </DialogTitle>
-      <DialogContent>
-        <Typography variant="body2" sx={{ mb: 2 }}>
-          Indstil tænd/sluk-tidspunkt for denne dag.<br />
-          Standard: {defaultTimes?.onTime} – {defaultTimes?.offTime}
-        </Typography>
-        <TextField
-          label="Tænd tid"
-          type="time"
-          value={onTime}
-          onChange={e => setOnTime(e.target.value)}
-          fullWidth
-          sx={{ mb: 2 }}
-          inputProps={{ step: 300 }}
-        />
-        <TextField
-          label="Sluk tid"
-          type="time"
-          value={offTime}
-          onChange={e => setOffTime(e.target.value)}
-          fullWidth
-          inputProps={{ step: 300 }}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} color="inherit">
-          Annullér
-        </Button>
-        <Button onClick={handleSave} color="primary" variant="contained" disabled={!onTime || !offTime}>
-          Gem
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-// ----- Kalender og klientvælger funktioner -----
+// ---------- Hjælpefunktioner ----------
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
@@ -152,21 +58,17 @@ function stripTimeFromDateKey(key) {
   return key.split("T")[0];
 }
 
-// ClientSelector inline (alfabetisk grid, checkboxes side om side)
+// ---------- ClientSelector ----------
 function ClientSelectorInline({ clients, selected, onChange }) {
   const [search, setSearch] = useState("");
-
-  // Sortér alfabetisk
   const sortedClients = [...clients].sort((a, b) => {
     const aName = (a.locality || a.name || "").toLowerCase();
     const bName = (b.locality || b.name || "").toLowerCase();
     return aName.localeCompare(bName);
   });
-
   const filteredClients = sortedClients.filter(c =>
     (c.locality || c.name || "").toLowerCase().includes(search.toLowerCase())
   );
-
   const handleToggle = (id) => {
     if (selected.includes(id)) {
       onChange(selected.filter(sid => sid !== id));
@@ -174,7 +76,6 @@ function ClientSelectorInline({ clients, selected, onChange }) {
       onChange([...selected, id]);
     }
   };
-
   return (
     <Box>
       <TextField
@@ -225,6 +126,7 @@ function ClientSelectorInline({ clients, selected, onChange }) {
   );
 }
 
+// ---------- MonthCalendar ----------
 function MonthCalendar({
   name,
   month,
@@ -335,6 +237,7 @@ function MonthCalendar({
   );
 }
 
+// ---------- CalendarPage ----------
 export default function CalendarPage() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(2025);
@@ -346,7 +249,7 @@ export default function CalendarPage() {
   const [markMode, setMarkMode] = useState("on");
   const [markedDays, setMarkedDays] = useState({});
 
-  // Dialog state for tid
+  // Dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editDialogDate, setEditDialogDate] = useState(null);
   const [editDialogClient, setEditDialogClient] = useState(null);
@@ -437,7 +340,6 @@ export default function CalendarPage() {
 
   // GEM direkte i databasen og state når tid redigeres på EN DAG for ALLE valgte klienter (OG GENHENT NYESTE FRA BACKEND)
   const handleSaveDateTime = async ({ date, onTime, offTime }) => {
-    // GEM til backend med det samme for alle valgte klienter
     const payloadMarkedDays = {};
     selectedClients.forEach(clientId => {
       payloadMarkedDays[clientId] = { ...(markedDays[clientId] || {}) };
@@ -455,7 +357,7 @@ export default function CalendarPage() {
         season: selectedSeason
       });
 
-      // GENHENT markedDays for den relevante klient (så dialogen viser nyeste)
+      // GENHENT markedDays for den relevante klient
       if (editDialogClient) {
         const data = await getMarkedDays(selectedSeason, editDialogClient);
         const rawDays = data.markedDays || {};
@@ -685,17 +587,8 @@ export default function CalendarPage() {
         open={editDialogOpen}
         onClose={() => setEditDialogOpen(false)}
         date={editDialogDate}
-        customTime={
-          editDialogClient && editDialogDate && markedDays[editDialogClient]?.[editDialogDate]
-            ? markedDays[editDialogClient][editDialogDate]
-            : null
-        }
-        defaultTimes={
-          editDialogDate 
-            ? getDefaultTimes(editDialogDate)
-            : { onTime: "09:00", offTime: "22:30" }
-        }
-        onSave={handleSaveDateTime}
+        clientId={editDialogClient}
+        onSaved={handleSaveDateTime}
       />
 
       <Snackbar
