@@ -254,6 +254,8 @@ export default function CalendarPage() {
   const [editDialogDate, setEditDialogDate] = useState(null);
   const [editDialogClient, setEditDialogClient] = useState(null);
 
+  const [autoSaveTimer, setAutoSaveTimer] = useState(null);
+
   const seasons = getSeasons(2025, 2040);
 
   // Hent klienter
@@ -366,7 +368,7 @@ export default function CalendarPage() {
   // GEM: Gem den viste kalender (activeClient) på ALLE markerede klienter
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (selectedClients.length === 0) {
       setSnackbar({ open: true, message: "Ingen klienter valgt", severity: "warning" });
       return;
@@ -444,7 +446,21 @@ export default function CalendarPage() {
     } catch (e) {
       setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
     }
-  };
+    // eslint-disable-next-line
+  }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]);
+
+  // --- AUTO-GEM funktion (debounce 1 sekund) ---
+  useEffect(() => {
+    if (selectedClients.length === 0 || !activeClient) return;
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    setAutoSaveTimer(setTimeout(() => {
+      handleSave();
+    }, 1000));
+    return () => {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    };
+    // eslint-disable-next-line
+  }, [markedDays, selectedClients, activeClient, selectedSeason]);
 
   const clientMarkedDays = markedDays[activeClient];
   const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
