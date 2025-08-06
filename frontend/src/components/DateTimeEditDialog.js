@@ -10,12 +10,25 @@ import {
   CircularProgress,
 } from "@mui/material";
 
+// Helper to get default times based on weekday/weekend
+const getDefaultTimes = (dateStr) => {
+  const dateObj = new Date(dateStr);
+  const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+  return {
+    onTime: isWeekend ? "08:00" : "09:00",
+    offTime: isWeekend ? "18:00" : "22:30",
+  };
+};
+
+// Helper to strip time-part from a possible ISO date string
+const stripTimeFromDateKey = (key) => key.split("T")[0];
+
 export default function DateTimeEditDialog({
   open,
   onClose,
   date,
   clientId,
-  onSaved, // kan bruges hvis du vil opdatere kalenderen efter gem
+  onSaved,
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
@@ -23,33 +36,37 @@ export default function DateTimeEditDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Hjælpefunktion til at sætte standardtider
-  const getDefaultTimes = (dateStr) => {
-    const dateObj = new Date(dateStr);
-    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-    return {
-      onTime: isWeekend ? "08:00" : "09:00",
-      offTime: isWeekend ? "18:00" : "22:30",
-    };
-  };
-
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
     setError("");
     fetch(
-      `https://kulturskole-infosk-rm.onrender.com/api/calendar/marked-days?date=${encodeURIComponent(date)}&clientId=${encodeURIComponent(clientId)}`
+      `https://kulturskole-infosk-rm.onrender.com/api/calendar/marked-days?clientId=${encodeURIComponent(clientId)}&season=${date.substring(0,4)}`
     )
       .then(res => {
-        if (!res.ok) throw new Error("Fejl ved hentning af tider");
+        if (!res.ok) throw new Error("Fejl ved hentning");
         return res.json();
       })
       .then(data => {
-        setOnTime(data.onTime ? data.onTime.replace(/\./g, ":") : getDefaultTimes(date).onTime);
-        setOffTime(data.offTime ? data.offTime.replace(/\./g, ":") : getDefaultTimes(date).offTime);
+        // data.markedDays kan have nøgler med både "YYYY-MM-DD" og "YYYY-MM-DDT00:00:00"
+        const allKeys = Object.keys(data.markedDays || {});
+        // Prøv at finde præcis match
+        let found = data.markedDays[date];
+        // Hvis ikke, prøv at matche på dato uden tid
+        if (!found) {
+          const matchKey = allKeys.find(k => stripTimeFromDateKey(k) === date);
+          if (matchKey) found = data.markedDays[matchKey];
+        }
+        if (found && found.status === "on") {
+          setOnTime(found.onTime ? found.onTime.replace(/\./g, ":") : getDefaultTimes(date).onTime);
+          setOffTime(found.offTime ? found.offTime.replace(/\./g, ":") : getDefaultTimes(date).offTime);
+        } else {
+          const defaults = getDefaultTimes(date);
+          setOnTime(defaults.onTime);
+          setOffTime(defaults.offTime);
+        }
       })
       .catch(() => {
-        // Brug default-tider hvis der ikke kan hentes fra server
         const defaults = getDefaultTimes(date);
         setOnTime(defaults.onTime);
         setOffTime(defaults.offTime);
