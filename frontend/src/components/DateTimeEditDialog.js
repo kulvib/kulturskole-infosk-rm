@@ -28,20 +28,25 @@ export default function DateTimeEditDialog({
   defaultTimes,
   onSave,
 }) {
-  const [onTime, setOnTime] = useState("");
-  const [offTime, setOffTime] = useState("");
+  // Hjælpefunktion for sikkert format
+  const formatTime = t =>
+    t && typeof t === "string" && t.match(/^\d{2}[:.]\d{2}$/)
+      ? t.replace(".", ":")
+      : "";
 
-  // Opdater visning når dialogen åbner eller data ændrer sig
+  const [onTime, setOnTime] = useState(formatTime(defaultTimes?.onTime));
+  const [offTime, setOffTime] = useState(formatTime(defaultTimes?.offTime));
+
   useEffect(() => {
     setOnTime(
-      customTime && typeof customTime.onTime === "string"
-        ? customTime.onTime
-        : defaultTimes?.onTime || ""
+      customTime && customTime.onTime
+        ? formatTime(customTime.onTime)
+        : formatTime(defaultTimes?.onTime)
     );
     setOffTime(
-      customTime && typeof customTime.offTime === "string"
-        ? customTime.offTime
-        : defaultTimes?.offTime || ""
+      customTime && customTime.offTime
+        ? formatTime(customTime.offTime)
+        : formatTime(defaultTimes?.offTime)
     );
   }, [customTime, defaultTimes, date, open]);
 
@@ -62,25 +67,25 @@ export default function DateTimeEditDialog({
   // Placeholder skal ALTID afspejle den aktuelle værdi fra databasen (altså customTime hvis den findes, ellers default)
   const onTimePlaceholder =
     customTime && typeof customTime.onTime === "string" && customTime.onTime
-      ? customTime.onTime
-      : defaultTimes?.onTime || "";
+      ? formatTime(customTime.onTime)
+      : formatTime(defaultTimes?.onTime) || "";
 
   const offTimePlaceholder =
     customTime && typeof customTime.offTime === "string" && customTime.offTime
-      ? customTime.offTime
-      : defaultTimes?.offTime || "";
+      ? formatTime(customTime.offTime)
+      : formatTime(defaultTimes?.offTime) || "";
 
-  // Dansk dato-format eller YYYY-MM-DD fallback
+  // Dansk format: lørdag d. 2. august 2025
   const displayDate = (() => {
     try {
       const d = new Date(date);
       if (!isNaN(d)) {
-        return d.toLocaleDateString("da-DK", {
-          weekday: "short",
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        });
+        // Ugedag og måned med langt navn
+        const weekday = d.toLocaleDateString("da-DK", { weekday: "long" });
+        const day = d.getDate();
+        const month = d.toLocaleDateString("da-DK", { month: "long" });
+        const year = d.getFullYear();
+        return `${weekday} d. ${day}. ${month} ${year}`;
       }
     } catch {}
     return date;
@@ -94,7 +99,7 @@ export default function DateTimeEditDialog({
       <DialogContent>
         <Typography variant="body2" sx={{ mb: 2 }}>
           Indstil tænd/sluk-tidspunkt for denne dag.<br />
-          Standard: {defaultTimes?.onTime} – {defaultTimes?.offTime}
+          Standard: {formatTime(defaultTimes?.onTime)} – {formatTime(defaultTimes?.offTime)}
         </Typography>
         <TextField
           label="Tænd tid"
