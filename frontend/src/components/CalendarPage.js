@@ -152,7 +152,7 @@ function stripTimeFromDateKey(key) {
   return key.split("T")[0];
 }
 
-// ClientSelector inline (uden separat fil) - ALFABETISK, GRID, CHECKBOXES SIDE OM SIDE
+// ClientSelector inline (alfabetisk grid, checkboxes side om side)
 function ClientSelectorInline({ clients, selected, onChange }) {
   const [search, setSearch] = useState("");
 
@@ -435,23 +435,8 @@ export default function CalendarPage() {
     setEditDialogOpen(true);
   };
 
-  // GEM direkte i databasen og state når tid redigeres på EN DAG for ALLE valgte klienter
+  // GEM direkte i databasen og state når tid redigeres på EN DAG for ALLE valgte klienter (OG GENHENT NYESTE FRA BACKEND)
   const handleSaveDateTime = async ({ date, onTime, offTime }) => {
-    // Opdater i state for at vise det med det samme:
-    setMarkedDays(prev => {
-      const updated = { ...prev };
-      selectedClients.forEach(clientId => {
-        if (!updated[clientId]) updated[clientId] = {};
-        updated[clientId][date] = {
-          ...(updated[clientId][date] || { status: "on" }),
-          status: "on",
-          onTime,
-          offTime
-        };
-      });
-      return updated;
-    });
-
     // GEM til backend med det samme for alle valgte klienter
     const payloadMarkedDays = {};
     selectedClients.forEach(clientId => {
@@ -469,6 +454,21 @@ export default function CalendarPage() {
         markedDays: payloadMarkedDays,
         season: selectedSeason
       });
+
+      // GENHENT markedDays for den relevante klient (så dialogen viser nyeste)
+      if (editDialogClient) {
+        const data = await getMarkedDays(selectedSeason, editDialogClient);
+        const rawDays = data.markedDays || {};
+        const mapped = {};
+        Object.keys(rawDays).forEach(key => {
+          mapped[stripTimeFromDateKey(key)] = rawDays[key];
+        });
+        setMarkedDays(prev => ({
+          ...prev,
+          [editDialogClient]: mapped
+        }));
+      }
+
       setSnackbar({ open: true, message: "Tid gemt i databasen for alle valgte klienter!", severity: "success" });
     } catch (e) {
       setSnackbar({ open: true, message: "Kunne ikke gemme i databasen!", severity: "error" });
