@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Snackbar, Alert, Checkbox, List, ListItem, ListItemText, TextField, Dialog,
+  Snackbar, Alert, Checkbox, TextField, Dialog,
   DialogTitle, DialogContent, DialogActions
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -152,11 +152,18 @@ function stripTimeFromDateKey(key) {
   return key.split("T")[0];
 }
 
-// ClientSelector inline (uden separat fil)
+// ClientSelector inline (uden separat fil) - ALFABETISK, GRID, CHECKBOXES SIDE OM SIDE
 function ClientSelectorInline({ clients, selected, onChange }) {
   const [search, setSearch] = useState("");
 
-  const filteredClients = clients.filter(c =>
+  // Sortér alfabetisk
+  const sortedClients = [...clients].sort((a, b) => {
+    const aName = (a.locality || a.name || "").toLowerCase();
+    const bName = (b.locality || b.name || "").toLowerCase();
+    return aName.localeCompare(bName);
+  });
+
+  const filteredClients = sortedClients.filter(c =>
     (c.locality || c.name || "").toLowerCase().includes(search.toLowerCase())
   );
 
@@ -178,11 +185,26 @@ function ClientSelectorInline({ clients, selected, onChange }) {
         onChange={e => setSearch(e.target.value)}
         sx={{ mb: 2 }}
       />
-      <List dense>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
+          gap: 1,
+        }}
+      >
         {filteredClients.map(client => (
-          <ListItem
+          <Box
             key={client.id}
-            button
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              px: 1,
+              py: 0.5,
+              background: selected.includes(client.id) ? "#f0f4ff" : "transparent",
+              borderRadius: 1,
+              cursor: "pointer",
+              ":hover": { background: "#f3f6fa" }
+            }}
             onClick={() => handleToggle(client.id)}
           >
             <Checkbox
@@ -190,13 +212,15 @@ function ClientSelectorInline({ clients, selected, onChange }) {
               checked={selected.includes(client.id)}
               tabIndex={-1}
               disableRipple
+              sx={{ p: 0, pr: 1 }}
+              inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
             />
-            <ListItemText
-              primary={client.locality || client.name || "Ingen lokalitet"}
-            />
-          </ListItem>
+            <Typography variant="body2" noWrap>
+              {client.locality || client.name || "Ingen lokalitet"}
+            </Typography>
+          </Box>
         ))}
-      </List>
+      </Box>
     </Box>
   );
 }
@@ -411,8 +435,9 @@ export default function CalendarPage() {
     setEditDialogOpen(true);
   };
 
-  // Gem custom tid for EN DAG på ALLE valgte klienter
-  const handleSaveDateTime = ({ date, onTime, offTime }) => {
+  // GEM direkte i databasen og state når tid redigeres på EN DAG for ALLE valgte klienter
+  const handleSaveDateTime = async ({ date, onTime, offTime }) => {
+    // Opdater i state for at vise det med det samme:
     setMarkedDays(prev => {
       const updated = { ...prev };
       selectedClients.forEach(clientId => {
@@ -426,7 +451,28 @@ export default function CalendarPage() {
       });
       return updated;
     });
-    setSnackbar({ open: true, message: "Tider opdateret for alle valgte klienter!", severity: "success" });
+
+    // GEM til backend med det samme for alle valgte klienter
+    const payloadMarkedDays = {};
+    selectedClients.forEach(clientId => {
+      payloadMarkedDays[clientId] = { ...(markedDays[clientId] || {}) };
+      payloadMarkedDays[clientId][date] = {
+        status: "on",
+        onTime,
+        offTime
+      };
+    });
+
+    try {
+      await saveMarkedDays({
+        clients: selectedClients,
+        markedDays: payloadMarkedDays,
+        season: selectedSeason
+      });
+      setSnackbar({ open: true, message: "Tid gemt i databasen for alle valgte klienter!", severity: "success" });
+    } catch (e) {
+      setSnackbar({ open: true, message: "Kunne ikke gemme i databasen!", severity: "error" });
+    }
   };
 
   // GEM: Gem den viste kalender (activeClient) på ALLE markerede klienter
@@ -529,11 +575,34 @@ export default function CalendarPage() {
         </Box>
       </Paper>
 
-      {/* Klientvælger inline */}
-      <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+      {/* Klientvælger inline med Refresh-knap i hjørnet */}
+      <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative" }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
           Godkendte klienter
         </Typography>
+        {/* Refresh-knap oppe i højre hjørne */}
+        <IconButton
+          aria-label="Opdater klienter"
+          onClick={fetchClients}
+          disabled={loadingClients}
+          sx={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            zIndex: 2,
+            background: "#fff",
+            border: "1px solid #dbeafe",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.04)"
+          }}
+        >
+          <RefreshIcon />
+          {loadingClients && (
+            <CircularProgress
+              size={32}
+              sx={{ color: "#1976d2", position: "absolute", left: 4, top: 4, zIndex: 1 }}
+            />
+          )}
+        </IconButton>
         <ClientSelectorInline
           clients={clients}
           selected={selectedClients}
@@ -542,21 +611,6 @@ export default function CalendarPage() {
         <Typography variant="body2" sx={{ mt: 2 }}>
           Viser kalender for: <b>{clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Ingen valgt"}</b>
         </Typography>
-        <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
-          <IconButton
-            aria-label="Opdater klienter"
-            onClick={fetchClients}
-            disabled={loadingClients}
-          >
-            <RefreshIcon />
-            {loadingClients && (
-              <CircularProgress
-                size={32}
-                sx={{ color: "#1976d2", position: "absolute", left: 4, top: 4, zIndex: 1 }}
-              />
-            )}
-          </IconButton>
-        </Box>
       </Paper>
 
       {/* Switch/kontakt for markering og GEM-knap */}
