@@ -338,18 +338,24 @@ export default function CalendarPage() {
     setEditDialogOpen(true);
   };
 
-  // Når tid gemmes i dialogen: hent ALTID nyeste markedDays fra backend for klienten
+  // Når tid gemmes i dialogen: kun opdater den pågældende dag i markedDays
   const handleSaveDateTime = async ({ date, clientId }) => {
     try {
       const data = await getMarkedDays(selectedSeason, clientId);
       const rawDays = data.markedDays || {};
-      const mapped = {};
-      Object.keys(rawDays).forEach(key => {
-        mapped[stripTimeFromDateKey(key)] = rawDays[key];
-      });
+      // Find kun den dag du har ændret
+      const changedDayKey = Object.keys(rawDays).find(
+        key => stripTimeFromDateKey(key) === date
+      );
+      if (!changedDayKey) return;
+      const changedDay = rawDays[changedDayKey];
+
       setMarkedDays(prev => ({
         ...prev,
-        [clientId]: mapped
+        [clientId]: {
+          ...prev[clientId],
+          [date]: changedDay
+        }
       }));
       setSnackbar({ open: true, message: "Tid opdateret", severity: "success" });
     } catch {
