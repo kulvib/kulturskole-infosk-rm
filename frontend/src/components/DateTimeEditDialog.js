@@ -38,16 +38,16 @@ export default function DateTimeEditDialog({
     if (!open || !date || !clientId) return;
     setLoading(true);
     setStatus("");
-    setOnTime(""); setOffTime("");
+    setOnTime(""); setOffTime(""); // Sørg for at felterne altid er tomme ved åbning!
     setApiOnTime(""); setApiOffTime("");
     const token = getToken();
+    const normDate = date.split("T")[0];
     fetch(
-      `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${date.slice(0, 4)}`,
+      `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${normDate.slice(0, 4)}`,
       token ? { headers: { Authorization: "Bearer " + token } } : undefined
     )
       .then(res => res.json())
       .then(data => {
-        const normDate = date.split("T")[0];
         const dayObj = data.markedDays?.[normDate] || {};
         setApiOnTime(dayObj.onTime || "");
         setApiOffTime(dayObj.offTime || "");
@@ -113,11 +113,10 @@ export default function DateTimeEditDialog({
     setSaving(true);
     setStatus("");
     try {
-      const token = getToken();
       const normDate = date.split("T")[0];
       const season = normDate.substring(0, 4);
+      const token = getToken();
 
-      // Hent eksisterende markedDays for klienten/sæsonen
       const resGet = await fetch(
         `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
         token ? { headers: { Authorization: "Bearer " + token } } : undefined
@@ -127,7 +126,6 @@ export default function DateTimeEditDialog({
         const data = await resGet.json();
         serverData = data.markedDays || {};
       }
-      // Merge denne dag
       const updatedDays = { ...serverData };
       updatedDays[normDate] = {
         status: "on",
@@ -159,7 +157,6 @@ export default function DateTimeEditDialog({
       setStatus("success");
       if (onSaved) onSaved({ date: normDate, clientId });
 
-      // HENT FRISKE TIDER EFTER GEM
       await fetchLatestTimes(clientId, normDate, season);
     } catch {
       setStatus("error");
@@ -176,7 +173,6 @@ export default function DateTimeEditDialog({
     >
       <DialogTitle sx={{ pb: 0 }}>
         <Box sx={{ display: "flex", alignItems: "center", position: "relative" }}>
-          {/* “Gemt” indikationen i venstre hjørne */}
           {status === "success" && (
             <Typography
               sx={{
@@ -221,7 +217,10 @@ export default function DateTimeEditDialog({
                 InputProps={{
                   style: { backgroundColor: "#f6f6f6" }
                 }}
-                inputProps={{ step: 300 }}
+                inputProps={{
+                  step: 300,
+                  placeholder: apiOnTime // For type="time" er det inputProps.placeholder der styrer fill!
+                }}
               />
             </Box>
             <Box sx={{ mb: 2 }}>
@@ -240,7 +239,10 @@ export default function DateTimeEditDialog({
                 InputProps={{
                   style: { backgroundColor: "#f6f6f6" }
                 }}
-                inputProps={{ step: 300 }}
+                inputProps={{
+                  step: 300,
+                  placeholder: apiOffTime
+                }}
               />
             </Box>
             {status === "error" && (
