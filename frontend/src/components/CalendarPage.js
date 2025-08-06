@@ -7,7 +7,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
-import ClientSelector from "./ClientSelector"; // <-- NY import
+import ClientSelector from "./ClientSelector"; // Integreret komponent
 
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
@@ -55,7 +55,6 @@ function getDefaultTimes(dateStr) {
 }
 
 function stripTimeFromDateKey(key) {
-  // Stripper "T00:00:00" hvis det findes
   return key.split("T")[0];
 }
 
@@ -125,7 +124,6 @@ function MonthCalendar({
           {cells.map((day, idx) => {
             if (!day) return <Box key={idx + "-empty"} />;
             const dateString = formatDate(year, month, day);
-            // Hvis datoen ikke er markeret, er den OFF!
             const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
             let bg = "#fff";
             if (cellStatus === "on") bg = "#b4eeb4";
@@ -212,7 +210,6 @@ export default function CalendarPage() {
     getMarkedDays(selectedSeason, activeClient)
       .then(data => {
         if (isCurrent) {
-          // Map keys to strip time-part, so "2025-08-06T00:00:00" -> "2025-08-06"
           const rawDays = data.markedDays || {};
           const mapped = {};
           Object.keys(rawDays).forEach(key => {
@@ -235,9 +232,10 @@ export default function CalendarPage() {
     return () => { isCurrent = false; };
   }, [selectedSeason, activeClient, token]);
 
-  // Vælg/fjern klienter (nu med checkboxes)
+  // Integreret ClientSelector: valg af flere klienter
   const handleClientSelectorChange = (newSelected) => {
     setSelectedClients(newSelected);
+    // Sæt aktiv klient til den senest valgte, hvis den forrige ikke længere er valgt
     if (!newSelected.includes(activeClient)) {
       setActiveClient(newSelected.length > 0 ? newSelected[newSelected.length - 1] : null);
     }
@@ -250,7 +248,6 @@ export default function CalendarPage() {
       clientIds.forEach(cid => {
         const current = updated?.[cid]?.[dateString]?.status;
         if (current === mode) {
-          // Hvis brugeren klikker igen for at fjerne markeringen, så slet den – datoen bliver OFF!
           delete updated[cid][dateString];
           if (Object.keys(updated[cid]).length === 0) {
             delete updated[cid];
@@ -299,7 +296,6 @@ export default function CalendarPage() {
       return;
     }
 
-    // Find alle datoer i skoleåret
     const allDates = [];
     schoolYearMonths.forEach(({ month, year }) => {
       const daysInMonth = getDaysInMonth(month, year);
@@ -308,10 +304,8 @@ export default function CalendarPage() {
       }
     });
 
-    // Brug kun markedDays[activeClient] som skabelon
     const baseMarked = markedDays[activeClient] || {};
 
-    // Lav payload til alle markerede klienter
     const payloadMarkedDays = {};
     selectedClients.forEach(cid => {
       payloadMarkedDays[cid] = {};
@@ -326,7 +320,6 @@ export default function CalendarPage() {
             payloadMarkedDays[cid][dateStr] = { status: "off" };
           }
         } else {
-          // Hvis ikke markeret specifikt, så SLUK (off)
           payloadMarkedDays[cid][dateStr] = { status: "off" };
         }
       });
@@ -341,11 +334,9 @@ export default function CalendarPage() {
     try {
       await saveMarkedDays(payload);
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
-      // Hent opdaterede markeringer for AKTIV klient (så alt vises korrekt næste gang)
       if (activeClient) {
         try {
           const data = await getMarkedDays(selectedSeason, activeClient);
-          // Map keys to strip time-part:
           const rawDays = data.markedDays || {};
           const mapped = {};
           Object.keys(rawDays).forEach(key => {
@@ -367,11 +358,9 @@ export default function CalendarPage() {
     }
   };
 
-  // Kalender loading state for aktiv klient
   const clientMarkedDays = markedDays[activeClient];
   const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
 
-  // --- UI ---
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
       {/* Sæsonvælger */}
@@ -394,7 +383,7 @@ export default function CalendarPage() {
         </Box>
       </Paper>
 
-      {/* Klientvælger med søg og checkboxes */}
+      {/* Klientvælger med checkboxes og søgning */}
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
           Godkendte klienter
@@ -475,7 +464,7 @@ export default function CalendarPage() {
           </Box>
         )}
         {activeClient && !loadingMarkedDays &&
-          schoolYearMonths.map(({ name, month, year }, idx) => (
+          getSchoolYearMonths(selectedSeason).map(({ name, month, year }) => (
             <MonthCalendar
               key={name + year}
               name={name}
