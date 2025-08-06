@@ -353,7 +353,7 @@ export default function CalendarPage() {
     if (selectedClients.length === 0 || !activeClient) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => {
-      handleSave(); // autosave: vis kun feedback hvis fejler
+      handleSave(false); // autosave: vis kun fejl, ikke "Gemt!"
     }, 1000);
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
@@ -406,35 +406,26 @@ export default function CalendarPage() {
     try {
       const data = await getMarkedDays(selectedSeason, clientId);
       const rawDays = data.markedDays || {};
-      const changedDayKey = Object.keys(rawDays).find(
-        key => stripTimeFromDateKey(key) === date
-      );
-      if (!changedDayKey) return;
-      const changedDay = rawDays[changedDayKey];
-
-      setMarkedDays(prev => {
-        const updated = { ...prev };
-        selectedClients.forEach(cid => {
-          updated[cid] = {
-            ...updated[cid],
-            [date]: changedDay
-          };
-        });
-        return updated;
+      const mapped = {};
+      Object.keys(rawDays).forEach(key => {
+        mapped[stripTimeFromDateKey(key)] = rawDays[key];
       });
-      // Ingen snackbar her!
+      setMarkedDays(prev => ({
+        ...prev,
+        [clientId]: mapped
+      }));
     } catch {
       setSaveStatus({ status: "error", message: "Kunne ikke hente nyeste tider" });
     }
   };
 
   // GEM: Gem hele kalenderen på ALLE markerede klienter.
-  // acceptér et parameter: showSnackbar - skal kun være true ved manuelt klik!
+  // acceptér et parameter: showSuccessFeedback - kun true ved klik på knap!
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
   const handleSave = useCallback(
-    async () => {
-      setSaveStatus({ status: "idle", message: "" });
+    async (showSuccessFeedback = false) => {
+      if (showSuccessFeedback) setSaveStatus({ status: "idle", message: "" });
       if (selectedClients.length === 0) {
         setSaveStatus({ status: "error", message: "Ingen klienter valgt" });
         return;
@@ -486,7 +477,7 @@ export default function CalendarPage() {
 
       try {
         await saveMarkedDays(payload);
-        setSaveStatus({ status: "success", message: "Gemt!" });
+        if (showSuccessFeedback) setSaveStatus({ status: "success", message: "Gemt!" });
         if (activeClient) {
           try {
             const data = await getMarkedDays(selectedSeason, activeClient);
@@ -630,7 +621,7 @@ export default function CalendarPage() {
         <Button
           variant="contained"
           color="primary"
-          onClick={handleSave}
+          onClick={() => handleSave(true)} // Kun vis "Gemt" ved klik!
         >
           Gem kalender for valgte klienter
         </Button>
