@@ -380,22 +380,26 @@ export default function CalendarPage() {
 
     const baseMarked = markedDays[activeClient] || {};
 
+    // VIGTIGT: Dato som nøgle, client_id indeni
     const payloadMarkedDays = {};
-    selectedClients.forEach(cid => {
-      payloadMarkedDays[cid] = {};
-      allDates.forEach(dateStr => {
-        if (baseMarked[dateStr]) {
-          const md = baseMarked[dateStr];
-          if (md.status === "on") {
-            // Bruges altid den aktuelle tid fra state, som er opdateret fra backend efter evt. dialog-redigering
-            const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
-            const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
-            payloadMarkedDays[cid][dateStr] = { status: "on", onTime, offTime };
-          } else {
-            payloadMarkedDays[cid][dateStr] = { status: "off" };
-          }
+    allDates.forEach(dateStr => {
+      // Til hver dato, lav en entry for hver valgt klient
+      selectedClients.forEach(cid => {
+        const md = baseMarked[dateStr];
+        if (md && md.status === "on") {
+          const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
+          const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
+          payloadMarkedDays[dateStr] = {
+            client_id: cid,
+            status: "on",
+            onTime,
+            offTime
+          };
         } else {
-          payloadMarkedDays[cid][dateStr] = { status: "off" };
+          payloadMarkedDays[dateStr] = {
+            client_id: cid,
+            status: "off"
+          };
         }
       });
     });
