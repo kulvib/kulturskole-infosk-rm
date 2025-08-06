@@ -28,59 +28,75 @@ export default function DateTimeEditDialog({
   defaultTimes,
   onSave,
 }) {
-  // Hjælpefunktion for sikkert format
+  // Hjælpefunktion for sikkert format (punktum eller kolon -> kolon)
   const formatTime = t =>
-    t && typeof t === "string" && t.match(/^\d{2}[:.]\d{2}$/)
+    t && typeof t === "string"
       ? t.replace(".", ":")
       : "";
 
-  const [onTime, setOnTime] = useState(formatTime(defaultTimes?.onTime));
-  const [offTime, setOffTime] = useState(formatTime(defaultTimes?.offTime));
+  const [onTime, setOnTime] = useState("");
+  const [offTime, setOffTime] = useState("");
+  const [error, setError] = useState(""); // For valideringsfejl
 
   useEffect(() => {
     setOnTime(
-      customTime && customTime.onTime
+      customTime && typeof customTime.onTime === "string" && customTime.onTime
         ? formatTime(customTime.onTime)
         : formatTime(defaultTimes?.onTime)
     );
     setOffTime(
-      customTime && customTime.offTime
+      customTime && typeof customTime.offTime === "string" && customTime.offTime
         ? formatTime(customTime.offTime)
         : formatTime(defaultTimes?.offTime)
     );
+    setError("");
   }, [customTime, defaultTimes, date, open]);
 
   if (!date) return null;
 
-  const handleSave = () => {
-    if (onTime && offTime) {
-      onSave({
-        clientId,
-        date,
-        onTime,
-        offTime,
-      });
-      onClose();
+  // Ekstra validering: Tider skal være gyldige og onTime < offTime
+  const validate = () => {
+    if (!onTime || !offTime) {
+      setError("Begge tidspunkter skal udfyldes.");
+      return false;
     }
+    // Tjek format (skal være HH:MM og 00 ≤ MM < 60)
+    const timeRegex = /^\d{2}:\d{2}$/;
+    if (!timeRegex.test(onTime) || !timeRegex.test(offTime)) {
+      setError("Tid skal være i formatet 08:00 eller 18:30.");
+      return false;
+    }
+    // Sammenlign tider
+    const [onH, onM] = onTime.split(":").map(Number);
+    const [offH, offM] = offTime.split(":").map(Number);
+    if (onH > 23 || offH > 23 || onM > 59 || offM > 59) {
+      setError("Tid skal være gyldig (00:00 - 23:59).");
+      return false;
+    }
+    if (onH > offH || (onH === offH && onM >= offM)) {
+      setError("Tænd-tid skal være før sluk-tid.");
+      return false;
+    }
+    setError("");
+    return true;
   };
 
-  // Placeholder skal ALTID afspejle den aktuelle værdi fra databasen (altså customTime hvis den findes, ellers default)
-  const onTimePlaceholder =
-    customTime && typeof customTime.onTime === "string" && customTime.onTime
-      ? formatTime(customTime.onTime)
-      : formatTime(defaultTimes?.onTime) || "";
-
-  const offTimePlaceholder =
-    customTime && typeof customTime.offTime === "string" && customTime.offTime
-      ? formatTime(customTime.offTime)
-      : formatTime(defaultTimes?.offTime) || "";
+  const handleSave = () => {
+    if (!validate()) return;
+    onSave({
+      clientId,
+      date,
+      onTime,
+      offTime,
+    });
+    onClose();
+  };
 
   // Dansk format: lørdag d. 2. august 2025
   const displayDate = (() => {
     try {
       const d = new Date(date);
       if (!isNaN(d)) {
-        // Ugedag og måned med langt navn
         const weekday = d.toLocaleDateString("da-DK", { weekday: "long" });
         const day = d.getDate();
         const month = d.toLocaleDateString("da-DK", { month: "long" });
@@ -105,24 +121,21 @@ export default function DateTimeEditDialog({
           label="Tænd tid"
           type="time"
           value={onTime}
-          onChange={e => setOnTime(e.target.value)}
+          onChange={e => setOnTime(formatTime(e.target.value))}
           fullWidth
           sx={{ mb: 2 }}
-          inputProps={{
-            step: 300,
-            placeholder: onTimePlaceholder,
-          }}
+          inputProps={{ step: 300 }}
+          error={Boolean(error)}
         />
         <TextField
           label="Sluk tid"
           type="time"
           value={offTime}
-          onChange={e => setOffTime(e.target.value)}
+          onChange={e => setOffTime(formatTime(e.target.value))}
           fullWidth
-          inputProps={{
-            step: 300,
-            placeholder: offTimePlaceholder,
-          }}
+          inputProps={{ step: 300 }}
+          error={Boolean(error)}
+          helperText={error}
         />
       </DialogContent>
       <DialogActions>
