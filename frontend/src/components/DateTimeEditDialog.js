@@ -181,7 +181,7 @@ export default function DateTimeEditDialog({
       onClose={status === "error" ? onClose : undefined}
       maxWidth="xs"
       fullWidth
-      sx={{ position: "relative" }}
+      // ingen sx eller PaperProps med position!
     >
       <DialogTitle sx={{ pb: 0 }}>
         <Box sx={{ display: "flex", alignItems: "center", position: "relative" }}>
@@ -253,7 +253,6 @@ export default function DateTimeEditDialog({
           {saving ? <CircularProgress size={20} /> : "Gem"}
         </Button>
       </DialogActions>
-      {/* FEEDBACK nederst til venstre */}
       <Box
         sx={{
           position: "absolute",
