@@ -349,37 +349,78 @@ export default function CalendarPage() {
     return () => { isCurrent = false; };
   }, [selectedSeason, activeClient, token]);
 
-  // AUTOSAVE: KUN for eksisterende klienter, ikke for nye!
+  // AUTOSAVE: Kun for aktiv klient!
   useEffect(() => {
     if (editDialogOpen) return; // Stop autosave mens dialogen er åben
-    if (selectedClients.length === 0 || !activeClient) return;
+    if (!activeClient) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
-    // Hvis der netop er tilføjet nye klienter, skal der ikke autosaves
-    // Vi gemmer kun på "Gem kalender for valgte klienter"
-    // dvs. autosave kun hvis selectedClients ikke er blevet flere
-    // (eller, simplere: autosave kun hvis markedDays er ændret for eksisterende klienter)
+    // Gem kun hvis der ER ændringer siden sidst dialog-gem for den aktive klient
     const changedSinceDialog =
       !deepEqual(
-        markedDays,
-        lastDialogSavedMarkedDays.current
+        markedDays[activeClient],
+        lastDialogSavedMarkedDays.current[activeClient]
       );
-
-    // Tjek om en klient er ny (findes ikke i markedDays før)
-    const existingClientIds = Object.keys(markedDays).map(Number);
-    const newClientSelected = selectedClients.some(cid => !existingClientIds.includes(cid));
-
-    if (!changedSinceDialog || newClientSelected) return;
+    if (!changedSinceDialog) return;
 
     autoSaveTimer.current = setTimeout(() => {
-      handleSave(false); // autosave: vis kun fejl, ikke "Gemt!"
+      handleSaveSingleClient(activeClient); // autosave: kun for aktiv klient
     }, 1000);
 
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
     // eslint-disable-next-line
-  }, [markedDays, selectedClients, activeClient, selectedSeason, editDialogOpen]);
+  }, [markedDays[activeClient], activeClient, editDialogOpen]);
+
+  // Gem kun for én klient (autosave)
+  const handleSaveSingleClient = async (clientId) => {
+    if (!clientId) return;
+    const allDates = [];
+    getSchoolYearMonths(selectedSeason).forEach(({ month, year }) => {
+      const daysInMonth = getDaysInMonth(month, year);
+      for (let d = 1; d <= daysInMonth; d++) {
+        allDates.push(formatDate(year, month, d));
+      }
+    });
+
+    const payloadMarkedDays = {};
+    payloadMarkedDays[String(clientId)] = {};
+    allDates.forEach(dateStr => {
+      const md = markedDays[clientId]?.[dateStr];
+      if (md && md.status === "on") {
+        const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
+        const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
+        payloadMarkedDays[String(clientId)][dateStr] = {
+          status: "on",
+          onTime,
+          offTime
+        };
+      } else {
+        payloadMarkedDays[String(clientId)][dateStr] = {
+          status: "off"
+        };
+      }
+    });
+
+    const payload = {
+      clients: [clientId],
+      markedDays: payloadMarkedDays,
+      season: selectedSeason
+    };
+
+    try {
+      await saveMarkedDays(payload);
+      // Opdater sidst gemte
+      lastDialogSavedMarkedDays.current = {
+        ...lastDialogSavedMarkedDays.current,
+        [clientId]: markedDays[clientId]
+      };
+      lastDialogSavedTimestamp.current = Date.now();
+    } catch (e) {
+      setSaveStatus({ status: "error", message: e.message || "Kunne ikke autosave!" });
+    }
+  };
 
   const handleClientSelectorChange = (newSelected) => {
     setSelectedClients(newSelected);
@@ -431,7 +472,10 @@ export default function CalendarPage() {
         [clientId]: mapped
       }));
 
-      lastDialogSavedMarkedDays.current = { ...markedDays, [clientId]: mapped };
+      lastDialogSavedMarkedDays.current = {
+        ...lastDialogSavedMarkedDays.current,
+        [clientId]: mapped
+      };
       lastDialogSavedTimestamp.current = Date.now();
 
       setSaveStatus({ status: "success", message: "Gemt" });
@@ -446,6 +490,7 @@ export default function CalendarPage() {
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
+  // GEM FOR ALLE KLIENTER: De andre klienter får data fra activeClient!
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
       if (showSuccessFeedback) setSaveStatus({ status: "idle", message: "" });
@@ -469,9 +514,11 @@ export default function CalendarPage() {
       const payloadMarkedDays = {};
       selectedClients.forEach(cid => {
         const clientKey = String(cid);
+        // Kopier markedDays fra activeClient hvis ikke aktiv
+        const sourceMarkedDays = markedDays[activeClient] || {};
         payloadMarkedDays[clientKey] = {};
         allDates.forEach(dateStr => {
-          const md = markedDays[cid]?.[dateStr] || markedDays[activeClient]?.[dateStr];
+          const md = sourceMarkedDays[dateStr];
           if (md && md.status === "on") {
             const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
             const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
@@ -601,15 +648,17 @@ export default function CalendarPage() {
           onChange={handleClientSelectorChange}
         />
         {activeClient && (
-          <Typography variant="body1" sx={{ mt: 2, fontSize: "1.15rem" }}>
-            <Box component="span" fontWeight={700}>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" sx={{ fontSize: "1rem", fontWeight: 700 }}>
               Viser kalender for: {navn}
               {selectedClients.length > 1 && " - "}
-            </Box>
-            {selectedClients.length > 1 &&
-              <>ændringerne slår også igennem på klienterne: {andre}</>
-            }
-          </Typography>
+            </Typography>
+            {selectedClients.length > 1 && (
+              <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "#555", fontWeight: 400 }}>
+                ændringerne slår også igennem på klienterne: {andre}
+              </Typography>
+            )}
+          </Box>
         )}
       </Paper>
 
