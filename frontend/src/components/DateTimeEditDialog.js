@@ -164,6 +164,15 @@ export default function DateTimeEditDialog({
     setSaving(false);
   };
 
+  // Hjælpefunktion til at vise placeholder korrekt for type="time"
+  // Viser fill hvis value er "", ellers bruger value
+  const getInputValue = (userValue, apiValue) => {
+    return userValue === "" ? "" : userValue;
+  };
+  const getInputPlaceholder = (apiValue) => {
+    return apiValue || "hh:mm";
+  };
+
   return (
     <Dialog
       open={open}
@@ -211,15 +220,14 @@ export default function DateTimeEditDialog({
               <TextField
                 type="time"
                 fullWidth
-                value={onTime}
+                value={getInputValue(onTime, apiOnTime)}
                 onChange={e => setOnTime(e.target.value)}
-                placeholder={apiOnTime}
                 InputProps={{
                   style: { backgroundColor: "#f6f6f6" }
                 }}
                 inputProps={{
                   step: 300,
-                  placeholder: apiOnTime // For type="time" er det inputProps.placeholder der styrer fill!
+                  placeholder: getInputPlaceholder(apiOnTime)
                 }}
               />
             </Box>
@@ -233,15 +241,14 @@ export default function DateTimeEditDialog({
               <TextField
                 type="time"
                 fullWidth
-                value={offTime}
+                value={getInputValue(offTime, apiOffTime)}
                 onChange={e => setOffTime(e.target.value)}
-                placeholder={apiOffTime}
                 InputProps={{
                   style: { backgroundColor: "#f6f6f6" }
                 }}
                 inputProps={{
                   step: 300,
-                  placeholder: apiOffTime
+                  placeholder: getInputPlaceholder(apiOffTime)
                 }}
               />
             </Box>
