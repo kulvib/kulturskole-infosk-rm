@@ -1,21 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Typography,
-  CircularProgress,
-  Box,
-  Alert
-} from "@mui/material";
-
-const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
-function getToken() {
-  return localStorage.getItem("token");
-}
+// ... resten af imports og setup ...
 
 export default function DateTimeEditDialog({
   open,
@@ -28,15 +11,22 @@ export default function DateTimeEditDialog({
   const [offTime, setOffTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState(""); // "success" | "error" | ""
+  const [status, setStatus] = useState("");
   const closeTimer = useRef(null);
 
-  // Hent tider fra API hver gang dialogen åbnes
+  // Hjælpefunktion til at finde dag-nøgle i API-data
+  function findDayObj(markedDays, normDate) {
+    if (markedDays[normDate]) return markedDays[normDate];
+    // Søg efter nøgle der starter med normDate
+    const key = Object.keys(markedDays).find(k => k.startsWith(normDate));
+    return key ? markedDays[key] : {};
+  }
+
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
     setStatus("");
-    setOnTime(""); setOffTime(""); // Sørg for at felterne altid er tomme ved åbning!
+    setOnTime(""); setOffTime("");
     const token = getToken();
     const normDate = date.split("T")[0];
     fetch(
@@ -45,8 +35,7 @@ export default function DateTimeEditDialog({
     )
       .then(res => res.json())
       .then(data => {
-        const dayObj = data.markedDays?.[normDate] || {};
-        // Sæt tider direkte som value hvis de findes!
+        const dayObj = findDayObj(data.markedDays || {}, normDate);
         setOnTime(dayObj.onTime || "");
         setOffTime(dayObj.offTime || "");
       })
@@ -70,12 +59,7 @@ export default function DateTimeEditDialog({
   }, [status, onClose]);
 
   const validate = () => {
-    // Skal bruge indtastet tid
-    if (!onTime) {
-      setStatus("error");
-      return false;
-    }
-    if (!offTime) {
+    if (!onTime || !offTime) {
       setStatus("error");
       return false;
     }
@@ -106,8 +90,12 @@ export default function DateTimeEditDialog({
         const data = await resGet.json();
         serverData = data.markedDays || {};
       }
+      // Find korrekt nøgle, evt. med tid
+      let updateKey = normDate;
+      const existingKey = Object.keys(serverData).find(k => k.startsWith(normDate));
+      if (existingKey) updateKey = existingKey;
       const updatedDays = { ...serverData };
-      updatedDays[normDate] = {
+      updatedDays[updateKey] = {
         status: "on",
         onTime,
         offTime
@@ -144,7 +132,7 @@ export default function DateTimeEditDialog({
       );
       if (resGet2.ok) {
         const data2 = await resGet2.json();
-        const dayObj2 = data2.markedDays?.[normDate] || {};
+        const dayObj2 = findDayObj(data2.markedDays || {}, normDate);
         setOnTime(dayObj2.onTime || "");
         setOffTime(dayObj2.offTime || "");
       }
