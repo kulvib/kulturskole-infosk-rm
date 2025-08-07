@@ -17,6 +17,27 @@ function getToken() {
   return localStorage.getItem("token");
 }
 
+// Dansk navne for ugedage og måneder
+const WEEKDAYS = [
+  "søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"
+];
+const MONTHS = [
+  "januar", "februar", "marts", "april", "maj", "juni",
+  "juli", "august", "september", "oktober", "november", "december"
+];
+
+// Formatter dato til "lørdag d. 2.august 2025"
+function formatFullDate(dateStr) {
+  // dateStr: "2025-08-02" eller "2025-08-02T00:00:00"
+  const [yyyy, mm, dd] = dateStr.split("T")[0].split("-");
+  const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+  const weekday = WEEKDAYS[d.getDay()];
+  const day = d.getDate();
+  const month = MONTHS[d.getMonth()];
+  const year = d.getFullYear();
+  return `${weekday} d. ${day}.${month} ${year}`;
+}
+
 export default function DateTimeEditDialog({
   open,
   onClose,
@@ -31,15 +52,12 @@ export default function DateTimeEditDialog({
   const [status, setStatus] = useState(""); // "success" | "error" | ""
   const closeTimer = useRef(null);
 
-  // Hjælpefunktion til at finde dag-nøgle i API-data
   function findDayObj(markedDays, normDate) {
     if (markedDays[normDate]) return markedDays[normDate];
-    // Søg efter nøgle der starter med normDate (fx "2025-08-01T00:00:00")
     const key = Object.keys(markedDays).find(k => k.startsWith(normDate));
     return key ? markedDays[key] : {};
   }
 
-  // Hent tider fra API hver gang dialogen åbnes
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
@@ -63,7 +81,6 @@ export default function DateTimeEditDialog({
       .finally(() => setLoading(false));
   }, [open, date, clientId]);
 
-  // Luk dialogen automatisk efter 1 sekund ved succes
   useEffect(() => {
     if (status === "success") {
       closeTimer.current = setTimeout(() => {
@@ -98,7 +115,6 @@ export default function DateTimeEditDialog({
       const season = normDate.substring(0, 4);
       const token = getToken();
 
-      // Hent eksisterende data fra API
       const resGet = await fetch(
         `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
         token ? { headers: { Authorization: "Bearer " + token } } : undefined
@@ -108,7 +124,6 @@ export default function DateTimeEditDialog({
         const data = await resGet.json();
         serverData = data.markedDays || {};
       }
-      // Find korrekt nøgle, evt. med tid
       let updateKey = normDate;
       const existingKey = Object.keys(serverData).find(k => k.startsWith(normDate));
       if (existingKey) updateKey = existingKey;
@@ -143,7 +158,6 @@ export default function DateTimeEditDialog({
       setStatus("success");
       if (onSaved) onSaved({ date: normDate, clientId });
 
-      // Hent nyeste tider fra API efter gem
       const resGet2 = await fetch(
         `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
         token ? { headers: { Authorization: "Bearer " + token } } : undefined
@@ -186,7 +200,7 @@ export default function DateTimeEditDialog({
             </Typography>
           )}
           <span style={{ margin: "0 auto" }}>
-            Redigér tid for {date}
+            Rediger tid for {formatFullDate(date)}
           </span>
         </Box>
       </DialogTitle>
