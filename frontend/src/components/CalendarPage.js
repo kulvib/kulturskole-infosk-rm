@@ -449,6 +449,7 @@ export default function CalendarPage() {
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
+  // Rettet: Gem ALT kalenderdata fra aktiv klient på alle valgte klienter!
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
       if (showSuccessFeedback) setSaveStatus({ status: "idle", message: "" });
@@ -474,7 +475,8 @@ export default function CalendarPage() {
         const clientKey = String(cid);
         payloadMarkedDays[clientKey] = {};
         allDates.forEach(dateStr => {
-          const md = markedDays[cid]?.[dateStr] || markedDays[activeClient]?.[dateStr];
+          // Brug ALTID data fra den aktive klient!
+          const md = markedDays[activeClient]?.[dateStr];
           if (md && md.status === "on") {
             const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
             const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
