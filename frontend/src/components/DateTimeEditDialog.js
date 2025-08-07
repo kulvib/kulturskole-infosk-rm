@@ -26,8 +26,6 @@ export default function DateTimeEditDialog({
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
-  const [apiOnTime, setApiOnTime] = useState("");
-  const [apiOffTime, setApiOffTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(""); // "success" | "error" | ""
@@ -39,7 +37,6 @@ export default function DateTimeEditDialog({
     setLoading(true);
     setStatus("");
     setOnTime(""); setOffTime(""); // Sørg for at felterne altid er tomme ved åbning!
-    setApiOnTime(""); setApiOffTime("");
     const token = getToken();
     const normDate = date.split("T")[0];
     fetch(
@@ -49,8 +46,9 @@ export default function DateTimeEditDialog({
       .then(res => res.json())
       .then(data => {
         const dayObj = data.markedDays?.[normDate] || {};
-        setApiOnTime(dayObj.onTime || "");
-        setApiOffTime(dayObj.offTime || "");
+        // Sæt tider direkte som value hvis de findes!
+        setOnTime(dayObj.onTime || "");
+        setOffTime(dayObj.offTime || "");
       })
       .catch(() => {
         setStatus("error");
@@ -72,40 +70,21 @@ export default function DateTimeEditDialog({
   }, [status, onClose]);
 
   const validate = () => {
-    // Skal bruge enten bruger-indtastet eller API-tid
-    if (!onTime && !apiOnTime) {
+    // Skal bruge indtastet tid
+    if (!onTime) {
       setStatus("error");
       return false;
     }
-    if (!offTime && !apiOffTime) {
+    if (!offTime) {
       setStatus("error");
       return false;
     }
     const timeRegex = /^\d{2}:\d{2}$/;
-    if ((onTime && !timeRegex.test(onTime)) || (offTime && !timeRegex.test(offTime))) {
+    if (!timeRegex.test(onTime) || !timeRegex.test(offTime)) {
       setStatus("error");
       return false;
     }
     return true;
-  };
-
-  // Brug API-tider som fallback hvis brugeren ikke har skrevet noget
-  const getFinalOnTime = () => onTime || apiOnTime || "";
-  const getFinalOffTime = () => offTime || apiOffTime || "";
-
-  const fetchLatestTimes = async (clientId, normDate, season) => {
-    const token = getToken();
-    const resGet = await fetch(
-      `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
-      token ? { headers: { Authorization: "Bearer " + token } } : undefined
-    );
-    if (resGet.ok) {
-      const data = await resGet.json();
-      const dayObj = data.markedDays?.[normDate] || {};
-      setApiOnTime(dayObj.onTime || "");
-      setApiOffTime(dayObj.offTime || "");
-      setOnTime(""); setOffTime("");
-    }
   };
 
   const handleSave = async () => {
@@ -117,6 +96,7 @@ export default function DateTimeEditDialog({
       const season = normDate.substring(0, 4);
       const token = getToken();
 
+      // Hent eksisterende data fra API
       const resGet = await fetch(
         `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
         token ? { headers: { Authorization: "Bearer " + token } } : undefined
@@ -129,8 +109,8 @@ export default function DateTimeEditDialog({
       const updatedDays = { ...serverData };
       updatedDays[normDate] = {
         status: "on",
-        onTime: getFinalOnTime(),
-        offTime: getFinalOffTime()
+        onTime,
+        offTime
       };
 
       const payload = {
@@ -157,20 +137,21 @@ export default function DateTimeEditDialog({
       setStatus("success");
       if (onSaved) onSaved({ date: normDate, clientId });
 
-      await fetchLatestTimes(clientId, normDate, season);
+      // Hent nyeste tider fra API efter gem
+      const resGet2 = await fetch(
+        `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
+        token ? { headers: { Authorization: "Bearer " + token } } : undefined
+      );
+      if (resGet2.ok) {
+        const data2 = await resGet2.json();
+        const dayObj2 = data2.markedDays?.[normDate] || {};
+        setOnTime(dayObj2.onTime || "");
+        setOffTime(dayObj2.offTime || "");
+      }
     } catch {
       setStatus("error");
     }
     setSaving(false);
-  };
-
-  // Hjælpefunktion til at vise placeholder korrekt for type="time"
-  // Viser fill hvis value er "", ellers bruger value
-  const getInputValue = (userValue, apiValue) => {
-    return userValue === "" ? "" : userValue;
-  };
-  const getInputPlaceholder = (apiValue) => {
-    return apiValue || "hh:mm";
   };
 
   return (
@@ -220,14 +201,13 @@ export default function DateTimeEditDialog({
               <TextField
                 type="time"
                 fullWidth
-                value={getInputValue(onTime, apiOnTime)}
+                value={onTime}
                 onChange={e => setOnTime(e.target.value)}
                 InputProps={{
                   style: { backgroundColor: "#f6f6f6" }
                 }}
                 inputProps={{
                   step: 300,
-                  placeholder: getInputPlaceholder(apiOnTime)
                 }}
               />
             </Box>
@@ -241,14 +221,13 @@ export default function DateTimeEditDialog({
               <TextField
                 type="time"
                 fullWidth
-                value={getInputValue(offTime, apiOffTime)}
+                value={offTime}
                 onChange={e => setOffTime(e.target.value)}
                 InputProps={{
                   style: { backgroundColor: "#f6f6f6" }
                 }}
                 inputProps={{
                   step: 300,
-                  placeholder: getInputPlaceholder(apiOffTime)
                 }}
               />
             </Box>
