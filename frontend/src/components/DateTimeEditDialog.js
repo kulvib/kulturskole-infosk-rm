@@ -1,4 +1,21 @@
-// ... resten af imports og setup ...
+import React, { useEffect, useState, useRef } from "react";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Typography,
+  CircularProgress,
+  Box,
+  Alert
+} from "@mui/material";
+
+const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
+function getToken() {
+  return localStorage.getItem("token");
+}
 
 export default function DateTimeEditDialog({
   open,
@@ -11,17 +28,18 @@ export default function DateTimeEditDialog({
   const [offTime, setOffTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(""); // "success" | "error" | ""
   const closeTimer = useRef(null);
 
   // Hjælpefunktion til at finde dag-nøgle i API-data
   function findDayObj(markedDays, normDate) {
     if (markedDays[normDate]) return markedDays[normDate];
-    // Søg efter nøgle der starter med normDate
+    // Søg efter nøgle der starter med normDate (fx "2025-08-01T00:00:00")
     const key = Object.keys(markedDays).find(k => k.startsWith(normDate));
     return key ? markedDays[key] : {};
   }
 
+  // Hent tider fra API hver gang dialogen åbnes
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
