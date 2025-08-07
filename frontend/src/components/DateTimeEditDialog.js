@@ -28,9 +28,9 @@ const MONTHS = [
 
 // Formatter dato til "lørdag d. 2.august 2025"
 function formatFullDate(dateStr) {
-  if (!dateStr) return ""; // Beskyt mod null/undefined
+  if (!dateStr) return "";
   const [yyyy, mm, dd] = dateStr.split("T")[0].split("-");
-  if (!yyyy || !mm || !dd) return ""; // Beskyt mod fejl i format
+  if (!yyyy || !mm || !dd) return "";
   const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
   const weekday = WEEKDAYS[d.getDay()];
   const day = d.getDate();
@@ -181,25 +181,10 @@ export default function DateTimeEditDialog({
       onClose={status === "error" ? onClose : undefined}
       maxWidth="xs"
       fullWidth
+      sx={{ position: "relative" }}
     >
       <DialogTitle sx={{ pb: 0 }}>
         <Box sx={{ display: "flex", alignItems: "center", position: "relative" }}>
-          {status === "success" && (
-            <Typography
-              sx={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                color: "#388e3c",
-                fontWeight: "normal",
-                fontSize: "1rem",
-                pl: 0.5,
-                pt: 0.5
-              }}
-            >
-              Gemt
-            </Typography>
-          )}
           <span style={{ margin: "0 auto" }}>
             {date ? `Rediger tid for ${formatFullDate(date)}` : "Rediger tid"}
           </span>
@@ -252,11 +237,6 @@ export default function DateTimeEditDialog({
                 }}
               />
             </Box>
-            {status === "error" && (
-              <Alert severity="error" sx={{ mt: 1 }}>
-                Fejl ved gemning eller hentning!
-              </Alert>
-            )}
           </>
         )}
       </DialogContent>
@@ -273,6 +253,33 @@ export default function DateTimeEditDialog({
           {saving ? <CircularProgress size={20} /> : "Gem"}
         </Button>
       </DialogActions>
+      {/* FEEDBACK nederst til venstre */}
+      <Box
+        sx={{
+          position: "absolute",
+          left: 16,
+          bottom: 8,
+          zIndex: 2,
+          minWidth: 180,
+          pointerEvents: "none"
+        }}
+      >
+        {status === "error" && (
+          <Alert severity="error" sx={{ mb: 1, py: 0.5, px: 2, fontSize: "1rem" }}>
+            Fejl ved gemning eller hentning!
+          </Alert>
+        )}
+        {status === "success" && (
+          <Typography sx={{ color: "#388e3c", fontWeight: "normal", fontSize: "1rem", mb: 1 }}>
+            Gemt
+          </Typography>
+        )}
+        {saving && (
+          <Typography sx={{ color: "#1976d2", fontWeight: "normal", fontSize: "1rem", mb: 1 }}>
+            Gemmer...
+          </Typography>
+        )}
+      </Box>
     </Dialog>
   );
 }
