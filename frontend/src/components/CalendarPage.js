@@ -291,6 +291,7 @@ export default function CalendarPage() {
   const [editDialogClient, setEditDialogClient] = useState(null);
   const [loadingDialogDate, setLoadingDialogDate] = useState(null);
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
+  const [showDialogLoader, setShowDialogLoader] = useState(false);
 
   // Feedback state for gemt/fejl
   const [saveStatus, setSaveStatus] = useState({ status: "idle", message: "" });
@@ -349,20 +350,27 @@ export default function CalendarPage() {
     return () => { isCurrent = false; };
   }, [selectedSeason, activeClient, token]);
 
-  // AUTOSAVE: kør ikke mens dialogen er åben og kun hvis ændret siden sidste dialog-gem
+  // AUTOSAVE: KUN for eksisterende klienter, ikke for nye!
   useEffect(() => {
     if (editDialogOpen) return; // Stop autosave mens dialogen er åben
     if (selectedClients.length === 0 || !activeClient) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
-    // Kun gem hvis der ER ændringer siden sidst dialog-gem
+    // Hvis der netop er tilføjet nye klienter, skal der ikke autosaves
+    // Vi gemmer kun på "Gem kalender for valgte klienter"
+    // dvs. autosave kun hvis selectedClients ikke er blevet flere
+    // (eller, simplere: autosave kun hvis markedDays er ændret for eksisterende klienter)
     const changedSinceDialog =
       !deepEqual(
         markedDays,
         lastDialogSavedMarkedDays.current
       );
 
-    if (!changedSinceDialog) return;
+    // Tjek om en klient er ny (findes ikke i markedDays før)
+    const existingClientIds = Object.keys(markedDays).map(Number);
+    const newClientSelected = selectedClients.some(cid => !existingClientIds.includes(cid));
+
+    if (!changedSinceDialog || newClientSelected) return;
 
     autoSaveTimer.current = setTimeout(() => {
       handleSave(false); // autosave: vis kun fejl, ikke "Gemt!"
@@ -386,27 +394,30 @@ export default function CalendarPage() {
     setMarkedDays(prev => {
       const updated = { ...prev };
       selectedClients.forEach(cid => {
-        // Sæt altid status til valgt mode, uanset nuværende
         updated[cid] = { ...(updated[cid] || {}), [dateString]: { status: mode } };
       });
       return updated;
     });
   };
 
-  // SHIFT+VENSTRE klik handler med 1,5 sek forsinkelse
+  // SHIFT+VENSTRE klik handler med 1,1 sek forsinkelse og loader!
   const handleDateShiftLeftClick = (clientId, date) => {
     if (autoSaveTimer.current) {
       clearTimeout(autoSaveTimer.current);
       autoSaveTimer.current = null;
     }
-    setLoadingDialogDate(null);
-    setLoadingDialogClient(null);
+    setLoadingDialogDate(date);
+    setLoadingDialogClient(clientId);
+    setShowDialogLoader(true);
 
     setTimeout(() => {
+      setShowDialogLoader(false);
       setEditDialogClient(clientId);
       setEditDialogDate(date);
       setEditDialogOpen(true);
-    }, 1500);
+      setLoadingDialogDate(null);
+      setLoadingDialogClient(null);
+    }, 1100);
   };
 
   // Opdater localMarkedDays for dialogen efter gem
@@ -423,7 +434,6 @@ export default function CalendarPage() {
         [clientId]: mapped
       }));
 
-      // Gem den aktuelle markedDays som "sidst gemt via dialog"
       lastDialogSavedMarkedDays.current = { ...markedDays, [clientId]: mapped };
       lastDialogSavedTimestamp.current = Date.now();
 
@@ -474,7 +484,6 @@ export default function CalendarPage() {
               offTime
             };
           } else {
-            // ALTID slukket hvis ikke markeret
             payloadMarkedDays[clientKey][dateStr] = {
               status: "off"
             };
@@ -693,6 +702,24 @@ export default function CalendarPage() {
           </Box>
         )}
       </Box>
+
+      {/* Dialog Loader vises under forsinkelse */}
+      {showDialogLoader && (
+        <Box sx={{
+          position: "fixed",
+          left: 0,
+          top: 0,
+          width: "100vw",
+          height: "100vh",
+          zIndex: 2222,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          bgcolor: "rgba(255,255,255,0.7)"
+        }}>
+          <CircularProgress size={48} color="primary" />
+        </Box>
+      )}
 
       <DateTimeEditDialog
         open={editDialogOpen}
