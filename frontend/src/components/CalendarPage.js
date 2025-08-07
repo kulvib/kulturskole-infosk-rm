@@ -381,25 +381,19 @@ export default function CalendarPage() {
     }
   };
 
+  // Brugeren kan kun markere med den valgte farve; ingen neutrale felter!
   const handleDayClick = (clientIds, dateString, mode, markedDays) => {
     setMarkedDays(prev => {
       const updated = { ...prev };
       selectedClients.forEach(cid => {
-        const current = updated?.[cid]?.[dateString]?.status;
-        if (current === mode) {
-          delete updated[cid][dateString];
-          if (Object.keys(updated[cid]).length === 0) {
-            delete updated[cid];
-          }
-        } else {
-          updated[cid] = { ...(updated[cid] || {}), [dateString]: { status: mode } };
-        }
+        // Sæt altid status til valgt mode, uanset nuværende
+        updated[cid] = { ...(updated[cid] || {}), [dateString]: { status: mode } };
       });
       return updated;
     });
   };
 
-  // SHIFT+VENSTRE klik handler
+  // SHIFT+VENSTRE klik handler med 1,5 sek forsinkelse
   const handleDateShiftLeftClick = (clientId, date) => {
     if (autoSaveTimer.current) {
       clearTimeout(autoSaveTimer.current);
@@ -407,9 +401,12 @@ export default function CalendarPage() {
     }
     setLoadingDialogDate(null);
     setLoadingDialogClient(null);
-    setEditDialogClient(clientId);
-    setEditDialogDate(date);
-    setEditDialogOpen(true);
+
+    setTimeout(() => {
+      setEditDialogClient(clientId);
+      setEditDialogDate(date);
+      setEditDialogOpen(true);
+    }, 1500);
   };
 
   // Opdater localMarkedDays for dialogen efter gem
@@ -476,11 +473,8 @@ export default function CalendarPage() {
               onTime,
               offTime
             };
-          } else if (md && md.status === "off") {
-            payloadMarkedDays[clientKey][dateStr] = {
-              status: "off"
-            };
           } else {
+            // ALTID slukket hvis ikke markeret
             payloadMarkedDays[clientKey][dateStr] = {
               status: "off"
             };
