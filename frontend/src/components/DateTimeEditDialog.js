@@ -28,8 +28,9 @@ const MONTHS = [
 
 // Formatter dato til "lørdag d. 2.august 2025"
 function formatFullDate(dateStr) {
-  // dateStr: "2025-08-02" eller "2025-08-02T00:00:00"
+  if (!dateStr) return ""; // Beskyt mod null/undefined
   const [yyyy, mm, dd] = dateStr.split("T")[0].split("-");
+  if (!yyyy || !mm || !dd) return ""; // Beskyt mod fejl i format
   const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
   const weekday = WEEKDAYS[d.getDay()];
   const day = d.getDate();
@@ -200,7 +201,7 @@ export default function DateTimeEditDialog({
             </Typography>
           )}
           <span style={{ margin: "0 auto" }}>
-            Rediger tid for {formatFullDate(date)}
+            {date ? `Rediger tid for ${formatFullDate(date)}` : "Rediger tid"}
           </span>
         </Box>
       </DialogTitle>
