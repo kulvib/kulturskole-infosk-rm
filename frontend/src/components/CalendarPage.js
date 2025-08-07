@@ -263,7 +263,7 @@ function MonthCalendar({
                   onMouseEnter={e => handleMouseEnter(e, dateString)}
                 >
                   {isLoading ? (
-                    <CircularProgress size={18} sx={{ position: "absolute", top: 2, left: 2 }} />
+                    <CircularProgress size={18} sx={{ position: "absolute", top: 2, left: 2, zIndex: 1201 }} />
                   ) : (
                     day
                   )}
@@ -291,7 +291,6 @@ export default function CalendarPage() {
   const [editDialogClient, setEditDialogClient] = useState(null);
   const [loadingDialogDate, setLoadingDialogDate] = useState(null);
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
-  const [showDialogLoader, setShowDialogLoader] = useState(false);
 
   // Feedback state for gemt/fejl
   const [saveStatus, setSaveStatus] = useState({ status: "idle", message: "" });
@@ -408,10 +407,8 @@ export default function CalendarPage() {
     }
     setLoadingDialogDate(date);
     setLoadingDialogClient(clientId);
-    setShowDialogLoader(true);
 
     setTimeout(() => {
-      setShowDialogLoader(false);
       setEditDialogClient(clientId);
       setEditDialogDate(date);
       setEditDialogOpen(true);
@@ -449,7 +446,6 @@ export default function CalendarPage() {
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
-  // Rettet: Gem ALT kalenderdata fra aktiv klient på alle valgte klienter!
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
       if (showSuccessFeedback) setSaveStatus({ status: "idle", message: "" });
@@ -475,8 +471,7 @@ export default function CalendarPage() {
         const clientKey = String(cid);
         payloadMarkedDays[clientKey] = {};
         allDates.forEach(dateStr => {
-          // Brug ALTID data fra den aktive klient!
-          const md = markedDays[activeClient]?.[dateStr];
+          const md = markedDays[cid]?.[dateStr] || markedDays[activeClient]?.[dateStr];
           if (md && md.status === "on") {
             const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
             const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
@@ -704,24 +699,6 @@ export default function CalendarPage() {
           </Box>
         )}
       </Box>
-
-      {/* Dialog Loader vises under forsinkelse */}
-      {showDialogLoader && (
-        <Box sx={{
-          position: "fixed",
-          left: 0,
-          top: 0,
-          width: "100vw",
-          height: "100vh",
-          zIndex: 2222,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          bgcolor: "rgba(255,255,255,0.7)"
-        }}>
-          <CircularProgress size={48} color="primary" />
-        </Box>
-      )}
 
       <DateTimeEditDialog
         open={editDialogOpen}
