@@ -1,7 +1,0 @@
-services:
-  - type: docker
-    name: guacamole-backend
-    repo: https://github.com/kulvib/kulturskole-infosk-rm
-    region: frankfurt
-    rootDir: backend/guacamole-docker
-    dockerCommand: docker compose up
