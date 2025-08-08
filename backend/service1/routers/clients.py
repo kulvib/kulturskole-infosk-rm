@@ -8,16 +8,13 @@ from ..auth import get_current_admin_user
 
 router = APIRouter()
 
-# Public endpoint til frontend
 @router.get("/clients/public")
 def get_clients_public(session=Depends(get_session)):
-    # Returner kun godkendte klienter
     clients = session.exec(select(Client).where(Client.status == "approved")).all()
     return {
         "clients": [{"id": c.id, "name": c.name} for c in clients]
     }
 
-# Admin endpoint – returnerer hele Client-objekter
 @router.get("/clients/", response_model=List[Client])
 def get_clients(session=Depends(get_session), user=Depends(get_current_admin_user)):
     clients = session.exec(select(Client)).all()
@@ -87,7 +84,6 @@ async def update_client(
         client.ubuntu_version = client_update.ubuntu_version
     if client_update.uptime is not None:
         client.uptime = client_update.uptime
-    # Netværksfelter fra klienten
     if client_update.wifi_ip_address is not None:
         client.wifi_ip_address = client_update.wifi_ip_address
     if client_update.wifi_mac_address is not None:
