@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from sqlmodel import select
-from ..models import CalendarMarking, Client
-from ..db import get_session
+from models import CalendarMarking, Client
+from db import get_session
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel
 from typing import Dict, List, Any
