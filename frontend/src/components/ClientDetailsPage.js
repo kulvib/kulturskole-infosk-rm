@@ -29,7 +29,7 @@ import {
   pushKioskUrl,
   clientAction,
   openTerminal,
-  openRemoteDesktop,
+  // openRemoteDesktop, // Ikke nødvendig længere
   getClientStream,
 } from "../api";
 
@@ -139,7 +139,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   };
 
   const handleOpenTerminal = () => openTerminal(client.id);
-  const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
+
+  // Denne funktion åbner en ny fane med din route/component
+  const handleOpenRemoteDesktop = () => {
+    window.open(`/remote-desktop/${client.id}`, "_blank", "noopener,noreferrer");
+  };
 
   const sectionSpacing = 2;
 
