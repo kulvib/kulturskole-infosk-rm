@@ -4,8 +4,7 @@ services:
     env: docker
     repo: https://github.com/kulvib/kulturskole-infosk-rm
     region: frankfurt
-    docker_context: backend/service2_RemoteDesktop
-    docker_compose_file: backend/service2_RemoteDesktop/docker-compose.yml
+    dockerfilePath: backend/service2_RemoteDesktop/Dockerfile
     envVars:
       - key: POSTGRES_HOSTNAME
         value: ep-fancy-grass-a2omc644-pooler.eu-central-1.aws.neon.tech
