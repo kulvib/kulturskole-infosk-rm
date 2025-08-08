@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import select
 from typing import List
 from datetime import datetime, timedelta
-from ..db import get_session
-from ..models import Client, ClientCreate, ClientUpdate
-from ..auth import get_current_admin_user
+from db import get_session
+from models import Client, ClientCreate, ClientUpdate
+from auth import get_current_admin_user
 
 router = APIRouter()
 
