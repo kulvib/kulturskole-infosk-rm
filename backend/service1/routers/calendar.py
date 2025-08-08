@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from sqlmodel import select
-from backend.models import CalendarMarking, Client
-from backend.db import get_session
+from ..models import CalendarMarking, Client
+from ..db import get_session
 from sqlalchemy.exc import SQLAlchemyError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Dict, List, Any
 from datetime import datetime
 import requests
@@ -11,7 +11,7 @@ import requests
 router = APIRouter()
 
 class MarkedDaysRequest(BaseModel):
-    markedDays: Dict[str, Dict[str, Any]]  # {"1": {...}, "2": {...}}
+    markedDays: Dict[str, Dict[str, Any]]
     clients: List[int]
     season: int
 
