@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: guacamole-backend
+    env: docker
+    rootDir: backend/guacamole-docker
+    plan: starter
+    envVars:
+      - key: POSTGRES_HOSTNAME
+        value: ep-fancy-grass-a2omc644-pooler.eu-central-1.aws.neon.tech
+      - key: POSTGRES_PORT
+        value: "5432"
+      - key: POSTGRES_DATABASE
+        value: guacamole_db
+      - key: POSTGRES_USER
+        value: neondb_owner
+      - key: POSTGRES_PASSWORD
+        value: KulVib2025info
+
+  - type: web
+    name: fastapi-service1
+    env: docker
+    rootDir: service1
+    plan: starter
+
+  - type: web
+    name: fastapi-service2
+    env: docker
+    rootDir: service2
+    plan: starter
+
+  # Tilføj evt. frontend service
+  - type: web
+    name: guacamole-frontend
+    env: static
+    rootDir: backend/guacamole-frontend
+    plan: starter
