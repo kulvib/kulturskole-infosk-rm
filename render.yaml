@@ -8,7 +8,7 @@ services:
     docker_compose_file: backend/service2_RemoteDesktop/docker-compose.yml
     envVars:
       - key: POSTGRES_HOSTNAME
-        value: your-db-host
+        value: ep-fancy-grass-a2omc644-pooler.eu-central-1.aws.neon.tech
       - key: POSTGRES_PORT
         value: "5432"
       - key: POSTGRES_DATABASE
@@ -16,4 +16,4 @@ services:
       - key: POSTGRES_USER
         value: guacamole_user
       - key: POSTGRES_PASSWORD
-        value: guacamole_pass
+        value: RemoteDesktop123#!
