@@ -1,8 +1,8 @@
 import logging
 import paho.mqtt.client as mqtt
 from sqlmodel import Session
-from ..db import engine
-from ..models import MqttMessage
+from db import engine
+from models import MqttMessage
 from datetime import datetime
 
 MQTT_BROKER = "test.mosquitto.org"
