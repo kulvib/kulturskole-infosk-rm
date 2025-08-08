@@ -9,8 +9,8 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from dotenv import load_dotenv
 
-from .db import get_session
-from .models import User
+from db import get_session
+from models import User
 
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY", "fallback-key")
