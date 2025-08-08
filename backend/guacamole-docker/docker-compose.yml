@@ -1,0 +1,31 @@
+version: '3'
+services:
+  guacamole:
+    image: guacamole/guacamole
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      GUACD_HOSTNAME: guacd
+      MYSQL_HOSTNAME: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: guacamole_db
+      MYSQL_USER: guacamole_user
+      MYSQL_PASSWORD: strongpassword
+      MYSQL_ROOT_PASSWORD: strongrootpassword
+    depends_on:
+      - guacd
+      - mysql
+
+  guacd:
+    image: guacamole/guacd
+    restart: always
+
+  mysql:
+    image: mysql:5.7
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: strongrootpassword
+      MYSQL_DATABASE: guacamole_db
+      MYSQL_USER: guacamole_user
+      MYSQL_PASSWORD: strongpassword
