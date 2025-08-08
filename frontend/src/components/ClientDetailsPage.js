@@ -13,7 +13,6 @@ import {
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import VideocamIcon from "@mui/icons-material/Videocam";
@@ -375,7 +374,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
-        {/* Client actions: Genstart, Start, Sluk */}
+        {/* Client actions: Genstart, Sluk */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
@@ -393,19 +392,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     </Button>
                   </span>
                 </Tooltip>
-                <Tooltip title="Start klient">
-                  <span>
-                    <Button
-                      variant="contained"
-                      color="success"
-                      startIcon={<PlayArrowIcon />}
-                      onClick={() => handleClientAction("start")}
-                      disabled={actionLoading["start"]}
-                    >
-                      Start klient
-                    </Button>
-                  </span>
-                </Tooltip>
+                {/* Start-knappen er fjernet */}
                 <Tooltip title="Sluk klient">
                   <span>
                     <Button
