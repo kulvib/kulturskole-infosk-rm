@@ -1,29 +1,19 @@
 services:
   - type: web
-    name: guacamole-backend
+    name: guacamole-service
     env: docker
-    rootDir: backend/service2_RemoteDesktop/guacamole-docker
-    plan: starter
+    repo: https://github.com/kulvib/kulturskole-infosk-rm
+    region: frankfurt
+    docker_context: backend/service2_RemoteDesktop
+    docker_compose_file: backend/service2_RemoteDesktop/docker-compose.yml
     envVars:
       - key: POSTGRES_HOSTNAME
-        value: ep-fancy-grass-a2omc644-pooler.eu-central-1.aws.neon.tech
+        value: your-db-host
       - key: POSTGRES_PORT
         value: "5432"
       - key: POSTGRES_DATABASE
         value: guacamole_db
       - key: POSTGRES_USER
-        value: neondb_owner
+        value: guacamole_user
       - key: POSTGRES_PASSWORD
-        value: KulVib2025info
-
-  - type: web
-    name: service1
-    env: docker
-    rootDir: backend/service1
-    plan: starter
-
-  - type: web
-    name: service2-remotedesktop
-    env: docker
-    rootDir: backend/service2_RemoteDesktop
-    plan: starter
+        value: guacamole_pass
