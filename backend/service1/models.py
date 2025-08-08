@@ -13,7 +13,6 @@ class ClientBase(SQLModel):
     name: str
     unique_id: str
     locality: Optional[str] = None
-
     wifi_ip_address: Optional[str] = None
     wifi_mac_address: Optional[str] = None
     lan_ip_address: Optional[str] = None
@@ -50,17 +49,6 @@ class ClientUpdate(SQLModel):
     wifi_mac_address: Optional[str] = None
     lan_ip_address: Optional[str] = None
     lan_mac_address: Optional[str] = None
-
-class MqttMessage(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    topic: str
-    payload: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-class Holiday(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    date: str
-    description: str
 
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
