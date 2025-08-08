@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 
-from routers import clients, calendar, meta, mqtt_service
+from routers import clients, calendar, meta
 from auth import router as auth_router, get_password_hash
 from db import create_db_and_tables, engine
 from models import User
@@ -37,7 +37,6 @@ def ensure_admin_user():
 def on_startup():
     create_db_and_tables()
     ensure_admin_user()
-    mqtt_service.connect()  # Start MQTT-forbindelse ved opstart
 
 app.add_middleware(
     CORSMiddleware,
