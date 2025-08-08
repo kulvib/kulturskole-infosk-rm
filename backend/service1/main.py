@@ -4,10 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 
-from .routers import clients, calendar, meta, mqtt_service
-from .auth import router as auth_router, get_password_hash
-from .db import create_db_and_tables, engine
-from .models import User
+from routers import clients, calendar, meta, mqtt_service
+from auth import router as auth_router, get_password_hash
+from db import create_db_and_tables, engine
+from models import User
 
 load_dotenv()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "meget_sikkert_fallback_kodeord")
@@ -43,7 +43,6 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://infoskaerm-frontend.netlify.app",
-        # "http://localhost:3000",  # f.eks. til udvikling
     ],
     allow_credentials=True,
     allow_methods=["*"],
