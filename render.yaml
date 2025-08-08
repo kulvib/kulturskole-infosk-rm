@@ -2,7 +2,7 @@ services:
   - type: web
     name: guacamole-backend
     env: docker
-    rootDir: backend/guacamole-docker
+    rootDir: backend/service2_RemoteDesktop/guacamole-docker
     plan: starter
     envVars:
       - key: POSTGRES_HOSTNAME
@@ -17,20 +17,13 @@ services:
         value: KulVib2025info
 
   - type: web
-    name: fastapi-service1
+    name: service1
     env: docker
-    rootDir: service1
+    rootDir: backend/service1
     plan: starter
 
   - type: web
-    name: fastapi-service2
+    name: service2-remotedesktop
     env: docker
-    rootDir: service2
-    plan: starter
-
-  # Tilføj evt. frontend service
-  - type: web
-    name: guacamole-frontend
-    env: static
-    rootDir: backend/guacamole-frontend
+    rootDir: backend/service2_RemoteDesktop
     plan: starter
