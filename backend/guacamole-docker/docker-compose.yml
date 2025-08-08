@@ -7,25 +7,15 @@ services:
       - "8080:8080"
     environment:
       GUACD_HOSTNAME: guacd
-      MYSQL_HOSTNAME: mysql
-      MYSQL_PORT: 3306
-      MYSQL_DATABASE: guacamole_db
-      MYSQL_USER: guacamole_user
-      MYSQL_PASSWORD: strongpassword
-      MYSQL_ROOT_PASSWORD: strongrootpassword
+      POSTGRES_HOSTNAME: <neon_host> # fx ep-xxx.eu-central-1.aws.neon.tech
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: guacamole_db
+      POSTGRES_USER: guacamole_user
+      POSTGRES_PASSWORD: strongpassword
+      POSTGRESQL_AUTO_CREATE_ACCOUNTS: "true"
     depends_on:
       - guacd
-      - mysql
 
   guacd:
     image: guacamole/guacd
     restart: always
-
-  mysql:
-    image: mysql:5.7
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: strongrootpassword
-      MYSQL_DATABASE: guacamole_db
-      MYSQL_USER: guacamole_user
-      MYSQL_PASSWORD: strongpassword
