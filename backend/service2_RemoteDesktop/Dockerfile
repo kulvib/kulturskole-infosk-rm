@@ -8,5 +8,3 @@ COPY guacamole-auth-jdbc-postgresql-1.6.0.jar /etc/guacamole/extensions/guacamol
 COPY guacamole.properties /etc/guacamole/guacamole.properties
 
 EXPOSE 8080 4822
-
-CMD service guacd start && /opt/guacamole/bin/start.sh
