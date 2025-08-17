@@ -28,8 +28,8 @@ import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
 // Hjælpefunktion til at formatere dato/tid med sekunder og dansk tid
 function formatTimestamp(isoDate) {
-  if (!isoDate) return "";
-  const date = new Date(isoDate.endsWith("Z") ? isoDate : isoDate + "Z");
+  if (!isoDate) return { date: "", time: "" };
+  const dateObj = new Date(isoDate.endsWith("Z") ? isoDate : isoDate + "Z");
   const formatter = new Intl.DateTimeFormat("da-DK", {
     timeZone: "Europe/Copenhagen",
     year: "numeric",
@@ -40,14 +40,17 @@ function formatTimestamp(isoDate) {
     second: "2-digit",
     hour12: false
   });
-  const parts = formatter.formatToParts(date);
+  const parts = formatter.formatToParts(dateObj);
   const day = parts.find(p => p.type === "day")?.value || "";
   const month = parts.find(p => p.type === "month")?.value || "";
   const year = parts.find(p => p.type === "year")?.value || "";
   const hour = parts.find(p => p.type === "hour")?.value || "";
   const minute = parts.find(p => p.type === "minute")?.value || "";
   const second = parts.find(p => p.type === "second")?.value || "";
-  return `${day}-${month}-${year}, Kl. ${hour}:${minute}:${second}`;
+  return {
+    date: `${day}-${month}-${year}`,
+    time: `Kl. ${hour}:${minute}:${second}`
+  };
 }
 
 // Kopiér ikon-knap, justeret størrelse
@@ -388,7 +391,7 @@ export default function ClientInfoPage() {
                 <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>IP-adresser</TableCell>
                 <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>MAC-adresser</TableCell>
                 <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>Tilføjet</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "14.28%", textAlign: "center" }}>Tilføj</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "14.28%", textAlign: "center" }}>Godkend</TableCell>
                 <TableCell sx={{ fontWeight: 700, width: "14.28%", textAlign: "center" }}>Fjern</TableCell>
               </TableRow>
             </TableHead>
@@ -437,9 +440,16 @@ export default function ClientInfoPage() {
                       </div>
                     </TableCell>
                     <TableCell sx={{ width: "14.28%" }}>
-                      <span style={{ whiteSpace: "nowrap" }}>
-                        {formatTimestamp(client.created_at)}
-                      </span>
+                      {(() => {
+                        const ts = formatTimestamp(client.created_at);
+                        return (
+                          <span style={{ whiteSpace: "pre-line" }}>
+                            {ts.date}
+                            {"\n"}
+                            {ts.time}
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell sx={{ width: "14.28%", textAlign: "center" }}>
                       <Button
@@ -450,7 +460,7 @@ export default function ClientInfoPage() {
                         onClick={() => handleApproveClient(client.id)}
                         sx={{ minWidth: 44 }}
                       >
-                        Tilføj
+                        Godkend
                       </Button>
                     </TableCell>
                     <TableCell sx={{ width: "14.28%", textAlign: "center" }}>
