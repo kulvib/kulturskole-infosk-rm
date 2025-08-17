@@ -35,19 +35,34 @@ import {
   getClientStream,
 } from "../api";
 
+// Dansk tid, robust
 function formatDateTime(dateStr) {
   if (!dateStr) return "ukendt";
-  const d = new Date(dateStr);
-  // Use Danish locale and Copenhagen timezone
-  return d.toLocaleString("da-DK", {
+  let d;
+  // Sikre korrekt UTC parse
+  if (dateStr.endsWith("Z") || dateStr.match(/[\+\-]\d{2}:?\d{2}$/)) {
+    d = new Date(dateStr);
+  } else {
+    d = new Date(dateStr + "Z"); // Tving UTC
+  }
+  // Intl.DateTimeFormat for ens resultat
+  const formatter = new Intl.DateTimeFormat("da-DK", {
+    timeZone: "Europe/Copenhagen",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
-    timeZone: "Europe/Copenhagen"
-  }).replace(',', ', Kl.');
+    hour12: false
+  });
+  // Format: DD-MM-YYYY, Kl. HH:MM
+  const parts = formatter.formatToParts(d);
+  const day = parts.find(p => p.type === "day")?.value || "";
+  const month = parts.find(p => p.type === "month")?.value || "";
+  const year = parts.find(p => p.type === "year")?.value || "";
+  const hour = parts.find(p => p.type === "hour")?.value || "";
+  const minute = parts.find(p => p.type === "minute")?.value || "";
+  return `${day}-${month}-${year}, Kl. ${hour}:${minute}`;
 }
 
 function formatUptime(uptimeStr) {
