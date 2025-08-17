@@ -33,7 +33,6 @@ import {
   getClientStream,
 } from "../api";
 
-// Format: 27.08.2025, Kl. 14:49
 function formatDateTime(dateStr) {
   if (!dateStr) return "ukendt";
   const d = new Date(dateStr);
@@ -91,7 +90,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     // eslint-disable-next-line
   }, [client]);
 
-  // Lokalitet
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -104,12 +102,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
       setLocalityDirty(false);
       setTimeout(() => setLocalitySaved(false), 3000);
     } catch (err) {
-      alert("Kunne ikke gemme lokalitet: " + err.message);
+      alert("Kunne ikke gemme lokation: " + err.message);
     }
     setSavingLocality(false);
   };
 
-  // Kiosk URL
   const handleKioskUrlChange = (e) => {
     setKioskUrl(e.target.value);
     setKioskUrlDirty(true);
@@ -127,7 +124,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setSavingKioskUrl(false);
   };
 
-  // Generic client action
   const handleClientAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
@@ -144,9 +140,36 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   };
 
   const sectionSpacing = 2;
-
-  // Højdejustering for Felt 2 og 3
   const cardMinHeight = 210;
+
+  // Stil til knapper i felt 4
+  const actionBtnStyle = {
+    minWidth: 160,
+    maxWidth: 160,
+    height: 34,
+    textTransform: "none",
+    fontWeight: 500,
+    fontSize: "0.95rem",
+    lineHeight: 1.1,
+    py: 0,
+    px: 1,
+    m: 0,
+    whiteSpace: "nowrap",
+  };
+
+  // Stil til små input-felter
+  const inputStyle = {
+    width: 300,
+    height: 34,
+    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "34px", boxSizing: "border-box", padding: "8px 14px" },
+    "& .MuiInputBase-root": { height: "34px" },
+  };
+  const kioskInputStyle = {
+    width: 480,
+    height: 34,
+    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "34px", boxSizing: "border-box", padding: "8px 14px" },
+    "& .MuiInputBase-root": { height: "34px" },
+  };
 
   if (!client) {
     return (
@@ -189,13 +212,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </span>
         </Tooltip>
       </Box>
-      {/* Felt 1: Øverst */}
       <Grid container spacing={sectionSpacing}>
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent>
               <Stack spacing={2}>
-                {/* Klientnavn og status */}
                 <Stack direction="row" alignItems="center" spacing={1}>
                   <Typography
                     variant="h6"
@@ -210,7 +231,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   </Typography>
                   <ClientStatusIcon isOnline={client.isOnline} />
                 </Stack>
-                {/* Klient ID */}
                 <Stack direction="row" alignItems="center" spacing={1}>
                   <LanIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
@@ -218,22 +238,17 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   </Typography>
                   <Typography variant="body2" sx={{ color: "#888" }}>{client.id}</Typography>
                 </Stack>
-                {/* Lokalitet */}
+                {/* Lokation */}
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOnIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 90 }}>
-                    Lokalitet:
+                    Lokation:
                   </Typography>
                   <TextField
                     size="small"
                     value={locality}
                     onChange={handleLocalityChange}
-                    sx={{
-                      width: 300,
-                      height: 40,
-                      "& .MuiInputBase-input": { fontSize: "0.95rem", height: "40px", boxSizing: "border-box", padding: "8px 14px" },
-                      "& .MuiInputBase-root": { height: "40px" },
-                    }}
+                    sx={inputStyle}
                     disabled={savingLocality}
                   />
                   <Button
@@ -241,7 +256,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     variant="outlined"
                     onClick={handleLocalitySave}
                     disabled={savingLocality}
-                    sx={{ minWidth: 44, px: 1, height: 40 }}
+                    sx={{ ...actionBtnStyle, minWidth: 44, maxWidth: 44 }}
                   >
                     {savingLocality ? <CircularProgress size={16} /> : "Gem"}
                   </Button>
@@ -261,12 +276,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     size="small"
                     value={kioskUrl}
                     onChange={handleKioskUrlChange}
-                    sx={{
-                      width: 550,
-                      height: 40,
-                      "& .MuiInputBase-input": { fontSize: "0.95rem", height: "40px", boxSizing: "border-box", padding: "8px 14px" },
-                      "& .MuiInputBase-root": { height: "40px" },
-                    }}
+                    sx={kioskInputStyle}
                     disabled={savingKioskUrl}
                   />
                   <Button
@@ -275,7 +285,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     color="primary"
                     onClick={handleKioskUrlSave}
                     disabled={savingKioskUrl}
-                    sx={{ minWidth: 44, px: 1, height: 40 }}
+                    sx={{ ...actionBtnStyle, minWidth: 44, maxWidth: 44 }}
                   >
                     {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
                   </Button>
@@ -289,7 +299,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
-        {/* Felt 2 og 3 ved siden af hinanden */}
         <Grid item xs={12} md={6}>
           {/* Felt 2: Oppetid, Sidst set, Tilføjet */}
           <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
@@ -339,14 +348,14 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
-                    IP-adresse WLAN / Wi-Fi:
+                    IP-adresse WLAN:
                   </Typography>
                   <Typography variant="body2">{client.wifi_ip_address || "ukendt"}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
-                    MAC-adresse WLAN / Wi-Fi:
+                    MAC-adresse WLAN:
                   </Typography>
                   <Typography variant="body2">{client.wifi_mac_address || "ukendt"}</Typography>
                 </Stack>
@@ -368,11 +377,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
-        {/* Felt 4: Knapper/handlinger med ens dimensioner */}
+        {/* Felt 4: Knapper/handlinger med ens dimensioner og på linje */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
-            <CardContent sx={{ overflow: "auto", px: 1 }}>
-              <Stack direction="row" spacing={2} alignItems="center" sx={{ flexWrap: "wrap", justifyContent: "center" }}>
+            <CardContent sx={{ px: 2 }}>
+              <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
                 <Tooltip title="Luk Chrome Browser på klient">
                   <span>
                     <Button
@@ -381,15 +390,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<PowerSettingsNewIcon />}
                       onClick={() => handleClientAction("chrome-shutdown")}
                       disabled={actionLoading["chrome-shutdown"]}
-                      sx={{
-                        minWidth: 170,
-                        height: 40,
-                        textTransform: "none",
-                        fontWeight: 500,
-                        fontSize: "0.95rem",
-                        lineHeight: 1.1,
-                        py: 0.5,
-                      }}
+                      sx={actionBtnStyle}
                     >
                       Luk Chrome Browser
                     </Button>
@@ -402,7 +403,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       color="primary"
                       startIcon={<DesktopWindowsIcon />}
                       onClick={handleOpenRemoteDesktop}
-                      sx={{ minWidth: 170, height: 40, textTransform: "none", fontWeight: 500 }}
+                      sx={actionBtnStyle}
                     >
                       Fjernskrivebord
                     </Button>
@@ -415,15 +416,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       color="inherit"
                       startIcon={<TerminalIcon />}
                       onClick={handleOpenTerminal}
-                      sx={{
-                        minWidth: 170,
-                        height: 40,
-                        textTransform: "none",
-                        fontWeight: 500,
-                        fontSize: "0.95rem",
-                        lineHeight: 1.1,
-                        py: 0.5,
-                      }}
+                      sx={actionBtnStyle}
                     >
                       Terminal på klient
                     </Button>
@@ -437,7 +430,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<RestartAltIcon />}
                       onClick={() => handleClientAction("restart")}
                       disabled={actionLoading["restart"]}
-                      sx={{ minWidth: 170, height: 40, textTransform: "none", fontWeight: 500 }}
+                      sx={actionBtnStyle}
                     >
                       Genstart klient
                     </Button>
@@ -451,7 +444,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<PowerSettingsNewIcon />}
                       onClick={() => handleClientAction("shutdown")}
                       disabled={actionLoading["shutdown"]}
-                      sx={{ minWidth: 170, height: 40, textTransform: "none", fontWeight: 500 }}
+                      sx={actionBtnStyle}
                     >
                       Sluk klient
                     </Button>
