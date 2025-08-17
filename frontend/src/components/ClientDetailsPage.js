@@ -240,7 +240,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   </Typography>
                   <Typography 
                     variant="body2" 
-                    sx={{ color: "text.primary", fontWeight: 400, fontSize: "1.15rem" }}
+                    sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem" }}
                   >
                     {client.id}
                   </Typography>
@@ -316,36 +316,36 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
               justifyContent: "center",
               p: 3
             }}>
-              <Stack spacing={2} sx={{ width: "100%" }}>
+              <Stack spacing={2} sx={{ width: "100%", alignItems: "center" }}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <MemoryIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                  <Typography sx={{ fontWeight: 700, minWidth: 130 }} variant="body1">
                     Ubuntu version:
                   </Typography>
-                  <Typography variant="body2">{client.ubuntu_version || "ukendt"}</Typography>
+                  <Typography variant="body1">{client.ubuntu_version || "ukendt"}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <AccessTimeIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                  <Typography sx={{ fontWeight: 700, minWidth: 130 }} variant="body1">
                     Oppetid:
                   </Typography>
-                  <Typography variant="body2">{client.uptime || "ukendt"}</Typography>
+                  <Typography variant="body1">{client.uptime || "ukendt"}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <AccessTimeIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                  <Typography sx={{ fontWeight: 700, minWidth: 130 }} variant="body1">
                     Sidst set:
                   </Typography>
-                  <Typography variant="body2">
+                  <Typography variant="body1">
                     {formatDateTime(client.last_seen)}
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <AccessTimeIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                  <Typography sx={{ fontWeight: 700, minWidth: 130 }} variant="body1">
                     Tilføjet:
                   </Typography>
-                  <Typography variant="body2">
+                  <Typography variant="body1">
                     {formatDateTime(client.created_at)}
                   </Typography>
                 </Stack>
@@ -363,34 +363,34 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
               justifyContent: "center",
               p: 3
             }}>
-              <Stack spacing={2} sx={{ width: "100%" }}>
+              <Stack spacing={2} sx={{ width: "100%", alignItems: "center" }}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                  <Typography sx={{ fontWeight: 700, minWidth: 170 }} variant="body1">
                     IP-adresse WLAN:
                   </Typography>
-                  <Typography variant="body2">{client.wifi_ip_address || "ukendt"}</Typography>
+                  <Typography variant="body1">{client.wifi_ip_address || "ukendt"}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                  <Typography sx={{ fontWeight: 700, minWidth: 170 }} variant="body1">
                     MAC-adresse WLAN:
                   </Typography>
-                  <Typography variant="body2">{client.wifi_mac_address || "ukendt"}</Typography>
+                  <Typography variant="body1">{client.wifi_mac_address || "ukendt"}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                  <Typography sx={{ fontWeight: 700, minWidth: 170 }} variant="body1">
                     IP-adresse LAN:
                   </Typography>
-                  <Typography variant="body2">{client.lan_ip_address || "ukendt"}</Typography>
+                  <Typography variant="body1">{client.lan_ip_address || "ukendt"}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                  <Typography sx={{ fontWeight: 700, minWidth: 170 }} variant="body1">
                     MAC-adresse LAN:
                   </Typography>
-                  <Typography variant="body2">{client.lan_mac_address || "ukendt"}</Typography>
+                  <Typography variant="body1">{client.lan_mac_address || "ukendt"}</Typography>
                 </Stack>
               </Stack>
             </CardContent>
