@@ -39,6 +39,7 @@ function formatDateTime(dateStr) {
   return `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear()}, Kl. ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
+// THIS IS THE UPDATED UPTIME FUNCTION TO CONVERT HOURS > 24 TO DAYS
 function formatUptime(uptimeStr) {
   if (!uptimeStr) return "ukendt";
   let days = 0, hours = 0, mins = 0;
@@ -61,7 +62,11 @@ function formatUptime(uptimeStr) {
     hours = Math.floor((totalSeconds % 86400) / 3600);
     mins = Math.floor((totalSeconds % 3600) / 60);
   }
-  // Vis altid alle tre felter, også hvis de er 0
+  // Convert hours > 24 to days
+  if (hours >= 24) {
+    days += Math.floor(hours / 24);
+    hours = hours % 24;
+  }
   return `${days} dage, ${hours} timer, ${mins} minutter`;
 }
 
