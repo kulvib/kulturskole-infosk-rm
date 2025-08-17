@@ -35,8 +35,8 @@ import {
   getClientStream,
 } from "../api";
 
-// Dansk tid, robust
-function formatDateTime(dateStr) {
+// Dansk tid, robust, inklusive sekunder for "Sidst set"/"Tilføjet"
+function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
   // Sikre korrekt UTC parse
@@ -53,16 +53,19 @@ function formatDateTime(dateStr) {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    second: withSeconds ? "2-digit" : undefined,
     hour12: false
   });
-  // Format: DD-MM-YYYY, Kl. HH:MM
   const parts = formatter.formatToParts(d);
   const day = parts.find(p => p.type === "day")?.value || "";
   const month = parts.find(p => p.type === "month")?.value || "";
   const year = parts.find(p => p.type === "year")?.value || "";
   const hour = parts.find(p => p.type === "hour")?.value || "";
   const minute = parts.find(p => p.type === "minute")?.value || "";
-  return `${day}-${month}-${year}, Kl. ${hour}:${minute}`;
+  const second = withSeconds ? (parts.find(p => p.type === "second")?.value || "00") : undefined;
+  return withSeconds
+    ? `${day}-${month}-${year}, Kl. ${hour}:${minute}:${second}`
+    : `${day}-${month}-${year}, Kl. ${hour}:${minute}`;
 }
 
 function formatUptime(uptimeStr) {
@@ -113,7 +116,7 @@ function ClientStatusIcon({ isOnline }) {
           width: 14,
           height: 14,
           borderRadius: "50%",
-          bgcolor: isOnline ? theme.palette.success.main : theme.palette.error.main, // MUI standardfarver
+          bgcolor: isOnline ? theme.palette.success.main : theme.palette.error.main,
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
         }}
@@ -175,7 +178,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     // eslint-disable-next-line
   }, [client]);
 
-  // Felt og input styles
   const actionBtnStyle = {
     minWidth: 200,
     maxWidth: 200,
@@ -204,7 +206,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     "& .MuiInputBase-root": { height: "32px" },
   };
 
-  // Lokalitet
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -222,7 +223,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setSavingLocality(false);
   };
 
-  // Kiosk URL
   const handleKioskUrlChange = (e) => {
     setKioskUrl(e.target.value);
     setKioskUrlDirty(true);
@@ -240,7 +240,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setSavingKioskUrl(false);
   };
 
-  // Generic client action
   const handleClientAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
@@ -270,7 +269,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 3 }}>
-      {/* Topbar med tilbage og opdater */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
         <Button
           variant="outlined"
@@ -330,7 +328,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     {client.id}
                   </Typography>
                 </Stack>
-                {/* Lokation */}
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOnIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 90 }}>
@@ -359,7 +356,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     </Typography>
                   )}
                 </Stack>
-                {/* Kiosk URL */}
                 <Stack direction="row" spacing={2} alignItems="center">
                   <ChromeReaderModeIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -394,7 +390,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </Card>
         </Grid>
         <Grid item xs={12} md={6}>
-          {/* Felt 2 */}
           <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
             <CardContent sx={{
               height: "100%",
@@ -421,7 +416,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     Sidst set:
                   </Typography>
                   <Typography variant="body2">
-                    {formatDateTime(client.last_seen)}
+                    {formatDateTime(client.last_seen, true)}
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
@@ -430,7 +425,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     Tilføjet:
                   </Typography>
                   <Typography variant="body2">
-                    {formatDateTime(client.created_at)}
+                    {formatDateTime(client.created_at, true)}
                   </Typography>
                 </Stack>
               </Stack>
@@ -438,7 +433,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </Card>
         </Grid>
         <Grid item xs={12} md={6}>
-          {/* Felt 3 */}
           <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
             <CardContent sx={{
               height: "100%",
@@ -481,11 +475,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
-        {/* Felt 4: Knapper/handlinger med to linjer */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent sx={{ px: 2 }}>
-              {/* Første linje: Luk Chrome Browser, Fjernskrivebord, Terminal på klient */}
               <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%", mb: 2 }}>
                 <Tooltip title="Luk Chrome Browser på klient">
                   <span>
@@ -528,7 +520,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   </span>
                 </Tooltip>
               </Stack>
-              {/* Anden linje: Genstart klient, Sluk klient */}
               <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
                 <Tooltip title="Genstart klient">
                   <span>
@@ -562,7 +553,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
-        {/* Felt 5: Livestream */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
