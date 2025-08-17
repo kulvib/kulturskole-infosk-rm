@@ -61,11 +61,8 @@ function formatUptime(uptimeStr) {
     hours = Math.floor((totalSeconds % 86400) / 3600);
     mins = Math.floor((totalSeconds % 3600) / 60);
   }
-  let res = "";
-  if (days > 0) res += `${days} dage, `;
-  if (hours > 0 || days > 0) res += `${hours} timer, `;
-  res += `${mins} minutter`;
-  return res;
+  // Vis altid alle tre felter, også hvis de er 0
+  return `${days} dage, ${hours} timer, ${mins} minutter`;
 }
 
 function ClientStatusIcon({ isOnline }) {
