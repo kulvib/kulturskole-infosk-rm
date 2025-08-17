@@ -140,7 +140,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   };
 
   const sectionSpacing = 2;
-  const cardMinHeight = 210;
+  const cardMinHeight = 250; // For bedre højde-match
 
   // Stil til knapper i felt 4
   const actionBtnStyle = {
@@ -160,15 +160,15 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   // Stil til små input-felter
   const inputStyle = {
     width: 300,
-    height: 34,
-    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "34px", boxSizing: "border-box", padding: "8px 14px" },
-    "& .MuiInputBase-root": { height: "34px" },
+    height: 32,
+    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
+    "& .MuiInputBase-root": { height: "32px" },
   };
   const kioskInputStyle = {
-    width: 480,
-    height: 34,
-    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "34px", boxSizing: "border-box", padding: "8px 14px" },
-    "& .MuiInputBase-root": { height: "34px" },
+    width: 530,
+    height: 32,
+    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
+    "& .MuiInputBase-root": { height: "32px" },
   };
 
   if (!client) {
@@ -300,10 +300,17 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </Card>
         </Grid>
         <Grid item xs={12} md={6}>
-          {/* Felt 2: Oppetid, Sidst set, Tilføjet */}
+          {/* Felt 2: Ubuntu version + Oppetid, Sidst set, Tilføjet */}
           <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-            <CardContent sx={{ minHeight: cardMinHeight }}>
+            <CardContent sx={{ minHeight: cardMinHeight, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <Stack spacing={2}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <MemoryIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                    Ubuntu version:
+                  </Typography>
+                  <Typography variant="body2">{client.ubuntu_version || "ukendt"}</Typography>
+                </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <AccessTimeIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
@@ -334,17 +341,10 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </Card>
         </Grid>
         <Grid item xs={12} md={6}>
-          {/* Felt 3: Ubuntu version + IP/MAC */}
+          {/* Felt 3: IP/MAC-adresser */}
           <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-            <CardContent sx={{ minHeight: cardMinHeight }}>
+            <CardContent sx={{ minHeight: cardMinHeight, display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <Stack spacing={2}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <MemoryIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                    Ubuntu version:
-                  </Typography>
-                  <Typography variant="body2">{client.ubuntu_version || "ukendt"}</Typography>
-                </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
@@ -377,11 +377,12 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
-        {/* Felt 4: Knapper/handlinger med ens dimensioner og på linje */}
+        {/* Felt 4: Knapper/handlinger med to linjer */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent sx={{ px: 2 }}>
-              <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
+              {/* Første linje: Luk Chrome Browser, Fjernskrivebord, Terminal på klient */}
+              <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%", mb: 2 }}>
                 <Tooltip title="Luk Chrome Browser på klient">
                   <span>
                     <Button
@@ -422,6 +423,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     </Button>
                   </span>
                 </Tooltip>
+              </Stack>
+              {/* Anden linje: Genstart klient, Sluk klient */}
+              <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
                 <Tooltip title="Genstart klient">
                   <span>
                     <Button
