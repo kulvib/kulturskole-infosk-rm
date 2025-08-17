@@ -410,34 +410,34 @@ export default function ClientInfoPage() {
                     </TableCell>
                     <TableCell sx={{ width: "14.28%" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <div style={{ display: "flex", alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
                           <b>WiFi:</b>&nbsp;
-                          <span>{client.wifi_ip_address || "ukendt"}</span>
+                          <span style={{ whiteSpace: "nowrap" }}>{client.wifi_ip_address || "ukendt"}</span>
                           <CopyIconButton value={client.wifi_ip_address || ""} disabled={!client.wifi_ip_address} iconSize={14.4} />
                         </div>
-                        <div style={{ display: "flex", alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
                           <b>LAN:</b>&nbsp;
-                          <span>{client.lan_ip_address || "ukendt"}</span>
+                          <span style={{ whiteSpace: "nowrap" }}>{client.lan_ip_address || "ukendt"}</span>
                           <CopyIconButton value={client.lan_ip_address || ""} disabled={!client.lan_ip_address} iconSize={14.4} />
                         </div>
                       </div>
                     </TableCell>
                     <TableCell sx={{ width: "14.28%" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <div style={{ display: "flex", alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
                           <b>WiFi:</b>&nbsp;
-                          <span>{client.wifi_mac_address || "ukendt"}</span>
+                          <span style={{ whiteSpace: "nowrap" }}>{client.wifi_mac_address || "ukendt"}</span>
                           <CopyIconButton value={client.wifi_mac_address || ""} disabled={!client.wifi_mac_address} iconSize={14.4} />
                         </div>
-                        <div style={{ display: "flex", alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
                           <b>LAN:</b>&nbsp;
-                          <span>{client.lan_mac_address || "ukendt"}</span>
+                          <span style={{ whiteSpace: "nowrap" }}>{client.lan_mac_address || "ukendt"}</span>
                           <CopyIconButton value={client.lan_mac_address || ""} disabled={!client.lan_mac_address} iconSize={14.4} />
                         </div>
                       </div>
                     </TableCell>
                     <TableCell sx={{ width: "14.28%" }}>
-                      <span>
+                      <span style={{ whiteSpace: "nowrap" }}>
                         {formatTimestamp(client.created_at)}
                       </span>
                     </TableCell>
