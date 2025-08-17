@@ -36,10 +36,18 @@ import {
 function formatDateTime(dateStr) {
   if (!dateStr) return "ukendt";
   const d = new Date(dateStr);
-  return `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear()}, Kl. ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  // Use Danish locale and Copenhagen timezone
+  return d.toLocaleString("da-DK", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/Copenhagen"
+  }).replace(',', ', Kl.');
 }
 
-// THIS IS THE UPDATED UPTIME FUNCTION TO CONVERT HOURS > 24 TO DAYS
 function formatUptime(uptimeStr) {
   if (!uptimeStr) return "ukendt";
   let days = 0, hours = 0, mins = 0;
@@ -88,7 +96,7 @@ function ClientStatusIcon({ isOnline }) {
           width: 14,
           height: 14,
           borderRadius: "50%",
-          bgcolor: isOnline ? theme.palette.success.main : "#CC3300",
+          bgcolor: isOnline ? theme.palette.success.main : theme.palette.error.main, // MUI standardfarver
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
         }}
