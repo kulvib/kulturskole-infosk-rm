@@ -145,6 +145,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
 
   const sectionSpacing = 2;
 
+  // Højdejustering for Felt 2 og 3
+  const cardMinHeight = 210;
+
   if (!client) {
     return (
       <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
@@ -227,8 +230,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     onChange={handleLocalityChange}
                     sx={{
                       width: 300,
-                      "& .MuiInputBase-input": { fontSize: "0.95rem" },
-                      "& .MuiInputBase-root": { height: 28 },
+                      height: 40,
+                      "& .MuiInputBase-input": { fontSize: "0.95rem", height: "40px", boxSizing: "border-box", padding: "8px 14px" },
+                      "& .MuiInputBase-root": { height: "40px" },
                     }}
                     disabled={savingLocality}
                   />
@@ -237,7 +241,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     variant="outlined"
                     onClick={handleLocalitySave}
                     disabled={savingLocality}
-                    sx={{ minWidth: 44, px: 1, height: 28 }}
+                    sx={{ minWidth: 44, px: 1, height: 40 }}
                   >
                     {savingLocality ? <CircularProgress size={16} /> : "Gem"}
                   </Button>
@@ -259,8 +263,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     onChange={handleKioskUrlChange}
                     sx={{
                       width: 550,
-                      "& .MuiInputBase-input": { fontSize: "0.95rem" },
-                      "& .MuiInputBase-root": { height: 28 },
+                      height: 40,
+                      "& .MuiInputBase-input": { fontSize: "0.95rem", height: "40px", boxSizing: "border-box", padding: "8px 14px" },
+                      "& .MuiInputBase-root": { height: "40px" },
                     }}
                     disabled={savingKioskUrl}
                   />
@@ -270,7 +275,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     color="primary"
                     onClick={handleKioskUrlSave}
                     disabled={savingKioskUrl}
-                    sx={{ minWidth: 44, px: 1, height: 28 }}
+                    sx={{ minWidth: 44, px: 1, height: 40 }}
                   >
                     {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
                   </Button>
@@ -287,8 +292,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
         {/* Felt 2 og 3 ved siden af hinanden */}
         <Grid item xs={12} md={6}>
           {/* Felt 2: Oppetid, Sidst set, Tilføjet */}
-          <Card elevation={2} sx={{ borderRadius: 2 }}>
-            <CardContent>
+          <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+            <CardContent sx={{ minHeight: cardMinHeight }}>
               <Stack spacing={2}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <AccessTimeIcon color="primary" />
@@ -321,8 +326,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
         </Grid>
         <Grid item xs={12} md={6}>
           {/* Felt 3: Ubuntu version + IP/MAC */}
-          <Card elevation={2} sx={{ borderRadius: 2 }}>
-            <CardContent>
+          <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+            <CardContent sx={{ minHeight: cardMinHeight }}>
               <Stack spacing={2}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <MemoryIcon color="primary" />
@@ -366,8 +371,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
         {/* Felt 4: Knapper/handlinger med ens dimensioner */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
-            <CardContent>
-              <Stack direction="row" spacing={2} alignItems="center">
+            <CardContent sx={{ overflow: "auto", px: 1 }}>
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ flexWrap: "wrap", justifyContent: "center" }}>
                 <Tooltip title="Luk Chrome Browser på klient">
                   <span>
                     <Button
@@ -376,7 +381,15 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<PowerSettingsNewIcon />}
                       onClick={() => handleClientAction("chrome-shutdown")}
                       disabled={actionLoading["chrome-shutdown"]}
-                      sx={{ minWidth: 170, height: 40, textTransform: "none", fontWeight: 500 }}
+                      sx={{
+                        minWidth: 170,
+                        height: 40,
+                        textTransform: "none",
+                        fontWeight: 500,
+                        fontSize: "0.95rem",
+                        lineHeight: 1.1,
+                        py: 0.5,
+                      }}
                     >
                       Luk Chrome Browser
                     </Button>
@@ -402,7 +415,15 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       color="inherit"
                       startIcon={<TerminalIcon />}
                       onClick={handleOpenTerminal}
-                      sx={{ minWidth: 170, height: 40, textTransform: "none", fontWeight: 500 }}
+                      sx={{
+                        minWidth: 170,
+                        height: 40,
+                        textTransform: "none",
+                        fontWeight: 500,
+                        fontSize: "0.95rem",
+                        lineHeight: 1.1,
+                        py: 0.5,
+                      }}
                     >
                       Terminal på klient
                     </Button>
