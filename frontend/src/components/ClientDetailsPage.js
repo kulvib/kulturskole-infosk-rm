@@ -10,6 +10,7 @@ import {
   TextField,
   CircularProgress,
   Tooltip,
+  useTheme,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -30,17 +31,17 @@ import {
   clientAction,
   openTerminal,
   getClientStream,
-  getClient, // <--- Tilføj denne, hvis du skal hente klientdata igen
 } from "../api";
 
-// Format: 27.08.2025, Kl. 14:49
-function formatDateTime(dateStr) {
+// Datoformat: 27.08.2025, Kl. 14:49
+function formatCreatedDate(dateStr) {
   if (!dateStr) return "ukendt";
   const d = new Date(dateStr);
   return `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear()}, Kl. ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
 function ClientStatusIcon({ isOnline }) {
+  const theme = useTheme();
   return (
     <Box
       sx={{
@@ -57,7 +58,7 @@ function ClientStatusIcon({ isOnline }) {
           width: 14,
           height: 14,
           borderRadius: "50%",
-          bgcolor: isOnline ? "#2E7D32" : "#CC3300", // mørkere grøn
+          bgcolor: isOnline ? theme.palette.success.main : "#CC3300",
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
         }}
@@ -67,11 +68,7 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
-export default function ClientDetailsPage({ client: initialClient, clientId }) {
-  // clientId skal gives som prop, så vi kan hente klienten igen!
-  const [client, setClient] = useState(initialClient || null);
-  const [refreshing, setRefreshing] = useState(false);
-
+export default function ClientDetailsPage({ client, refreshing, handleRefresh }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
   const [savingLocality, setSavingLocality] = useState(false);
@@ -86,34 +83,6 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
 
   const navigate = useNavigate();
 
-  // Hent klientdata fra API
-  const fetchClient = async () => {
-    if (!clientId) return;
-    setRefreshing(true);
-    try {
-      const data = await getClient(clientId);
-      setClient(data);
-      setLocality(data.locality || "");
-      setKioskUrl(data.kiosk_url || "");
-      setLocalityDirty(false);
-      setKioskUrlDirty(false);
-    } catch (err) {
-      // Håndter evt. fejl
-    }
-    setRefreshing(false);
-  };
-
-  // Polling: hent data hvert 10. sekund
-  useEffect(() => {
-    if (!clientId) return;
-    fetchClient(); // hent ved mount
-    const interval = setInterval(() => {
-      fetchClient();
-    }, 10000); // hvert 10. sekund
-    return () => clearInterval(interval);
-  }, [clientId]);
-
-  // Opdater lokale states, hvis client ændres
   useEffect(() => {
     if (client) {
       if (!localityDirty) setLocality(client.locality || "");
@@ -134,7 +103,6 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
       setLocalitySaved(true);
       setLocalityDirty(false);
       setTimeout(() => setLocalitySaved(false), 3000);
-      fetchClient(); // Opdater data efter gem
     } catch (err) {
       alert("Kunne ikke gemme lokalitet: " + err.message);
     }
@@ -153,7 +121,6 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
       setKioskUrlSaved(true);
       setKioskUrlDirty(false);
       setTimeout(() => setKioskUrlSaved(false), 3000);
-      fetchClient(); // Opdater data efter gem
     } catch (err) {
       alert("Kunne ikke opdatere kiosk webadresse: " + err.message);
     }
@@ -165,7 +132,6 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
       await clientAction(client.id, action);
-      fetchClient(); // Opdater data efter handling
     } catch (err) {
       alert("Handlingen mislykkedes: " + err.message);
     }
@@ -173,14 +139,8 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
   };
 
   const handleOpenTerminal = () => openTerminal(client.id);
-
   const handleOpenRemoteDesktop = () => {
     window.open(`/remote-desktop/${client.id}`, "_blank", "noopener,noreferrer");
-  };
-
-  // Opdater-knap skal trigge fetchClient
-  const handleRefresh = () => {
-    fetchClient();
   };
 
   const sectionSpacing = 2;
@@ -197,6 +157,7 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 3 }}>
+      {/* Topbar med tilbage og opdater */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
         <Button
           variant="outlined"
@@ -226,7 +187,7 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
         </Tooltip>
       </Box>
       <Grid container spacing={sectionSpacing}>
-        {/* Felt 1 */}
+        {/* Felt 1: Klient ID, Lokation, Kiosk webadresse */}
         <Grid item xs={12} md={6}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
@@ -306,7 +267,7 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
             </CardContent>
           </Card>
         </Grid>
-        {/* Felt 2 */}
+        {/* Felt 2: Oppetid, Sidst set, Tilføjet */}
         <Grid item xs={12} md={6}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
@@ -324,7 +285,7 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
                     Sidst set:
                   </Typography>
                   <Typography variant="body2">
-                    {formatDateTime(client.last_seen)}
+                    {client.last_seen || "ukendt"}
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
@@ -333,14 +294,14 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
                     Tilføjet:
                   </Typography>
                   <Typography variant="body2">
-                    {formatDateTime(client.created_at)}
+                    {formatCreatedDate(client.created_at)}
                   </Typography>
                 </Stack>
               </Stack>
             </CardContent>
           </Card>
         </Grid>
-        {/* Felt 3 */}
+        {/* Felt 3: Ubuntu version + IP/MAC */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
@@ -384,7 +345,7 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
             </CardContent>
           </Card>
         </Grid>
-        {/* Felt 4: Handlinger */}
+        {/* Felt 4: Knapper/handlinger */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
@@ -402,7 +363,7 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
                     </Button>
                   </span>
                 </Tooltip>
-                <Tooltip title="Åbn fjernskrivebord på klient">
+                <Tooltip title="Fjernskrivebord på klient">
                   <span>
                     <Button
                       variant="outlined"
@@ -414,7 +375,7 @@ export default function ClientDetailsPage({ client: initialClient, clientId }) {
                     </Button>
                   </span>
                 </Tooltip>
-                <Tooltip title="Åbn terminal på klient">
+                <Tooltip title="Terminal på klient">
                   <span>
                     <Button
                       variant="outlined"
