@@ -408,36 +408,26 @@ export default function ClientInfoPage() {
                     <TableCell sx={{ width: "14.28%" }}>
                       {client.name || "Ukendt navn"}
                     </TableCell>
-                    <TableCell sx={{ width: "14.28%" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <div style={{ display: "flex", alignItems: "center" }}>
-                          <b>WiFi:</b>&nbsp;
-                          <span>{client.wifi_ip_address || "ukendt"}</span>
-                          <CopyIconButton value={client.wifi_ip_address || ""} disabled={!client.wifi_ip_address} iconSize={14.4} />
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center" }}>
-                          <b>LAN:</b>&nbsp;
-                          <span>{client.lan_ip_address || "ukendt"}</span>
-                          <CopyIconButton value={client.lan_ip_address || ""} disabled={!client.lan_ip_address} iconSize={14.4} />
-                        </div>
+                    <TableCell sx={{ width: "14.28%", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "nowrap" }}>
+                        <span><b>WiFi:</b> {client.wifi_ip_address || "ukendt"}</span>
+                        <CopyIconButton value={client.wifi_ip_address || ""} disabled={!client.wifi_ip_address} iconSize={14.4} />
+                        <span><b>LAN:</b> {client.lan_ip_address || "ukendt"}</span>
+                        <CopyIconButton value={client.lan_ip_address || ""} disabled={!client.lan_ip_address} iconSize={14.4} />
                       </div>
                     </TableCell>
-                    <TableCell sx={{ width: "14.28%" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <div style={{ display: "flex", alignItems: "center" }}>
-                          <b>WiFi:</b>&nbsp;
-                          <span>{client.wifi_mac_address || "ukendt"}</span>
-                          <CopyIconButton value={client.wifi_mac_address || ""} disabled={!client.wifi_mac_address} iconSize={14.4} />
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center" }}>
-                          <b>LAN:</b>&nbsp;
-                          <span>{client.lan_mac_address || "ukendt"}</span>
-                          <CopyIconButton value={client.lan_mac_address || ""} disabled={!client.lan_mac_address} iconSize={14.4} />
-                        </div>
+                    <TableCell sx={{ width: "14.28%", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "nowrap" }}>
+                        <span><b>WiFi:</b> {client.wifi_mac_address || "ukendt"}</span>
+                        <CopyIconButton value={client.wifi_mac_address || ""} disabled={!client.wifi_mac_address} iconSize={14.4} />
+                        <span><b>LAN:</b> {client.lan_mac_address || "ukendt"}</span>
+                        <CopyIconButton value={client.lan_mac_address || ""} disabled={!client.lan_mac_address} iconSize={14.4} />
                       </div>
                     </TableCell>
-                    <TableCell sx={{ width: "14.28%" }}>
-                      <span>{formatTimestamp(client.created_at)}</span>
+                    <TableCell sx={{ width: "14.28%", whiteSpace: "nowrap" }}>
+                      <span>
+                        {formatTimestamp(client.created_at)}
+                      </span>
                     </TableCell>
                     <TableCell sx={{ width: "14.28%", textAlign: "center" }}>
                       <Button
