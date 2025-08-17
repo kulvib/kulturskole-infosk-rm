@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
-from sqlmodel import select
+from sqlmodel import select, delete
 from typing import List
 from datetime import datetime, timedelta
 from db import get_session
-from models import Client, ClientCreate, ClientUpdate
+from models import Client, ClientCreate, ClientUpdate, CalendarMarking
 from auth import get_current_admin_user
 
 router = APIRouter()
@@ -169,6 +169,11 @@ async def remove_client(id: int, session=Depends(get_session), user=Depends(get_
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+    # Slet alle tilknyttede CalendarMarking-rækker først!
+    session.exec(
+        delete(CalendarMarking).where(CalendarMarking.client_id == client.id)
+    )
+    session.commit()
     session.delete(client)
     session.commit()
     return {"ok": True}
