@@ -29,12 +29,12 @@ import {
   pushKioskUrl,
   clientAction,
   openTerminal,
-  // openRemoteDesktop, // Ikke nødvendig længere
   getClientStream,
+  getClient, // <--- Tilføj denne, hvis du skal hente klientdata igen
 } from "../api";
 
-// Datoformat: 27.08.2025, Kl. 14:49
-function formatCreatedDate(dateStr) {
+// Format: 27.08.2025, Kl. 14:49
+function formatDateTime(dateStr) {
   if (!dateStr) return "ukendt";
   const d = new Date(dateStr);
   return `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear()}, Kl. ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
@@ -57,7 +57,7 @@ function ClientStatusIcon({ isOnline }) {
           width: 14,
           height: 14,
           borderRadius: "50%",
-          bgcolor: isOnline ? "#66FF33" : "#CC3300",
+          bgcolor: isOnline ? "#2E7D32" : "#CC3300", // mørkere grøn
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
         }}
@@ -67,7 +67,11 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
-export default function ClientDetailsPage({ client, refreshing, handleRefresh }) {
+export default function ClientDetailsPage({ client: initialClient, clientId }) {
+  // clientId skal gives som prop, så vi kan hente klienten igen!
+  const [client, setClient] = useState(initialClient || null);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
   const [savingLocality, setSavingLocality] = useState(false);
@@ -82,8 +86,35 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
 
   const navigate = useNavigate();
 
+  // Hent klientdata fra API
+  const fetchClient = async () => {
+    if (!clientId) return;
+    setRefreshing(true);
+    try {
+      const data = await getClient(clientId);
+      setClient(data);
+      setLocality(data.locality || "");
+      setKioskUrl(data.kiosk_url || "");
+      setLocalityDirty(false);
+      setKioskUrlDirty(false);
+    } catch (err) {
+      // Håndter evt. fejl
+    }
+    setRefreshing(false);
+  };
+
+  // Polling: hent data hvert 10. sekund
   useEffect(() => {
-    // Kun opdater hvis der ikke er unsaved ændringer (dirty) i locality/kioskUrl
+    if (!clientId) return;
+    fetchClient(); // hent ved mount
+    const interval = setInterval(() => {
+      fetchClient();
+    }, 10000); // hvert 10. sekund
+    return () => clearInterval(interval);
+  }, [clientId]);
+
+  // Opdater lokale states, hvis client ændres
+  useEffect(() => {
     if (client) {
       if (!localityDirty) setLocality(client.locality || "");
       if (!kioskUrlDirty) setKioskUrl(client.kiosk_url || "");
@@ -101,8 +132,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     try {
       await updateClient(client.id, { locality });
       setLocalitySaved(true);
-      setLocalityDirty(false); // Nu er den ikke dirty mere!
+      setLocalityDirty(false);
       setTimeout(() => setLocalitySaved(false), 3000);
+      fetchClient(); // Opdater data efter gem
     } catch (err) {
       alert("Kunne ikke gemme lokalitet: " + err.message);
     }
@@ -119,8 +151,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     try {
       await pushKioskUrl(client.id, kioskUrl);
       setKioskUrlSaved(true);
-      setKioskUrlDirty(false); // Nu er den ikke dirty mere!
+      setKioskUrlDirty(false);
       setTimeout(() => setKioskUrlSaved(false), 3000);
+      fetchClient(); // Opdater data efter gem
     } catch (err) {
       alert("Kunne ikke opdatere kiosk webadresse: " + err.message);
     }
@@ -132,6 +165,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
       await clientAction(client.id, action);
+      fetchClient(); // Opdater data efter handling
     } catch (err) {
       alert("Handlingen mislykkedes: " + err.message);
     }
@@ -140,9 +174,13 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
 
   const handleOpenTerminal = () => openTerminal(client.id);
 
-  // Denne funktion åbner en ny fane med din route/component
   const handleOpenRemoteDesktop = () => {
     window.open(`/remote-desktop/${client.id}`, "_blank", "noopener,noreferrer");
+  };
+
+  // Opdater-knap skal trigge fetchClient
+  const handleRefresh = () => {
+    fetchClient();
   };
 
   const sectionSpacing = 2;
@@ -188,26 +226,19 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
         </Tooltip>
       </Box>
       <Grid container spacing={sectionSpacing}>
-        <Grid item xs={12}>
+        {/* Felt 1 */}
+        <Grid item xs={12} md={6}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
-              <Stack spacing={1.2}>
-                {/* Navn og status */}
+              <Stack spacing={2}>
                 <Stack direction="row" alignItems="center" spacing={1}>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 700,
-                      lineHeight: 1.2,
-                      letterSpacing: 0.5,
-                      fontSize: { xs: "1rem", sm: "1.15rem", md: "1.25rem" },
-                    }}
-                  >
-                    {client.name}
+                  <LanIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                    Klient ID:
                   </Typography>
+                  <Typography variant="body2" sx={{ color: "#888" }}>{client.id}</Typography>
                   <ClientStatusIcon isOnline={client.isOnline} />
                 </Stack>
-                {/* Lokalitet */}
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOnIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 90 }}>
@@ -239,61 +270,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     </Typography>
                   )}
                 </Stack>
-                {/* Sidst set */}
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <AccessTimeIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">Sidst set:</Typography>
-                  <Typography variant="body2">{client.last_seen || "ukendt"}</Typography>
-                </Stack>
-                {/* Oppetid */}
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <AccessTimeIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">Oppetid:</Typography>
-                  <Typography variant="body2">{client.uptime || "ukendt"}</Typography>
-                </Stack>
-                {/* Tilføjet */}
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <AccessTimeIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">Tilføjet:</Typography>
-                  <Typography variant="body2">
-                    {formatCreatedDate(client.created_at)}
-                  </Typography>
-                </Stack>
-                {/* Klient ID */}
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">Klient ID:</Typography>
-                  <Typography variant="body2" sx={{ color: "#888" }}>{client.id}</Typography>
-                </Stack>
-                {/* IP/MAC info */}
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">IP-adresse WLAN / Wi-Fi:</Typography>
-                  <Typography variant="body2">{client.wifi_ip_address || "ukendt"}</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">MAC-adresse WLAN / Wi-Fi:</Typography>
-                  <Typography variant="body2">{client.wifi_mac_address || "ukendt"}</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">IP-adresse LAN:</Typography>
-                  <Typography variant="body2">{client.lan_ip_address || "ukendt"}</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">MAC-adresse LAN:</Typography>
-                  <Typography variant="body2">{client.lan_mac_address || "ukendt"}</Typography>
-                </Stack>
-                {/* Ubuntu version */}
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <MemoryIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">Ubuntu version:</Typography>
-                  <Typography variant="body2">{client.ubuntu_version || "ukendt"}</Typography>
-                </Stack>
-                {/* Kiosk webadresse og Chrome shutdown */}
-                <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 1 }}>
+                <Stack direction="row" spacing={2} alignItems="center">
                   <ChromeReaderModeIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     Kiosk webadresse:
@@ -303,53 +280,128 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     value={kioskUrl}
                     onChange={handleKioskUrlChange}
                     sx={{
-                      width: 440,
+                      width: 300,
                       "& .MuiInputBase-input": { fontSize: "0.95rem" },
                       "& .MuiInputBase-root": { height: 28 },
                     }}
                     disabled={savingKioskUrl}
                   />
-                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="primary"
-                      onClick={handleKioskUrlSave}
-                      disabled={savingKioskUrl}
-                      sx={{ minWidth: 44, px: 1, height: 28 }}
-                    >
-                      {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
-                    </Button>
-                    {kioskUrlSaved && (
-                      <Typography variant="body2" color="success.main" sx={{ mt: 0.5 }}>
-                        Gemt
-                      </Typography>
-                    )}
-                  </Box>
-                  <Tooltip title="Luk Chrome Browser på klient">
-                    <span>
-                      <Button
-                        variant="outlined"
-                        color="secondary"
-                        startIcon={<PowerSettingsNewIcon />}
-                        onClick={() => handleClientAction("chrome-shutdown")}
-                        disabled={actionLoading["chrome-shutdown"]}
-                        sx={{ ml: 2 }}
-                      >
-                        Luk Chrome Browser
-                      </Button>
-                    </span>
-                  </Tooltip>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    onClick={handleKioskUrlSave}
+                    disabled={savingKioskUrl}
+                    sx={{ minWidth: 44, px: 1, height: 28 }}
+                  >
+                    {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
+                  </Button>
+                  {kioskUrlSaved && (
+                    <Typography variant="body2" color="success.main" sx={{ ml: 2 }}>
+                      Gemt
+                    </Typography>
+                  )}
                 </Stack>
               </Stack>
             </CardContent>
           </Card>
         </Grid>
-        {/* Fjernskrivebord og Terminal */}
+        {/* Felt 2 */}
+        <Grid item xs={12} md={6}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <AccessTimeIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                    Oppetid:
+                  </Typography>
+                  <Typography variant="body2">{client.uptime || "ukendt"}</Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <AccessTimeIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                    Sidst set:
+                  </Typography>
+                  <Typography variant="body2">
+                    {formatDateTime(client.last_seen)}
+                  </Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <AccessTimeIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                    Tilføjet:
+                  </Typography>
+                  <Typography variant="body2">
+                    {formatDateTime(client.created_at)}
+                  </Typography>
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+        {/* Felt 3 */}
+        <Grid item xs={12}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <MemoryIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                    Ubuntu version:
+                  </Typography>
+                  <Typography variant="body2">{client.ubuntu_version || "ukendt"}</Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <LanIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                    IP-adresse WLAN / Wi-Fi:
+                  </Typography>
+                  <Typography variant="body2">{client.wifi_ip_address || "ukendt"}</Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <LanIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                    MAC-adresse WLAN / Wi-Fi:
+                  </Typography>
+                  <Typography variant="body2">{client.wifi_mac_address || "ukendt"}</Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <LanIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                    IP-adresse LAN:
+                  </Typography>
+                  <Typography variant="body2">{client.lan_ip_address || "ukendt"}</Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <LanIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                    MAC-adresse LAN:
+                  </Typography>
+                  <Typography variant="body2">{client.lan_mac_address || "ukendt"}</Typography>
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+        {/* Felt 4: Handlinger */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
               <Stack direction="row" spacing={2} alignItems="center">
+                <Tooltip title="Luk Chrome Browser på klient">
+                  <span>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      startIcon={<PowerSettingsNewIcon />}
+                      onClick={() => handleClientAction("chrome-shutdown")}
+                      disabled={actionLoading["chrome-shutdown"]}
+                    >
+                      Luk Chrome Browser
+                    </Button>
+                  </span>
+                </Tooltip>
                 <Tooltip title="Åbn fjernskrivebord på klient">
                   <span>
                     <Button
@@ -374,15 +426,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     </Button>
                   </span>
                 </Tooltip>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-        {/* Client actions: Genstart, Sluk */}
-        <Grid item xs={12}>
-          <Card elevation={2} sx={{ borderRadius: 2 }}>
-            <CardContent>
-              <Stack direction="row" spacing={2}>
                 <Tooltip title="Genstart klient">
                   <span>
                     <Button
@@ -396,7 +439,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     </Button>
                   </span>
                 </Tooltip>
-                {/* Start-knappen er fjernet */}
                 <Tooltip title="Sluk klient">
                   <span>
                     <Button
@@ -414,7 +456,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
-        {/* Livestream fra klient */}
+        {/* Felt 5: Livestream */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
