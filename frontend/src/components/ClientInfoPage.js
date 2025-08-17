@@ -20,6 +20,7 @@ import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { Link } from "react-router-dom";
 import { getClients, approveClient, removeClient, updateClient } from "../api";
 import { useAuth } from "../auth/authcontext";
@@ -47,6 +48,33 @@ function formatTimestamp(isoDate) {
   const minute = parts.find(p => p.type === "minute")?.value || "";
   const second = parts.find(p => p.type === "second")?.value || "";
   return `${day}-${month}-${year}, Kl. ${hour}:${minute}:${second}`;
+}
+
+// Kopiér ikon-knap
+function CopyIconButton({ value, disabled, iconSize = 16 }) {
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = async (e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch (err) {}
+  };
+  return (
+    <Tooltip title={copied ? "Kopieret!" : "Kopiér"}>
+      <span>
+        <IconButton
+          size="small"
+          onClick={handleCopy}
+          sx={{ ml: 0.5, p: 0.2 }}
+          disabled={disabled}
+        >
+          <ContentCopyIcon sx={{ fontSize: iconSize }} color={copied ? "success" : "inherit"} />
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
 }
 
 // Sammenlign arrays af klienter (id+relevante felter)
@@ -266,8 +294,9 @@ export default function ClientInfoPage() {
                 >
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
+                      {/* Byttet: Klient ID før Klientnavn */}
                       <TableCell sx={{ fontWeight: 700 }}>Klient ID</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
@@ -301,8 +330,9 @@ export default function ClientInfoPage() {
                               }}
                               hover
                             >
-                              <TableCell>{client.name}</TableCell>
+                              {/* Byttet: Klient ID før Klientnavn */}
                               <TableCell>{client.id}</TableCell>
+                              <TableCell>{client.name}</TableCell>
                               <TableCell>
                                 {client.locality || <span style={{ color: "#888" }}>Ingen lokalitet</span>}
                               </TableCell>
@@ -377,15 +407,31 @@ export default function ClientInfoPage() {
                       {client.name || "Ukendt navn"}
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <div><b>WiFi:</b> {client.wifi_ip_address || "ukendt"}</div>
-                        <div><b>LAN:</b> {client.lan_ip_address || "ukendt"}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <b>WiFi:</b>&nbsp;
+                          <span>{client.wifi_ip_address || "ukendt"}</span>
+                          <CopyIconButton value={client.wifi_ip_address || ""} disabled={!client.wifi_ip_address} iconSize={15} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <b>LAN:</b>&nbsp;
+                          <span>{client.lan_ip_address || "ukendt"}</span>
+                          <CopyIconButton value={client.lan_ip_address || ""} disabled={!client.lan_ip_address} iconSize={15} />
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <div><b>WiFi:</b> {client.wifi_mac_address || "ukendt"}</div>
-                        <div><b>LAN:</b> {client.lan_mac_address || "ukendt"}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <b>WiFi:</b>&nbsp;
+                          <span>{client.wifi_mac_address || "ukendt"}</span>
+                          <CopyIconButton value={client.wifi_mac_address || ""} disabled={!client.wifi_mac_address} iconSize={15} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <b>LAN:</b>&nbsp;
+                          <span>{client.lan_mac_address || "ukendt"}</span>
+                          <CopyIconButton value={client.lan_mac_address || ""} disabled={!client.lan_mac_address} iconSize={15} />
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
