@@ -50,7 +50,7 @@ function formatTimestamp(isoDate) {
   return `${day}-${month}-${year}, Kl. ${hour}:${minute}:${second}`;
 }
 
-// Kopiér ikon-knap
+// Kopiér ikon-knap, justeret størrelse
 function CopyIconButton({ value, disabled, iconSize = 16 }) {
   const [copied, setCopied] = React.useState(false);
   const handleCopy = async (e) => {
@@ -70,7 +70,7 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
           sx={{ ml: 0.5, p: 0.2 }}
           disabled={disabled}
         >
-          <ContentCopyIcon sx={{ fontSize: iconSize }} color={copied ? "success" : "inherit"} />
+          <ContentCopyIcon sx={{ fontSize: iconSize * 0.96 }} color={copied ? "success" : "inherit"} />
         </IconButton>
       </span>
     </Tooltip>
@@ -294,7 +294,6 @@ export default function ClientInfoPage() {
                 >
                   <TableHead>
                     <TableRow>
-                      {/* Byttet: Klient ID før Klientnavn */}
                       <TableCell sx={{ fontWeight: 700 }}>Klient ID</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
@@ -330,7 +329,6 @@ export default function ClientInfoPage() {
                               }}
                               hover
                             >
-                              {/* Byttet: Klient ID før Klientnavn */}
                               <TableCell>{client.id}</TableCell>
                               <TableCell>{client.name}</TableCell>
                               <TableCell>
@@ -385,59 +383,63 @@ export default function ClientInfoPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>IP-adresser</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>MAC-adresser</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Tilføjet</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Tilføj</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>Klient ID</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>Klientnavn</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>IP-adresser</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>MAC-adresser</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>Tilføjet</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "14.28%", textAlign: "center" }}>Tilføj</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "14.28%", textAlign: "center" }}>Fjern</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {unapprovedClients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     Ingen ikke-godkendte klienter.
                   </TableCell>
                 </TableRow>
               ) : (
                 unapprovedClients.map((client) => (
                   <TableRow key={client.id} hover>
-                    <TableCell>
+                    <TableCell sx={{ width: "14.28%" }}>
+                      {client.id}
+                    </TableCell>
+                    <TableCell sx={{ width: "14.28%" }}>
                       {client.name || "Ukendt navn"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ width: "14.28%" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <b>WiFi:</b>&nbsp;
                           <span>{client.wifi_ip_address || "ukendt"}</span>
-                          <CopyIconButton value={client.wifi_ip_address || ""} disabled={!client.wifi_ip_address} iconSize={15} />
+                          <CopyIconButton value={client.wifi_ip_address || ""} disabled={!client.wifi_ip_address} iconSize={14.4} />
                         </div>
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <b>LAN:</b>&nbsp;
                           <span>{client.lan_ip_address || "ukendt"}</span>
-                          <CopyIconButton value={client.lan_ip_address || ""} disabled={!client.lan_ip_address} iconSize={15} />
+                          <CopyIconButton value={client.lan_ip_address || ""} disabled={!client.lan_ip_address} iconSize={14.4} />
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ width: "14.28%" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <b>WiFi:</b>&nbsp;
                           <span>{client.wifi_mac_address || "ukendt"}</span>
-                          <CopyIconButton value={client.wifi_mac_address || ""} disabled={!client.wifi_mac_address} iconSize={15} />
+                          <CopyIconButton value={client.wifi_mac_address || ""} disabled={!client.wifi_mac_address} iconSize={14.4} />
                         </div>
                         <div style={{ display: "flex", alignItems: "center" }}>
                           <b>LAN:</b>&nbsp;
                           <span>{client.lan_mac_address || "ukendt"}</span>
-                          <CopyIconButton value={client.lan_mac_address || ""} disabled={!client.lan_mac_address} iconSize={15} />
+                          <CopyIconButton value={client.lan_mac_address || ""} disabled={!client.lan_mac_address} iconSize={14.4} />
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ width: "14.28%" }}>
                       <span>{formatTimestamp(client.created_at)}</span>
                     </TableCell>
-                    <TableCell align="center">
+                    <TableCell sx={{ width: "14.28%", textAlign: "center" }}>
                       <Button
                         variant="contained"
                         color="success"
@@ -449,7 +451,7 @@ export default function ClientInfoPage() {
                         Tilføj
                       </Button>
                     </TableCell>
-                    <TableCell align="center">
+                    <TableCell sx={{ width: "14.28%", textAlign: "center" }}>
                       <Tooltip title="Fjern klient">
                         <IconButton
                           color="error"
