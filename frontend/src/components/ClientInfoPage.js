@@ -253,7 +253,7 @@ export default function ClientInfoPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
+    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
       {error && (
         <Typography sx={{ color: "red", mb: 2, fontWeight: 600 }}>
           {error}
