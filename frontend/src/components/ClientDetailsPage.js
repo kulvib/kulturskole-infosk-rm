@@ -33,8 +33,8 @@ import {
   getClientStream,
 } from "../api";
 
-// Datoformat: 27.08.2025, Kl. 14:49
-function formatCreatedDate(dateStr) {
+// Format: 27.08.2025, Kl. 14:49
+function formatDateTime(dateStr) {
   if (!dateStr) return "ukendt";
   const d = new Date(dateStr);
   return `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear()}, Kl. ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
@@ -186,20 +186,36 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </span>
         </Tooltip>
       </Box>
+      {/* Felt 1: Øverst */}
       <Grid container spacing={sectionSpacing}>
-        {/* Felt 1: Klient ID, Lokation, Kiosk webadresse */}
-        <Grid item xs={12} md={6}>
-          <Card elevation={2} sx={{ borderRadius: 2 }}>
+        <Grid item xs={12}>
+          <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent>
               <Stack spacing={2}>
+                {/* Klientnavn og status */}
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 700,
+                      lineHeight: 1.2,
+                      letterSpacing: 0.5,
+                      fontSize: { xs: "1rem", sm: "1.15rem", md: "1.25rem" },
+                    }}
+                  >
+                    {client.name}
+                  </Typography>
+                  <ClientStatusIcon isOnline={client.isOnline} />
+                </Stack>
+                {/* Klient ID */}
                 <Stack direction="row" alignItems="center" spacing={1}>
                   <LanIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
                     Klient ID:
                   </Typography>
                   <Typography variant="body2" sx={{ color: "#888" }}>{client.id}</Typography>
-                  <ClientStatusIcon isOnline={client.isOnline} />
                 </Stack>
+                {/* Lokalitet */}
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOnIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 90 }}>
@@ -231,6 +247,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     </Typography>
                   )}
                 </Stack>
+                {/* Kiosk webadresse */}
                 <Stack direction="row" spacing={2} alignItems="center">
                   <ChromeReaderModeIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -267,8 +284,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
-        {/* Felt 2: Oppetid, Sidst set, Tilføjet */}
+        {/* Felt 2 og 3 ved siden af hinanden */}
         <Grid item xs={12} md={6}>
+          {/* Felt 2: Oppetid, Sidst set, Tilføjet */}
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
               <Stack spacing={2}>
@@ -285,7 +303,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     Sidst set:
                   </Typography>
                   <Typography variant="body2">
-                    {client.last_seen || "ukendt"}
+                    {formatDateTime(client.last_seen)}
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
@@ -294,15 +312,15 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     Tilføjet:
                   </Typography>
                   <Typography variant="body2">
-                    {formatCreatedDate(client.created_at)}
+                    {formatDateTime(client.created_at)}
                   </Typography>
                 </Stack>
               </Stack>
             </CardContent>
           </Card>
         </Grid>
-        {/* Felt 3: Ubuntu version + IP/MAC */}
-        <Grid item xs={12}>
+        <Grid item xs={12} md={6}>
+          {/* Felt 3: Ubuntu version + IP/MAC */}
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
               <Stack spacing={2}>
@@ -345,7 +363,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
-        {/* Felt 4: Knapper/handlinger */}
+        {/* Felt 4: Knapper/handlinger med ens dimensioner */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
@@ -358,6 +376,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<PowerSettingsNewIcon />}
                       onClick={() => handleClientAction("chrome-shutdown")}
                       disabled={actionLoading["chrome-shutdown"]}
+                      sx={{ minWidth: 170, height: 40, textTransform: "none", fontWeight: 500 }}
                     >
                       Luk Chrome Browser
                     </Button>
@@ -370,6 +389,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       color="primary"
                       startIcon={<DesktopWindowsIcon />}
                       onClick={handleOpenRemoteDesktop}
+                      sx={{ minWidth: 170, height: 40, textTransform: "none", fontWeight: 500 }}
                     >
                       Fjernskrivebord
                     </Button>
@@ -382,6 +402,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       color="inherit"
                       startIcon={<TerminalIcon />}
                       onClick={handleOpenTerminal}
+                      sx={{ minWidth: 170, height: 40, textTransform: "none", fontWeight: 500 }}
                     >
                       Terminal på klient
                     </Button>
@@ -395,6 +416,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<RestartAltIcon />}
                       onClick={() => handleClientAction("restart")}
                       disabled={actionLoading["restart"]}
+                      sx={{ minWidth: 170, height: 40, textTransform: "none", fontWeight: 500 }}
                     >
                       Genstart klient
                     </Button>
@@ -408,6 +430,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<PowerSettingsNewIcon />}
                       onClick={() => handleClientAction("shutdown")}
                       disabled={actionLoading["shutdown"]}
+                      sx={{ minWidth: 170, height: 40, textTransform: "none", fontWeight: 500 }}
                     >
                       Sluk klient
                     </Button>
