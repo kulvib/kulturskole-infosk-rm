@@ -33,6 +33,7 @@ import {
   getClientStream,
 } from "../api";
 
+// Format: 27.08.2025, Kl. 14:49
 function formatDateTime(dateStr) {
   if (!dateStr) return "ukendt";
   const d = new Date(dateStr);
@@ -90,6 +91,36 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     // eslint-disable-next-line
   }, [client]);
 
+  // Felt og input styles
+  const actionBtnStyle = {
+    minWidth: 200,
+    maxWidth: 200,
+    height: 36,
+    textTransform: "none",
+    fontWeight: 500,
+    fontSize: "0.95rem",
+    lineHeight: 1.1,
+    py: 0,
+    px: 1,
+    m: 0,
+    whiteSpace: "nowrap",
+    display: "inline-flex",
+    justifyContent: "center"
+  };
+  const inputStyle = {
+    width: 300,
+    height: 32,
+    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
+    "& .MuiInputBase-root": { height: "32px" },
+  };
+  const kioskInputStyle = {
+    width: 550,
+    height: 32,
+    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
+    "& .MuiInputBase-root": { height: "32px" },
+  };
+
+  // Lokalitet
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -107,6 +138,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setSavingLocality(false);
   };
 
+  // Kiosk URL
   const handleKioskUrlChange = (e) => {
     setKioskUrl(e.target.value);
     setKioskUrlDirty(true);
@@ -124,6 +156,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setSavingKioskUrl(false);
   };
 
+  // Generic client action
   const handleClientAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
@@ -140,37 +173,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   };
 
   const sectionSpacing = 2;
-
-  // Stil til knapper i felt 4
-  const actionBtnStyle = {
-    minWidth: 200,
-    maxWidth: 200,
-    height: 36,
-    textTransform: "none",
-    fontWeight: 500,
-    fontSize: "0.95rem",
-    lineHeight: 1.1,
-    py: 0,
-    px: 1,
-    m: 0,
-    whiteSpace: "nowrap",
-    display: "inline-flex",
-    justifyContent: "center"
-  };
-
-  // Stil til input-felter
-  const inputStyle = {
-    width: 300,
-    height: 32,
-    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
-    "& .MuiInputBase-root": { height: "32px" },
-  };
-  const kioskInputStyle = {
-    width: 550,
-    height: 32,
-    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
-    "& .MuiInputBase-root": { height: "32px" },
-  };
 
   if (!client) {
     return (
@@ -239,7 +241,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   </Typography>
                   <Typography 
                     variant="body2" 
-                    sx={{ color: "text.primary", fontSize: "1.15rem", fontWeight: 600 }}
+                    sx={{ color: "text.primary", fontSize: "0.85rem", fontWeight: 500 }}
                   >
                     {client.id}
                   </Typography>
@@ -308,8 +310,20 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
         <Grid item xs={12} md={6}>
           {/* Felt 2 */}
           <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-            <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" }}>
+            <CardContent sx={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              p: 3
+            }}>
+              <Box sx={{
+                flex: 1, 
+                display: "flex", 
+                flexDirection: "column", 
+                justifyContent: "center",
+                height: "100%"
+              }}>
                 <Stack spacing={2}>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <MemoryIcon color="primary" />
@@ -351,8 +365,20 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
         <Grid item xs={12} md={6}>
           {/* Felt 3 */}
           <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-            <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" }}>
+            <CardContent sx={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              p: 3
+            }}>
+              <Box sx={{
+                flex: 1, 
+                display: "flex", 
+                flexDirection: "column", 
+                justifyContent: "center",
+                height: "100%"
+              }}>
                 <Stack spacing={2}>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <LanIcon color="primary" />
