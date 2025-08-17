@@ -226,7 +226,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     value={locality}
                     onChange={handleLocalityChange}
                     sx={{
-                      width: 140,
+                      width: 300,
                       "& .MuiInputBase-input": { fontSize: "0.95rem" },
                       "& .MuiInputBase-root": { height: 28 },
                     }}
@@ -258,7 +258,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     value={kioskUrl}
                     onChange={handleKioskUrlChange}
                     sx={{
-                      width: 300,
+                      width: 550,
                       "& .MuiInputBase-input": { fontSize: "0.95rem" },
                       "& .MuiInputBase-root": { height: 28 },
                     }}
