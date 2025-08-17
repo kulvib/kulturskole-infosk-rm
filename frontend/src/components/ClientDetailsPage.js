@@ -39,6 +39,35 @@ function formatDateTime(dateStr) {
   return `${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear()}, Kl. ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
+function formatUptime(uptimeStr) {
+  if (!uptimeStr) return "ukendt";
+  let days = 0, hours = 0, mins = 0;
+  if (uptimeStr.includes('-')) {
+    // format: DAYS-HH:MM:SS
+    const [d, hms] = uptimeStr.split('-');
+    days = parseInt(d, 10);
+    const [h, m] = hms.split(':');
+    hours = parseInt(h, 10);
+    mins = parseInt(m, 10);
+  } else if (uptimeStr.includes(':')) {
+    // format: HH:MM:SS
+    const [h, m] = uptimeStr.split(':');
+    hours = parseInt(h, 10);
+    mins = parseInt(m, 10);
+  } else {
+    // uptimeStr is seconds
+    const totalSeconds = parseInt(uptimeStr, 10);
+    days = Math.floor(totalSeconds / 86400);
+    hours = Math.floor((totalSeconds % 86400) / 3600);
+    mins = Math.floor((totalSeconds % 3600) / 60);
+  }
+  let res = "";
+  if (days > 0) res += `${days} dage, `;
+  if (hours > 0 || days > 0) res += `${hours} timer, `;
+  res += `${mins} minutter`;
+  return res;
+}
+
 function ClientStatusIcon({ isOnline }) {
   const theme = useTheme();
   return (
@@ -326,7 +355,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
                     Oppetid:
                   </Typography>
-                  <Typography variant="body2">{client.uptime || "ukendt"}</Typography>
+                  <Typography variant="body2">{formatUptime(client.uptime)}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <AccessTimeIcon color="primary" />
