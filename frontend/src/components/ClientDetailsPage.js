@@ -140,13 +140,12 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   };
 
   const sectionSpacing = 2;
-  const cardMinHeight = 250; // For bedre højde-match
 
   // Stil til knapper i felt 4
   const actionBtnStyle = {
-    minWidth: 160,
-    maxWidth: 160,
-    height: 34,
+    minWidth: 180,
+    maxWidth: 180,
+    height: 36,
     textTransform: "none",
     fontWeight: 500,
     fontSize: "0.95rem",
@@ -155,9 +154,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     px: 1,
     m: 0,
     whiteSpace: "nowrap",
+    display: "inline-flex",
+    justifyContent: "center"
   };
 
-  // Stil til små input-felter
+  // Stil til input-felter
   const inputStyle = {
     width: 300,
     height: 32,
@@ -165,7 +166,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     "& .MuiInputBase-root": { height: "32px" },
   };
   const kioskInputStyle = {
-    width: 530,
+    width: 550,
     height: 32,
     "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
     "& .MuiInputBase-root": { height: "32px" },
@@ -300,9 +301,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </Card>
         </Grid>
         <Grid item xs={12} md={6}>
-          {/* Felt 2: Ubuntu version + Oppetid, Sidst set, Tilføjet */}
+          {/* Felt 2 */}
           <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-            <CardContent sx={{ minHeight: cardMinHeight, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <Stack spacing={2}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <MemoryIcon color="primary" />
@@ -341,9 +342,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </Card>
         </Grid>
         <Grid item xs={12} md={6}>
-          {/* Felt 3: IP/MAC-adresser */}
+          {/* Felt 3 */}
           <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-            <CardContent sx={{ minHeight: cardMinHeight, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <Stack spacing={2}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
