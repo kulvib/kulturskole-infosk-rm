@@ -108,7 +108,7 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
-function CopyIconButton({ value, disabled }) {
+function CopyIconButton({ value, disabled, iconSize = 16 }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -127,10 +127,10 @@ function CopyIconButton({ value, disabled }) {
         <IconButton
           size="small"
           onClick={handleCopy}
-          sx={{ ml: 1 }}
+          sx={{ ml: 1, p: 0.5 }}
           disabled={disabled}
         >
-          <ContentCopyIcon fontSize="small" color={copied ? "success" : "inherit"} />
+          <ContentCopyIcon sx={{ fontSize: iconSize }} color={copied ? "success" : "inherit"} />
         </IconButton>
       </span>
     </Tooltip>
@@ -328,7 +328,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     sx={inputStyle}
                     disabled={savingLocality}
                   />
-                  <CopyIconButton value={locality} disabled={!locality} />
+                  <CopyIconButton value={locality} disabled={!locality} iconSize={15} />
                   <Button
                     size="small"
                     variant="outlined"
@@ -344,11 +344,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     </Typography>
                   )}
                 </Stack>
-                {/* Kiosk webadresse */}
+                {/* Kiosk URL */}
                 <Stack direction="row" spacing={2} alignItems="center">
                   <ChromeReaderModeIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Kiosk webadresse:
+                    Kiosk URL:
                   </Typography>
                   <TextField
                     size="small"
@@ -357,7 +357,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     sx={kioskInputStyle}
                     disabled={savingKioskUrl}
                   />
-                  <CopyIconButton value={kioskUrl} disabled={!kioskUrl} />
+                  <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={15} />
                   <Button
                     size="small"
                     variant="outlined"
@@ -436,7 +436,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     IP-adresse WLAN:
                   </Typography>
                   <Typography variant="body2">{client.wifi_ip_address || "ukendt"}</Typography>
-                  <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} />
+                  <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
@@ -444,7 +444,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     MAC-adresse WLAN:
                   </Typography>
                   <Typography variant="body2">{client.wifi_mac_address || "ukendt"}</Typography>
-                  <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} />
+                  <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
@@ -452,7 +452,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     IP-adresse LAN:
                   </Typography>
                   <Typography variant="body2">{client.lan_ip_address || "ukendt"}</Typography>
-                  <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} />
+                  <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
@@ -460,7 +460,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     MAC-adresse LAN:
                   </Typography>
                   <Typography variant="body2">{client.lan_mac_address || "ukendt"}</Typography>
-                  <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} />
+                  <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
                 </Stack>
               </Stack>
             </CardContent>
