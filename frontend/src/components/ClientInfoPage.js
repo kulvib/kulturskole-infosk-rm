@@ -14,6 +14,7 @@ import {
   Tooltip,
   CircularProgress,
   Stack,
+  useTheme,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -24,16 +25,28 @@ import { getClients, approveClient, removeClient, updateClient } from "../api";
 import { useAuth } from "../auth/authcontext";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
-// Hjælpefunktion til at formatere dato/tid
+// Hjælpefunktion til at formatere dato/tid med sekunder og dansk tid
 function formatTimestamp(isoDate) {
   if (!isoDate) return "";
-  const date = new Date(isoDate);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  const hour = String(date.getHours()).padStart(2, "0");
-  const minute = String(date.getMinutes()).padStart(2, "0");
-  return `${day}.${month}.${year}, Kl. ${hour}:${minute}`;
+  const date = new Date(isoDate.endsWith("Z") ? isoDate : isoDate + "Z");
+  const formatter = new Intl.DateTimeFormat("da-DK", {
+    timeZone: "Europe/Copenhagen",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+  const parts = formatter.formatToParts(date);
+  const day = parts.find(p => p.type === "day")?.value || "";
+  const month = parts.find(p => p.type === "month")?.value || "";
+  const year = parts.find(p => p.type === "year")?.value || "";
+  const hour = parts.find(p => p.type === "hour")?.value || "";
+  const minute = parts.find(p => p.type === "minute")?.value || "";
+  const second = parts.find(p => p.type === "second")?.value || "";
+  return `${day}-${month}-${year}, Kl. ${hour}:${minute}:${second}`;
 }
 
 // Sammenlign arrays af klienter (id+relevante felter)
@@ -53,6 +66,29 @@ function isClientListEqual(a, b) {
     }
   }
   return true;
+}
+
+function ClientStatusCell({ isOnline }) {
+  const theme = useTheme();
+  return (
+    <Box
+      sx={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 48,
+        height: 20,
+        borderRadius: "12px",
+        bgcolor: isOnline ? theme.palette.success.main : theme.palette.error.main,
+        color: "#fff",
+        fontWeight: 400,
+        fontSize: 13,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+      }}
+    >
+      {isOnline ? "online" : "offline"}
+    </Box>
+  );
 }
 
 export default function ClientInfoPage() {
@@ -139,28 +175,6 @@ export default function ClientInfoPage() {
     }
   };
 
-  function ClientStatusCell({ isOnline }) {
-    return (
-      <Box
-        sx={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 48,
-          height: 20,
-          borderRadius: "12px",
-          bgcolor: isOnline ? "#66FF33" : "#CC3300",
-          color: "#fff",
-          fontWeight: 400,
-          fontSize: 13,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
-        }}
-      >
-        {isOnline ? "online" : "offline"}
-      </Box>
-    );
-  }
-
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchClients(true); // force update
@@ -176,7 +190,6 @@ export default function ClientInfoPage() {
     }
   };
 
-  // Moderne Vent venligst-dialog
   if (loading) {
     return (
       <Box
@@ -254,6 +267,7 @@ export default function ClientInfoPage() {
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Klient ID</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
@@ -264,7 +278,7 @@ export default function ClientInfoPage() {
                   <TableBody>
                     {dragClients.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} align="center">
+                        <TableCell colSpan={7} align="center">
                           Ingen godkendte klienter.
                         </TableCell>
                       </TableRow>
@@ -288,6 +302,7 @@ export default function ClientInfoPage() {
                               hover
                             >
                               <TableCell>{client.name}</TableCell>
+                              <TableCell>{client.id}</TableCell>
                               <TableCell>
                                 {client.locality || <span style={{ color: "#888" }}>Ingen lokalitet</span>}
                               </TableCell>
@@ -341,8 +356,8 @@ export default function ClientInfoPage() {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>IP-adresse</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>MAC-adresse</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>IP-adresser</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>MAC-adresser</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Tilføjet</TableCell>
                 <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Tilføj</TableCell>
                 <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
@@ -362,10 +377,16 @@ export default function ClientInfoPage() {
                       {client.name || "Ukendt navn"}
                     </TableCell>
                     <TableCell>
-                      <span>{client.ip_address || "ukendt"}</span>
+                      <div>
+                        <div><b>WiFi:</b> {client.wifi_ip_address || "ukendt"}</div>
+                        <div><b>LAN:</b> {client.lan_ip_address || "ukendt"}</div>
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <span>{client.mac_address || "ukendt"}</span>
+                      <div>
+                        <div><b>WiFi:</b> {client.wifi_mac_address || "ukendt"}</div>
+                        <div><b>LAN:</b> {client.lan_mac_address || "ukendt"}</div>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <span>{formatTimestamp(client.created_at)}</span>
