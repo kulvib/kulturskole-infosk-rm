@@ -236,7 +236,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
                     Klient ID:
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "#888" }}>{client.id}</Typography>
+                  <Typography variant="body2" sx={{ color: "text.primary" }}>{client.id}</Typography>
                 </Stack>
                 {/* Lokation */}
                 <Stack direction="row" spacing={1} alignItems="center">
