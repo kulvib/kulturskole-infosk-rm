@@ -85,7 +85,7 @@ def chrome_control(
     if action not in ["start", "stop"]:
         raise HTTPException(status_code=400, detail="Invalid action")
     # Her skal du sende kommandoen til klient-agenten! (fx via push_client_command)
-    # push_client_command(client.unique_id, f"chrome:{action}")
+    # push_client_command(client.id, f"chrome:{action}")
     return {"ok": True, "action": action}
 
 @router.post("/clients/", response_model=Client)
@@ -96,7 +96,6 @@ async def create_client(
 ):
     client = Client(
         name=client_in.name,
-        unique_id=client_in.unique_id,
         locality=client_in.locality,
         wifi_ip_address=client_in.wifi_ip_address,
         wifi_mac_address=client_in.wifi_mac_address,
@@ -183,7 +182,7 @@ def client_action(
     action = data.get("action")
     if not action:
         raise HTTPException(status_code=400, detail="Missing action")
-    # push_client_command(client.unique_id, action) # Hvis relevant
+    # push_client_command(client.id, action) # Hvis relevant
     return {"ok": True, "action": action}
 
 @router.post("/clients/{id}/approve", response_model=Client)
