@@ -84,9 +84,32 @@ def chrome_control(
     action = data.get("action")
     if action not in ["start", "stop"]:
         raise HTTPException(status_code=400, detail="Invalid action")
-    # Her skal du sende kommandoen til klient-agenten! (fx via push_client_command)
     # push_client_command(client.id, f"chrome:{action}")
     return {"ok": True, "action": action}
+
+@router.post("/clients/{id}/restart")
+def restart_client(
+    id: int,
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    # push_client_command(client.id, "restart")
+    return {"ok": True, "action": "restart"}
+
+@router.post("/clients/{id}/shutdown")
+def shutdown_client(
+    id: int,
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    # push_client_command(client.id, "shutdown")
+    return {"ok": True, "action": "shutdown"}
 
 @router.post("/clients/", response_model=Client)
 async def create_client(
@@ -182,7 +205,7 @@ def client_action(
     action = data.get("action")
     if not action:
         raise HTTPException(status_code=400, detail="Missing action")
-    # push_client_command(client.id, action) # Hvis relevant
+    # push_client_command(client.id, action)
     return {"ok": True, "action": action}
 
 @router.post("/clients/{id}/approve", response_model=Client)
@@ -221,7 +244,6 @@ async def remove_client(id: int, session=Depends(get_session), user=Depends(get_
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    # Slet alle tilknyttede CalendarMarking-rækker først!
     session.exec(
         delete(CalendarMarking).where(CalendarMarking.client_id == client.id)
     )
