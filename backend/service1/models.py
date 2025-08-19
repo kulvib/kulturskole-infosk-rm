@@ -28,6 +28,8 @@ class Client(ClientBase, table=True):
     ubuntu_version: Optional[str] = None
     uptime: Optional[str] = None
     created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, nullable=False)
+    chrome_status: Optional[str] = "unknown"  # 'running', 'stopped', 'unknown'
+    chrome_last_updated: Optional[datetime] = None
 
 class ClientCreate(ClientBase):
     sort_order: Optional[int] = None
