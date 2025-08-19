@@ -134,17 +134,41 @@ export async function pushKioskUrl(id, url) {
   return await res.json();
 }
 
+// NY: Client actions med REST endpoints
 export async function clientAction(id, action) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
-  const res = await fetch(`${apiUrl}/api/clients/${id}/action`, {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer " + token,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ action }),
+
+  let url = "";
+  let body = null;
+  let method = "POST";
+
+  if (action === "restart") {
+    url = `${apiUrl}/api/clients/${id}/restart`;
+  } else if (action === "shutdown") {
+    url = `${apiUrl}/api/clients/${id}/shutdown`;
+  } else if (action === "chrome-shutdown") {
+    url = `${apiUrl}/api/clients/${id}/chrome-control`;
+    body = JSON.stringify({ action: "stop" });
+  } else if (action === "chrome-start") {
+    url = `${apiUrl}/api/clients/${id}/chrome-control`;
+    body = JSON.stringify({ action: "start" });
+  } else {
+    url = `${apiUrl}/api/clients/${id}/action`;
+    body = JSON.stringify({ action });
+  }
+
+  const headers = {
+    Authorization: "Bearer " + token,
+    "Content-Type": "application/json",
+  };
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body,
   });
+
   if (!res.ok) {
     let msg = "Kunne ikke udføre handling";
     try {
