@@ -40,17 +40,18 @@ import {
   getClientStream,
 } from "../api";
 
+// Tilføj denne import for live status
+import { getClient } from "../api";
+
 // Dansk tid, robust, inklusive sekunder for "Sidst set"/"Tilføjet"
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
-  // Sikre korrekt UTC parse
   if (dateStr.endsWith("Z") || dateStr.match(/[\+\-]\d{2}:?\d{2}$/)) {
     d = new Date(dateStr);
   } else {
-    d = new Date(dateStr + "Z"); // Tving UTC
+    d = new Date(dateStr + "Z");
   }
-  // Intl.DateTimeFormat for ens resultat
   const formatter = new Intl.DateTimeFormat("da-DK", {
     timeZone: "Europe/Copenhagen",
     year: "numeric",
@@ -77,25 +78,21 @@ function formatUptime(uptimeStr) {
   if (!uptimeStr) return "ukendt";
   let days = 0, hours = 0, mins = 0;
   if (uptimeStr.includes('-')) {
-    // format: DAYS-HH:MM:SS
     const [d, hms] = uptimeStr.split('-');
     days = parseInt(d, 10);
     const [h, m] = hms.split(':');
     hours = parseInt(h, 10);
     mins = parseInt(m, 10);
   } else if (uptimeStr.includes(':')) {
-    // format: HH:MM:SS
     const [h, m] = uptimeStr.split(':');
     hours = parseInt(h, 10);
     mins = parseInt(m, 10);
   } else {
-    // uptimeStr is seconds
     const totalSeconds = parseInt(uptimeStr, 10);
     days = Math.floor(totalSeconds / 86400);
     hours = Math.floor((totalSeconds % 86400) / 3600);
     mins = Math.floor((totalSeconds % 3600) / 60);
   }
-  // Convert hours > 24 to days
   if (hours >= 24) {
     days += Math.floor(hours / 24);
     hours = hours % 24;
@@ -131,6 +128,33 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
+function ChromeStatusIcon({ status }) {
+  let color = "grey.400";
+  let text = "Ukendt";
+  if (status === "running") {
+    color = "success.main";
+    text = "Åben";
+  } else if (status === "stopped") {
+    color = "error.main";
+    text = "Lukket";
+  }
+  return (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Box
+        sx={{
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
+          bgcolor: color,
+          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+          border: "1px solid #ddd",
+        }}
+      />
+      <Typography variant="body2" sx={{ fontWeight: 700 }}>{text}</Typography>
+    </Stack>
+  );
+}
+
 function CopyIconButton({ value, disabled, iconSize = 16 }) {
   const [copied, setCopied] = useState(false);
 
@@ -139,9 +163,7 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
       await navigator.clipboard.writeText(value);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch (err) {
-      // Optional: handle error
-    }
+    } catch (err) {}
   };
 
   return (
@@ -171,9 +193,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   const [savingKioskUrl, setSavingKioskUrl] = useState(false);
   const [kioskUrlSaved, setKioskUrlSaved] = useState(false);
 
-  // NYT: State til handlinger og dialoger
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
+
+  // NYT: Live opdatering af chrome_status
+  const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status || "unknown");
 
   const navigate = useNavigate();
 
@@ -181,9 +205,22 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     if (client) {
       if (!localityDirty) setLocality(client.locality || "");
       if (!kioskUrlDirty) setKioskUrl(client.kiosk_url || "");
+      setLiveChromeStatus(client.chrome_status || "unknown");
     }
     // eslint-disable-next-line
   }, [client]);
+
+  // NYT: Poll chrome_status hvert 5 sekund
+  useEffect(() => {
+    if (!client?.id) return;
+    const poller = setInterval(async () => {
+      try {
+        const updated = await getClient(client.id);
+        setLiveChromeStatus(updated.chrome_status || "unknown");
+      } catch {}
+    }, 5000);
+    return () => clearInterval(poller);
+  }, [client?.id]);
 
   const actionBtnStyle = {
     minWidth: 200,
@@ -247,7 +284,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setSavingKioskUrl(false);
   };
 
-  // NYT: Handlinger til knapper
   const handleClientAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
@@ -391,6 +427,15 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     </Typography>
                   )}
                 </Stack>
+
+                {/* NY LINJE: Kiosk browser status, farvet og live */}
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <ChromeReaderModeIcon color="primary" />
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    Kiosk browser status:
+                  </Typography>
+                  <ChromeStatusIcon status={liveChromeStatus} />
+                </Stack>
               </Stack>
             </CardContent>
           </Card>
@@ -482,10 +527,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </Card>
         </Grid>
         <Grid item xs={12}>
-          {/* NYT: TO LINJER MED HANDLINGSKNAPPER */}
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
-              {/* Linje 1 */}
               <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%", mb: 2 }}>
                 <Tooltip title="Start kiosk browser">
                   <span>
@@ -542,7 +585,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   </span>
                 </Tooltip>
               </Stack>
-              {/* Linje 2 */}
               <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
                 <Tooltip title="Genstart klient">
                   <span>
@@ -573,7 +615,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   </span>
                 </Tooltip>
               </Stack>
-              {/* Advarselsdialog for Sluk klient */}
               <Dialog open={shutdownDialogOpen} onClose={() => setShutdownDialogOpen(false)}>
                 <DialogTitle>Bekræft slukning af klient</DialogTitle>
                 <DialogContent>
