@@ -11,7 +11,6 @@ class User(SQLModel, table=True):
 
 class ClientBase(SQLModel):
     name: str
-    unique_id: str
     locality: Optional[str] = None
     wifi_ip_address: Optional[str] = None
     wifi_mac_address: Optional[str] = None
