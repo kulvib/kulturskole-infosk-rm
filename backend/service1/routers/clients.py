@@ -37,6 +37,57 @@ def get_client(id: int, session=Depends(get_session), user=Depends(get_current_a
     )
     return client
 
+@router.get("/clients/{id}/chrome-status")
+def get_chrome_status(
+    id: int,
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return {
+        "client_id": client.id,
+        "chrome_status": getattr(client, "chrome_status", "unknown"),
+        "chrome_last_updated": getattr(client, "chrome_last_updated", None)
+    }
+
+@router.put("/clients/{id}/chrome-status")
+def update_chrome_status(
+    id: int,
+    data: dict = Body(...),  # fx {"chrome_status": "running"}
+    session=Depends(get_session)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    status = data.get("chrome_status")
+    if status not in ["running", "stopped", "unknown"]:
+        raise HTTPException(status_code=400, detail="Invalid chrome_status")
+    client.chrome_status = status
+    client.chrome_last_updated = datetime.utcnow()
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return {"ok": True}
+
+@router.post("/clients/{id}/chrome-control")
+def chrome_control(
+    id: int,
+    data: dict = Body(...),  # fx {"action": "start"} eller {"action": "stop"}
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    action = data.get("action")
+    if action not in ["start", "stop"]:
+        raise HTTPException(status_code=400, detail="Invalid action")
+    # Her skal du sende kommandoen til klient-agenten! (fx via push_client_command)
+    # push_client_command(client.unique_id, f"chrome:{action}")
+    return {"ok": True, "action": action}
+
 @router.post("/clients/", response_model=Client)
 async def create_client(
     client_in: ClientCreate,
@@ -58,6 +109,8 @@ async def create_client(
         kiosk_url=getattr(client_in, "kiosk_url", None),
         ubuntu_version=getattr(client_in, "ubuntu_version", None),
         uptime=getattr(client_in, "uptime", None),
+        chrome_status="unknown",
+        chrome_last_updated=None,
     )
     session.add(client)
     session.commit()
