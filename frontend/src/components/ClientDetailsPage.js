@@ -12,6 +12,10 @@ import {
   Tooltip,
   IconButton,
   useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -32,6 +36,7 @@ import {
   pushKioskUrl,
   clientAction,
   openTerminal,
+  openRemoteDesktop,
   getClientStream,
 } from "../api";
 
@@ -166,7 +171,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   const [savingKioskUrl, setSavingKioskUrl] = useState(false);
   const [kioskUrlSaved, setKioskUrlSaved] = useState(false);
 
+  // NYT: State til handlinger og dialoger
   const [actionLoading, setActionLoading] = useState({});
+  const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
 
   const navigate = useNavigate();
 
@@ -240,6 +247,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setSavingKioskUrl(false);
   };
 
+  // NYT: Handlinger til knapper
   const handleClientAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
@@ -251,9 +259,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   };
 
   const handleOpenTerminal = () => openTerminal(client.id);
-  const handleOpenRemoteDesktop = () => {
-    window.open(`/remote-desktop/${client.id}`, "_blank", "noopener,noreferrer");
-  };
+  const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
   const sectionSpacing = 2;
 
@@ -476,20 +482,36 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </Card>
         </Grid>
         <Grid item xs={12}>
-          <Card elevation={2} sx={{ borderRadius: 2 }}>
+          {/* NYT: TO LINJER MED HANDLINGSKNAPPER */}
+          <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
+              {/* Linje 1 */}
               <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%", mb: 2 }}>
-                <Tooltip title="Luk Chrome Browser på klient">
+                <Tooltip title="Start kiosk browser">
+                  <span>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      startIcon={<ChromeReaderModeIcon />}
+                      disabled={actionLoading["chrome-start"]}
+                      onClick={() => handleClientAction("chrome-start")}
+                      sx={actionBtnStyle}
+                    >
+                      Start kiosk browser
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Luk kiosk browser">
                   <span>
                     <Button
                       variant="outlined"
                       color="secondary"
                       startIcon={<PowerSettingsNewIcon />}
-                      onClick={() => handleClientAction("chrome-shutdown")}
                       disabled={actionLoading["chrome-shutdown"]}
+                      onClick={() => handleClientAction("chrome-shutdown")}
                       sx={actionBtnStyle}
                     >
-                      Luk Chrome Browser
+                      Luk kiosk browser
                     </Button>
                   </span>
                 </Tooltip>
@@ -520,6 +542,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   </span>
                 </Tooltip>
               </Stack>
+              {/* Linje 2 */}
               <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
                 <Tooltip title="Genstart klient">
                   <span>
@@ -527,8 +550,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       variant="contained"
                       color="warning"
                       startIcon={<RestartAltIcon />}
-                      onClick={() => handleClientAction("restart")}
                       disabled={actionLoading["restart"]}
+                      onClick={() => handleClientAction("restart")}
                       sx={actionBtnStyle}
                     >
                       Genstart klient
@@ -541,8 +564,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       variant="contained"
                       color="error"
                       startIcon={<PowerSettingsNewIcon />}
-                      onClick={() => handleClientAction("shutdown")}
                       disabled={actionLoading["shutdown"]}
+                      onClick={() => setShutdownDialogOpen(true)}
                       sx={actionBtnStyle}
                     >
                       Sluk klient
@@ -550,6 +573,32 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   </span>
                 </Tooltip>
               </Stack>
+              {/* Advarselsdialog for Sluk klient */}
+              <Dialog open={shutdownDialogOpen} onClose={() => setShutdownDialogOpen(false)}>
+                <DialogTitle>Bekræft slukning af klient</DialogTitle>
+                <DialogContent>
+                  <Typography>
+                    <strong>Ved dette valg skal klienten startes manuelt lokalt.</strong>
+                    <br />
+                    Er du sikker på, at du vil slukke klienten?
+                  </Typography>
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={() => setShutdownDialogOpen(false)} color="primary">
+                    Annuller
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      setShutdownDialogOpen(false);
+                      await handleClientAction("shutdown");
+                    }}
+                    color="error"
+                    variant="contained"
+                  >
+                    Ja, sluk klienten
+                  </Button>
+                </DialogActions>
+              </Dialog>
             </CardContent>
           </Card>
         </Grid>
