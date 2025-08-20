@@ -106,7 +106,10 @@ def restart_client(
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    # push_client_command(client.id, "restart")
+    client.pending_reboot = True
+    session.add(client)
+    session.commit()
+    session.refresh(client)
     return {"ok": True, "action": "restart"}
 
 @router.post("/clients/{id}/shutdown")
@@ -118,7 +121,10 @@ def shutdown_client(
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    # push_client_command(client.id, "shutdown")
+    client.pending_shutdown = True
+    session.add(client)
+    session.commit()
+    session.refresh(client)
     return {"ok": True, "action": "shutdown"}
 
 @router.post("/clients/", response_model=Client)
@@ -143,6 +149,8 @@ async def create_client(
         uptime=getattr(client_in, "uptime", None),
         chrome_status="unknown",
         chrome_last_updated=None,
+        pending_reboot=False,
+        pending_shutdown=False,
     )
     session.add(client)
     session.commit()
@@ -177,6 +185,10 @@ async def update_client(
         client.lan_ip_address = client_update.lan_ip_address
     if client_update.lan_mac_address is not None:
         client.lan_mac_address = client_update.lan_mac_address
+    if client_update.pending_reboot is not None:
+        client.pending_reboot = client_update.pending_reboot
+    if client_update.pending_shutdown is not None:
+        client.pending_shutdown = client_update.pending_shutdown
 
     session.add(client)
     session.commit()
