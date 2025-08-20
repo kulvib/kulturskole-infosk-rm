@@ -16,6 +16,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Snackbar,
+  Alert as MuiAlert,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -38,10 +40,8 @@ import {
   openTerminal,
   openRemoteDesktop,
   getClientStream,
+  getClient,
 } from "../api";
-
-// Tilføj denne import for live status
-import { getClient } from "../api";
 
 // Dansk tid, robust, inklusive sekunder for "Sidst set"/"Tilføjet"
 function formatDateTime(dateStr, withSeconds = false) {
@@ -199,6 +199,12 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   // NYT: Live opdatering af chrome_status
   const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status || "unknown");
 
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
+  // Global loading overlay
+  const [globalLoading, setGlobalLoading] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -207,7 +213,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
       if (!kioskUrlDirty) setKioskUrl(client.kiosk_url || "");
       setLiveChromeStatus(client.chrome_status || "unknown");
     }
-    // eslint-disable-next-line
+  // eslint-disable-next-line
   }, [client]);
 
   // NYT: Poll chrome_status hvert 5 sekund
@@ -221,6 +227,14 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     }, 5000);
     return () => clearInterval(poller);
   }, [client?.id]);
+
+  const showSnackbar = (message, severity = "success") => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ open: false, message: "", severity: "success" });
+  };
 
   const actionBtnStyle = {
     minWidth: 200,
@@ -256,15 +270,18 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   };
   const handleLocalitySave = async () => {
     setSavingLocality(true);
+    setGlobalLoading(true);
     try {
       await updateClient(client.id, { locality });
       setLocalitySaved(true);
       setLocalityDirty(false);
+      showSnackbar("Lokation gemt!", "success");
       setTimeout(() => setLocalitySaved(false), 3000);
     } catch (err) {
-      alert("Kunne ikke gemme lokation: " + err.message);
+      showSnackbar("Kunne ikke gemme lokation: " + err.message, "error");
     }
     setSavingLocality(false);
+    setGlobalLoading(false);
   };
 
   const handleKioskUrlChange = (e) => {
@@ -273,25 +290,35 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   };
   const handleKioskUrlSave = async () => {
     setSavingKioskUrl(true);
+    setGlobalLoading(true);
     try {
       await pushKioskUrl(client.id, kioskUrl);
       setKioskUrlSaved(true);
       setKioskUrlDirty(false);
+      showSnackbar("Kiosk webadresse opdateret!", "success");
       setTimeout(() => setKioskUrlSaved(false), 3000);
     } catch (err) {
-      alert("Kunne ikke opdatere kiosk webadresse: " + err.message);
+      showSnackbar("Kunne ikke opdatere kiosk webadresse: " + err.message, "error");
     }
     setSavingKioskUrl(false);
+    setGlobalLoading(false);
   };
 
+  // Optimeret: Force-poll status og snackbar ved handling
   const handleClientAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
+    setGlobalLoading(true);
     try {
       await clientAction(client.id, action);
+      showSnackbar("Handlingen blev udført!", "success");
+      // Force-poll status
+      const updated = await getClient(client.id);
+      setLiveChromeStatus(updated.chrome_status || "unknown");
     } catch (err) {
-      alert("Handlingen mislykkedes: " + err.message);
+      showSnackbar("Fejl: " + err.message, "error");
     }
     setActionLoading((prev) => ({ ...prev, [action]: false }));
+    setGlobalLoading(false);
   };
 
   const handleOpenTerminal = () => openTerminal(client.id);
@@ -311,6 +338,24 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 3 }}>
+      {globalLoading && (
+        <Box sx={{
+          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+          bgcolor: "rgba(255,255,255,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+          <CircularProgress size={50} />
+        </Box>
+      )}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3500}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
         <Button
           variant="outlined"
@@ -530,7 +575,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
               <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%", mb: 2 }}>
-                <Tooltip title="Start kiosk browser">
+                <Tooltip title="Start browser (fuldskærm)">
                   <span>
                     <Button
                       variant="outlined"
@@ -540,11 +585,12 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       onClick={() => handleClientAction("chrome-start")}
                       sx={actionBtnStyle}
                     >
-                      Start kiosk browser
+                      {actionLoading["chrome-start"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+                      Start browser (fuldskærm)
                     </Button>
                   </span>
                 </Tooltip>
-                <Tooltip title="Luk kiosk browser">
+                <Tooltip title="Luk browser (fuldskærm)">
                   <span>
                     <Button
                       variant="outlined"
@@ -554,7 +600,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       onClick={() => handleClientAction("chrome-shutdown")}
                       sx={actionBtnStyle}
                     >
-                      Luk kiosk browser
+                      {actionLoading["chrome-shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+                      Luk browser (fuldskærm)
                     </Button>
                   </span>
                 </Tooltip>
@@ -596,6 +643,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       onClick={() => handleClientAction("restart")}
                       sx={actionBtnStyle}
                     >
+                      {actionLoading["restart"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                       Genstart klient
                     </Button>
                   </span>
@@ -610,6 +658,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       onClick={() => setShutdownDialogOpen(true)}
                       sx={actionBtnStyle}
                     >
+                      {actionLoading["shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                       Sluk klient
                     </Button>
                   </span>
