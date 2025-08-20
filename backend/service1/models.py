@@ -29,6 +29,8 @@ class Client(ClientBase, table=True):
     created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, nullable=False)
     chrome_status: Optional[str] = "unknown"  # 'running', 'stopped', 'unknown'
     chrome_last_updated: Optional[datetime] = None
+    pending_reboot: Optional[bool] = False
+    pending_shutdown: Optional[bool] = False
 
 class ClientCreate(ClientBase):
     sort_order: Optional[int] = None
@@ -50,6 +52,8 @@ class ClientUpdate(SQLModel):
     wifi_mac_address: Optional[str] = None
     lan_ip_address: Optional[str] = None
     lan_mac_address: Optional[str] = None
+    pending_reboot: Optional[bool] = None
+    pending_shutdown: Optional[bool] = None
 
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
