@@ -84,8 +84,18 @@ def chrome_control(
     action = data.get("action")
     if action not in ["start", "stop"]:
         raise HTTPException(status_code=400, detail="Invalid action")
-    # push_client_command(client.id, f"chrome:{action}")
-    return {"ok": True, "action": action}
+    # Opdater chrome_status direkte!
+    client.chrome_status = "running" if action == "start" else "stopped"
+    client.chrome_last_updated = datetime.utcnow()
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return {
+        "ok": True,
+        "action": action,
+        "chrome_status": client.chrome_status,
+        "chrome_last_updated": client.chrome_last_updated
+    }
 
 @router.post("/clients/{id}/restart")
 def restart_client(
