@@ -208,8 +208,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
 
+  // Status-felter til hurtig polling
   const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status || "unknown");
   const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color || null);
+  const [lastSeen, setLastSeen] = useState(client?.last_seen || null);
+  const [uptime, setUptime] = useState(client?.uptime || null);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
@@ -217,26 +220,47 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
 
   const navigate = useNavigate();
 
+  // Sæt lokal state fra prop ved client ændring
   useEffect(() => {
     if (client) {
       if (!localityDirty) setLocality(client.locality || "");
       if (!kioskUrlDirty) setKioskUrl(client.kiosk_url || "");
       setLiveChromeStatus(client.chrome_status || "unknown");
       setLiveChromeColor(client.chrome_color || null);
+      setLastSeen(client.last_seen || null);
+      setUptime(client.uptime || null);
     }
     // eslint-disable-next-line
   }, [client]);
 
+  // Poll hele klienten hvert 15. sekund
   useEffect(() => {
     if (!client?.id) return;
-    const poller = setInterval(async () => {
+    const pollerFull = setInterval(async () => {
+      try {
+        const updated = await getClient(client.id);
+        // Her opdaterer vi hele client-objektet
+        // Hvis du ønsker at opdatere alle felter, kan du evt. kalde en prop-funktion, eller lave en setClient-state her.
+        // setClient(updated); // hvis du har setClient
+        // Du kan også opdatere "client" via en callback fra parent, hvis nødvendigt.
+      } catch {}
+    }, 15000); // 15 sekunder
+    return () => clearInterval(pollerFull);
+  }, [client?.id]);
+
+  // Poll status-felter (browser, sidst set, oppetid) hvert sekund
+  useEffect(() => {
+    if (!client?.id) return;
+    const pollerStatus = setInterval(async () => {
       try {
         const updated = await getClient(client.id);
         setLiveChromeStatus(updated.chrome_status || "unknown");
         setLiveChromeColor(updated.chrome_color || null);
+        setLastSeen(updated.last_seen || null);
+        setUptime(updated.uptime || null);
       } catch {}
-    }, 3500);
-    return () => clearInterval(poller);
+    }, 1000); // 1 sekund
+    return () => clearInterval(pollerStatus);
   }, [client?.id]);
 
   const showSnackbar = (message, severity = "success") => {
@@ -320,6 +344,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
       const updated = await getClient(client.id);
       setLiveChromeStatus(updated.chrome_status || "unknown");
       setLiveChromeColor(updated.chrome_color || null);
+      setLastSeen(updated.last_seen || null);
+      setUptime(updated.uptime || null);
     } catch (err) {
       showSnackbar("Fejl: " + err.message, "error");
     }
@@ -499,7 +525,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
                     Oppetid:
                   </Typography>
-                  <Typography variant="body2">{formatUptime(client.uptime)}</Typography>
+                  <Typography variant="body2">{formatUptime(uptime)}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <AccessTimeIcon color="primary" />
@@ -507,7 +533,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     Sidst set:
                   </Typography>
                   <Typography variant="body2">
-                    {formatDateTime(client.last_seen, true)}
+                    {formatDateTime(lastSeen, true)}
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
