@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Alert, Checkbox, TextField
+  Checkbox, TextField, Snackbar, Alert as MuiAlert
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
@@ -57,7 +57,6 @@ function stripTimeFromDateKey(key) {
   return key.split("T")[0];
 }
 
-// Helper for deep comparison of markedDays objects
 function deepEqual(obj1, obj2) {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
@@ -174,7 +173,6 @@ function MonthCalendar({
   while (cells.length % 7 !== 0) cells.push(null);
 
   const handleMouseDown = (e, dateString) => {
-    // SHIFT+VENSTRE klik åbner dialogen (hvis status "on")
     if (e.shiftKey && e.button === 0) {
       e.preventDefault();
       if (
@@ -186,7 +184,6 @@ function MonthCalendar({
         return;
       }
     }
-    // Ellers start drag markering
     setIsDragging(true);
     draggedDates.current = new Set([dateString]);
     if (clientId) {
@@ -292,13 +289,12 @@ export default function CalendarPage() {
   const [loadingDialogDate, setLoadingDialogDate] = useState(null);
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
 
-  // Feedback state for gemt/fejl
-  const [saveStatus, setSaveStatus] = useState({ status: "idle", message: "" });
-  const saveIndicatorTimer = useRef(null);
+  // Snackbar state for feedback
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const snackbarTimer = useRef(null);
 
   const autoSaveTimer = useRef(null);
 
-  // Holder den sidst gemte markedDays fra dialogen
   const lastDialogSavedMarkedDays = useRef({});
   const lastDialogSavedTimestamp = useRef(0);
 
@@ -312,6 +308,7 @@ export default function CalendarPage() {
       setClients(approvedClients);
     } catch {
       setClients([]);
+      setSnackbar({ open: true, message: "Kunne ikke hente klienter.", severity: "error" });
     }
     setLoadingClients(false);
   }, [token]);
@@ -344,18 +341,17 @@ export default function CalendarPage() {
             ...prev,
             [activeClient]: {}
           }));
+          setSnackbar({ open: true, message: "Kunne ikke hente kalender.", severity: "error" });
         }
       });
     return () => { isCurrent = false; };
   }, [selectedSeason, activeClient, token]);
 
-  // AUTOSAVE: Kun for aktiv klient!
   useEffect(() => {
-    if (editDialogOpen) return; // Stop autosave mens dialogen er åben
+    if (editDialogOpen) return;
     if (!activeClient) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
-    // Gem kun hvis der ER ændringer siden sidst dialog-gem for den aktive klient
     const changedSinceDialog =
       !deepEqual(
         markedDays[activeClient],
@@ -364,16 +360,14 @@ export default function CalendarPage() {
     if (!changedSinceDialog) return;
 
     autoSaveTimer.current = setTimeout(() => {
-      handleSaveSingleClient(activeClient); // autosave: kun for aktiv klient
+      handleSaveSingleClient(activeClient);
     }, 1000);
 
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-    // eslint-disable-next-line
   }, [markedDays[activeClient], activeClient, editDialogOpen]);
 
-  // Gem kun for én klient (autosave)
   const handleSaveSingleClient = async (clientId) => {
     if (!clientId) return;
     const allDates = [];
@@ -411,14 +405,13 @@ export default function CalendarPage() {
 
     try {
       await saveMarkedDays(payload);
-      // Opdater sidst gemte
       lastDialogSavedMarkedDays.current = {
         ...lastDialogSavedMarkedDays.current,
         [clientId]: markedDays[clientId]
       };
       lastDialogSavedTimestamp.current = Date.now();
     } catch (e) {
-      setSaveStatus({ status: "error", message: e.message || "Kunne ikke autosave!" });
+      setSnackbar({ open: true, message: e.message || "Kunne ikke autosave!", severity: "error" });
     }
   };
 
@@ -429,7 +422,6 @@ export default function CalendarPage() {
     }
   };
 
-  // Brugeren kan kun markere med den valgte farve; ingen neutrale felter!
   const handleDayClick = (clientIds, dateString, mode, markedDays) => {
     setMarkedDays(prev => {
       const updated = { ...prev };
@@ -440,7 +432,6 @@ export default function CalendarPage() {
     });
   };
 
-  // SHIFT+VENSTRE klik handler med 1,1 sek forsinkelse og loader!
   const handleDateShiftLeftClick = (clientId, date) => {
     if (autoSaveTimer.current) {
       clearTimeout(autoSaveTimer.current);
@@ -458,7 +449,6 @@ export default function CalendarPage() {
     }, 1100);
   };
 
-  // Opdater localMarkedDays for dialogen efter gem
   const handleSaveDateTime = async ({ date, clientId }) => {
     try {
       const data = await getMarkedDays(selectedSeason, clientId);
@@ -478,28 +468,22 @@ export default function CalendarPage() {
       };
       lastDialogSavedTimestamp.current = Date.now();
 
-      setSaveStatus({ status: "success", message: "Gemt" });
-      if (saveIndicatorTimer.current) clearTimeout(saveIndicatorTimer.current);
-      saveIndicatorTimer.current = setTimeout(() => {
-        setSaveStatus({ status: "idle", message: "" });
-      }, 2000);
+      setSnackbar({ open: true, message: "Gemt!", severity: "success" });
     } catch {
-      setSaveStatus({ status: "error", message: "Kunne ikke hente nyeste tider" });
+      setSnackbar({ open: true, message: "Kunne ikke hente nyeste tider", severity: "error" });
     }
   };
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
-  // GEM FOR ALLE KLIENTER: De andre klienter får data fra activeClient!
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
-      if (showSuccessFeedback) setSaveStatus({ status: "idle", message: "" });
       if (selectedClients.length === 0) {
-        setSaveStatus({ status: "error", message: "Ingen klienter valgt" });
+        setSnackbar({ open: true, message: "Ingen klienter valgt", severity: "error" });
         return;
       }
       if (!activeClient) {
-        setSaveStatus({ status: "error", message: "Ingen aktiv klient valgt" });
+        setSnackbar({ open: true, message: "Ingen aktiv klient valgt", severity: "error" });
         return;
       }
 
@@ -514,7 +498,6 @@ export default function CalendarPage() {
       const payloadMarkedDays = {};
       selectedClients.forEach(cid => {
         const clientKey = String(cid);
-        // Kopier markedDays fra activeClient hvis ikke aktiv
         const sourceMarkedDays = markedDays[activeClient] || {};
         payloadMarkedDays[clientKey] = {};
         allDates.forEach(dateStr => {
@@ -544,11 +527,7 @@ export default function CalendarPage() {
       try {
         await saveMarkedDays(payload);
         if (showSuccessFeedback) {
-          setSaveStatus({ status: "success", message: "Gemt" });
-          if (saveIndicatorTimer.current) clearTimeout(saveIndicatorTimer.current);
-          saveIndicatorTimer.current = setTimeout(() => {
-            setSaveStatus({ status: "idle", message: "" });
-          }, 2000);
+          setSnackbar({ open: true, message: "Gemt!", severity: "success" });
         }
         if (activeClient) {
           try {
@@ -570,14 +549,14 @@ export default function CalendarPage() {
           }
         }
       } catch (e) {
-        setSaveStatus({ status: "error", message: e.message || "Kunne ikke gemme!" });
+        setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
       }
     }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]
   );
 
   useEffect(() => {
     return () => {
-      if (saveIndicatorTimer.current) clearTimeout(saveIndicatorTimer.current);
+      if (snackbarTimer.current) clearTimeout(snackbarTimer.current);
     };
   }, []);
 
@@ -595,8 +574,22 @@ export default function CalendarPage() {
         .join(", ")
     : "";
 
+  const handleCloseSnackbar = () => {
+    setSnackbar({ open: false, message: "", severity: "success" });
+  };
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={2000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
       <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c" }}>
@@ -684,24 +677,7 @@ export default function CalendarPage() {
         </Button>
         <Box sx={{ flexGrow: 1 }} />
         <Box sx={{ display: "flex", alignItems: "center", mr: 2, minWidth: 55 }}>
-          {saveStatus.status === "success" && (
-            <Typography
-              sx={{
-                color: "#388e3c",
-                fontWeight: 600,
-                fontSize: "1rem",
-                transition: "opacity 0.3s",
-                opacity: 1
-              }}
-            >
-              Gemt
-            </Typography>
-          )}
-          {saveStatus.status === "error" && (
-            <Alert severity="error" sx={{ mr: 1, py: 0.5, px: 2, fontSize: 14 }}>
-              {saveStatus.message}
-            </Alert>
-          )}
+          {/* Ingen renderede beskeder her! */}
         </Box>
         <Button
           variant="contained"
