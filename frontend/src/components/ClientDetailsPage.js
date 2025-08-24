@@ -128,16 +128,32 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
+// NY VERSION: ChromeStatusIcon matcher backend
 function ChromeStatusIcon({ status }) {
   let color = "grey.400";
-  let text = "Ukendt";
-  if (status === "running") {
-    color = "success.main";
-    text = "Åben";
-  } else if (status === "stopped") {
-    color = "error.main";
-    text = "Lukket";
+  let text = status || "Ukendt";
+
+  // Map relevante statusværdier til farve og tekst
+  if (typeof status === "string") {
+    const s = status.toLowerCase();
+    if (s === "running") {
+      color = "success.main";
+      text = "Åben";
+    } else if (s === "stopped" || s === "closed") {
+      color = "error.main";
+      text = "Lukket";
+    } else if (s === "unknown") {
+      color = "grey.400";
+      text = "Ukendt";
+    } else if (s.includes("kører")) {
+      color = "success.main";
+      text = status;
+    } else if (s.includes("lukket")) {
+      color = "error.main";
+      text = status;
+    }
   }
+
   return (
     <Stack direction="row" spacing={1} alignItems="center">
       <Box
