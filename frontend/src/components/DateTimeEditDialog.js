@@ -9,7 +9,8 @@ import {
   Typography,
   CircularProgress,
   Box,
-  Alert
+  Snackbar,
+  Alert as MuiAlert,
 } from "@mui/material";
 
 const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
@@ -17,7 +18,6 @@ function getToken() {
   return localStorage.getItem("token");
 }
 
-// Dansk navne for ugedage og måneder
 const WEEKDAYS = [
   "søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"
 ];
@@ -26,7 +26,6 @@ const MONTHS = [
   "juli", "august", "september", "oktober", "november", "december"
 ];
 
-// Formatter dato til "lørdag d. 2.august 2025"
 function formatFullDate(dateStr) {
   if (!dateStr) return "";
   const [yyyy, mm, dd] = dateStr.split("T")[0].split("-");
@@ -50,7 +49,9 @@ export default function DateTimeEditDialog({
   const [offTime, setOffTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState(""); // "success" | "error" | ""
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const closeTimer = useRef(null);
 
   function findDayObj(markedDays, normDate) {
@@ -62,7 +63,6 @@ export default function DateTimeEditDialog({
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
-    setStatus("");
     setOnTime(""); setOffTime("");
     const token = getToken();
     const normDate = date.split("T")[0];
@@ -77,31 +77,25 @@ export default function DateTimeEditDialog({
         setOffTime(dayObj.offTime || "");
       })
       .catch(() => {
-        setStatus("error");
+        setSnackbar({ open: true, message: "Fejl ved hentning!", severity: "error" });
       })
       .finally(() => setLoading(false));
   }, [open, date, clientId]);
 
   useEffect(() => {
-    if (status === "success") {
-      closeTimer.current = setTimeout(() => {
-        setStatus("");
-        if (onClose) onClose();
-      }, 1000);
-    }
     return () => {
       if (closeTimer.current) clearTimeout(closeTimer.current);
     };
-  }, [status, onClose]);
+  }, []);
 
   const validate = () => {
     if (!onTime || !offTime) {
-      setStatus("error");
+      setSnackbar({ open: true, message: "Begge tider skal udfyldes!", severity: "error" });
       return false;
     }
     const timeRegex = /^\d{2}:\d{2}$/;
     if (!timeRegex.test(onTime) || !timeRegex.test(offTime)) {
-      setStatus("error");
+      setSnackbar({ open: true, message: "Tid skal være på formatet hh:mm!", severity: "error" });
       return false;
     }
     return true;
@@ -110,7 +104,6 @@ export default function DateTimeEditDialog({
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
-    setStatus("");
     try {
       const normDate = date.split("T")[0];
       const season = normDate.substring(0, 4);
@@ -156,9 +149,10 @@ export default function DateTimeEditDialog({
         }
       );
       if (!res.ok) throw new Error();
-      setStatus("success");
+      setSnackbar({ open: true, message: "Gemt!", severity: "success" });
       if (onSaved) onSaved({ date: normDate, clientId });
 
+      // Opdater input felter med evt. backend rettelser:
       const resGet2 = await fetch(
         `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
         token ? { headers: { Authorization: "Bearer " + token } } : undefined
@@ -169,8 +163,15 @@ export default function DateTimeEditDialog({
         setOnTime(dayObj2.onTime || "");
         setOffTime(dayObj2.offTime || "");
       }
+
+      // Luk dialogen automatisk efter success
+      closeTimer.current = setTimeout(() => {
+        setSnackbar({ open: false, message: "", severity: "success" });
+        if (onClose) onClose();
+      }, 1200);
+
     } catch {
-      setStatus("error");
+      setSnackbar({ open: true, message: "Fejl ved gemning!", severity: "error" });
     }
     setSaving(false);
   };
@@ -178,10 +179,9 @@ export default function DateTimeEditDialog({
   return (
     <Dialog
       open={open}
-      onClose={status === "error" ? onClose : undefined}
+      onClose={onClose}
       maxWidth="xs"
       fullWidth
-      // ingen sx eller PaperProps med position!
     >
       <DialogTitle sx={{ pb: 0 }}>
         <Box sx={{ display: "flex", alignItems: "center", position: "relative" }}>
@@ -253,32 +253,16 @@ export default function DateTimeEditDialog({
           {saving ? <CircularProgress size={20} /> : "Gem"}
         </Button>
       </DialogActions>
-      <Box
-        sx={{
-          position: "absolute",
-          left: 16,
-          bottom: 8,
-          zIndex: 2,
-          minWidth: 180,
-          pointerEvents: "none"
-        }}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={1800}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        {status === "error" && (
-          <Alert severity="error" sx={{ mb: 1, py: 0.5, px: 2, fontSize: "1rem" }}>
-            Fejl ved gemning eller hentning!
-          </Alert>
-        )}
-        {status === "success" && (
-          <Typography sx={{ color: "#388e3c", fontWeight: "normal", fontSize: "1rem", mb: 1 }}>
-            Gemt
-          </Typography>
-        )}
-        {saving && (
-          <Typography sx={{ color: "#1976d2", fontWeight: "normal", fontSize: "1rem", mb: 1 }}>
-            Gemmer...
-          </Typography>
-        )}
-      </Box>
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
     </Dialog>
   );
 }
