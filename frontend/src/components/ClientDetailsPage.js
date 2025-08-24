@@ -43,7 +43,6 @@ import {
   getClient,
 } from "../api";
 
-// Dansk tid, robust, inklusive sekunder for "Sidst set"/"Tilføjet"
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
@@ -128,20 +127,18 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
-// NY VERSION: ChromeStatusIcon viser backend-farve hvis den findes
 function ChromeStatusIcon({ status, color }) {
   let fallbackColor = "grey.400";
   let text = status || "Ukendt";
-  // Brug farven fra backend hvis angivet, ellers logik/fallback
   let dotColor = color || fallbackColor;
 
   if (!color && typeof status === "string") {
     const s = status.toLowerCase();
     if (s === "running") {
-      dotColor = "#43a047"; // grøn
+      dotColor = "#43a047";
       text = "Åben";
     } else if (s === "stopped" || s === "closed") {
-      dotColor = "#e53935"; // rød
+      dotColor = "#e53935";
       text = "Lukket";
     } else if (s === "unknown") {
       dotColor = "grey.400";
@@ -213,14 +210,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
 
-  // NYT: Live opdatering af chrome_status og chrome_color!
   const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status || "unknown");
   const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color || null);
 
-  // Snackbar state
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  // Global loading overlay
   const [globalLoading, setGlobalLoading] = useState(false);
 
   const navigate = useNavigate();
@@ -235,7 +229,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     // eslint-disable-next-line
   }, [client]);
 
-  // NYT: Poll chrome_status og chrome_color hvert 5 sekund
   useEffect(() => {
     if (!client?.id) return;
     const poller = setInterval(async () => {
@@ -324,14 +317,12 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setGlobalLoading(false);
   };
 
-  // Optimeret: Force-poll status og snackbar ved handling
   const handleClientAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     setGlobalLoading(true);
     try {
       await clientAction(client.id, action);
       showSnackbar("Handlingen blev udført!", "success");
-      // Force-poll status
       const updated = await getClient(client.id);
       setLiveChromeStatus(updated.chrome_status || "unknown");
       setLiveChromeColor(updated.chrome_color || null);
@@ -436,6 +427,18 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     {client.id}
                   </Typography>
                 </Stack>
+                {/* NYT: Vis status direkte fra backend */}
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                    Status:
+                  </Typography>
+                  <Typography 
+                    variant="body2"
+                    sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem" }}
+                  >
+                    {client.status || "ukendt"}
+                  </Typography>
+                </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOnIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 90 }}>
@@ -493,8 +496,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     </Typography>
                   )}
                 </Stack>
-
-                {/* NU: Kiosk browser status - farve og tekst fra backend */}
+                {/* Kiosk browser status - farve og tekst fra backend */}
                 <Stack direction="row" spacing={2} alignItems="center">
                   <ChromeReaderModeIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
