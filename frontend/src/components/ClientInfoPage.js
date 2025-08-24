@@ -141,9 +141,10 @@ export default function ClientInfoPage() {
     setSnackbar({ open: false, message: "", severity: "success" });
   };
 
-  // Hent klienter fra API, men kun opdatér hvis der er ændringer
-  const fetchClients = async (forceUpdate = false) => {
-    setLoading(true);
+  // Hent klienter fra API, kun opdatér hvis der er ændringer
+  // Brug showLoading=true for første load og manuel refresh, false for polling
+  const fetchClients = async (forceUpdate = false, showLoading = false) => {
+    if (showLoading) setLoading(true);
     try {
       const data = await getClients(token);
       if (forceUpdate || !isClientListEqual(data, lastFetchedClients.current)) {
@@ -153,15 +154,15 @@ export default function ClientInfoPage() {
     } catch (err) {
       showSnackbar("Fejl: " + err.message, "error");
     }
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
-  // Polling: hent data hvert 5. sekund, men kun opdatér hvis ændringer
+  // Første load med overlay, derefter polling uden overlay
   useEffect(() => {
-    fetchClients();
+    fetchClients(false, true); // Første load med overlay!
     let timer = setInterval(() => {
-      fetchClients(false);
-    }, 5000); // <-- 5 sekunder
+      fetchClients(false, false); // Polling uden overlay!
+    }, 5000); // 5 sekunder
     return () => clearInterval(timer);
   }, [token]);
 
@@ -192,7 +193,7 @@ export default function ClientInfoPage() {
     try {
       await removeClient(clientId, token);
       showSnackbar("Klient fjernet!", "success");
-      fetchClients(true); // force update
+      fetchClients(true, true); // force update med overlay
     } catch (err) {
       showSnackbar("Kunne ikke fjerne klient: " + err.message, "error");
     }
@@ -210,7 +211,7 @@ export default function ClientInfoPage() {
         await updateClient(reordered[i].id, { sort_order: i + 1 }, token);
       }
       showSnackbar("Sortering opdateret!", "success");
-      fetchClients(true); // force update
+      fetchClients(true, true); // force update med overlay
     } catch (err) {
       showSnackbar("Kunne ikke opdatere sortering: " + err.message, "error");
     }
@@ -218,7 +219,7 @@ export default function ClientInfoPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchClients(true); // force update
+    await fetchClients(true, true); // force update med overlay
     setRefreshing(false);
   };
 
@@ -226,7 +227,7 @@ export default function ClientInfoPage() {
     try {
       await approveClient(clientId, token);
       showSnackbar("Klient godkendt!", "success");
-      fetchClients(true); // force update
+      fetchClients(true, true); // force update med overlay
     } catch (err) {
       showSnackbar("Kunne ikke godkende klient: " + err.message, "error");
     }
