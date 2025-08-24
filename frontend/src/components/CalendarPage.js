@@ -596,6 +596,40 @@ export default function CalendarPage() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
+      {/* Sæson-feltet lige over Godkendte klienter */}
+      <Box sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "flex-start",
+        mb: 2,
+        p: 2,
+        bgcolor: "#f7fafd",
+        borderRadius: 2,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.04)"
+      }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
+          Vælg Sæson:
+        </Typography>
+        <select
+          value={selectedSeason}
+          onChange={e => setSelectedSeason(Number(e.target.value))}
+          style={{
+            minWidth: 120,
+            fontWeight: 700,
+            background: "#fff",
+            fontSize: "1rem",
+            padding: "6px 14px",
+            borderRadius: "7px",
+            border: "1px solid #dbeafe"
+          }}
+        >
+          {seasons.map(season => (
+            <option key={season.value} value={season.value}>
+              {season.label}
+            </option>
+          ))}
+        </select>
+      </Box>
       <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column", minHeight: 260 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
           Godkendte klienter
