@@ -189,7 +189,9 @@ async def update_client(
         client.pending_reboot = client_update.pending_reboot
     if client_update.pending_shutdown is not None:
         client.pending_shutdown = client_update.pending_shutdown
-
+    if client_update.chrome_status is not None:                 # <-- Tilføjet!
+        client.chrome_status = client_update.chrome_status
+        client.chrome_last_updated = datetime.utcnow()
     session.add(client)
     session.commit()
     session.refresh(client)
