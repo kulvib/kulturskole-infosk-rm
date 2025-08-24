@@ -39,7 +39,6 @@ import {
   clientAction,
   openTerminal,
   openRemoteDesktop,
-  getClientStream,
   getClient,
 } from "../api";
 
@@ -208,19 +207,16 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
 
-  // Status-felter til hurtig polling
   const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status || "unknown");
   const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color || null);
   const [lastSeen, setLastSeen] = useState(client?.last_seen || null);
   const [uptime, setUptime] = useState(client?.uptime || null);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-
   const [globalLoading, setGlobalLoading] = useState(false);
 
   const navigate = useNavigate();
 
-  // Sæt lokal state fra prop ved client ændring
   useEffect(() => {
     if (client) {
       if (!localityDirty) setLocality(client.locality || "");
@@ -232,21 +228,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     }
     // eslint-disable-next-line
   }, [client]);
-
-  // Poll hele klienten hvert 15. sekund
-  useEffect(() => {
-    if (!client?.id) return;
-    const pollerFull = setInterval(async () => {
-      try {
-        const updated = await getClient(client.id);
-        // Her opdaterer vi hele client-objektet
-        // Hvis du ønsker at opdatere alle felter, kan du evt. kalde en prop-funktion, eller lave en setClient-state her.
-        // setClient(updated); // hvis du har setClient
-        // Du kan også opdatere "client" via en callback fra parent, hvis nødvendigt.
-      } catch {}
-    }, 15000); // 15 sekunder
-    return () => clearInterval(pollerFull);
-  }, [client?.id]);
 
   // Poll status-felter (browser, sidst set, oppetid) hvert sekund
   useEffect(() => {
