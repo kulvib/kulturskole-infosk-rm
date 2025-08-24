@@ -156,14 +156,13 @@ export default function ClientInfoPage() {
     setLoading(false);
   };
 
-  // Polling: hent data hvert 30. sekund, men kun opdatér hvis ændringer
+  // Polling: hent data hvert 5. sekund, men kun opdatér hvis ændringer
   useEffect(() => {
     fetchClients();
     let timer = setInterval(() => {
       fetchClients(false);
-    }, 30000);
+    }, 5000); // <-- 5 sekunder
     return () => clearInterval(timer);
-    // eslint-disable-next-line
   }, [token]);
 
   useEffect(() => {
@@ -233,40 +232,6 @@ export default function ClientInfoPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          minHeight: "60vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "transparent",
-        }}
-      >
-        <Paper
-          elevation={5}
-          sx={{
-            p: 4,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            minWidth: 320,
-            borderRadius: 3,
-          }}
-        >
-          <CircularProgress color="primary" size={48} sx={{ mb: 2 }} />
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-            Vent venligst
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 0 }}>
-            Henter klientdata...
-          </Typography>
-        </Paper>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
       <Snackbar
@@ -303,7 +268,18 @@ export default function ClientInfoPage() {
         </Tooltip>
       </Stack>
       <Paper sx={{ mb: 4 }}>
-        <TableContainer>
+        <TableContainer style={{ position: "relative" }}>
+          {/* Spinner overlay for loading */}
+          {loading && (
+            <Box sx={{
+              position: "absolute",
+              left: 0, top: 0, right: 0, bottom: 0,
+              background: "rgba(255,255,255,0.7)",
+              display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10
+            }}>
+              <CircularProgress />
+            </Box>
+          )}
           <DragDropContext onDragEnd={onDragEnd}>
             <Droppable droppableId="clients-droppable">
               {(provided) => (
