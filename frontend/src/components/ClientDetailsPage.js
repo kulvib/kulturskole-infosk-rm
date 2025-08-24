@@ -229,7 +229,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     // eslint-disable-next-line
   }, [client]);
 
-  // Poll status-felter (browser, sidst set, oppetid) hvert sekund
+  // Poll status-felter (browser, sidst set, oppetid) hvert 4,13 sekund
   useEffect(() => {
     if (!client?.id) return;
     const pollerStatus = setInterval(async () => {
@@ -240,7 +240,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
         setLastSeen(updated.last_seen || null);
         setUptime(updated.uptime || null);
       } catch {}
-    }, 1000); // 1 sekund
+    }, 4130); // 4,13 sekunder
     return () => clearInterval(pollerStatus);
   }, [client?.id]);
 
