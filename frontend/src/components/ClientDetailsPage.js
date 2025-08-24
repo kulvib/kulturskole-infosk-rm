@@ -200,12 +200,10 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
   const [savingLocality, setSavingLocality] = useState(false);
-  const [localitySaved, setLocalitySaved] = useState(false);
 
   const [kioskUrl, setKioskUrl] = useState("");
   const [kioskUrlDirty, setKioskUrlDirty] = useState(false);
   const [savingKioskUrl, setSavingKioskUrl] = useState(false);
-  const [kioskUrlSaved, setKioskUrlSaved] = useState(false);
 
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
@@ -286,10 +284,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setGlobalLoading(true);
     try {
       await updateClient(client.id, { locality });
-      setLocalitySaved(true);
       setLocalityDirty(false);
       showSnackbar("Lokation gemt!", "success");
-      setTimeout(() => setLocalitySaved(false), 3000);
     } catch (err) {
       showSnackbar("Kunne ikke gemme lokation: " + err.message, "error");
     }
@@ -306,10 +302,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setGlobalLoading(true);
     try {
       await pushKioskUrl(client.id, kioskUrl);
-      setKioskUrlSaved(true);
       setKioskUrlDirty(false);
       showSnackbar("Kiosk webadresse opdateret!", "success");
-      setTimeout(() => setKioskUrlSaved(false), 3000);
     } catch (err) {
       showSnackbar("Kunne ikke opdatere kiosk webadresse: " + err.message, "error");
     }
@@ -321,7 +315,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     setGlobalLoading(true);
     try {
-      await clientAction(client.id, action); // api.js: chrome-start/shutdown bruger nu /chrome-command
+      await clientAction(client.id, action);
       showSnackbar("Handlingen blev udført!", "success");
       const updated = await getClient(client.id);
       setLiveChromeStatus(updated.chrome_status || "unknown");
@@ -427,7 +421,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     {client.id}
                   </Typography>
                 </Stack>
-                {/* STATUS-RÆKKEN FJERNET */}
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOnIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 90 }}>
@@ -450,11 +443,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   >
                     {savingLocality ? <CircularProgress size={16} /> : "Gem"}
                   </Button>
-                  {localitySaved && (
-                    <Typography variant="body2" color="success.main" sx={{ ml: 2 }}>
-                      Gemt
-                    </Typography>
-                  )}
                 </Stack>
                 <Stack direction="row" spacing={2} alignItems="center">
                   <ChromeReaderModeIcon color="primary" />
@@ -479,11 +467,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   >
                     {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
                   </Button>
-                  {kioskUrlSaved && (
-                    <Typography variant="body2" color="success.main" sx={{ ml: 2 }}>
-                      Gemt
-                    </Typography>
-                  )}
                 </Stack>
                 {/* Kiosk browser status - farve og tekst fra backend */}
                 <Stack direction="row" spacing={2} alignItems="center">
@@ -587,7 +570,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
               <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%", mb: 2 }}>
-                <Tooltip title="Start browser (fuldskærm)">
+                <Tooltip title="Start kiosk browser">
                   <span>
                     <Button
                       variant="outlined"
@@ -598,11 +581,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       sx={actionBtnStyle}
                     >
                       {actionLoading["chrome-start"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
-                      Start browser (fuldskærm)
+                      Start kiosk browser
                     </Button>
                   </span>
                 </Tooltip>
-                <Tooltip title="Luk browser (fuldskærm)">
+                <Tooltip title="Luk kiosk browser">
                   <span>
                     <Button
                       variant="outlined"
@@ -613,7 +596,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       sx={actionBtnStyle}
                     >
                       {actionLoading["chrome-shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
-                      Luk browser (fuldskærm)
+                      Luk kiosk browser
                     </Button>
                   </span>
                 </Tooltip>
