@@ -213,7 +213,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   const [uptime, setUptime] = useState(client?.uptime || null);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const [globalLoading, setGlobalLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -286,7 +285,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   };
   const handleLocalitySave = async () => {
     setSavingLocality(true);
-    setGlobalLoading(true);
     try {
       await updateClient(client.id, { locality });
       setLocalityDirty(false);
@@ -295,7 +293,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
       showSnackbar("Kunne ikke gemme lokation: " + err.message, "error");
     }
     setSavingLocality(false);
-    setGlobalLoading(false);
   };
 
   const handleKioskUrlChange = (e) => {
@@ -304,7 +301,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   };
   const handleKioskUrlSave = async () => {
     setSavingKioskUrl(true);
-    setGlobalLoading(true);
     try {
       await pushKioskUrl(client.id, kioskUrl);
       setKioskUrlDirty(false);
@@ -313,12 +309,10 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
       showSnackbar("Kunne ikke opdatere kiosk webadresse: " + err.message, "error");
     }
     setSavingKioskUrl(false);
-    setGlobalLoading(false);
   };
 
   const handleClientAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
-    setGlobalLoading(true);
     try {
       await clientAction(client.id, action);
       showSnackbar("Handlingen blev udført!", "success");
@@ -331,7 +325,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
       showSnackbar("Fejl: " + err.message, "error");
     }
     setActionLoading((prev) => ({ ...prev, [action]: false }));
-    setGlobalLoading(false);
   };
 
   const handleOpenTerminal = () => openTerminal(client.id);
@@ -351,14 +344,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
 
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 3 }}>
-      {globalLoading && (
-        <Box sx={{
-          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-          bgcolor: "rgba(255,255,255,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center"
-        }}>
-          <CircularProgress size={50} />
-        </Box>
-      )}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3500}
