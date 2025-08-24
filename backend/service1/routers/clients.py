@@ -49,22 +49,25 @@ def get_chrome_status(
     return {
         "client_id": client.id,
         "chrome_status": getattr(client, "chrome_status", "unknown"),
-        "chrome_last_updated": getattr(client, "chrome_last_updated", None)
+        "chrome_last_updated": getattr(client, "chrome_last_updated", None),
+        "chrome_color": getattr(client, "chrome_color", None)  # <-- NYT FELT
     }
 
 @router.put("/clients/{id}/chrome-status")
 def update_chrome_status(
     id: int,
-    data: dict = Body(...),  # fx {"chrome_status": "running"}, {"chrome_status": "closed"}, {"chrome_status": "fejl"}, osv.
+    data: dict = Body(...),  # fx {"chrome_status": "running", "chrome_color": "#fbc02d"}
     session=Depends(get_session)
 ):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     status = data.get("chrome_status")
-    # Ændret: Accepterer og gemmer ALLE værdier!
+    color = data.get("chrome_color")  # <-- NYT FELT
     client.chrome_status = status
     client.chrome_last_updated = datetime.utcnow()
+    if color is not None:
+        client.chrome_color = color
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -83,7 +86,6 @@ def chrome_control(
     action = data.get("action")
     if action not in ["start", "stop"]:
         raise HTTPException(status_code=400, detail="Invalid action")
-    # Opdater chrome_status direkte!
     client.chrome_status = "running" if action == "start" else "stopped"
     client.chrome_last_updated = datetime.utcnow()
     session.add(client)
@@ -146,8 +148,9 @@ async def create_client(
         kiosk_url=getattr(client_in, "kiosk_url", None),
         ubuntu_version=getattr(client_in, "ubuntu_version", None),
         uptime=getattr(client_in, "uptime", None),
-        chrome_status="unknown",
+        chrome_status=getattr(client_in, "chrome_status", "unknown"),
         chrome_last_updated=None,
+        chrome_color=getattr(client_in, "chrome_color", None),  # <-- NYT FELT
         pending_reboot=False,
         pending_shutdown=False,
     )
@@ -188,9 +191,11 @@ async def update_client(
         client.pending_reboot = client_update.pending_reboot
     if client_update.pending_shutdown is not None:
         client.pending_shutdown = client_update.pending_shutdown
-    if client_update.chrome_status is not None:                 # <-- Uændret, accepterer enhver værdi!
+    if client_update.chrome_status is not None:
         client.chrome_status = client_update.chrome_status
         client.chrome_last_updated = datetime.utcnow()
+    if getattr(client_update, "chrome_color", None) is not None:   # <-- NYT FELT
+        client.chrome_color = client_update.chrome_color
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -228,7 +233,6 @@ def client_action(
     action = data.get("action")
     if not action:
         raise HTTPException(status_code=400, detail="Missing action")
-    # push_client_command(client.id, action)
     return {"ok": True, "action": action}
 
 @router.post("/clients/{id}/approve", response_model=Client)
