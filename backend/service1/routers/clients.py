@@ -55,15 +55,14 @@ def get_chrome_status(
 @router.put("/clients/{id}/chrome-status")
 def update_chrome_status(
     id: int,
-    data: dict = Body(...),  # fx {"chrome_status": "running"}
+    data: dict = Body(...),  # fx {"chrome_status": "running"}, {"chrome_status": "closed"}, {"chrome_status": "fejl"}, osv.
     session=Depends(get_session)
 ):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     status = data.get("chrome_status")
-    if status not in ["running", "stopped", "unknown"]:
-        raise HTTPException(status_code=400, detail="Invalid chrome_status")
+    # Ændret: Accepterer og gemmer ALLE værdier!
     client.chrome_status = status
     client.chrome_last_updated = datetime.utcnow()
     session.add(client)
@@ -189,7 +188,7 @@ async def update_client(
         client.pending_reboot = client_update.pending_reboot
     if client_update.pending_shutdown is not None:
         client.pending_shutdown = client_update.pending_shutdown
-    if client_update.chrome_status is not None:                 # <-- Tilføjet!
+    if client_update.chrome_status is not None:                 # <-- Uændret, accepterer enhver værdi!
         client.chrome_status = client_update.chrome_status
         client.chrome_last_updated = datetime.utcnow()
     session.add(client)
