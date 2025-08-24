@@ -147,10 +147,10 @@ export async function clientAction(id, action) {
   } else if (action === "shutdown") {
     url = `${apiUrl}/api/clients/${id}/shutdown`;
   } else if (action === "chrome-shutdown") {
-    url = `${apiUrl}/api/clients/${id}/chrome-control`;
+    url = `${apiUrl}/api/clients/${id}/chrome-command`;
     body = JSON.stringify({ action: "stop" });
   } else if (action === "chrome-start") {
-    url = `${apiUrl}/api/clients/${id}/chrome-control`;
+    url = `${apiUrl}/api/clients/${id}/chrome-command`;
     body = JSON.stringify({ action: "start" });
   } else {
     url = `${apiUrl}/api/clients/${id}/action`;
