@@ -45,7 +45,7 @@ function formatDate(year, month, day) {
 
 function getDefaultTimes(dateStr) {
   const date = new Date(dateStr);
-  const day = date.getDay(); // 0=søndag, 6=lørdag
+  const day = date.getDay();
   if (day === 0 || day === 6) {
     return { onTime: "08:00", offTime: "18:00" };
   } else {
@@ -288,11 +288,8 @@ export default function CalendarPage() {
   const [editDialogClient, setEditDialogClient] = useState(null);
   const [loadingDialogDate, setLoadingDialogDate] = useState(null);
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
+  const [savingCalendar, setSavingCalendar] = useState(false); // NY state
 
-  // NY STATE TIL GEM-SPINNER
-  const [savingCalendar, setSavingCalendar] = useState(false);
-
-  // Snackbar state for feedback
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const snackbarTimer = useRef(null);
 
@@ -479,11 +476,10 @@ export default function CalendarPage() {
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
-  // Ændret handleSave med spinner
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
-      if (selectedClients.length === 0) {
-        setSnackbar({ open: true, message: "Ingen klienter valgt", severity: "error" });
+      if (selectedClients.length < 2) {
+        setSnackbar({ open: true, message: "Vælg mindst to klienter", severity: "error" });
         return;
       }
       if (!activeClient) {
@@ -491,7 +487,7 @@ export default function CalendarPage() {
         return;
       }
 
-      setSavingCalendar(true); // Start spinner
+      setSavingCalendar(true);
 
       const allDates = [];
       schoolYearMonths.forEach(({ month, year }) => {
@@ -557,7 +553,7 @@ export default function CalendarPage() {
       } catch (e) {
         setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
       } finally {
-        setSavingCalendar(false); // Stop spinner
+        setSavingCalendar(false);
       }
     }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]
   );
@@ -598,25 +594,7 @@ export default function CalendarPage() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
-      <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c" }}>
-            Vælg Sæson:
-          </Typography>
-          <select
-            value={selectedSeason}
-            onChange={e => setSelectedSeason(Number(e.target.value))}
-            style={{ minWidth: 120, fontWeight: 700, background: "#fff", fontSize: "1rem", padding: "2px 8px" }}
-          >
-            {seasons.map(season => (
-              <option key={season.value} value={season.value}>
-                {season.label}
-              </option>
-            ))}
-          </select>
-        </Box>
-      </Paper>
-      <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative" }}>
+      <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column", minHeight: 260 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
           Godkendte klienter
         </Typography>
@@ -660,6 +638,31 @@ export default function CalendarPage() {
             )}
           </Box>
         )}
+        {/* Gem-knappen nederst til højre */}
+        <Box sx={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "flex-end",
+          flexGrow: 1,
+          mt: 2
+        }}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => handleSave(true)}
+            disabled={savingCalendar || selectedClients.length < 2}
+            startIcon={savingCalendar ? <CircularProgress color="inherit" size={20} /> : null}
+            sx={{
+              boxShadow: selectedClients.length < 2 ? "none" : undefined,
+              bgcolor: selectedClients.length < 2 ? "#eee" : undefined,
+              color: selectedClients.length < 2 ? "#888" : undefined,
+              pointerEvents: selectedClients.length < 2 ? "none" : undefined,
+              minWidth: 220
+            }}
+          >
+            {savingCalendar ? "Gemmer..." : "Gem kalender for valgte klienter"}
+          </Button>
+        </Box>
       </Paper>
       <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
         <Typography sx={{ mr: 1 }}>
@@ -682,15 +685,6 @@ export default function CalendarPage() {
           SLUKKET
         </Button>
         <Box sx={{ flexGrow: 1 }} />
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => handleSave(true)}
-          disabled={savingCalendar}
-          startIcon={savingCalendar ? <CircularProgress color="inherit" size={20} /> : null}
-        >
-          {savingCalendar ? "Gemmer..." : "Gem kalender for valgte klienter"}
-        </Button>
       </Box>
       <Box
         sx={{
