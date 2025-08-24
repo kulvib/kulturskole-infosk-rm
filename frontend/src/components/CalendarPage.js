@@ -8,6 +8,8 @@ import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
 
+// --- Hjælpefunktioner og constants --- (samme som før)
+
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
@@ -45,7 +47,7 @@ function formatDate(year, month, day) {
 
 function getDefaultTimes(dateStr) {
   const date = new Date(dateStr);
-  const day = date.getDay();
+  const day = date.getDay(); // 0=søndag, 6=lørdag
   if (day === 0 || day === 6) {
     return { onTime: "08:00", offTime: "18:00" };
   } else {
@@ -288,7 +290,7 @@ export default function CalendarPage() {
   const [editDialogClient, setEditDialogClient] = useState(null);
   const [loadingDialogDate, setLoadingDialogDate] = useState(null);
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
-  const [savingCalendar, setSavingCalendar] = useState(false); // NY state
+  const [savingCalendar, setSavingCalendar] = useState(false);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const snackbarTimer = useRef(null);
@@ -486,7 +488,6 @@ export default function CalendarPage() {
         setSnackbar({ open: true, message: "Ingen aktiv klient valgt", severity: "error" });
         return;
       }
-
       setSavingCalendar(true);
 
       const allDates = [];
@@ -567,10 +568,11 @@ export default function CalendarPage() {
   const clientMarkedDays = markedDays[activeClient];
   const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
 
-  const navn = activeClient
-    ? clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Ingen valgt"
-    : "";
-  const andre = selectedClients.length > 1
+  // VIS TEKST OG ANDRE NAVNE
+  const activeClientName = activeClient
+    ? clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Automatisk"
+    : "Automatisk";
+  const otherClientNames = selectedClients.length > 1
     ? clients
         .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
         .map(c => c.locality || c.name)
@@ -625,44 +627,41 @@ export default function CalendarPage() {
           selected={selectedClients}
           onChange={handleClientSelectorChange}
         />
-        {activeClient && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="body2" sx={{ fontSize: "1rem", fontWeight: 700 }}>
-              Viser kalender for: {navn}
-              {selectedClients.length > 1 && " - "}
-            </Typography>
-            {selectedClients.length > 1 && (
-              <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "#555", fontWeight: 400 }}>
-                ændringerne slår også igennem på klienterne: {andre}
+        {/* Samme række med tekst og knap */}
+        {selectedClients.length > 1 && (
+          <Box sx={{
+            mt: 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
+          }}>
+            <Box>
+              <Typography variant="body2" sx={{ fontSize: "1rem", fontWeight: 700 }}>
+                Viser kalender for: {activeClientName} -
               </Typography>
-            )}
+              <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "#555", fontWeight: 400 }}>
+                ændringerne slår også igennem på klienterne: {otherClientNames}
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => handleSave(true)}
+              disabled={savingCalendar || selectedClients.length < 2}
+              startIcon={savingCalendar ? <CircularProgress color="inherit" size={20} /> : null}
+              sx={{
+                boxShadow: selectedClients.length < 2 ? "none" : undefined,
+                bgcolor: selectedClients.length < 2 ? "#eee" : undefined,
+                color: selectedClients.length < 2 ? "#888" : undefined,
+                pointerEvents: selectedClients.length < 2 ? "none" : undefined,
+                minWidth: 220,
+                ml: 3
+              }}
+            >
+              {savingCalendar ? "Gemmer..." : "Gem kalender for valgte klienter"}
+            </Button>
           </Box>
         )}
-        {/* Gem-knappen nederst til højre */}
-        <Box sx={{
-          display: "flex",
-          justifyContent: "flex-end",
-          alignItems: "flex-end",
-          flexGrow: 1,
-          mt: 2
-        }}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => handleSave(true)}
-            disabled={savingCalendar || selectedClients.length < 2}
-            startIcon={savingCalendar ? <CircularProgress color="inherit" size={20} /> : null}
-            sx={{
-              boxShadow: selectedClients.length < 2 ? "none" : undefined,
-              bgcolor: selectedClients.length < 2 ? "#eee" : undefined,
-              color: selectedClients.length < 2 ? "#888" : undefined,
-              pointerEvents: selectedClients.length < 2 ? "none" : undefined,
-              minWidth: 220
-            }}
-          >
-            {savingCalendar ? "Gemmer..." : "Gem kalender for valgte klienter"}
-          </Button>
-        </Box>
       </Paper>
       <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
         <Typography sx={{ mr: 1 }}>
