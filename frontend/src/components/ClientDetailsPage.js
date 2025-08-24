@@ -72,30 +72,37 @@ function formatDateTime(dateStr, withSeconds = false) {
     : `${day}-${month}-${year}, Kl. ${hour}:${minute}`;
 }
 
+// NY FORMAT OPPETID - ALTID: 0 d., 2 t., 52 min., 23 sek.
 function formatUptime(uptimeStr) {
   if (!uptimeStr) return "ukendt";
-  let days = 0, hours = 0, mins = 0;
+  let totalSeconds = 0;
   if (uptimeStr.includes('-')) {
+    // d-h:m:s
     const [d, hms] = uptimeStr.split('-');
-    days = parseInt(d, 10);
-    const [h, m] = hms.split(':');
-    hours = parseInt(h, 10);
-    mins = parseInt(m, 10);
+    const [h = "0", m = "0", s = "0"] = hms.split(':');
+    totalSeconds =
+      parseInt(d, 10) * 86400 +
+      parseInt(h, 10) * 3600 +
+      parseInt(m, 10) * 60 +
+      parseInt(s, 10);
   } else if (uptimeStr.includes(':')) {
-    const [h, m] = uptimeStr.split(':');
-    hours = parseInt(h, 10);
-    mins = parseInt(m, 10);
+    const parts = uptimeStr.split(':').map(Number);
+    if (parts.length === 3) {
+      totalSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 2) {
+      totalSeconds = parts[0] * 60 + parts[1];
+    } else if (parts.length === 1) {
+      totalSeconds = parts[0];
+    }
   } else {
-    const totalSeconds = parseInt(uptimeStr, 10);
-    days = Math.floor(totalSeconds / 86400);
-    hours = Math.floor((totalSeconds % 86400) / 3600);
-    mins = Math.floor((totalSeconds % 3600) / 60);
+    totalSeconds = parseInt(uptimeStr, 10);
   }
-  if (hours >= 24) {
-    days += Math.floor(hours / 24);
-    hours = hours % 24;
-  }
-  return `${days} dage, ${hours} timer, ${mins} minutter`;
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
 }
 
 function ClientStatusIcon({ isOnline }) {
