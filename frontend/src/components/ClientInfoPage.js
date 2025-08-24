@@ -15,6 +15,8 @@ import {
   CircularProgress,
   Stack,
   useTheme,
+  Snackbar,
+  Alert as MuiAlert,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -53,7 +55,6 @@ function formatTimestamp(isoDate) {
   };
 }
 
-// Kopiér ikon-knap, justeret størrelse
 function CopyIconButton({ value, disabled, iconSize = 16 }) {
   const [copied, setCopied] = React.useState(false);
   const handleCopy = async (e) => {
@@ -80,7 +81,6 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
   );
 }
 
-// Sammenlign arrays af klienter (id+relevante felter)
 function isClientListEqual(a, b) {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
@@ -128,13 +128,22 @@ export default function ClientInfoPage() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dragClients, setDragClients] = useState([]);
-  const [error, setError] = useState("");
   const lastFetchedClients = useRef([]);
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
+  const showSnackbar = (message, severity = "success") => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ open: false, message: "", severity: "success" });
+  };
 
   // Hent klienter fra API, men kun opdatér hvis der er ændringer
   const fetchClients = async (forceUpdate = false) => {
     setLoading(true);
-    setError("");
     try {
       const data = await getClients(token);
       if (forceUpdate || !isClientListEqual(data, lastFetchedClients.current)) {
@@ -142,7 +151,7 @@ export default function ClientInfoPage() {
         lastFetchedClients.current = data;
       }
     } catch (err) {
-      setError(err.message);
+      showSnackbar("Fejl: " + err.message, "error");
     }
     setLoading(false);
   };
@@ -183,9 +192,10 @@ export default function ClientInfoPage() {
   const handleRemoveClient = async (clientId) => {
     try {
       await removeClient(clientId, token);
+      showSnackbar("Klient fjernet!", "success");
       fetchClients(true); // force update
     } catch (err) {
-      alert("Kunne ikke fjerne klient: " + err.message);
+      showSnackbar("Kunne ikke fjerne klient: " + err.message, "error");
     }
   };
 
@@ -200,9 +210,10 @@ export default function ClientInfoPage() {
       for (let i = 0; i < reordered.length; i++) {
         await updateClient(reordered[i].id, { sort_order: i + 1 }, token);
       }
+      showSnackbar("Sortering opdateret!", "success");
       fetchClients(true); // force update
     } catch (err) {
-      alert("Kunne ikke opdatere sortering: " + err.message);
+      showSnackbar("Kunne ikke opdatere sortering: " + err.message, "error");
     }
   };
 
@@ -215,9 +226,10 @@ export default function ClientInfoPage() {
   const handleApproveClient = async (clientId) => {
     try {
       await approveClient(clientId, token);
+      showSnackbar("Klient godkendt!", "success");
       fetchClients(true); // force update
     } catch (err) {
-      alert("Kunne ikke godkende klient: " + err.message);
+      showSnackbar("Kunne ikke godkende klient: " + err.message, "error");
     }
   };
 
@@ -257,11 +269,16 @@ export default function ClientInfoPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
-      {error && (
-        <Typography sx={{ color: "red", mb: 2, fontWeight: 600 }}>
-          {error}
-        </Typography>
-      )}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3400}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           Godkendte klienter
