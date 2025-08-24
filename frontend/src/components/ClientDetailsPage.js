@@ -321,7 +321,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     setGlobalLoading(true);
     try {
-      await clientAction(client.id, action);
+      await clientAction(client.id, action); // api.js: chrome-start/shutdown bruger nu /chrome-command
       showSnackbar("Handlingen blev udført!", "success");
       const updated = await getClient(client.id);
       setLiveChromeStatus(updated.chrome_status || "unknown");
