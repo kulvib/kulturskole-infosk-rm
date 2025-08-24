@@ -134,7 +134,6 @@ export async function pushKioskUrl(id, url) {
   return await res.json();
 }
 
-// NY: Client actions med REST endpoints
 export async function clientAction(id, action) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -248,8 +247,6 @@ export async function deleteHoliday(id) {
   }
 }
 
-// --- Kalender endpoints ---
-// Gem markeringer for flere klienter
 export async function saveMarkedDays(payload) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -272,14 +269,12 @@ export async function saveMarkedDays(payload) {
   return await res.json();
 }
 
-// Hent markeringer for EN klient og sæson
 export async function getMarkedDays(season, client_id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/calendar/marked-days?season=${season}&client_id=${client_id}`, {
     headers: { Authorization: "Bearer " + token },
   });
-  // ÆNDRING: Returner altid {markedDays: {}} hvis fejl, så loader aldrig fryser!
   if (!res.ok) {
     return { markedDays: {} };
   }
