@@ -54,6 +54,11 @@ export default function DateTimeEditDialog({
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const closeTimer = useRef(null);
 
+  // ADD THIS FUNCTION
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
   function findDayObj(markedDays, normDate) {
     if (markedDays[normDate]) return markedDays[normDate];
     const key = Object.keys(markedDays).find(k => k.startsWith(normDate));
