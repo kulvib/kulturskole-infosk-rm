@@ -427,18 +427,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     {client.id}
                   </Typography>
                 </Stack>
-                {/* NYT: Vis status direkte fra backend */}
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                    Status:
-                  </Typography>
-                  <Typography 
-                    variant="body2"
-                    sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem" }}
-                  >
-                    {client.status || "ukendt"}
-                  </Typography>
-                </Stack>
+                {/* STATUS-RÆKKEN FJERNET */}
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LocationOnIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 90 }}>
