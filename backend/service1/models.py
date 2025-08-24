@@ -31,7 +31,8 @@ class Client(ClientBase, table=True):
     chrome_last_updated: Optional[datetime] = None
     pending_reboot: Optional[bool] = False
     pending_shutdown: Optional[bool] = False
-    chrome_color: Optional[str] = None    # <-- NYT FELT!
+    chrome_color: Optional[str] = None
+    pending_chrome_action: Optional[str] = None  # <-- NYT FELT! Kommando fra backend
 
 class ClientCreate(ClientBase):
     sort_order: Optional[int] = None
@@ -42,8 +43,9 @@ class ClientCreate(ClientBase):
     wifi_mac_address: Optional[str] = None
     lan_ip_address: Optional[str] = None
     lan_mac_address: Optional[str] = None
-    chrome_status: Optional[str] = None          # <-- NYT FELT FOR CREATE
-    chrome_color: Optional[str] = None           # <-- NYT FELT FOR CREATE
+    chrome_status: Optional[str] = None
+    chrome_color: Optional[str] = None
+    pending_chrome_action: Optional[str] = None  # <-- NYT FELT FOR CREATE
 
 class ClientUpdate(SQLModel):
     locality: Optional[str] = None
@@ -57,9 +59,10 @@ class ClientUpdate(SQLModel):
     lan_mac_address: Optional[str] = None
     pending_reboot: Optional[bool] = None
     pending_shutdown: Optional[bool] = None
-    chrome_status: Optional[str] = None              # <-- Tilføjet!
-    chrome_last_updated: Optional[datetime] = None   # <-- Valgfrit!
-    chrome_color: Optional[str] = None               # <-- NYT FELT!
+    chrome_status: Optional[str] = None
+    chrome_last_updated: Optional[datetime] = None
+    chrome_color: Optional[str] = None
+    pending_chrome_action: Optional[str] = None  # <-- NYT FELT!
 
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
