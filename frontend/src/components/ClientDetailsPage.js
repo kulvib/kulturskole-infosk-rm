@@ -237,7 +237,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
         setLiveChromeStatus(updated.chrome_status || "unknown");
         setLiveChromeColor(updated.chrome_color || null);
       } catch {}
-    }, 5000);
+    }, 3500);
     return () => clearInterval(poller);
   }, [client?.id]);
 
