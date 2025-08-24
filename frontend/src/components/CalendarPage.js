@@ -289,6 +289,9 @@ export default function CalendarPage() {
   const [loadingDialogDate, setLoadingDialogDate] = useState(null);
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
 
+  // NY STATE TIL GEM-SPINNER
+  const [savingCalendar, setSavingCalendar] = useState(false);
+
   // Snackbar state for feedback
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const snackbarTimer = useRef(null);
@@ -476,6 +479,7 @@ export default function CalendarPage() {
 
   const schoolYearMonths = getSchoolYearMonths(selectedSeason);
 
+  // Ændret handleSave med spinner
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
       if (selectedClients.length === 0) {
@@ -486,6 +490,8 @@ export default function CalendarPage() {
         setSnackbar({ open: true, message: "Ingen aktiv klient valgt", severity: "error" });
         return;
       }
+
+      setSavingCalendar(true); // Start spinner
 
       const allDates = [];
       schoolYearMonths.forEach(({ month, year }) => {
@@ -550,6 +556,8 @@ export default function CalendarPage() {
         }
       } catch (e) {
         setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
+      } finally {
+        setSavingCalendar(false); // Stop spinner
       }
     }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]
   );
@@ -674,13 +682,14 @@ export default function CalendarPage() {
           SLUKKET
         </Button>
         <Box sx={{ flexGrow: 1 }} />
-        {/* INGEN renderede feedback-beskeder her */}
         <Button
           variant="contained"
           color="primary"
           onClick={() => handleSave(true)}
+          disabled={savingCalendar}
+          startIcon={savingCalendar ? <CircularProgress color="inherit" size={20} /> : null}
         >
-          Gem kalender for valgte klienter
+          {savingCalendar ? "Gemmer..." : "Gem kalender for valgte klienter"}
         </Button>
       </Box>
       <Box
