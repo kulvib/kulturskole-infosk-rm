@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getClient } from "../api";
-import ClientDetailsPage from "./ClientDetailsPage"; // <-- VIGTIGT!
+import ClientDetailsPage from "./ClientDetailsPage";
 
 function isEqualClient(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
