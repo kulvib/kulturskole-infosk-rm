@@ -26,7 +26,7 @@ export default function ClientDetailsPageWrapper() {
 
   useEffect(() => {
     fetchClient();
-    const timer = setInterval(() => fetchClient(false), 10000);
+    const timer = setInterval(() => fetchClient(false), 15000); // 15 sekunder
     return () => clearInterval(timer);
     // eslint-disable-next-line
   }, [clientId]);
