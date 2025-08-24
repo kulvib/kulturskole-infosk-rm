@@ -128,28 +128,29 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
-// NY VERSION: ChromeStatusIcon matcher backend
-function ChromeStatusIcon({ status }) {
-  let color = "grey.400";
+// NY VERSION: ChromeStatusIcon viser backend-farve hvis den findes
+function ChromeStatusIcon({ status, color }) {
+  let fallbackColor = "grey.400";
   let text = status || "Ukendt";
+  // Brug farven fra backend hvis angivet, ellers logik/fallback
+  let dotColor = color || fallbackColor;
 
-  // Map relevante statusværdier til farve og tekst
-  if (typeof status === "string") {
+  if (!color && typeof status === "string") {
     const s = status.toLowerCase();
     if (s === "running") {
-      color = "success.main";
+      dotColor = "#43a047"; // grøn
       text = "Åben";
     } else if (s === "stopped" || s === "closed") {
-      color = "error.main";
+      dotColor = "#e53935"; // rød
       text = "Lukket";
     } else if (s === "unknown") {
-      color = "grey.400";
+      dotColor = "grey.400";
       text = "Ukendt";
     } else if (s.includes("kører")) {
-      color = "success.main";
+      dotColor = "#43a047";
       text = status;
     } else if (s.includes("lukket")) {
-      color = "error.main";
+      dotColor = "#e53935";
       text = status;
     }
   }
@@ -161,7 +162,7 @@ function ChromeStatusIcon({ status }) {
           width: 14,
           height: 14,
           borderRadius: "50%",
-          bgcolor: color,
+          bgcolor: dotColor,
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
         }}
@@ -212,8 +213,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
 
-  // NYT: Live opdatering af chrome_status
+  // NYT: Live opdatering af chrome_status og chrome_color!
   const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status || "unknown");
+  const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color || null);
 
   // Snackbar state
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -228,17 +230,19 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
       if (!localityDirty) setLocality(client.locality || "");
       if (!kioskUrlDirty) setKioskUrl(client.kiosk_url || "");
       setLiveChromeStatus(client.chrome_status || "unknown");
+      setLiveChromeColor(client.chrome_color || null);
     }
-  // eslint-disable-next-line
+    // eslint-disable-next-line
   }, [client]);
 
-  // NYT: Poll chrome_status hvert 5 sekund
+  // NYT: Poll chrome_status og chrome_color hvert 5 sekund
   useEffect(() => {
     if (!client?.id) return;
     const poller = setInterval(async () => {
       try {
         const updated = await getClient(client.id);
         setLiveChromeStatus(updated.chrome_status || "unknown");
+        setLiveChromeColor(updated.chrome_color || null);
       } catch {}
     }, 5000);
     return () => clearInterval(poller);
@@ -330,6 +334,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
       // Force-poll status
       const updated = await getClient(client.id);
       setLiveChromeStatus(updated.chrome_status || "unknown");
+      setLiveChromeColor(updated.chrome_color || null);
     } catch (err) {
       showSnackbar("Fejl: " + err.message, "error");
     }
@@ -489,13 +494,13 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                   )}
                 </Stack>
 
-                {/* NY LINJE: Kiosk browser status, farvet og live */}
+                {/* NU: Kiosk browser status - farve og tekst fra backend */}
                 <Stack direction="row" spacing={2} alignItems="center">
                   <ChromeReaderModeIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     Kiosk browser status:
                   </Typography>
-                  <ChromeStatusIcon status={liveChromeStatus} />
+                  <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
                 </Stack>
               </Stack>
             </CardContent>
