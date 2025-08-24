@@ -54,6 +54,8 @@ class ClientUpdate(SQLModel):
     lan_mac_address: Optional[str] = None
     pending_reboot: Optional[bool] = None
     pending_shutdown: Optional[bool] = None
+    chrome_status: Optional[str] = None              # <-- Tilføjet!
+    chrome_last_updated: Optional[datetime] = None   # <-- Valgfrit!
 
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
