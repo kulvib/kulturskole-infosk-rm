@@ -50,20 +50,20 @@ def get_chrome_status(
         "client_id": client.id,
         "chrome_status": getattr(client, "chrome_status", "unknown"),
         "chrome_last_updated": getattr(client, "chrome_last_updated", None),
-        "chrome_color": getattr(client, "chrome_color", None)  # <-- NYT FELT
+        "chrome_color": getattr(client, "chrome_color", None)
     }
 
 @router.put("/clients/{id}/chrome-status")
 def update_chrome_status(
     id: int,
-    data: dict = Body(...),  # fx {"chrome_status": "running", "chrome_color": "#fbc02d"}
+    data: dict = Body(...),
     session=Depends(get_session)
 ):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     status = data.get("chrome_status")
-    color = data.get("chrome_color")  # <-- NYT FELT
+    color = data.get("chrome_color")
     client.chrome_status = status
     client.chrome_last_updated = datetime.utcnow()
     if color is not None:
@@ -73,8 +73,9 @@ def update_chrome_status(
     session.refresh(client)
     return {"ok": True}
 
-@router.post("/clients/{id}/chrome-control")
-def chrome_control(
+# NYE ENDPOINTS TIL KOMMANDO:
+@router.post("/clients/{id}/chrome-command")
+def set_chrome_command(
     id: int,
     data: dict = Body(...),  # fx {"action": "start"} eller {"action": "stop"}
     session=Depends(get_session),
@@ -86,17 +87,35 @@ def chrome_control(
     action = data.get("action")
     if action not in ["start", "stop"]:
         raise HTTPException(status_code=400, detail="Invalid action")
-    client.chrome_status = "running" if action == "start" else "stopped"
-    client.chrome_last_updated = datetime.utcnow()
+    client.pending_chrome_action = action
     session.add(client)
     session.commit()
     session.refresh(client)
-    return {
-        "ok": True,
-        "action": action,
-        "chrome_status": client.chrome_status,
-        "chrome_last_updated": client.chrome_last_updated
-    }
+    return {"ok": True, "pending_chrome_action": client.pending_chrome_action}
+
+@router.get("/clients/{id}/chrome-command")
+def get_chrome_command(
+    id: int,
+    session=Depends(get_session)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return {"action": client.pending_chrome_action}
+
+@router.post("/clients/{id}/chrome-command-clear")
+def clear_chrome_command(
+    id: int,
+    session=Depends(get_session)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    client.pending_chrome_action = None
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return {"ok": True}
 
 @router.post("/clients/{id}/restart")
 def restart_client(
@@ -150,9 +169,10 @@ async def create_client(
         uptime=getattr(client_in, "uptime", None),
         chrome_status=getattr(client_in, "chrome_status", "unknown"),
         chrome_last_updated=None,
-        chrome_color=getattr(client_in, "chrome_color", None),  # <-- NYT FELT
+        chrome_color=getattr(client_in, "chrome_color", None),
         pending_reboot=False,
         pending_shutdown=False,
+        pending_chrome_action=getattr(client_in, "pending_chrome_action", None),
     )
     session.add(client)
     session.commit()
@@ -194,8 +214,10 @@ async def update_client(
     if client_update.chrome_status is not None:
         client.chrome_status = client_update.chrome_status
         client.chrome_last_updated = datetime.utcnow()
-    if getattr(client_update, "chrome_color", None) is not None:   # <-- NYT FELT
+    if getattr(client_update, "chrome_color", None) is not None:
         client.chrome_color = client_update.chrome_color
+    if getattr(client_update, "pending_chrome_action", None) is not None:
+        client.pending_chrome_action = client_update.pending_chrome_action
     session.add(client)
     session.commit()
     session.refresh(client)
