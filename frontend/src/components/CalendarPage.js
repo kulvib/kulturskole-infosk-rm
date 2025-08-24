@@ -608,7 +608,6 @@ export default function CalendarPage() {
           </select>
         </Box>
       </Paper>
-
       <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative" }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
           Godkendte klienter
@@ -654,7 +653,6 @@ export default function CalendarPage() {
           </Box>
         )}
       </Paper>
-
       <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
         <Typography sx={{ mr: 1 }}>
           Markering betyder:
@@ -676,9 +674,7 @@ export default function CalendarPage() {
           SLUKKET
         </Button>
         <Box sx={{ flexGrow: 1 }} />
-        <Box sx={{ display: "flex", alignItems: "center", mr: 2, minWidth: 55 }}>
-          {/* Ingen renderede beskeder her! */}
-        </Box>
+        {/* INGEN renderede feedback-beskeder her */}
         <Button
           variant="contained"
           color="primary"
@@ -687,7 +683,6 @@ export default function CalendarPage() {
           Gem kalender for valgte klienter
         </Button>
       </Box>
-
       <Box
         sx={{
           display: "grid",
@@ -724,7 +719,6 @@ export default function CalendarPage() {
           </Box>
         )}
       </Box>
-
       <DateTimeEditDialog
         open={editDialogOpen}
         onClose={() => setEditDialogOpen(false)}
