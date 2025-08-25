@@ -219,24 +219,39 @@ function formatDateLong(dt) {
     year: "numeric"
   });
 }
-function getStatusAndTimes(dayData) {
-  if (!dayData || dayData.status !== "on") {
+
+// Denne funktion håndterer både dag-nøgler og tid-nøgler!
+function getStatusAndTimesFromRaw(markedDays, dateKey) {
+  // Saml alle markeringer for denne dag
+  const marks = Object.entries(markedDays)
+    .filter(([k]) => k.startsWith(dateKey))
+    .map(([k, v]) => ({ ...v, datetime: k }));
+
+  const on = marks.find(m => m.action === "power_on");
+  const off = marks.find(m => m.action === "power_off");
+
+  if (on || off) {
     return {
-      status: "Slukket",
-      color: "error",
-      powerOn: "",
-      powerOff: ""
+      status: "Tændt",
+      color: "success",
+      powerOn: on ? on.datetime.slice(11,16) : "",
+      powerOff: off ? off.datetime.slice(11,16) : ""
     };
+  } else {
+    const basic = markedDays[dateKey];
+    if (basic && basic.status === "on") {
+      return {
+        status: "Tændt",
+        color: "success",
+        powerOn: basic.onTime || "",
+        powerOff: basic.offTime || ""
+      };
+    }
+    return { status: "Slukket", color: "error", powerOn: "", powerOff: "" };
   }
-  return {
-    status: "Tændt",
-    color: "success",
-    powerOn: dayData.onTime || "",
-    powerOff: dayData.offTime || ""
-  };
 }
+
 function ClientPowerWeekTable({ markedDays }) {
-  // Lav liste over i dag + 5 dage
   const days = [];
   const now = new Date();
   for (let i = 0; i < 6; i++) {
@@ -265,9 +280,8 @@ function ClientPowerWeekTable({ markedDays }) {
             </TableHead>
             <TableBody>
               {days.map((dt) => {
-                const dateKey = dt.toISOString().slice(0, 10); // "YYYY-MM-DD"
-                const dayData = markedDays?.[dateKey];
-                const { status, color, powerOn, powerOff } = getStatusAndTimes(dayData);
+                const dateKey = dt.toISOString().slice(0, 10);
+                const { status, color, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dateKey);
 
                 return (
                   <TableRow key={dateKey}>
@@ -697,7 +711,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<ChromeReaderModeIcon />}
                       disabled={actionLoading["chrome-start"]}
                       onClick={() => handleClientAction("chrome-start")}
-                      sx={actionBtnStyle}
+                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
                     >
                       {actionLoading["chrome-start"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                       Start kiosk browser
@@ -712,7 +726,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<PowerSettingsNewIcon />}
                       disabled={actionLoading["chrome-shutdown"]}
                       onClick={() => handleClientAction("chrome-shutdown")}
-                      sx={actionBtnStyle}
+                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
                     >
                       {actionLoading["chrome-shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                       Luk kiosk browser
@@ -726,7 +740,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       color="primary"
                       startIcon={<DesktopWindowsIcon />}
                       onClick={handleOpenRemoteDesktop}
-                      sx={actionBtnStyle}
+                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
                     >
                       Fjernskrivebord
                     </Button>
@@ -739,7 +753,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       color="inherit"
                       startIcon={<TerminalIcon />}
                       onClick={handleOpenTerminal}
-                      sx={actionBtnStyle}
+                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
                     >
                       Terminal på klient
                     </Button>
@@ -755,7 +769,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<RestartAltIcon />}
                       disabled={actionLoading["restart"]}
                       onClick={() => handleClientAction("restart")}
-                      sx={actionBtnStyle}
+                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
                     >
                       {actionLoading["restart"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                       Genstart klient
@@ -770,7 +784,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<PowerSettingsNewIcon />}
                       disabled={actionLoading["shutdown"]}
                       onClick={() => setShutdownDialogOpen(true)}
-                      sx={actionBtnStyle}
+                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
                     >
                       {actionLoading["shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                       Sluk klient
