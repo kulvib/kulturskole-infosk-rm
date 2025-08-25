@@ -51,8 +51,6 @@ import {
   getCurrentSeason,
 } from "../api";
 
-// ----------- UTILITIES -----------
-
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
@@ -225,24 +223,22 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
   const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
   const data = markedDays[dateKey];
   if (!data || !data.status || data.status === "off") {
-    return { status: "off", color: "error", powerOn: "", powerOff: "" };
+    return { status: "off", powerOn: "", powerOff: "" };
   }
   return {
     status: "on",
-    color: "success",
     powerOn: data.onTime || "",
     powerOff: data.offTime || ""
   };
 }
 
 function StatusText({ status }) {
-  // Grøn for 'on', rød for 'off'
   return (
     <Typography
       variant="body2"
       sx={{
         fontWeight: 600,
-        color: status === "on" ? "#43a047" : "#e53935", // MUI success/error
+        color: status === "on" ? "#43a047" : "#e53935",
         textTransform: "lowercase"
       }}
     >
@@ -254,7 +250,7 @@ function StatusText({ status }) {
 function ClientPowerShortTable({ markedDays }) {
   const days = [];
   const now = new Date();
-  for (let i = 0; i < 3; i++) { // Kun i dag + 2 dage
+  for (let i = 0; i < 3; i++) {
     const d = new Date(now);
     d.setDate(now.getDate() + i);
     days.push(d);
@@ -337,7 +333,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
         setLastSeen(updated.last_seen || null);
         setUptime(updated.uptime || null);
       } catch {}
-    }, 4130);
+    }, 1000); // 1 sekund
     return () => clearInterval(pollerStatus);
   }, [client?.id]);
 
@@ -355,6 +351,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
       setCalendarLoading(false);
     }
     fetchCalendar();
+    const timer = setInterval(fetchCalendar, 15000); // 15 sekunder
+    return () => clearInterval(timer);
   }, [client?.id]);
 
   const showSnackbar = (message, severity = "success") => {
@@ -498,7 +496,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
       </Box>
       <Grid container spacing={sectionSpacing}>
         <Grid item xs={12}>
-          {/* Øverste felt bibeholdes */}
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent>
               <Stack spacing={2}>
@@ -716,7 +713,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
         </Grid>
         {/* ----------- SLUT NY TRE-KOLONNE SEKTION ----------- */}
 
-        {/* Handlinger og livestream bibeholdes */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
