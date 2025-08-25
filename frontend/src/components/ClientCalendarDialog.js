@@ -1,0 +1,178 @@
+import React, { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Box,
+  CircularProgress,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Stack,
+  TextField,
+} from "@mui/material";
+import AdapterDateFns from "@mui/lab/AdapterDateFns";
+import { LocalizationProvider, DatePicker } from "@mui/lab";
+import daLocale from 'date-fns/locale/da';
+import { getMarkedDays, getCurrentSeason } from "../api";
+
+function formatDateShort(dt) {
+  return dt.toLocaleDateString("da-DK", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+function getStatusAndTimesFromRaw(markedDays, dt) {
+  const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
+  const data = markedDays[dateKey];
+  if (!data || !data.status || data.status === "off") {
+    return { status: "off", powerOn: "", powerOff: "" };
+  }
+  return {
+    status: "on",
+    powerOn: data.onTime || "",
+    powerOff: data.offTime || ""
+  };
+}
+function StatusText({ status }) {
+  return (
+    <Typography
+      variant="body2"
+      sx={{
+        fontWeight: 600,
+        color: status === "on" ? "#43a047" : "#e53935",
+        textTransform: "lowercase"
+      }}
+    >
+      {status}
+    </Typography>
+  );
+}
+function getDaysInRange(start, end) {
+  const days = [];
+  let d = new Date(start);
+  while (d <= end) {
+    days.push(new Date(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return days;
+}
+function ClientPowerPeriodTable({ markedDays, days }) {
+  return (
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Dato</TableCell>
+            <TableCell>Status</TableCell>
+            <TableCell>Tænd</TableCell>
+            <TableCell>Sluk</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {days.map((dt) => {
+            const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
+            return (
+              <TableRow key={dt.toISOString().slice(0, 10)}>
+                <TableCell>{formatDateShort(dt)}</TableCell>
+                <TableCell><StatusText status={status} /></TableCell>
+                <TableCell>{powerOn}</TableCell>
+                <TableCell>{powerOff}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+export default function ClientCalendarDialog({ open, onClose, clientId }) {
+  const [season, setSeason] = useState(null);
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+  const [markedDays, setMarkedDays] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [showTable, setShowTable] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      (async () => {
+        const s = await getCurrentSeason();
+        setSeason(s);
+        setStartDate(new Date(s.start_date));
+        setEndDate(new Date(s.end_date));
+        setMarkedDays({});
+        setShowTable(false);
+      })();
+    }
+  }, [open]);
+
+  const handleFetch = async () => {
+    if (!startDate || !endDate || !clientId) return;
+    setLoading(true);
+    try {
+      const res = await getMarkedDays(season.id, clientId, startDate, endDate);
+      setMarkedDays(res?.markedDays || {});
+      setShowTable(true);
+    } catch {
+      setMarkedDays({});
+      setShowTable(true);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>Vis kalender for periode</DialogTitle>
+      <DialogContent>
+        <LocalizationProvider dateAdapter={AdapterDateFns} locale={daLocale}>
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+            <DatePicker
+              label="Startdato"
+              value={startDate}
+              onChange={setStartDate}
+              minDate={season ? new Date(season.start_date) : undefined}
+              maxDate={season ? new Date(season.end_date) : undefined}
+              renderInput={(params) => <TextField {...params} size="small" />}
+            />
+            <DatePicker
+              label="Slutdato"
+              value={endDate}
+              onChange={setEndDate}
+              minDate={season ? new Date(season.start_date) : undefined}
+              maxDate={season ? new Date(season.end_date) : undefined}
+              renderInput={(params) => <TextField {...params} size="small" />}
+            />
+            <Button variant="contained" onClick={handleFetch} disabled={loading || !startDate || !endDate}>
+              Hent kalender
+            </Button>
+          </Stack>
+        </LocalizationProvider>
+        {loading && (
+          <Box sx={{ textAlign: "center", py: 2 }}>
+            <CircularProgress size={28} />
+            <Typography sx={{ mt: 1 }}>Indlæser kalender...</Typography>
+          </Box>
+        )}
+        {showTable && !loading && (
+          <Box sx={{ mt: 2 }}>
+            <ClientPowerPeriodTable markedDays={markedDays} days={getDaysInRange(startDate, endDate)} />
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} color="primary">
+          Luk
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
