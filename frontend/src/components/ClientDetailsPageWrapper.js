@@ -12,6 +12,7 @@ export default function ClientDetailsPageWrapper() {
   const [client, setClient] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Poll klientdata og kalenderdata hver 15 sekunder
   const fetchClient = async (forceUpdate = false) => {
     if (!clientId) return;
     try {
