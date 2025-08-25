@@ -209,13 +209,12 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
   );
 }
 
-// ----------- TÆND/SLUK KALENDER-TABEL START -----------
+// ----------- NY KALENDER-TABEL MED DD-MM-YYYY FORMAT -----------
 
-function formatDateLong(dt) {
+function formatDateShort(dt) {
   return dt.toLocaleDateString("da-DK", {
-    weekday: "long",
     day: "2-digit",
-    month: "long",
+    month: "2-digit",
     year: "numeric"
   });
 }
@@ -235,7 +234,7 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
   };
 }
 
-function ClientPowerWeekTable({ markedDays }) {
+function ClientPowerWeekTableCompact({ markedDays }) {
   const days = [];
   const now = new Date();
   for (let i = 0; i < 6; i++) {
@@ -245,46 +244,37 @@ function ClientPowerWeekTable({ markedDays }) {
   }
 
   return (
-    <Card elevation={2} sx={{ borderRadius: 2, mb: 2, mt: 1 }}>
-      <CardContent>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Tænd/Sluk Kalender (næste 6 dage)
-          </Typography>
-        </Stack>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Dato</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Tænd</TableCell>
-                <TableCell>Sluk</TableCell>
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Dato</TableCell>
+            <TableCell>Status</TableCell>
+            <TableCell>Tænd</TableCell>
+            <TableCell>Sluk</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {days.map((dt) => {
+            const { status, color, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
+            return (
+              <TableRow key={dt.toISOString().slice(0, 10)}>
+                <TableCell>{formatDateShort(dt)}</TableCell>
+                <TableCell>
+                  <Chip label={status} color={color} size="small" sx={{ fontWeight: 600 }} />
+                </TableCell>
+                <TableCell>{powerOn}</TableCell>
+                <TableCell>{powerOff}</TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {days.map((dt) => {
-                const { status, color, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
-                return (
-                  <TableRow key={dt.toISOString().slice(0, 10)}>
-                    <TableCell>{formatDateLong(dt)}</TableCell>
-                    <TableCell>
-                      <Chip label={status} color={color} size="small" sx={{ fontWeight: 600 }} />
-                    </TableCell>
-                    <TableCell>{powerOn}</TableCell>
-                    <TableCell>{powerOff}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </CardContent>
-    </Card>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 }
 
-// ----------- TÆND/SLUK KALENDER-TABEL SLUT -----------
+// ----------- SLUT NY KALENDER-TABEL -----------
 
 export default function ClientDetailsPage({ client, refreshing, handleRefresh }) {
   const [locality, setLocality] = useState("");
@@ -494,6 +484,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
       </Box>
       <Grid container spacing={sectionSpacing}>
         <Grid item xs={12}>
+          {/* Øverste felt bibeholdes */}
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent>
               <Stack spacing={2}>
@@ -582,105 +573,117 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </Card>
         </Grid>
 
-        {/* --------- INDSAT KALENDER-TABEL HER --------- */}
+        {/* ----------- NY TRE-KOLONNE SEKTION ----------- */}
         <Grid item xs={12}>
-          {calendarLoading ? (
-            <Box sx={{ textAlign: "center", py: 3 }}>
-              <CircularProgress size={32} />
-              <Typography sx={{ mt: 2 }}>Indlæser Tænd/Sluk kalender...</Typography>
-            </Box>
-          ) : (
-            <ClientPowerWeekTable markedDays={markedDays} />
-          )}
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={4}>
+              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                    Kalender
+                  </Typography>
+                  {calendarLoading ? (
+                    <Box sx={{ textAlign: "center", py: 3 }}>
+                      <CircularProgress size={32} />
+                      <Typography sx={{ mt: 2 }}>Indlæser Tænd/Sluk kalender...</Typography>
+                    </Box>
+                  ) : (
+                    <ClientPowerWeekTableCompact markedDays={markedDays} />
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                    Systeminfo
+                  </Typography>
+                  <Stack spacing={1} sx={{ width: "100%" }} alignItems="flex-start">
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <MemoryIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                        Ubuntu version:
+                      </Typography>
+                      <Typography variant="body2">{client.ubuntu_version || "ukendt"}</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <AccessTimeIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                        Oppetid:
+                      </Typography>
+                      <Typography variant="body2">{formatUptime(uptime)}</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <AccessTimeIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                        Sidst set:
+                      </Typography>
+                      <Typography variant="body2">
+                        {formatDateTime(lastSeen, true)}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <AccessTimeIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                        Tilføjet:
+                      </Typography>
+                      <Typography variant="body2">
+                        {formatDateTime(client.created_at, true)}
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                    Netværksinfo
+                  </Typography>
+                  <Stack spacing={1} sx={{ width: "100%" }} alignItems="flex-start">
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <LanIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                        IP-adresse WLAN:
+                      </Typography>
+                      <Typography variant="body2">{client.wifi_ip_address || "ukendt"}</Typography>
+                      <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <LanIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                        MAC-adresse WLAN:
+                      </Typography>
+                      <Typography variant="body2">{client.wifi_mac_address || "ukendt"}</Typography>
+                      <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <LanIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                        IP-adresse LAN:
+                      </Typography>
+                      <Typography variant="body2">{client.lan_ip_address || "ukendt"}</Typography>
+                      <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <LanIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                        MAC-adresse LAN:
+                      </Typography>
+                      <Typography variant="body2">{client.lan_mac_address || "ukendt"}</Typography>
+                      <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
+                    </Stack>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
         </Grid>
-        {/* --------- SLUT TABEL --------- */}
+        {/* ----------- SLUT NY TRE-KOLONNE SEKTION ----------- */}
 
-        <Grid item xs={12} md={6}>
-          <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-            <CardContent sx={{
-              height: "100%",
-              p: 3
-            }}>
-              <Stack spacing={2} sx={{ width: "100%" }} alignItems="flex-start">
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <MemoryIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                    Ubuntu version:
-                  </Typography>
-                  <Typography variant="body2">{client.ubuntu_version || "ukendt"}</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <AccessTimeIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                    Oppetid:
-                  </Typography>
-                  <Typography variant="body2">{formatUptime(uptime)}</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <AccessTimeIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                    Sidst set:
-                  </Typography>
-                  <Typography variant="body2">
-                    {formatDateTime(lastSeen, true)}
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <AccessTimeIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                    Tilføjet:
-                  </Typography>
-                  <Typography variant="body2">
-                    {formatDateTime(client.created_at, true)}
-                  </Typography>
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-            <CardContent sx={{
-              height: "100%",
-              p: 3
-            }}>
-              <Stack spacing={2} sx={{ width: "100%" }} alignItems="flex-start">
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
-                    IP-adresse WLAN:
-                  </Typography>
-                  <Typography variant="body2">{client.wifi_ip_address || "ukendt"}</Typography>
-                  <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
-                    MAC-adresse WLAN:
-                  </Typography>
-                  <Typography variant="body2">{client.wifi_mac_address || "ukendt"}</Typography>
-                  <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
-                    IP-adresse LAN:
-                  </Typography>
-                  <Typography variant="body2">{client.lan_ip_address || "ukendt"}</Typography>
-                  <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
-                    MAC-adresse LAN:
-                  </Typography>
-                  <Typography variant="body2">{client.lan_mac_address || "ukendt"}</Typography>
-                  <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
+        {/* Handlinger og livestream bibeholdes */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
