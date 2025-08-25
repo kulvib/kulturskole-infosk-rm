@@ -594,62 +594,7 @@ export default function CalendarPage() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
-      {/* Knapper og sæsonvælger på samme linje */}
-      <Box sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        mb: 2,
-        gap: 2
-      }}>
-        {/* Venstre: MarkMode-knapper */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography sx={{ mr: 1 }}>
-            Markering betyder:
-          </Typography>
-          <Button
-            variant={markMode === "on" ? "contained" : "outlined"}
-            color="success"
-            onClick={() => setMarkMode("on")}
-            sx={{ fontWeight: markMode === "on" ? 700 : 400 }}
-          >
-            TÆNDT
-          </Button>
-          <Button
-            variant={markMode === "off" ? "contained" : "outlined"}
-            color="error"
-            onClick={() => setMarkMode("off")}
-            sx={{ fontWeight: markMode === "off" ? 700 : 400 }}
-          >
-            SLUKKET
-          </Button>
-        </Box>
-        {/* Højre: Sæsonvælger */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
-            Vælg Sæson:
-          </Typography>
-          <select
-            value={selectedSeason}
-            onChange={e => setSelectedSeason(Number(e.target.value))}
-            style={{
-              minWidth: 120,
-              fontWeight: 700,
-              background: "#fff",
-              fontSize: "1rem",
-              padding: "6px 14px",
-              borderRadius: "7px",
-              border: "1px solid #dbeafe"
-            }}
-          >
-            {seasons.map(season => (
-              <option key={season.value} value={season.value}>
-                {season.label}
-              </option>
-            ))}
-          </select>
-        </Box>
-      </Box>
+      {/* Godkendte klienter øverst */}
       <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
         Godkendte klienter
       </Typography>
@@ -716,6 +661,63 @@ export default function CalendarPage() {
           </Box>
         )}
       </Paper>
+      {/* Knapper og sæsonvælger */}
+      <Box sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        mb: 2,
+        gap: 2
+      }}>
+        {/* Venstre: MarkMode-knapper */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="h6" sx={{ mr: 1, fontWeight: 700 }}>
+            Markering betyder:
+          </Typography>
+          <Button
+            variant={markMode === "on" ? "contained" : "outlined"}
+            color="success"
+            onClick={() => setMarkMode("on")}
+            sx={{ fontWeight: markMode === "on" ? 700 : 400 }}
+          >
+            TÆNDT
+          </Button>
+          <Button
+            variant={markMode === "off" ? "contained" : "outlined"}
+            color="error"
+            onClick={() => setMarkMode("off")}
+            sx={{ fontWeight: markMode === "off" ? 700 : 400 }}
+          >
+            SLUKKET
+          </Button>
+        </Box>
+        {/* Højre: Sæsonvælger */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
+            Vælg Sæson:
+          </Typography>
+          <select
+            value={selectedSeason}
+            onChange={e => setSelectedSeason(Number(e.target.value))}
+            style={{
+              minWidth: 120,
+              fontWeight: 700,
+              background: "#fff",
+              fontSize: "1rem",
+              padding: "6px 14px",
+              borderRadius: "7px",
+              border: "1px solid #dbeafe"
+            }}
+          >
+            {seasons.map(season => (
+              <option key={season.value} value={season.value}>
+                {season.label}
+              </option>
+            ))}
+          </select>
+        </Box>
+      </Box>
+      {/* Kalender */}
       <Box
         sx={{
           display: "grid",
@@ -746,20 +748,4 @@ export default function CalendarPage() {
           ))
         }
         {activeClient && loadingMarkedDays && (
-          <Box sx={{ textAlign: "center", mt: 6, gridColumn: "1/-1" }}>
-            <CircularProgress />
-            <Typography variant="body2" sx={{ mt: 2 }}>Henter kalender...</Typography>
-          </Box>
-        )}
-      </Box>
-      <DateTimeEditDialog
-        open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
-        date={editDialogDate}
-        clientId={editDialogClient}
-        onSaved={handleSaveDateTime}
-        localMarkedDays={markedDays[editDialogClient]}
-      />
-    </Box>
-  );
-}
+          <Box sx={{ textAlign: "center", mt: 6, gridColumn:
