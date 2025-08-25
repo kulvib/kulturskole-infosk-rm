@@ -748,4 +748,20 @@ export default function CalendarPage() {
           ))
         }
         {activeClient && loadingMarkedDays && (
-          <Box sx={{ textAlign: "center", mt: 6, gridColumn:
+          <Box sx={{ textAlign: "center", mt: 6, gridColumn: "1/-1" }}>
+            <CircularProgress />
+            <Typography variant="body2" sx={{ mt: 2 }}>Henter kalender...</Typography>
+          </Box>
+        )}
+      </Box>
+      <DateTimeEditDialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        date={editDialogDate}
+        clientId={editDialogClient}
+        onSaved={handleSaveDateTime}
+        localMarkedDays={markedDays[editDialogClient]}
+      />
+    </Box>
+  );
+}
