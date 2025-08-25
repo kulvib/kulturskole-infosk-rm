@@ -18,6 +18,13 @@ import {
   DialogActions,
   Snackbar,
   Alert as MuiAlert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -40,6 +47,8 @@ import {
   openTerminal,
   openRemoteDesktop,
   getClient,
+  getMarkedDays,
+  getCurrentSeason,
 } from "../api";
 
 function formatDateTime(dateStr, withSeconds = false) {
@@ -72,12 +81,10 @@ function formatDateTime(dateStr, withSeconds = false) {
     : `${day}-${month}-${year}, Kl. ${hour}:${minute}`;
 }
 
-// NY FORMAT OPPETID - ALTID: 0 d., 2 t., 52 min., 23 sek.
 function formatUptime(uptimeStr) {
   if (!uptimeStr) return "ukendt";
   let totalSeconds = 0;
   if (uptimeStr.includes('-')) {
-    // d-h:m:s
     const [d, hms] = uptimeStr.split('-');
     const [h = "0", m = "0", s = "0"] = hms.split(':');
     totalSeconds =
@@ -202,6 +209,87 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
   );
 }
 
+// ----------- TÆND/SLUK KALENDER-TABEL START -----------
+
+function formatDateLong(dt) {
+  return dt.toLocaleDateString("da-DK", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric"
+  });
+}
+function getStatusAndTimes(dayData) {
+  if (!dayData || dayData.status !== "on") {
+    return {
+      status: "Slukket",
+      color: "error",
+      powerOn: "",
+      powerOff: ""
+    };
+  }
+  return {
+    status: "Tændt",
+    color: "success",
+    powerOn: dayData.onTime || "",
+    powerOff: dayData.offTime || ""
+  };
+}
+function ClientPowerWeekTable({ markedDays }) {
+  // Lav liste over i dag + 5 dage
+  const days = [];
+  const now = new Date();
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    days.push(d);
+  }
+
+  return (
+    <Card elevation={2} sx={{ borderRadius: 2, mb: 2, mt: 1 }}>
+      <CardContent>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            Tænd/Sluk Kalender (næste 6 dage)
+          </Typography>
+        </Stack>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Dato</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Tænd</TableCell>
+                <TableCell>Sluk</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {days.map((dt) => {
+                const dateKey = dt.toISOString().slice(0, 10); // "YYYY-MM-DD"
+                const dayData = markedDays?.[dateKey];
+                const { status, color, powerOn, powerOff } = getStatusAndTimes(dayData);
+
+                return (
+                  <TableRow key={dateKey}>
+                    <TableCell>{formatDateLong(dt)}</TableCell>
+                    <TableCell>
+                      <Chip label={status} color={color} size="small" sx={{ fontWeight: 600 }} />
+                    </TableCell>
+                    <TableCell>{powerOn}</TableCell>
+                    <TableCell>{powerOff}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ----------- TÆND/SLUK KALENDER-TABEL SLUT -----------
+
 export default function ClientDetailsPage({ client, refreshing, handleRefresh }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -221,6 +309,9 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
+  const [markedDays, setMarkedDays] = useState({});
+  const [calendarLoading, setCalendarLoading] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -235,7 +326,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     // eslint-disable-next-line
   }, [client]);
 
-  // Poll status-felter (browser, sidst set, oppetid) hvert 4,13 sekund
   useEffect(() => {
     if (!client?.id) return;
     const pollerStatus = setInterval(async () => {
@@ -246,8 +336,25 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
         setLastSeen(updated.last_seen || null);
         setUptime(updated.uptime || null);
       } catch {}
-    }, 4130); // 4,13 sekunder
+    }, 4130);
     return () => clearInterval(pollerStatus);
+  }, [client?.id]);
+
+  // Tænd/sluk kalender: Hent for aktuel sæson og klient
+  useEffect(() => {
+    async function fetchCalendar() {
+      if (!client?.id) return;
+      setCalendarLoading(true);
+      try {
+        const season = await getCurrentSeason();
+        const res = await getMarkedDays(season.id, client.id);
+        setMarkedDays(res?.markedDays || {});
+      } catch {
+        setMarkedDays({});
+      }
+      setCalendarLoading(false);
+    }
+    fetchCalendar();
   }, [client?.id]);
 
   const showSnackbar = (message, severity = "success") => {
@@ -438,7 +545,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     variant="outlined"
                     onClick={handleLocalitySave}
                     disabled={savingLocality}
-                    sx={{ ...actionBtnStyle, minWidth: 44, maxWidth: 44 }}
+                    sx={{ minWidth: 44, maxWidth: 44 }}
                   >
                     {savingLocality ? <CircularProgress size={16} /> : "Gem"}
                   </Button>
@@ -462,12 +569,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     color="primary"
                     onClick={handleKioskUrlSave}
                     disabled={savingKioskUrl}
-                    sx={{ ...actionBtnStyle, minWidth: 44, maxWidth: 44 }}
+                    sx={{ minWidth: 44, maxWidth: 44 }}
                   >
                     {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
                   </Button>
                 </Stack>
-                {/* Kiosk browser status - farve og tekst fra backend */}
                 <Stack direction="row" spacing={2} alignItems="center">
                   <ChromeReaderModeIcon color="primary" />
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -479,6 +585,20 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
+
+        {/* --------- INDSAT KALENDER-TABEL HER --------- */}
+        <Grid item xs={12}>
+          {calendarLoading ? (
+            <Box sx={{ textAlign: "center", py: 3 }}>
+              <CircularProgress size={32} />
+              <Typography sx={{ mt: 2 }}>Indlæser Tænd/Sluk kalender...</Typography>
+            </Box>
+          ) : (
+            <ClientPowerWeekTable markedDays={markedDays} />
+          )}
+        </Grid>
+        {/* --------- SLUT TABEL --------- */}
+
         <Grid item xs={12} md={6}>
           <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
             <CardContent sx={{
