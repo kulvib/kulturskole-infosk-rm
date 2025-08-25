@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
-from sqlmodel import select
+from sqlmodel import select, delete
 from models import CalendarMarking, Client
 from db import get_session
 from sqlalchemy.exc import SQLAlchemyError
@@ -111,3 +111,23 @@ def get_seasons_list(count: int = 20):
             "label": f"{season_start}/{season_end}"
         })
     return result
+
+# NYT ENDPOINT: Slet automatisk den forrige sæson hvis vi er efter 10. august
+@router.post("/calendar/cleanup-past-seasons")
+def cleanup_past_seasons(session=Depends(get_session)):
+    """
+    Slet alle CalendarMarking for den forrige sæson,
+    hvis vi er efter 10. august.
+    """
+    today = date.today()
+    # Bestem hvilken sæson der skal slettes
+    # Hvis vi er efter 10. august, slettes sidste år
+    if today.month > 8 or (today.month == 8 and today.day >= 10):
+        season_to_delete = today.year - 1
+        session.exec(
+            delete(CalendarMarking).where(CalendarMarking.season == season_to_delete)
+        )
+        session.commit()
+        return {"deleted_season": season_to_delete}
+    else:
+        return {"deleted_season": None, "message": "Ingen sæson slettet - ikke efter 10. august"}
