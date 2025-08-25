@@ -8,7 +8,7 @@
     "@mui/icons-material": "^5.15.18",
     "@mui/material": "^5.15.18",
     "@mui/x-date-pickers": "^6.17.0",
-    "date-fns": "^3.6.0",
+    "date-fns": "^2.30.0",
     "axios": "^1.6.8",
     "mqtt": "^5.7.0",
     "react": "^18.2.0",
