@@ -280,3 +280,16 @@ export async function getMarkedDays(season, client_id) {
   }
   return await res.json();
 }
+
+// Tilføj denne funktion for at hente aktuel sæson
+export async function getCurrentSeason() {
+  const token = getToken();
+  if (!token) throw new Error("Token mangler - du er ikke logget ind");
+  const res = await fetch(`${apiUrl}/api/calendar/season`, {
+    headers: { Authorization: "Bearer " + token },
+  });
+  if (!res.ok) {
+    throw new Error("Kunne ikke hente aktuel sæson");
+  }
+  return await res.json();
+}
