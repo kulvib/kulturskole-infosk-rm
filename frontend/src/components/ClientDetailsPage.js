@@ -24,7 +24,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -39,6 +38,7 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import { useNavigate } from "react-router-dom";
 import {
   updateClient,
@@ -50,6 +50,8 @@ import {
   getMarkedDays,
   getCurrentSeason,
 } from "../api";
+
+// ----------- UTILITIES -----------
 
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
@@ -209,7 +211,7 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
   );
 }
 
-// ----------- NY KALENDER-TABEL MED DD-MM-YYYY FORMAT -----------
+// ----------- KALENDER-TABEL (on/off, farvet tekst, kun 3 dage) -----------
 
 function formatDateShort(dt) {
   return dt.toLocaleDateString("da-DK", {
@@ -219,25 +221,40 @@ function formatDateShort(dt) {
   });
 }
 
-// Matcher backend-format: "YYYY-MM-DDT00:00:00"
 function getStatusAndTimesFromRaw(markedDays, dt) {
   const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
   const data = markedDays[dateKey];
   if (!data || !data.status || data.status === "off") {
-    return { status: "Slukket", color: "error", powerOn: "", powerOff: "" };
+    return { status: "off", color: "error", powerOn: "", powerOff: "" };
   }
   return {
-    status: "Tændt",
+    status: "on",
     color: "success",
     powerOn: data.onTime || "",
     powerOff: data.offTime || ""
   };
 }
 
-function ClientPowerWeekTableCompact({ markedDays }) {
+function StatusText({ status }) {
+  // Grøn for 'on', rød for 'off'
+  return (
+    <Typography
+      variant="body2"
+      sx={{
+        fontWeight: 600,
+        color: status === "on" ? "#43a047" : "#e53935", // MUI success/error
+        textTransform: "lowercase"
+      }}
+    >
+      {status}
+    </Typography>
+  );
+}
+
+function ClientPowerShortTable({ markedDays }) {
   const days = [];
   const now = new Date();
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 3; i++) { // Kun i dag + 2 dage
     const d = new Date(now);
     d.setDate(now.getDate() + i);
     days.push(d);
@@ -256,13 +273,11 @@ function ClientPowerWeekTableCompact({ markedDays }) {
         </TableHead>
         <TableBody>
           {days.map((dt) => {
-            const { status, color, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
+            const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
               <TableRow key={dt.toISOString().slice(0, 10)}>
                 <TableCell>{formatDateShort(dt)}</TableCell>
-                <TableCell>
-                  <Chip label={status} color={color} size="small" sx={{ fontWeight: 600 }} />
-                </TableCell>
+                <TableCell><StatusText status={status} /></TableCell>
                 <TableCell>{powerOn}</TableCell>
                 <TableCell>{powerOff}</TableCell>
               </TableRow>
@@ -274,7 +289,7 @@ function ClientPowerWeekTableCompact({ markedDays }) {
   );
 }
 
-// ----------- SLUT NY KALENDER-TABEL -----------
+// ----------- SLUT KALENDER-TABEL -----------
 
 export default function ClientDetailsPage({ client, refreshing, handleRefresh }) {
   const [locality, setLocality] = useState("");
@@ -326,7 +341,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
     return () => clearInterval(pollerStatus);
   }, [client?.id]);
 
-  // Tænd/sluk kalender: Hent for aktuel sæson og klient
   useEffect(() => {
     async function fetchCalendar() {
       if (!client?.id) return;
@@ -579,16 +593,35 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             <Grid item xs={12} md={4}>
               <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                    Kalender
-                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      Kalender
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="text"
+                      sx={{
+                        ml: 1,
+                        minWidth: 0,
+                        color: "text.secondary",
+                        fontSize: "0.85rem",
+                        textTransform: "none",
+                        px: 1,
+                        verticalAlign: "middle",
+                        borderRadius: 8
+                      }}
+                      onClick={() => navigate("/kalender")}
+                    >
+                      <ArrowForwardIosIcon sx={{ fontSize: 16 }} />
+                    </Button>
+                  </Box>
                   {calendarLoading ? (
                     <Box sx={{ textAlign: "center", py: 3 }}>
                       <CircularProgress size={32} />
                       <Typography sx={{ mt: 2 }}>Indlæser Tænd/Sluk kalender...</Typography>
                     </Box>
                   ) : (
-                    <ClientPowerWeekTableCompact markedDays={markedDays} />
+                    <ClientPowerShortTable markedDays={markedDays} />
                   )}
                 </CardContent>
               </Card>
