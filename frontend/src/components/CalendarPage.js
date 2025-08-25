@@ -8,8 +8,6 @@ import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
 
-// --- Hjælpefunktioner og constants --- (samme som før)
-
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
@@ -63,7 +61,7 @@ function deepEqual(obj1, obj2) {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
 
-// ClientSelectorInline: 2/3/5 klienter pr. række
+// ClientSelectorInline med 2/3/5 klienter pr. række
 function ClientSelectorInline({ clients, selected, onChange }) {
   const [search, setSearch] = useState("");
   const sortedClients = [...clients].sort((a, b) => {
@@ -569,7 +567,6 @@ export default function CalendarPage() {
   const clientMarkedDays = markedDays[activeClient];
   const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
 
-  // VIS TEKST OG ANDRE NAVNE
   const activeClientName = activeClient
     ? clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Automatisk"
     : "Automatisk";
@@ -597,44 +594,66 @@ export default function CalendarPage() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
-      {/* Sæson-feltet lige over Godkendte klienter */}
+      {/* Knapper og sæsonvælger på samme linje */}
       <Box sx={{
         display: "flex",
         alignItems: "center",
-        justifyContent: "flex-start",
+        justifyContent: "space-between",
         mb: 2,
-        p: 2,
-        bgcolor: "#f7fafd",
-        borderRadius: 2,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.04)"
+        gap: 2
       }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
-          Vælg Sæson:
-        </Typography>
-        <select
-          value={selectedSeason}
-          onChange={e => setSelectedSeason(Number(e.target.value))}
-          style={{
-            minWidth: 120,
-            fontWeight: 700,
-            background: "#fff",
-            fontSize: "1rem",
-            padding: "6px 14px",
-            borderRadius: "7px",
-            border: "1px solid #dbeafe"
-          }}
-        >
-          {seasons.map(season => (
-            <option key={season.value} value={season.value}>
-              {season.label}
-            </option>
-          ))}
-        </select>
+        {/* Venstre: MarkMode-knapper */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography sx={{ mr: 1 }}>
+            Markering betyder:
+          </Typography>
+          <Button
+            variant={markMode === "on" ? "contained" : "outlined"}
+            color="success"
+            onClick={() => setMarkMode("on")}
+            sx={{ fontWeight: markMode === "on" ? 700 : 400 }}
+          >
+            TÆNDT
+          </Button>
+          <Button
+            variant={markMode === "off" ? "contained" : "outlined"}
+            color="error"
+            onClick={() => setMarkMode("off")}
+            sx={{ fontWeight: markMode === "off" ? 700 : 400 }}
+          >
+            SLUKKET
+          </Button>
+        </Box>
+        {/* Højre: Sæsonvælger */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
+            Vælg Sæson:
+          </Typography>
+          <select
+            value={selectedSeason}
+            onChange={e => setSelectedSeason(Number(e.target.value))}
+            style={{
+              minWidth: 120,
+              fontWeight: 700,
+              background: "#fff",
+              fontSize: "1rem",
+              padding: "6px 14px",
+              borderRadius: "7px",
+              border: "1px solid #dbeafe"
+            }}
+          >
+            {seasons.map(season => (
+              <option key={season.value} value={season.value}>
+                {season.label}
+              </option>
+            ))}
+          </select>
+        </Box>
       </Box>
-      <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column", minHeight: 260 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
-          Godkendte klienter
-        </Typography>
+      <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
+        Godkendte klienter
+      </Typography>
+      <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
         <IconButton
           aria-label="Opdater klienter"
           onClick={fetchClients}
@@ -662,7 +681,6 @@ export default function CalendarPage() {
           selected={selectedClients}
           onChange={handleClientSelectorChange}
         />
-        {/* Samme række med tekst og knap */}
         {selectedClients.length > 1 && (
           <Box sx={{
             mt: 2,
@@ -698,28 +716,6 @@ export default function CalendarPage() {
           </Box>
         )}
       </Paper>
-      <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 2 }}>
-        <Typography sx={{ mr: 1 }}>
-          Markering betyder:
-        </Typography>
-        <Button
-          variant={markMode === "on" ? "contained" : "outlined"}
-          color="success"
-          onClick={() => setMarkMode("on")}
-          sx={{ fontWeight: markMode === "on" ? 700 : 400 }}
-        >
-          TÆNDT
-        </Button>
-        <Button
-          variant={markMode === "off" ? "contained" : "outlined"}
-          color="error"
-          onClick={() => setMarkMode("off")}
-          sx={{ fontWeight: markMode === "off" ? 700 : 400 }}
-        >
-          SLUKKET
-        </Button>
-        <Box sx={{ flexGrow: 1 }} />
-      </Box>
       <Box
         sx={{
           display: "grid",
