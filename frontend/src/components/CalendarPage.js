@@ -47,7 +47,7 @@ function formatDate(year, month, day) {
 
 function getDefaultTimes(dateStr) {
   const date = new Date(dateStr);
-  const day = date.getDay(); // 0=søndag, 6=lørdag
+  const day = date.getDay();
   if (day === 0 || day === 6) {
     return { onTime: "08:00", offTime: "18:00" };
   } else {
@@ -63,6 +63,7 @@ function deepEqual(obj1, obj2) {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
 
+// ClientSelectorInline: 2/3/5 klienter pr. række
 function ClientSelectorInline({ clients, selected, onChange }) {
   const [search, setSearch] = useState("");
   const sortedClients = [...clients].sort((a, b) => {
@@ -107,7 +108,7 @@ function ClientSelectorInline({ clients, selected, onChange }) {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
+          gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr", md: "repeat(5, 1fr)" },
           gap: 1,
         }}
       >
