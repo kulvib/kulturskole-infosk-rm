@@ -12,7 +12,11 @@ import {
   Snackbar,
   Alert as MuiAlert,
 } from "@mui/material";
-import { getMarkedDays, saveMarkedDays } from "../api"; // Brug fælles API
+
+const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
+function getToken() {
+  return localStorage.getItem("token");
+}
 
 const WEEKDAYS = [
   "søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"
@@ -34,20 +38,12 @@ function formatFullDate(dateStr) {
   return `${weekday} d. ${day}.${month} ${year}`;
 }
 
-function findDayObj(markedDays, normDate) {
-  if (!markedDays) return {};
-  if (markedDays[normDate]) return markedDays[normDate];
-  const key = Object.keys(markedDays).find(k => k.startsWith(normDate));
-  return key ? markedDays[key] : {};
-}
-
 export default function DateTimeEditDialog({
   open,
   onClose,
   date,
   clientId,
   onSaved,
-  localMarkedDays // typisk: markedDays[clientId] fra CalendarPage
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
@@ -58,38 +54,44 @@ export default function DateTimeEditDialog({
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const closeTimer = useRef(null);
 
+  // ADD THIS FUNCTION
   const handleCloseSnackbar = () => {
-    setSnackbar(s => ({ ...s, open: false }));
+    setSnackbar({ ...snackbar, open: false });
   };
+
+  function findDayObj(markedDays, normDate) {
+    if (markedDays[normDate]) return markedDays[normDate];
+    const key = Object.keys(markedDays).find(k => k.startsWith(normDate));
+    return key ? markedDays[key] : {};
+  }
 
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
     setOnTime(""); setOffTime("");
+    const token = getToken();
     const normDate = date.split("T")[0];
-    if (localMarkedDays && Object.keys(localMarkedDays).length > 0) {
-      const dayObj = findDayObj(localMarkedDays, normDate);
-      setOnTime(dayObj.onTime || "");
-      setOffTime(dayObj.offTime || "");
-      setLoading(false);
-    } else {
-      // fallback: hent fra backend
-      getMarkedDays(Number(normDate.slice(0, 4)), clientId)
-        .then(data => {
-          const dayObj = findDayObj(data.markedDays || {}, normDate);
-          setOnTime(dayObj.onTime || "");
-          setOffTime(dayObj.offTime || "");
-        })
-        .catch(() => {
-          setSnackbar({ open: true, message: "Fejl ved hentning!", severity: "error" });
-        })
-        .finally(() => setLoading(false));
-    }
-    // clean-up timer
+    fetch(
+      `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${normDate.slice(0, 4)}`,
+      token ? { headers: { Authorization: "Bearer " + token } } : undefined
+    )
+      .then(res => res.json())
+      .then(data => {
+        const dayObj = findDayObj(data.markedDays || {}, normDate);
+        setOnTime(dayObj.onTime || "");
+        setOffTime(dayObj.offTime || "");
+      })
+      .catch(() => {
+        setSnackbar({ open: true, message: "Fejl ved hentning!", severity: "error" });
+      })
+      .finally(() => setLoading(false));
+  }, [open, date, clientId]);
+
+  useEffect(() => {
     return () => {
       if (closeTimer.current) clearTimeout(closeTimer.current);
     };
-  }, [open, date, clientId, localMarkedDays]);
+  }, []);
 
   const validate = () => {
     if (!onTime || !offTime) {
@@ -109,10 +111,18 @@ export default function DateTimeEditDialog({
     setSaving(true);
     try {
       const normDate = date.split("T")[0];
-      const season = Number(normDate.substring(0, 4));
-      // Hent markedDays fra backend for merge
-      const backendDays = await getMarkedDays(season, clientId);
-      let serverData = backendDays.markedDays?.[clientId] || {};
+      const season = normDate.substring(0, 4);
+      const token = getToken();
+
+      const resGet = await fetch(
+        `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
+        token ? { headers: { Authorization: "Bearer " + token } } : undefined
+      );
+      let serverData = {};
+      if (resGet.ok) {
+        const data = await resGet.json();
+        serverData = data.markedDays || {};
+      }
       let updateKey = normDate;
       const existingKey = Object.keys(serverData).find(k => k.startsWith(normDate));
       if (existingKey) updateKey = existingKey;
@@ -128,19 +138,36 @@ export default function DateTimeEditDialog({
           [String(clientId)]: updatedDays
         },
         clients: [clientId],
-        season: season
+        season: Number(season)
       };
 
-      await saveMarkedDays(payload);
-
+      const res = await fetch(
+        `${API_BASE}/api/calendar/marked-days`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            accept: "application/json",
+            ...(token ? { Authorization: "Bearer " + token } : {}),
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) throw new Error();
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
       if (onSaved) onSaved({ date: normDate, clientId });
 
-      // Opdater input felter med evt. backend rettelser
-      const backendAfterSave = await getMarkedDays(season, clientId);
-      const dayObj2 = findDayObj(backendAfterSave.markedDays?.[clientId] || {}, normDate);
-      setOnTime(dayObj2.onTime || "");
-      setOffTime(dayObj2.offTime || "");
+      // Opdater input felter med evt. backend rettelser:
+      const resGet2 = await fetch(
+        `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
+        token ? { headers: { Authorization: "Bearer " + token } } : undefined
+      );
+      if (resGet2.ok) {
+        const data2 = await resGet2.json();
+        const dayObj2 = findDayObj(data2.markedDays || {}, normDate);
+        setOnTime(dayObj2.onTime || "");
+        setOffTime(dayObj2.offTime || "");
+      }
 
       // Luk dialogen automatisk efter success
       closeTimer.current = setTimeout(() => {
