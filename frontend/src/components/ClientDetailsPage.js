@@ -220,35 +220,19 @@ function formatDateLong(dt) {
   });
 }
 
-// Denne funktion håndterer både dag-nøgler og tid-nøgler!
-function getStatusAndTimesFromRaw(markedDays, dateKey) {
-  // Saml alle markeringer for denne dag
-  const marks = Object.entries(markedDays)
-    .filter(([k]) => k.startsWith(dateKey))
-    .map(([k, v]) => ({ ...v, datetime: k }));
-
-  const on = marks.find(m => m.action === "power_on");
-  const off = marks.find(m => m.action === "power_off");
-
-  if (on || off) {
-    return {
-      status: "Tændt",
-      color: "success",
-      powerOn: on ? on.datetime.slice(11,16) : "",
-      powerOff: off ? off.datetime.slice(11,16) : ""
-    };
-  } else {
-    const basic = markedDays[dateKey];
-    if (basic && basic.status === "on") {
-      return {
-        status: "Tændt",
-        color: "success",
-        powerOn: basic.onTime || "",
-        powerOff: basic.offTime || ""
-      };
-    }
+// Matcher backend-format: "YYYY-MM-DDT00:00:00"
+function getStatusAndTimesFromRaw(markedDays, dt) {
+  const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
+  const data = markedDays[dateKey];
+  if (!data || !data.status || data.status === "off") {
     return { status: "Slukket", color: "error", powerOn: "", powerOff: "" };
   }
+  return {
+    status: "Tændt",
+    color: "success",
+    powerOn: data.onTime || "",
+    powerOff: data.offTime || ""
+  };
 }
 
 function ClientPowerWeekTable({ markedDays }) {
@@ -280,11 +264,9 @@ function ClientPowerWeekTable({ markedDays }) {
             </TableHead>
             <TableBody>
               {days.map((dt) => {
-                const dateKey = dt.toISOString().slice(0, 10);
-                const { status, color, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dateKey);
-
+                const { status, color, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
                 return (
-                  <TableRow key={dateKey}>
+                  <TableRow key={dt.toISOString().slice(0, 10)}>
                     <TableCell>{formatDateLong(dt)}</TableCell>
                     <TableCell>
                       <Chip label={status} color={color} size="small" sx={{ fontWeight: 600 }} />
@@ -462,7 +444,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
 
   if (!client) {
     return (
-      <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
+      <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4 }}>
         <Card sx={{ p: 3 }}>
           <Typography variant="h6">Klientdata indlæses...</Typography>
         </Card>
@@ -471,7 +453,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   }
 
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", mt: 3 }}>
+    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 3 }}>
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3500}
@@ -711,7 +693,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<ChromeReaderModeIcon />}
                       disabled={actionLoading["chrome-start"]}
                       onClick={() => handleClientAction("chrome-start")}
-                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
+                      sx={actionBtnStyle}
                     >
                       {actionLoading["chrome-start"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                       Start kiosk browser
@@ -726,7 +708,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<PowerSettingsNewIcon />}
                       disabled={actionLoading["chrome-shutdown"]}
                       onClick={() => handleClientAction("chrome-shutdown")}
-                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
+                      sx={actionBtnStyle}
                     >
                       {actionLoading["chrome-shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                       Luk kiosk browser
@@ -740,7 +722,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       color="primary"
                       startIcon={<DesktopWindowsIcon />}
                       onClick={handleOpenRemoteDesktop}
-                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
+                      sx={actionBtnStyle}
                     >
                       Fjernskrivebord
                     </Button>
@@ -753,7 +735,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       color="inherit"
                       startIcon={<TerminalIcon />}
                       onClick={handleOpenTerminal}
-                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
+                      sx={actionBtnStyle}
                     >
                       Terminal på klient
                     </Button>
@@ -769,7 +751,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<RestartAltIcon />}
                       disabled={actionLoading["restart"]}
                       onClick={() => handleClientAction("restart")}
-                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
+                      sx={actionBtnStyle}
                     >
                       {actionLoading["restart"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                       Genstart klient
@@ -784,7 +766,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                       startIcon={<PowerSettingsNewIcon />}
                       disabled={actionLoading["shutdown"]}
                       onClick={() => setShutdownDialogOpen(true)}
-                      sx={{ minWidth: 200, maxWidth: 200, height: 36, textTransform: "none", fontWeight: 500, fontSize: "0.95rem", lineHeight: 1.1, py: 0, px: 1, m: 0, whiteSpace: "nowrap", display: "inline-flex", justifyContent: "center" }}
+                      sx={actionBtnStyle}
                     >
                       {actionLoading["shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                       Sluk klient
