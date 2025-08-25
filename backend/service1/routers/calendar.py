@@ -89,7 +89,6 @@ def get_marked_days(
             formatted_markings[str(k)] = v
     return {"markedDays": formatted_markings}
 
-# NYT ENDPOINT: Liste over de næste 20 sæsoner
 @router.get("/calendar/seasons")
 def get_seasons_list(count: int = 20):
     """
@@ -112,7 +111,26 @@ def get_seasons_list(count: int = 20):
         })
     return result
 
-# NYT ENDPOINT: Slet automatisk den forrige sæson hvis vi er efter 10. august
+@router.get("/calendar/season")
+def get_current_season():
+    """
+    Returnerer den aktuelle sæson, hvor sæsonen går fra 1. august til 31. juli året efter.
+    Eksempel: Hvis i dag er mellem 1. august 2024 og 31. juli 2025, returneres 2024/2025.
+    """
+    today = date.today()
+    year = today.year
+    # Fra august til december gælder sæsonen for dette år til næste år
+    if today.month >= 8:  # August til December
+        season_start = year
+        season_end = year + 1
+    else:  # Januar til Juli
+        season_start = year - 1
+        season_end = year
+    return {
+        "id": season_start,
+        "label": f"{season_start}/{season_end}"
+    }
+
 @router.post("/calendar/cleanup-past-seasons")
 def cleanup_past_seasons(session=Depends(get_session)):
     """
