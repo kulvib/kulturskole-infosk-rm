@@ -2,24 +2,25 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getClient } from "../api";
 import ClientDetailsPage from "./ClientDetailsPage";
-
-function isEqualClient(a, b) {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
+import ClientCalendarDialog from "./ClientCalendarDialog";
 
 export default function ClientDetailsPageWrapper() {
   const { clientId } = useParams();
   const [client, setClient] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // Poll klientdata og kalenderdata hver 15 sekunder
   const fetchClient = async (forceUpdate = false) => {
     if (!clientId) return;
     try {
       const data = await getClient(clientId);
-      if (forceUpdate || !isEqualClient(data, client)) {
-        setClient(data);
-      }
+      setClient(prev => {
+        if (forceUpdate || JSON.stringify(data) !== JSON.stringify(prev)) {
+          return data;
+        }
+        return prev;
+      });
     } catch (err) {
       // evt. fejl-håndtering
     }
@@ -39,10 +40,18 @@ export default function ClientDetailsPageWrapper() {
   };
 
   return (
-    <ClientDetailsPage
-      client={client}
-      refreshing={refreshing}
-      handleRefresh={handleRefresh}
-    />
+    <>
+      <ClientDetailsPage
+        client={client}
+        refreshing={refreshing}
+        handleRefresh={handleRefresh}
+        onOpenCalendarDialog={() => setCalendarOpen(true)}
+      />
+      <ClientCalendarDialog
+        open={calendarOpen}
+        onClose={() => setCalendarOpen(false)}
+        clientId={client?.id}
+      />
+    </>
   );
 }
