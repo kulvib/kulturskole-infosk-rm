@@ -1,609 +1,466 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Checkbox, TextField, Snackbar, Alert as MuiAlert
+  Box,
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Stack,
+  TextField,
+  CircularProgress,
+  Tooltip,
+  IconButton,
+  useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar,
+  Alert as MuiAlert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from "@mui/material";
+import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import TerminalIcon from "@mui/icons-material/Terminal";
+import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import ChromeReaderModeIcon from "@mui/icons-material/ChromeReaderMode";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import LanIcon from "@mui/icons-material/Lan";
+import MemoryIcon from "@mui/icons-material/Memory";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { getClients, saveMarkedDays, getMarkedDays } from "../api";
-import { useAuth } from "../auth/authcontext";
-import DateTimeEditDialog from "./DateTimeEditDialog";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
+import { useNavigate } from "react-router-dom";
+import {
+  updateClient,
+  pushKioskUrl,
+  clientAction,
+  openTerminal,
+  openRemoteDesktop,
+  getClient,
+  getMarkedDays,
+  getCurrentSeason,
+} from "../api";
 
-const monthNames = [
-  "August", "September", "Oktober", "November", "December",
-  "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
-];
-const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
+// ----------- UTILITIES -----------
 
-// --- NY getSeasons funktion: ---
-function getSeasons() {
-  // Beregn aktuel sæson ud fra dags dato
-  const now = new Date();
-  let seasonStartYear;
-  // Sæson starter 1. august
-  if (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)) {
-    // Hvis vi er i august eller senere, er sæsonen det nuværende år
-    seasonStartYear = now.getFullYear();
+function formatDateTime(dateStr, withSeconds = false) {
+  if (!dateStr) return "ukendt";
+  let d;
+  if (dateStr.endsWith("Z") || dateStr.match(/[\+\-]\d{2}:?\d{2}$/)) {
+    d = new Date(dateStr);
   } else {
-    // Hvis vi er før august, er sæsonen sidste år
-    seasonStartYear = now.getFullYear() - 1;
+    d = new Date(dateStr + "Z");
   }
-  // Lav listen med aktuel sæson + 2 næste
-  const seasons = [];
-  for (let i = 0; i < 3; i++) {
-    const start = seasonStartYear + i;
-    const end = (start + 1).toString().slice(-2);
-    seasons.push({ label: `${start}/${end}`, value: start });
-  }
-  return seasons;
+  const formatter = new Intl.DateTimeFormat("da-DK", {
+    timeZone: "Europe/Copenhagen",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: withSeconds ? "2-digit" : undefined,
+    hour12: false
+  });
+  const parts = formatter.formatToParts(d);
+  const day = parts.find(p => p.type === "day")?.value || "";
+  const month = parts.find(p => p.type === "month")?.value || "";
+  const year = parts.find(p => p.type === "year")?.value || "";
+  const hour = parts.find(p => p.type === "hour")?.value || "";
+  const minute = parts.find(p => p.type === "minute")?.value || "";
+  const second = withSeconds ? (parts.find(p => p.type === "second")?.value || "00") : undefined;
+  return withSeconds
+    ? `${day}-${month}-${year}, Kl. ${hour}:${minute}:${second}`
+    : `${day}-${month}-${year}, Kl. ${hour}:${minute}`;
 }
 
-function getSchoolYearMonths(seasonStart) {
-  const months = [];
-  for (let i = 0; i < 5; i++) {
-    months.push({ name: monthNames[i], month: i + 7, year: seasonStart });
-  }
-  for (let i = 5; i < 12; i++) {
-    months.push({ name: monthNames[i], month: i - 5, year: seasonStart + 1 });
-  }
-  return months;
-}
-
-function getDaysInMonth(month, year) {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-function formatDate(year, month, day) {
-  const mm = String(month + 1).padStart(2, '0');
-  const dd = String(day).padStart(2, '0');
-  return `${year}-${mm}-${dd}`;
-}
-
-function getDefaultTimes(dateStr) {
-  const date = new Date(dateStr);
-  const day = date.getDay();
-  if (day === 0 || day === 6) {
-    return { onTime: "08:00", offTime: "18:00" };
-  } else {
-    return { onTime: "09:00", offTime: "22:30" };
-  }
-}
-
-function stripTimeFromDateKey(key) {
-  return key.split("T")[0];
-}
-
-function deepEqual(obj1, obj2) {
-  return JSON.stringify(obj1) === JSON.stringify(obj2);
-}
-
-// ClientSelectorInline med 2/3/5 klienter pr. række
-function ClientSelectorInline({ clients, selected, onChange }) {
-  const [search, setSearch] = useState("");
-  const sortedClients = useMemo(() => [...clients].sort((a, b) => {
-    const aName = (a.locality || a.name || "").toLowerCase();
-    const bName = (b.locality || b.name || "").toLowerCase();
-    return aName.localeCompare(bName);
-  }), [clients]);
-
-  const filteredClients = useMemo(() => sortedClients.filter(c =>
-    (c.locality || c.name || "").toLowerCase().includes(search.toLowerCase())
-  ), [sortedClients, search]);
-
-  const allVisibleIds = filteredClients.map(c => c.id);
-  const allMarked = allVisibleIds.length > 0 && allVisibleIds.every(id => selected.includes(id));
-
-  const handleToggleAll = () => {
-    if (allMarked) {
-      onChange(selected.filter(id => !allVisibleIds.includes(id)));
-    } else {
-      const newSelected = Array.from(new Set([...selected, ...allVisibleIds]));
-      onChange(newSelected);
+function formatUptime(uptimeStr) {
+  if (!uptimeStr) return "ukendt";
+  let totalSeconds = 0;
+  if (uptimeStr.includes('-')) {
+    const [d, hms] = uptimeStr.split('-');
+    const [h = "0", m = "0", s = "0"] = hms.split(':');
+    totalSeconds =
+      parseInt(d, 10) * 86400 +
+      parseInt(h, 10) * 3600 +
+      parseInt(m, 10) * 60 +
+      parseInt(s, 10);
+  } else if (uptimeStr.includes(':')) {
+    const parts = uptimeStr.split(':').map(Number);
+    if (parts.length === 3) {
+      totalSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 2) {
+      totalSeconds = parts[0] * 60 + parts[1];
+    } else if (parts.length === 1) {
+      totalSeconds = parts[0];
     }
-  };
+  } else {
+    totalSeconds = parseInt(uptimeStr, 10);
+  }
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
 
+  return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
+}
+
+function ClientStatusIcon({ isOnline }) {
+  const theme = useTheme();
   return (
-    <Box>
-      <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-        <TextField
-          label="Søg klient"
-          variant="outlined"
-          size="small"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <Button
-          sx={{ ml: 2, minWidth: 0, px: 2 }}
-          variant={allMarked ? "contained" : "outlined"}
-          color={allMarked ? "success" : "primary"}
-          onClick={handleToggleAll}
-        >
-          {allMarked ? "Fjern alle" : "Markér alle"}
-        </Button>
-      </Box>
+    <Box
+      sx={{
+        display: "inline-flex",
+        alignItems: "center",
+        fontFamily: "Roboto, Helvetica, Arial, sans-serif",
+        fontSize: 13,
+        fontWeight: 400,
+        ml: 1,
+      }}
+    >
       <Box
         sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr", md: "repeat(5, 1fr)" },
-          gap: 1,
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
+          bgcolor: isOnline ? theme.palette.success.main : theme.palette.error.main,
+          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+          border: "1px solid #ddd",
         }}
-      >
-        {filteredClients.map(client => (
-          <Box
-            key={client.id}
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              px: 1,
-              py: 0.5,
-              background: selected.includes(client.id) ? "#f0f4ff" : "transparent",
-              borderRadius: 1,
-              cursor: "pointer",
-              ":hover": { background: "#f3f6fa" }
-            }}
-            onClick={() => {
-              if (selected.includes(client.id)) {
-                onChange(selected.filter(sid => sid !== client.id));
-              } else {
-                onChange([...selected, client.id]);
-              }
-            }}
-          >
-            <Checkbox
-              edge="start"
-              checked={selected.includes(client.id)}
-              tabIndex={-1}
-              disableRipple
-              sx={{ p: 0, pr: 1 }}
-              inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
-            />
-            <Typography variant="body2" noWrap>
-              {client.locality || client.name || "Ingen lokalitet"}
-            </Typography>
-          </Box>
-        ))}
-      </Box>
+      />
+      <span style={{ marginLeft: 6 }}>{isOnline ? "online" : "offline"}</span>
     </Box>
   );
 }
 
-function MonthCalendar({
-  name,
-  month,
-  year,
-  clientId,
-  markedDays,
-  markMode,
-  onDayClick,
-  onDateShiftLeftClick,
-  loadingDialogDate,
-  loadingDialogClient
-}) {
-  const [isDragging, setIsDragging] = useState(false);
-  const draggedDates = useRef(new Set());
+function ChromeStatusIcon({ status, color }) {
+  let fallbackColor = "grey.400";
+  let text = status || "Ukendt";
+  let dotColor = color || fallbackColor;
 
-  const daysInMonth = getDaysInMonth(month, year);
-  const firstDayOfWeek = new Date(year, month, 1).getDay();
-  const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-
-  const cells = [];
-  for (let i = 0; i < offset; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const handleMouseDown = (e, dateString) => {
-    if (e.shiftKey && e.button === 0) {
-      e.preventDefault();
-      if (
-        clientId &&
-        markedDays?.[clientId]?.[dateString]?.status === "on" &&
-        !loadingDialogDate
-      ) {
-        onDateShiftLeftClick(clientId, dateString);
-        return;
-      }
+  if (!color && typeof status === "string") {
+    const s = status.toLowerCase();
+    if (s === "running") {
+      dotColor = "#43a047";
+      text = "Åben";
+    } else if (s === "stopped" || s === "closed") {
+      dotColor = "#e53935";
+      text = "Lukket";
+    } else if (s === "unknown") {
+      dotColor = "grey.400";
+      text = "Ukendt";
+    } else if (s.includes("kører")) {
+      dotColor = "#43a047";
+      text = status;
+    } else if (s.includes("lukket")) {
+      dotColor = "#e53935";
+      text = status;
     }
-    setIsDragging(true);
-    draggedDates.current = new Set([dateString]);
-    if (clientId) {
-      onDayClick([clientId], dateString, markMode, markedDays);
-    }
-  };
-
-  const handleMouseEnter = (e, dateString) => {
-    if (isDragging && clientId && !draggedDates.current.has(dateString)) {
-      draggedDates.current.add(dateString);
-      onDayClick([clientId], dateString, markMode, markedDays);
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    draggedDates.current = new Set();
-  };
-
-  useEffect(() => {
-    if (!isDragging) return;
-    const handleUp = () => handleMouseUp();
-    window.addEventListener("mouseup", handleUp);
-    return () => window.removeEventListener("mouseup", handleUp);
-  }, [isDragging]);
+  }
 
   return (
-    <Card sx={{ borderRadius: "14px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", minWidth: 0, background: "#f9fafc" }}>
-      <CardContent>
-        <Typography variant="h6" sx={{ color: "#0a275c", fontWeight: 700, textAlign: "center", fontSize: "1.08rem", mb: 1 }}>
-          {name} {year}
-        </Typography>
-        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.2, mb: 0.5 }}>
-          {weekdayNames.map(wd => (
-            <Typography key={wd} variant="caption" sx={{ fontWeight: 700, color: "#555", textAlign: "center", fontSize: "0.90rem", letterSpacing: "0.03em" }}>
-              {wd}
-            </Typography>
-          ))}
-        </Box>
-        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.2 }}>
-          {cells.map((day, idx) => {
-            if (!day) return <Box key={idx + "-empty"} />;
-            const dateString = formatDate(year, month, day);
-            const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
-            let bg = "#fff";
-            if (cellStatus === "on") bg = "#b4eeb4";
-            if (cellStatus === "off") bg = "#ffb7b7";
-            const isLoading =
-              loadingDialogDate === dateString && loadingDialogClient === clientId;
-
-            return (
-              <Box key={idx}
-                sx={{
-                  display: "flex", justifyContent: "center", alignItems: "center", p: 0.2, position: "relative"
-                }}>
-                <Box
-                  sx={{
-                    width: 23, height: 23, borderRadius: "50%", background: bg,
-                    border: "1px solid #eee", color: "#0a275c", fontWeight: 500,
-                    fontSize: "0.95rem", textAlign: "center", lineHeight: "23px",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                    cursor: clientId ? "pointer" : "default",
-                    transition: "background 0.2s", opacity: clientId ? 1 : 0.55,
-                    position: "relative"
-                  }}
-                  title={
-                    cellStatus === "on"
-                      ? "Tændt (shift+klik for tid)"
-                      : cellStatus === "off"
-                        ? "Slukket"
-                        : ""
-                  }
-                  onMouseDown={e => handleMouseDown(e, dateString)}
-                  onMouseEnter={e => handleMouseEnter(e, dateString)}
-                >
-                  {isLoading ? (
-                    <CircularProgress size={18} sx={{ position: "absolute", top: 2, left: 2, zIndex: 1201 }} />
-                  ) : (
-                    day
-                  )}
-                </Box>
-              </Box>
-            );
-          })}
-        </Box>
-      </CardContent>
-    </Card>
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Box
+        sx={{
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
+          bgcolor: dotColor,
+          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+          border: "1px solid #ddd",
+        }}
+      />
+      <Typography variant="body2" sx={{ fontWeight: 700 }}>{text}</Typography>
+    </Stack>
   );
 }
 
-export default function CalendarPage() {
-  const { token } = useAuth();
-  const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
-  const [clients, setClients] = useState([]);
-  const [selectedClients, setSelectedClients] = useState([]);
-  const [activeClient, setActiveClient] = useState(null);
-  const [loadingClients, setLoadingClients] = useState(false);
-  const [markMode, setMarkMode] = useState("on");
-  const [markedDays, setMarkedDays] = useState({});
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editDialogDate, setEditDialogDate] = useState(null);
-  const [editDialogClient, setEditDialogClient] = useState(null);
-  const [loadingDialogDate, setLoadingDialogDate] = useState(null);
-  const [loadingDialogClient, setLoadingDialogClient] = useState(null);
-  const [savingCalendar, setSavingCalendar] = useState(false);
+function CopyIconButton({ value, disabled, iconSize = 16 }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {}
+  };
+
+  return (
+    <Tooltip title={copied ? "Kopieret!" : "Kopiér"}>
+      <span>
+        <IconButton
+          size="small"
+          onClick={handleCopy}
+          sx={{ ml: 1, p: 0.5 }}
+          disabled={disabled}
+        >
+          <ContentCopyIcon sx={{ fontSize: iconSize }} color={copied ? "success" : "inherit"} />
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
+}
+
+// ----------- KALENDER-TABEL (on/off, farvet tekst, kun 3 dage) -----------
+
+function formatDateShort(dt) {
+  return dt.toLocaleDateString("da-DK", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+
+function getStatusAndTimesFromRaw(markedDays, dt) {
+  const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
+  const data = markedDays[dateKey];
+  if (!data || !data.status || data.status === "off") {
+    return { status: "off", color: "error", powerOn: "", powerOff: "" };
+  }
+  return {
+    status: "on",
+    color: "success",
+    powerOn: data.onTime || "",
+    powerOff: data.offTime || ""
+  };
+}
+
+function StatusText({ status }) {
+  // Grøn for 'on', rød for 'off'
+  return (
+    <Typography
+      variant="body2"
+      sx={{
+        fontWeight: 600,
+        color: status === "on" ? "#43a047" : "#e53935", // MUI success/error
+        textTransform: "lowercase"
+      }}
+    >
+      {status}
+    </Typography>
+  );
+}
+
+function ClientPowerShortTable({ markedDays }) {
+  const days = [];
+  const now = new Date();
+  for (let i = 0; i < 3; i++) { // Kun i dag + 2 dage
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    days.push(d);
+  }
+
+  return (
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Dato</TableCell>
+            <TableCell>Status</TableCell>
+            <TableCell>Tænd</TableCell>
+            <TableCell>Sluk</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {days.map((dt) => {
+            const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
+            return (
+              <TableRow key={dt.toISOString().slice(0, 10)}>
+                <TableCell>{formatDateShort(dt)}</TableCell>
+                <TableCell><StatusText status={status} /></TableCell>
+                <TableCell>{powerOn}</TableCell>
+                <TableCell>{powerOff}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+// ----------- SLUT KALENDER-TABEL -----------
+
+export default function ClientDetailsPage({ client, refreshing, handleRefresh }) {
+  const [locality, setLocality] = useState("");
+  const [localityDirty, setLocalityDirty] = useState(false);
+  const [savingLocality, setSavingLocality] = useState(false);
+
+  const [kioskUrl, setKioskUrl] = useState("");
+  const [kioskUrlDirty, setKioskUrlDirty] = useState(false);
+  const [savingKioskUrl, setSavingKioskUrl] = useState(false);
+
+  const [actionLoading, setActionLoading] = useState({});
+  const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
+
+  const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status || "unknown");
+  const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color || null);
+  const [lastSeen, setLastSeen] = useState(client?.last_seen || null);
+  const [uptime, setUptime] = useState(client?.uptime || null);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const snackbarTimer = useRef(null);
 
-  const autoSaveTimer = useRef(null);
+  const [markedDays, setMarkedDays] = useState({});
+  const [calendarLoading, setCalendarLoading] = useState(false);
 
-  const lastDialogSavedMarkedDays = useRef({});
-  const lastDialogSavedTimestamp = useRef(0);
-
-  const seasons = getSeasons();
-
-  const fetchClients = useCallback(async () => {
-    setLoadingClients(true);
-    try {
-      const data = await getClients(token);
-      const approvedClients = (data?.filter((c) => c.status === "approved") || []).slice();
-      setClients(approvedClients);
-    } catch {
-      setClients([]);
-      setSnackbar({ open: true, message: "Kunne ikke hente klienter.", severity: "error" });
-    }
-    setLoadingClients(false);
-  }, [token]);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchClients();
-  }, [fetchClients]);
+    if (client) {
+      if (!localityDirty) setLocality(client.locality || "");
+      if (!kioskUrlDirty) setKioskUrl(client.kiosk_url || "");
+      setLiveChromeStatus(client.chrome_status || "unknown");
+      setLiveChromeColor(client.chrome_color || null);
+      setLastSeen(client.last_seen || null);
+      setUptime(client.uptime || null);
+    }
+    // eslint-disable-next-line
+  }, [client]);
 
   useEffect(() => {
-    if (!activeClient) return;
-    setMarkedDays(prev => ({ ...prev, [activeClient]: undefined }));
-    let isCurrent = true;
-    getMarkedDays(selectedSeason, activeClient)
-      .then(data => {
-        if (isCurrent) {
-          const rawDays = data.markedDays || {};
-          const mapped = {};
-          Object.keys(rawDays).forEach(key => {
-            mapped[stripTimeFromDateKey(key)] = rawDays[key];
-          });
-          setMarkedDays(prev => ({
-            ...prev,
-            [activeClient]: mapped
-          }));
-        }
-      })
-      .catch(() => {
-        if (isCurrent) {
-          setMarkedDays(prev => ({
-            ...prev,
-            [activeClient]: {}
-          }));
-          setSnackbar({ open: true, message: "Kunne ikke hente kalender.", severity: "error" });
-        }
-      });
-    return () => { isCurrent = false; };
-  }, [selectedSeason, activeClient, token]);
-
-  useEffect(() => {
-    if (editDialogOpen) return;
-    if (!activeClient) return;
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-
-    const changedSinceDialog =
-      !deepEqual(
-        markedDays[activeClient],
-        lastDialogSavedMarkedDays.current[activeClient]
-      );
-    if (!changedSinceDialog) return;
-
-    autoSaveTimer.current = setTimeout(() => {
-      handleSaveSingleClient(activeClient);
-    }, 1000);
-
-    return () => {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    };
-  }, [markedDays[activeClient], activeClient, editDialogOpen]);
-
-  const handleSaveSingleClient = async (clientId) => {
-    if (!clientId) return;
-    const allDates = [];
-    getSchoolYearMonths(selectedSeason).forEach(({ month, year }) => {
-      const daysInMonth = getDaysInMonth(month, year);
-      for (let d = 1; d <= daysInMonth; d++) {
-        allDates.push(formatDate(year, month, d));
-      }
-    });
-
-    const payloadMarkedDays = {};
-    payloadMarkedDays[String(clientId)] = {};
-    allDates.forEach(dateStr => {
-      const md = markedDays[clientId]?.[dateStr];
-      if (md && md.status === "on") {
-        const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
-        const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
-        payloadMarkedDays[String(clientId)][dateStr] = {
-          status: "on",
-          onTime,
-          offTime
-        };
-      } else {
-        payloadMarkedDays[String(clientId)][dateStr] = {
-          status: "off"
-        };
-      }
-    });
-
-    const payload = {
-      clients: [clientId],
-      markedDays: payloadMarkedDays,
-      season: selectedSeason
-    };
-
-    try {
-      await saveMarkedDays(payload);
-      lastDialogSavedMarkedDays.current = {
-        ...lastDialogSavedMarkedDays.current,
-        [clientId]: markedDays[clientId]
-      };
-      lastDialogSavedTimestamp.current = Date.now();
-    } catch (e) {
-      setSnackbar({ open: true, message: e.message || "Kunne ikke autosave!", severity: "error" });
-    }
-  };
-
-  const handleClientSelectorChange = (newSelected) => {
-    setSelectedClients(newSelected);
-    if (!newSelected.includes(activeClient)) {
-      setActiveClient(newSelected.length > 0 ? newSelected[newSelected.length - 1] : null);
-    }
-  };
-
-  const handleDayClick = (clientIds, dateString, mode, markedDays) => {
-    setMarkedDays(prev => {
-      const updated = { ...prev };
-      selectedClients.forEach(cid => {
-        updated[cid] = { ...(updated[cid] || {}), [dateString]: { status: mode } };
-      });
-      return updated;
-    });
-  };
-
-  const handleDateShiftLeftClick = (clientId, date) => {
-    if (autoSaveTimer.current) {
-      clearTimeout(autoSaveTimer.current);
-      autoSaveTimer.current = null;
-    }
-    setLoadingDialogDate(date);
-    setLoadingDialogClient(clientId);
-
-    setTimeout(() => {
-      setEditDialogClient(clientId);
-      setEditDialogDate(date);
-      setEditDialogOpen(true);
-      setLoadingDialogDate(null);
-      setLoadingDialogClient(null);
-    }, 1100);
-  };
-
-  const handleSaveDateTime = async ({ date, clientId }) => {
-    try {
-      const data = await getMarkedDays(selectedSeason, clientId);
-      const rawDays = data.markedDays || {};
-      const mapped = {};
-      Object.keys(rawDays).forEach(key => {
-        mapped[stripTimeFromDateKey(key)] = rawDays[key];
-      });
-      setMarkedDays(prev => ({
-        ...prev,
-        [clientId]: mapped
-      }));
-
-      lastDialogSavedMarkedDays.current = {
-        ...lastDialogSavedMarkedDays.current,
-        [clientId]: mapped
-      };
-      lastDialogSavedTimestamp.current = Date.now();
-
-      setSnackbar({ open: true, message: "Gemt!", severity: "success" });
-    } catch {
-      setSnackbar({ open: true, message: "Kunne ikke hente nyeste tider", severity: "error" });
-    }
-  };
-
-  const schoolYearMonths = useMemo(() => getSchoolYearMonths(selectedSeason), [selectedSeason]);
-
-  const handleSave = useCallback(
-    async (showSuccessFeedback = false) => {
-      if (selectedClients.length < 2) {
-        setSnackbar({ open: true, message: "Vælg mindst to klienter", severity: "error" });
-        return;
-      }
-      if (!activeClient) {
-        setSnackbar({ open: true, message: "Ingen aktiv klient valgt", severity: "error" });
-        return;
-      }
-      setSavingCalendar(true);
-
-      const allDates = [];
-      schoolYearMonths.forEach(({ month, year }) => {
-        const daysInMonth = getDaysInMonth(month, year);
-        for (let d = 1; d <= daysInMonth; d++) {
-          allDates.push(formatDate(year, month, d));
-        }
-      });
-
-      const payloadMarkedDays = {};
-      selectedClients.forEach(cid => {
-        const clientKey = String(cid);
-        const sourceMarkedDays = markedDays[activeClient] || {};
-        payloadMarkedDays[clientKey] = {};
-        allDates.forEach(dateStr => {
-          const md = sourceMarkedDays[dateStr];
-          if (md && md.status === "on") {
-            const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
-            const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
-            payloadMarkedDays[clientKey][dateStr] = {
-              status: "on",
-              onTime,
-              offTime
-            };
-          } else {
-            payloadMarkedDays[clientKey][dateStr] = {
-              status: "off"
-            };
-          }
-        });
-      });
-
-      const payload = {
-        clients: selectedClients,
-        markedDays: payloadMarkedDays,
-        season: selectedSeason
-      };
-
+    if (!client?.id) return;
+    const pollerStatus = setInterval(async () => {
       try {
-        await saveMarkedDays(payload);
-        if (showSuccessFeedback) {
-          setSnackbar({ open: true, message: "Gemt!", severity: "success" });
-        }
-        if (activeClient) {
-          try {
-            const data = await getMarkedDays(selectedSeason, activeClient);
-            const rawDays = data.markedDays || {};
-            const mapped = {};
-            Object.keys(rawDays).forEach(key => {
-              mapped[stripTimeFromDateKey(key)] = rawDays[key];
-            });
-            setMarkedDays(prev => ({
-              ...prev,
-              [activeClient]: mapped
-            }));
-          } catch (e) {
-            setMarkedDays(prev => ({
-              ...prev,
-              [activeClient]: {}
-            }));
-          }
-        }
-      } catch (e) {
-        setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
-      } finally {
-        setSavingCalendar(false);
-      }
-    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]
-  );
+        const updated = await getClient(client.id);
+        setLiveChromeStatus(updated.chrome_status || "unknown");
+        setLiveChromeColor(updated.chrome_color || null);
+        setLastSeen(updated.last_seen || null);
+        setUptime(updated.uptime || null);
+      } catch {}
+    }, 4130);
+    return () => clearInterval(pollerStatus);
+  }, [client?.id]);
 
   useEffect(() => {
-    return () => {
-      if (snackbarTimer.current) clearTimeout(snackbarTimer.current);
-    };
-  }, []);
+    async function fetchCalendar() {
+      if (!client?.id) return;
+      setCalendarLoading(true);
+      try {
+        const season = await getCurrentSeason();
+        const res = await getMarkedDays(season.id, client.id);
+        setMarkedDays(res?.markedDays || {});
+      } catch {
+        setMarkedDays({});
+      }
+      setCalendarLoading(false);
+    }
+    fetchCalendar();
+  }, [client?.id]);
 
-  const clientMarkedDays = markedDays[activeClient];
-  const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
-
-  const activeClientName = activeClient
-    ? clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Automatisk"
-    : "Automatisk";
-  const otherClientNames = selectedClients.length > 1
-    ? clients
-        .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
-        .map(c => c.locality || c.name)
-        .filter(Boolean)
-        .join(", ")
-    : "";
+  const showSnackbar = (message, severity = "success") => {
+    setSnackbar({ open: true, message, severity });
+  };
 
   const handleCloseSnackbar = () => {
     setSnackbar({ open: false, message: "", severity: "success" });
   };
 
+  const actionBtnStyle = {
+    minWidth: 200,
+    maxWidth: 200,
+    height: 36,
+    textTransform: "none",
+    fontWeight: 500,
+    fontSize: "0.95rem",
+    lineHeight: 1.1,
+    py: 0,
+    px: 1,
+    m: 0,
+    whiteSpace: "nowrap",
+    display: "inline-flex",
+    justifyContent: "center"
+  };
+  const inputStyle = {
+    width: 300,
+    height: 32,
+    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
+    "& .MuiInputBase-root": { height: "32px" },
+  };
+  const kioskInputStyle = {
+    width: 550,
+    height: 32,
+    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
+    "& .MuiInputBase-root": { height: "32px" },
+  };
+
+  const handleLocalityChange = (e) => {
+    setLocality(e.target.value);
+    setLocalityDirty(true);
+  };
+  const handleLocalitySave = async () => {
+    setSavingLocality(true);
+    try {
+      await updateClient(client.id, { locality });
+      setLocalityDirty(false);
+      showSnackbar("Lokation gemt!", "success");
+    } catch (err) {
+      showSnackbar("Kunne ikke gemme lokation: " + err.message, "error");
+    }
+    setSavingLocality(false);
+  };
+
+  const handleKioskUrlChange = (e) => {
+    setKioskUrl(e.target.value);
+    setKioskUrlDirty(true);
+  };
+  const handleKioskUrlSave = async () => {
+    setSavingKioskUrl(true);
+    try {
+      await pushKioskUrl(client.id, kioskUrl);
+      setKioskUrlDirty(false);
+      showSnackbar("Kiosk webadresse opdateret!", "success");
+    } catch (err) {
+      showSnackbar("Kunne ikke opdatere kiosk webadresse: " + err.message, "error");
+    }
+    setSavingKioskUrl(false);
+  };
+
+  const handleClientAction = async (action) => {
+    setActionLoading((prev) => ({ ...prev, [action]: true }));
+    try {
+      await clientAction(client.id, action);
+      showSnackbar("Handlingen blev udført!", "success");
+      const updated = await getClient(client.id);
+      setLiveChromeStatus(updated.chrome_status || "unknown");
+      setLiveChromeColor(updated.chrome_color || null);
+      setLastSeen(updated.last_seen || null);
+      setUptime(updated.uptime || null);
+    } catch (err) {
+      showSnackbar("Fejl: " + err.message, "error");
+    }
+    setActionLoading((prev) => ({ ...prev, [action]: false }));
+  };
+
+  const handleOpenTerminal = () => openTerminal(client.id);
+  const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
+
+  const sectionSpacing = 2;
+
+  if (!client) {
+    return (
+      <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4 }}>
+        <Card sx={{ p: 3 }}>
+          <Typography variant="h6">Klientdata indlæses...</Typography>
+        </Card>
+      </Box>
+    );
+  }
+
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
+    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 3 }}>
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={2000}
+        autoHideDuration={3500}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
@@ -611,174 +468,401 @@ export default function CalendarPage() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
-      {/* Godkendte klienter øverst */}
-      <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
-        Godkendte klienter
-      </Typography>
-      <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
-        <IconButton
-          aria-label="Opdater klienter"
-          onClick={fetchClients}
-          disabled={loadingClients}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+        <Button
+          variant="outlined"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate("/clients")}
           sx={{
-            position: "absolute",
-            top: 12,
-            right: 12,
-            zIndex: 2,
-            background: "#fff",
-            border: "1px solid #dbeafe",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)"
+            textTransform: "none",
+            fontWeight: 500,
+            minWidth: 0,
+            px: 2,
           }}
         >
-          <RefreshIcon />
-          {loadingClients && (
-            <CircularProgress
-              size={32}
-              sx={{ color: "#1976d2", position: "absolute", left: 4, top: 4, zIndex: 1 }}
-            />
-          )}
-        </IconButton>
-        <ClientSelectorInline
-          clients={clients}
-          selected={selectedClients}
-          onChange={handleClientSelectorChange}
-        />
-        {selectedClients.length > 1 && (
-          <Box sx={{
-            mt: 2,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between"
-          }}>
-            <Box>
-              <Typography variant="body2" sx={{ fontSize: "1rem", fontWeight: 700 }}>
-                Viser kalender for: {activeClientName} -
-              </Typography>
-              <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "#555", fontWeight: 400 }}>
-                ændringerne slår også igennem på klienterne: {otherClientNames}
-              </Typography>
-            </Box>
+          Tilbage til klientoversigt
+        </Button>
+        <Tooltip title="Opdater klient">
+          <span>
             <Button
-              variant="contained"
+              startIcon={refreshing ? <CircularProgress size={18} /> : <RefreshIcon fontSize="medium" />}
+              disabled={refreshing}
               color="primary"
-              onClick={() => handleSave(true)}
-              disabled={savingCalendar || selectedClients.length < 2}
-              startIcon={savingCalendar ? <CircularProgress color="inherit" size={20} /> : null}
-              sx={{
-                boxShadow: selectedClients.length < 2 ? "none" : undefined,
-                bgcolor: selectedClients.length < 2 ? "#eee" : undefined,
-                color: selectedClients.length < 2 ? "#888" : undefined,
-                pointerEvents: selectedClients.length < 2 ? "none" : undefined,
-                minWidth: 220,
-                ml: 3
-              }}
+              onClick={handleRefresh}
+              sx={{ fontWeight: 500, textTransform: "none", minWidth: 0, mr: 1, px: 2 }}
             >
-              {savingCalendar ? "Gemmer..." : "Gem kalender for valgte klienter"}
+              {refreshing ? "Opdaterer..." : "Opdater"}
             </Button>
-          </Box>
-        )}
-      </Paper>
-      {/* Knapper og sæsonvælger */}
-      <Box sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        mb: 2,
-        gap: 2
-      }}>
-        {/* Venstre: MarkMode-knapper */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography variant="h6" sx={{ mr: 1, fontWeight: 700 }}>
-            Markering betyder:
-          </Typography>
-          <Button
-            variant={markMode === "on" ? "contained" : "outlined"}
-            color="success"
-            onClick={() => setMarkMode("on")}
-            sx={{ fontWeight: markMode === "on" ? 700 : 400 }}
-          >
-            TÆNDT
-          </Button>
-          <Button
-            variant={markMode === "off" ? "contained" : "outlined"}
-            color="error"
-            onClick={() => setMarkMode("off")}
-            sx={{ fontWeight: markMode === "off" ? 700 : 400 }}
-          >
-            SLUKKET
-          </Button>
-        </Box>
-        {/* Højre: Sæsonvælger */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
-            Vælg Sæson:
-          </Typography>
-          <select
-            value={selectedSeason}
-            onChange={e => setSelectedSeason(Number(e.target.value))}
-            style={{
-              minWidth: 120,
-              fontWeight: 700,
-              background: "#fff",
-              fontSize: "1rem",
-              padding: "6px 14px",
-              borderRadius: "7px",
-              border: "1px solid #dbeafe"
-            }}
-          >
-            {seasons.map(season => (
-              <option key={season.value} value={season.value}>
-                {season.label}
-              </option>
-            ))}
-          </select>
-        </Box>
+          </span>
+        </Tooltip>
       </Box>
-      {/* Kalender */}
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "2fr 2fr", md: "repeat(4, 1fr)" },
-          gap: 3,
-        }}
-      >
-        {!activeClient && (
-          <Typography sx={{ mt: 4, textAlign: "center", gridColumn: "1/-1" }}>
-            Vælg en klient for at se kalenderen.
-          </Typography>
-        )}
-        {activeClient && !loadingMarkedDays &&
-          schoolYearMonths.map(({ name, month, year }) => (
-            <MonthCalendar
-              key={name + year}
-              name={name}
-              month={month}
-              year={year}
-              clientId={activeClient}
-              markedDays={markedDays}
-              markMode={markMode}
-              onDayClick={handleDayClick}
-              onDateShiftLeftClick={handleDateShiftLeftClick}
-              loadingDialogDate={loadingDialogDate}
-              loadingDialogClient={loadingDialogClient}
-            />
-          ))
-        }
-        {activeClient && loadingMarkedDays && (
-          <Box sx={{ textAlign: "center", mt: 6, gridColumn: "1/-1" }}>
-            <CircularProgress />
-            <Typography variant="body2" sx={{ mt: 2 }}>Henter kalender...</Typography>
-          </Box>
-        )}
-      </Box>
-      <DateTimeEditDialog
-        open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
-        date={editDialogDate}
-        clientId={editDialogClient}
-        onSaved={handleSaveDateTime}
-        localMarkedDays={markedDays[editDialogClient]}
-      />
+      <Grid container spacing={sectionSpacing}>
+        <Grid item xs={12}>
+          {/* Øverste felt bibeholdes */}
+          <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 700,
+                      lineHeight: 1.2,
+                      letterSpacing: 0.5,
+                      fontSize: { xs: "1rem", sm: "1.15rem", md: "1.25rem" },
+                    }}
+                  >
+                    {client.name}
+                  </Typography>
+                  <ClientStatusIcon isOnline={client.isOnline} />
+                </Stack>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <LanIcon color="primary" />
+                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                    Klient ID:
+                  </Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem" }}
+                  >
+                    {client.id}
+                  </Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <LocationOnIcon color="primary" />
+                  <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 90 }}>
+                    Lokation:
+                  </Typography>
+                  <TextField
+                    size="small"
+                    value={locality}
+                    onChange={handleLocalityChange}
+                    sx={inputStyle}
+                    disabled={savingLocality}
+                  />
+                  <CopyIconButton value={locality} disabled={!locality} iconSize={15} />
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handleLocalitySave}
+                    disabled={savingLocality}
+                    sx={{ minWidth: 44, maxWidth: 44 }}
+                  >
+                    {savingLocality ? <CircularProgress size={16} /> : "Gem"}
+                  </Button>
+                </Stack>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <ChromeReaderModeIcon color="primary" />
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    Kiosk URL:
+                  </Typography>
+                  <TextField
+                    size="small"
+                    value={kioskUrl}
+                    onChange={handleKioskUrlChange}
+                    sx={kioskInputStyle}
+                    disabled={savingKioskUrl}
+                  />
+                  <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={15} />
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    onClick={handleKioskUrlSave}
+                    disabled={savingKioskUrl}
+                    sx={{ minWidth: 44, maxWidth: 44 }}
+                  >
+                    {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
+                  </Button>
+                </Stack>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <ChromeReaderModeIcon color="primary" />
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    Kiosk browser status:
+                  </Typography>
+                  <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* ----------- NY TRE-KOLONNE SEKTION ----------- */}
+        <Grid item xs={12}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={4}>
+              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+                <CardContent>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      Kalender
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="text"
+                      sx={{
+                        ml: 1,
+                        minWidth: 0,
+                        color: "text.secondary",
+                        fontSize: "0.85rem",
+                        textTransform: "none",
+                        px: 1,
+                        verticalAlign: "middle",
+                        borderRadius: 8
+                      }}
+                      onClick={() => navigate("/kalender")}
+                    >
+                      <ArrowForwardIosIcon sx={{ fontSize: 16 }} />
+                    </Button>
+                  </Box>
+                  {calendarLoading ? (
+                    <Box sx={{ textAlign: "center", py: 3 }}>
+                      <CircularProgress size={32} />
+                      <Typography sx={{ mt: 2 }}>Indlæser Tænd/Sluk kalender...</Typography>
+                    </Box>
+                  ) : (
+                    <ClientPowerShortTable markedDays={markedDays} />
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                    Systeminfo
+                  </Typography>
+                  <Stack spacing={1} sx={{ width: "100%" }} alignItems="flex-start">
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <MemoryIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                        Ubuntu version:
+                      </Typography>
+                      <Typography variant="body2">{client.ubuntu_version || "ukendt"}</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <AccessTimeIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                        Oppetid:
+                      </Typography>
+                      <Typography variant="body2">{formatUptime(uptime)}</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <AccessTimeIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                        Sidst set:
+                      </Typography>
+                      <Typography variant="body2">
+                        {formatDateTime(lastSeen, true)}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <AccessTimeIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
+                        Tilføjet:
+                      </Typography>
+                      <Typography variant="body2">
+                        {formatDateTime(client.created_at, true)}
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                    Netværksinfo
+                  </Typography>
+                  <Stack spacing={1} sx={{ width: "100%" }} alignItems="flex-start">
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <LanIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                        IP-adresse WLAN:
+                      </Typography>
+                      <Typography variant="body2">{client.wifi_ip_address || "ukendt"}</Typography>
+                      <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <LanIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                        MAC-adresse WLAN:
+                      </Typography>
+                      <Typography variant="body2">{client.wifi_mac_address || "ukendt"}</Typography>
+                      <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <LanIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                        IP-adresse LAN:
+                      </Typography>
+                      <Typography variant="body2">{client.lan_ip_address || "ukendt"}</Typography>
+                      <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <LanIcon color="primary" />
+                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
+                        MAC-adresse LAN:
+                      </Typography>
+                      <Typography variant="body2">{client.lan_mac_address || "ukendt"}</Typography>
+                      <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
+                    </Stack>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Grid>
+        {/* ----------- SLUT NY TRE-KOLONNE SEKTION ----------- */}
+
+        {/* Handlinger og livestream bibeholdes */}
+        <Grid item xs={12}>
+          <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
+            <CardContent sx={{ px: 2 }}>
+              <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%", mb: 2 }}>
+                <Tooltip title="Start kiosk browser">
+                  <span>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      startIcon={<ChromeReaderModeIcon />}
+                      disabled={actionLoading["chrome-start"]}
+                      onClick={() => handleClientAction("chrome-start")}
+                      sx={actionBtnStyle}
+                    >
+                      {actionLoading["chrome-start"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+                      Start kiosk browser
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Luk kiosk browser">
+                  <span>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      startIcon={<PowerSettingsNewIcon />}
+                      disabled={actionLoading["chrome-shutdown"]}
+                      onClick={() => handleClientAction("chrome-shutdown")}
+                      sx={actionBtnStyle}
+                    >
+                      {actionLoading["chrome-shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+                      Luk kiosk browser
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Fjernskrivebord på klient">
+                  <span>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      startIcon={<DesktopWindowsIcon />}
+                      onClick={handleOpenRemoteDesktop}
+                      sx={actionBtnStyle}
+                    >
+                      Fjernskrivebord
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Terminal på klient">
+                  <span>
+                    <Button
+                      variant="outlined"
+                      color="inherit"
+                      startIcon={<TerminalIcon />}
+                      onClick={handleOpenTerminal}
+                      sx={actionBtnStyle}
+                    >
+                      Terminal på klient
+                    </Button>
+                  </span>
+                </Tooltip>
+              </Stack>
+              <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
+                <Tooltip title="Genstart klient">
+                  <span>
+                    <Button
+                      variant="contained"
+                      color="warning"
+                      startIcon={<RestartAltIcon />}
+                      disabled={actionLoading["restart"]}
+                      onClick={() => handleClientAction("restart")}
+                      sx={actionBtnStyle}
+                    >
+                      {actionLoading["restart"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+                      Genstart klient
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Sluk klient">
+                  <span>
+                    <Button
+                      variant="contained"
+                      color="error"
+                      startIcon={<PowerSettingsNewIcon />}
+                      disabled={actionLoading["shutdown"]}
+                      onClick={() => setShutdownDialogOpen(true)}
+                      sx={actionBtnStyle}
+                    >
+                      {actionLoading["shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+                      Sluk klient
+                    </Button>
+                  </span>
+                </Tooltip>
+              </Stack>
+              <Dialog open={shutdownDialogOpen} onClose={() => setShutdownDialogOpen(false)}>
+                <DialogTitle>Bekræft slukning af klient</DialogTitle>
+                <DialogContent>
+                  <Typography>
+                    <strong>Ved dette valg skal klienten startes manuelt lokalt.</strong>
+                    <br />
+                    Er du sikker på, at du vil slukke klienten?
+                  </Typography>
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={() => setShutdownDialogOpen(false)} color="primary">
+                    Annuller
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      setShutdownDialogOpen(false);
+                      await handleClientAction("shutdown");
+                    }}
+                    color="error"
+                    variant="contained"
+                  >
+                    Ja, sluk klienten
+                  </Button>
+                </DialogActions>
+              </Dialog>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
+            <CardContent>
+              <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+                <VideocamIcon color="action" fontSize="large" />
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  Livestream fra klient
+                </Typography>
+              </Stack>
+              <Box sx={{
+                p: 2,
+                border: "1px solid #eee",
+                borderRadius: 2,
+                background: "#fafafa",
+                textAlign: "center",
+                color: "#888",
+                fontStyle: "italic",
+                fontSize: "0.95rem"
+              }}>
+                Livestream placeholder (MJPEG/WebRTC)
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
     </Box>
   );
 }
