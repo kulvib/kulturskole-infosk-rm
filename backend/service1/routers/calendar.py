@@ -5,7 +5,7 @@ from db import get_session
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel
 from typing import Dict, List, Any
-from datetime import datetime
+from datetime import datetime, date
 import requests
 
 router = APIRouter()
@@ -88,3 +88,26 @@ def get_marked_days(
         except Exception:
             formatted_markings[str(k)] = v
     return {"markedDays": formatted_markings}
+
+# NYT ENDPOINT: Liste over de næste 20 sæsoner
+@router.get("/calendar/seasons")
+def get_seasons_list(count: int = 20):
+    """
+    Returnerer en liste af sæsoner (id og label), f.eks. [{"id":2025,"label":"2025/2026"}, ...].
+    """
+    today = date.today()
+    # Første sæson: Hvis vi er fra august og frem, starter vi i år, ellers sidste år
+    if today.month >= 8:
+        first_season = today.year
+    else:
+        first_season = today.year - 1
+
+    result = []
+    for i in range(count):
+        season_start = first_season + i
+        season_end = season_start + 1
+        result.append({
+            "id": season_start,
+            "label": f"{season_start}/{season_end}"
+        })
+    return result
