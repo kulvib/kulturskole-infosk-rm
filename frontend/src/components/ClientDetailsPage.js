@@ -287,7 +287,7 @@ function ClientPowerShortTable({ markedDays }) {
 
 // ----------- SLUT KALENDER-TABEL -----------
 
-export default function ClientDetailsPage({ client, refreshing, handleRefresh }) {
+export default function ClientDetailsPage({ client, refreshing, handleRefresh, onOpenCalendarDialog }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
   const [savingLocality, setSavingLocality] = useState(false);
@@ -607,7 +607,7 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                         verticalAlign: "middle",
                         borderRadius: 8
                       }}
-                      onClick={() => navigate("/kalender")}
+                      onClick={onOpenCalendarDialog}
                     >
                       <ArrowForwardIosIcon sx={{ fontSize: 16 }} />
                     </Button>
