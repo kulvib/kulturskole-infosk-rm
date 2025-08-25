@@ -20,16 +20,20 @@ import {
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { DatePicker } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import daLocale from 'date-fns/locale/da';
+import daLocale from "date-fns/locale/da";
 import { getMarkedDays, getCurrentSeason } from "../api";
 
 // Datoformat: DD/MM/YYYY
 function formatDateShort(dt) {
-  return `${dt.getDate().toString().padStart(2, '0')}/${(dt.getMonth()+1).toString().padStart(2, '0')}/${dt.getFullYear()}`;
+  return `${dt.getDate().toString().padStart(2, "0")}/${(dt.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}/${dt.getFullYear()}`;
 }
 
 function getStatusAndTimesFromRaw(markedDays, dt) {
-  const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
+  const dateKey = `${dt.getFullYear()}-${(dt.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}-${dt.getDate().toString().padStart(2, "0")}T00:00:00`;
   const data = markedDays[dateKey];
   if (!data || !data.status || data.status === "off") {
     return { status: "off", powerOn: "", powerOff: "" };
@@ -37,7 +41,7 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
   return {
     status: "on",
     powerOn: data.onTime || "",
-    powerOff: data.offTime || ""
+    powerOff: data.offTime || "",
   };
 }
 
@@ -48,7 +52,7 @@ function StatusText({ status }) {
       sx={{
         fontWeight: 600,
         color: status === "on" ? "#43a047" : "#e53935",
-        textTransform: "lowercase"
+        textTransform: "lowercase",
       }}
     >
       {status}
@@ -80,11 +84,16 @@ function ClientPowerPeriodTable({ markedDays, days }) {
         </TableHead>
         <TableBody>
           {days.map((dt) => {
-            const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
+            const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(
+              markedDays,
+              dt
+            );
             return (
               <TableRow key={dt.toISOString().slice(0, 10)}>
                 <TableCell>{formatDateShort(dt)}</TableCell>
-                <TableCell><StatusText status={status} /></TableCell>
+                <TableCell>
+                  <StatusText status={status} />
+                </TableCell>
                 <TableCell>{powerOn}</TableCell>
                 <TableCell>{powerOff}</TableCell>
               </TableRow>
@@ -136,13 +145,19 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
       <DialogTitle>Vis kalender for periode</DialogTitle>
       <DialogContent>
         <LocalizationProvider dateAdapter={AdapterDateFns} locale={daLocale}>
-          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+          <Stack
+            direction="row"
+            spacing={2}
+            alignItems="center"
+            sx={{ mb: 2 }}
+          >
             <DatePicker
               label="Startdato"
               value={startDate}
               onChange={setStartDate}
               minDate={season ? new Date(season.start_date) : undefined}
               maxDate={season ? new Date(season.end_date) : undefined}
+              format="dd/MM/yyyy"
               inputFormat="dd/MM/yyyy"
               renderInput={(params) => (
                 <TextField
@@ -150,7 +165,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   size="small"
                   variant="outlined"
                   fullWidth
-                  sx={{ minWidth: 140, bgcolor: '#fff' }}
+                  sx={{ minWidth: 140, bgcolor: "#fff" }}
                 />
               )}
             />
@@ -160,6 +175,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               onChange={setEndDate}
               minDate={season ? new Date(season.start_date) : undefined}
               maxDate={season ? new Date(season.end_date) : undefined}
+              format="dd/MM/yyyy"
               inputFormat="dd/MM/yyyy"
               renderInput={(params) => (
                 <TextField
@@ -167,11 +183,15 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   size="small"
                   variant="outlined"
                   fullWidth
-                  sx={{ minWidth: 140, bgcolor: '#fff' }}
+                  sx={{ minWidth: 140, bgcolor: "#fff" }}
                 />
               )}
             />
-            <Button variant="contained" onClick={handleFetch} disabled={loading || !startDate || !endDate}>
+            <Button
+              variant="contained"
+              onClick={handleFetch}
+              disabled={loading || !startDate || !endDate}
+            >
               Hent kalender
             </Button>
           </Stack>
@@ -184,7 +204,10 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
         )}
         {showTable && !loading && (
           <Box sx={{ mt: 2 }}>
-            <ClientPowerPeriodTable markedDays={markedDays} days={getDaysInRange(startDate, endDate)} />
+            <ClientPowerPeriodTable
+              markedDays={markedDays}
+              days={getDaysInRange(startDate, endDate)}
+            />
           </Box>
         )}
       </DialogContent>
