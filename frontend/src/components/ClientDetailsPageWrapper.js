@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getClient } from "../api";
+import { getClient, getMarkedDays, getCurrentSeason } from "../api";
 import ClientDetailsPage from "./ClientDetailsPage";
 import ClientCalendarDialog from "./ClientCalendarDialog";
 
@@ -9,33 +9,42 @@ export default function ClientDetailsPageWrapper() {
   const [client, setClient] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [markedDays, setMarkedDays] = useState({});
+  const [calendarLoading, setCalendarLoading] = useState(false);
 
-  // Poll klientdata hver 15 sekunder
-  const fetchClient = async (forceUpdate = false) => {
+  // Hent klientdata og kalenderdata samtidig
+  const fetchAllData = async (forceUpdate = false) => {
     if (!clientId) return;
+    setCalendarLoading(true);
     try {
-      const data = await getClient(clientId);
+      const [clientData, season] = await Promise.all([
+        getClient(clientId),
+        getCurrentSeason()
+      ]);
+      const calendarData = await getMarkedDays(season.id, clientId);
+
       setClient(prev => {
-        if (forceUpdate || JSON.stringify(data) !== JSON.stringify(prev)) {
-          return data;
+        if (forceUpdate || JSON.stringify(clientData) !== JSON.stringify(prev)) {
+          return clientData;
         }
         return prev;
       });
+      setMarkedDays(calendarData?.markedDays || {});
     } catch (err) {
-      // evt. fejl-håndtering
+      setMarkedDays({});
     }
+    setCalendarLoading(false);
   };
 
   useEffect(() => {
-    fetchClient();
-    const timer = setInterval(() => fetchClient(false), 15000); // 15 sekunder
+    fetchAllData();
+    const timer = setInterval(() => fetchAllData(false), 15000); // 15 sekunder
     return () => clearInterval(timer);
-    // eslint-disable-next-line
   }, [clientId]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchClient(true);
+    await fetchAllData(true);
     setRefreshing(false);
   };
 
@@ -45,6 +54,8 @@ export default function ClientDetailsPageWrapper() {
         client={client}
         refreshing={refreshing}
         handleRefresh={handleRefresh}
+        markedDays={markedDays}
+        calendarLoading={calendarLoading}
         onOpenCalendarDialog={() => setCalendarOpen(true)}
       />
       <ClientCalendarDialog
