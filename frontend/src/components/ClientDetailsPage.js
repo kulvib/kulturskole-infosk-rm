@@ -51,6 +51,7 @@ import {
   getCurrentSeason,
 } from "../api";
 
+// ---------- Utility Functions ----------
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
@@ -112,6 +113,34 @@ function formatUptime(uptimeStr) {
   return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
 }
 
+function CopyIconButton({ value, disabled, iconSize = 16 }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {}
+  };
+
+  return (
+    <Tooltip title={copied ? "Kopieret!" : "Kopiér"}>
+      <span>
+        <IconButton
+          size="small"
+          onClick={handleCopy}
+          sx={{ ml: 1, p: 0.5 }}
+          disabled={disabled}
+        >
+          <ContentCopyIcon sx={{ fontSize: iconSize }} color={copied ? "success" : "inherit"} />
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
+}
+
+// ---------- Status Icons ----------
 function ClientStatusIcon({ isOnline }) {
   const theme = useTheme();
   return (
@@ -140,77 +169,7 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
-function ChromeStatusIcon({ status, color }) {
-  let fallbackColor = "grey.400";
-  let text = status || "Ukendt";
-  let dotColor = color || fallbackColor;
-
-  if (!color && typeof status === "string") {
-    const s = status.toLowerCase();
-    if (s === "running") {
-      dotColor = "#43a047";
-      text = "Åben";
-    } else if (s === "stopped" || s === "closed") {
-      dotColor = "#e53935";
-      text = "Lukket";
-    } else if (s === "unknown") {
-      dotColor = "grey.400";
-      text = "Ukendt";
-    } else if (s.includes("kører")) {
-      dotColor = "#43a047";
-      text = status;
-    } else if (s.includes("lukket")) {
-      dotColor = "#e53935";
-      text = status;
-    }
-  }
-
-  return (
-    <Stack direction="row" spacing={1} alignItems="center">
-      <Box
-        sx={{
-          width: 14,
-          height: 14,
-          borderRadius: "50%",
-          bgcolor: dotColor,
-          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-          border: "1px solid #ddd",
-        }}
-      />
-      <Typography variant="body2" sx={{ fontWeight: 700 }}>{text}</Typography>
-    </Stack>
-  );
-}
-
-function CopyIconButton({ value, disabled, iconSize = 16 }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (err) {}
-  };
-
-  return (
-    <Tooltip title={copied ? "Kopieret!" : "Kopiér"}>
-      <span>
-        <IconButton
-          size="small"
-          onClick={handleCopy}
-          sx={{ ml: 1, p: 0.5 }}
-          disabled={disabled}
-        >
-          <ContentCopyIcon sx={{ fontSize: iconSize }} color={copied ? "success" : "inherit"} />
-        </IconButton>
-      </span>
-    </Tooltip>
-  );
-}
-
-// ----------- TÆND/SLUK KALENDER-TABEL START -----------
-
+// ---------- Kalender Table ----------
 function formatDateLong(dt) {
   return dt.toLocaleDateString("da-DK", {
     weekday: "long",
@@ -245,47 +204,37 @@ function ClientPowerWeekTable({ markedDays }) {
   }
 
   return (
-    <Card elevation={2} sx={{ borderRadius: 2, mb: 2, mt: 1 }}>
-      <CardContent>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Tænd/Sluk Kalender (næste 6 dage)
-          </Typography>
-        </Stack>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Dato</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Tænd</TableCell>
-                <TableCell>Sluk</TableCell>
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Dato</TableCell>
+            <TableCell>Status</TableCell>
+            <TableCell>Tænd</TableCell>
+            <TableCell>Sluk</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {days.map((dt) => {
+            const { status, color, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
+            return (
+              <TableRow key={dt.toISOString().slice(0, 10)}>
+                <TableCell>{formatDateLong(dt)}</TableCell>
+                <TableCell>
+                  <Chip label={status} color={color} size="small" sx={{ fontWeight: 600 }} />
+                </TableCell>
+                <TableCell>{powerOn}</TableCell>
+                <TableCell>{powerOff}</TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {days.map((dt) => {
-                const { status, color, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
-                return (
-                  <TableRow key={dt.toISOString().slice(0, 10)}>
-                    <TableCell>{formatDateLong(dt)}</TableCell>
-                    <TableCell>
-                      <Chip label={status} color={color} size="small" sx={{ fontWeight: 600 }} />
-                    </TableCell>
-                    <TableCell>{powerOn}</TableCell>
-                    <TableCell>{powerOff}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </CardContent>
-    </Card>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 }
 
-// ----------- TÆND/SLUK KALENDER-TABEL SLUT -----------
-
+// ---------- Main Component ----------
 export default function ClientDetailsPage({ client, refreshing, handleRefresh }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -362,8 +311,8 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   };
 
   const actionBtnStyle = {
-    minWidth: 200,
-    maxWidth: 200,
+    minWidth: 180,
+    maxWidth: 180,
     height: 36,
     textTransform: "none",
     fontWeight: 500,
@@ -440,8 +389,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
   const handleOpenTerminal = () => openTerminal(client.id);
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
-  const sectionSpacing = 2;
-
   if (!client) {
     return (
       <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4 }}>
@@ -492,116 +439,29 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
           </span>
         </Tooltip>
       </Box>
-      <Grid container spacing={sectionSpacing}>
-        <Grid item xs={12}>
-          <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
+      <Grid container spacing={2}>
+
+        {/* ----------- Info-rækken med tre kolonner ----------- */}
+        <Grid item xs={12} md={4}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
-              <Stack spacing={2}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 700,
-                      lineHeight: 1.2,
-                      letterSpacing: 0.5,
-                      fontSize: { xs: "1rem", sm: "1.15rem", md: "1.25rem" },
-                    }}
-                  >
-                    {client.name}
-                  </Typography>
-                  <ClientStatusIcon isOnline={client.isOnline} />
-                </Stack>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                    Klient ID:
-                  </Typography>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem" }}
-                  >
-                    {client.id}
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LocationOnIcon color="primary" />
-                  <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 90 }}>
-                    Lokation:
-                  </Typography>
-                  <TextField
-                    size="small"
-                    value={locality}
-                    onChange={handleLocalityChange}
-                    sx={inputStyle}
-                    disabled={savingLocality}
-                  />
-                  <CopyIconButton value={locality} disabled={!locality} iconSize={15} />
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={handleLocalitySave}
-                    disabled={savingLocality}
-                    sx={{ minWidth: 44, maxWidth: 44 }}
-                  >
-                    {savingLocality ? <CircularProgress size={16} /> : "Gem"}
-                  </Button>
-                </Stack>
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <ChromeReaderModeIcon color="primary" />
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Kiosk URL:
-                  </Typography>
-                  <TextField
-                    size="small"
-                    value={kioskUrl}
-                    onChange={handleKioskUrlChange}
-                    sx={kioskInputStyle}
-                    disabled={savingKioskUrl}
-                  />
-                  <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={15} />
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="primary"
-                    onClick={handleKioskUrlSave}
-                    disabled={savingKioskUrl}
-                    sx={{ minWidth: 44, maxWidth: 44 }}
-                  >
-                    {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
-                  </Button>
-                </Stack>
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <ChromeReaderModeIcon color="primary" />
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Kiosk browser status:
-                  </Typography>
-                  <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
-                </Stack>
-              </Stack>
+              <Typography variant="h6" gutterBottom>Kalender</Typography>
+              {calendarLoading ? (
+                <Box sx={{ textAlign: "center", py: 3 }}>
+                  <CircularProgress size={32} />
+                  <Typography sx={{ mt: 2 }}>Indlæser Tænd/Sluk kalender...</Typography>
+                </Box>
+              ) : (
+                <ClientPowerWeekTable markedDays={markedDays} />
+              )}
             </CardContent>
           </Card>
         </Grid>
-
-        {/* --------- INDSAT KALENDER-TABEL HER --------- */}
-        <Grid item xs={12}>
-          {calendarLoading ? (
-            <Box sx={{ textAlign: "center", py: 3 }}>
-              <CircularProgress size={32} />
-              <Typography sx={{ mt: 2 }}>Indlæser Tænd/Sluk kalender...</Typography>
-            </Box>
-          ) : (
-            <ClientPowerWeekTable markedDays={markedDays} />
-          )}
-        </Grid>
-        {/* --------- SLUT TABEL --------- */}
-
-        <Grid item xs={12} md={6}>
-          <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-            <CardContent sx={{
-              height: "100%",
-              p: 3
-            }}>
-              <Stack spacing={2} sx={{ width: "100%" }} alignItems="flex-start">
+        <Grid item xs={12} md={4}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>Systeminfo</Typography>
+              <Stack spacing={1}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <MemoryIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
@@ -638,13 +498,11 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} md={6}>
-          <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-            <CardContent sx={{
-              height: "100%",
-              p: 3
-            }}>
-              <Stack spacing={2} sx={{ width: "100%" }} alignItems="flex-start">
+        <Grid item xs={12} md={4}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>Netværksinfo</Typography>
+              <Stack spacing={1}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <LanIcon color="primary" />
                   <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
@@ -681,10 +539,12 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
+
+        {/* ----------- Action-knapper: Én række ----------- */}
         <Grid item xs={12}>
-          <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
-            <CardContent sx={{ px: 2 }}>
-              <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%", mb: 2 }}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
+            <CardContent>
+              <Stack direction="row" spacing={2} justifyContent="center" alignItems="center">
                 <Tooltip title="Start kiosk browser">
                   <span>
                     <Button
@@ -741,8 +601,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
                     </Button>
                   </span>
                 </Tooltip>
-              </Stack>
-              <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
                 <Tooltip title="Genstart klient">
                   <span>
                     <Button
@@ -802,6 +660,69 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh })
             </CardContent>
           </Card>
         </Grid>
+
+        {/* ----------- Lokalitet og Kiosk-URL ----------- */}
+        <Grid item xs={12} md={6}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
+            <CardContent>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <LocationOnIcon color="primary" />
+                <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 90 }}>
+                  Lokation:
+                </Typography>
+                <TextField
+                  size="small"
+                  value={locality}
+                  onChange={handleLocalityChange}
+                  sx={inputStyle}
+                  disabled={savingLocality}
+                />
+                <CopyIconButton value={locality} disabled={!locality} iconSize={15} />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={handleLocalitySave}
+                  disabled={savingLocality}
+                  sx={{ minWidth: 44, maxWidth: 44 }}
+                >
+                  {savingLocality ? <CircularProgress size={16} /> : "Gem"}
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Card elevation={2} sx={{ borderRadius: 2 }}>
+            <CardContent>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <ChromeReaderModeIcon color="primary" />
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Kiosk URL:
+                </Typography>
+                <TextField
+                  size="small"
+                  value={kioskUrl}
+                  onChange={handleKioskUrlChange}
+                  sx={kioskInputStyle}
+                  disabled={savingKioskUrl}
+                />
+                <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={15} />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  onClick={handleKioskUrlSave}
+                  disabled={savingKioskUrl}
+                  sx={{ minWidth: 44, maxWidth: 44 }}
+                >
+                  {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* ----------- Livestream Placeholder ----------- */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
