@@ -17,8 +17,9 @@ import {
   Stack,
   TextField,
 } from "@mui/material";
-import AdapterDateFns from "@mui/lab/AdapterDateFns";
-import { LocalizationProvider, DatePicker } from "@mui/lab";
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import { DatePicker } from "@mui/x-date-pickers";
+import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import daLocale from 'date-fns/locale/da';
 import { getMarkedDays, getCurrentSeason } from "../api";
 
