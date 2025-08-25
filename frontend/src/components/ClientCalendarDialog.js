@@ -143,7 +143,16 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               onChange={setStartDate}
               minDate={season ? new Date(season.start_date) : undefined}
               maxDate={season ? new Date(season.end_date) : undefined}
-              renderInput={(params) => <TextField {...params} size="small" />}
+              inputFormat="dd/MM/yyyy"
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  size="small"
+                  variant="outlined"
+                  fullWidth
+                  sx={{ minWidth: 140, bgcolor: '#fff' }}
+                />
+              )}
             />
             <DatePicker
               label="Slutdato"
@@ -151,7 +160,16 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               onChange={setEndDate}
               minDate={season ? new Date(season.start_date) : undefined}
               maxDate={season ? new Date(season.end_date) : undefined}
-              renderInput={(params) => <TextField {...params} size="small" />}
+              inputFormat="dd/MM/yyyy"
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  size="small"
+                  variant="outlined"
+                  fullWidth
+                  sx={{ minWidth: 140, bgcolor: '#fff' }}
+                />
+              )}
             />
             <Button variant="contained" onClick={handleFetch} disabled={loading || !startDate || !endDate}>
               Hent kalender
