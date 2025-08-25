@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
   Checkbox, TextField, Snackbar, Alert as MuiAlert
@@ -79,14 +79,16 @@ function deepEqual(obj1, obj2) {
 // ClientSelectorInline med 2/3/5 klienter pr. række
 function ClientSelectorInline({ clients, selected, onChange }) {
   const [search, setSearch] = useState("");
-  const sortedClients = [...clients].sort((a, b) => {
+  const sortedClients = useMemo(() => [...clients].sort((a, b) => {
     const aName = (a.locality || a.name || "").toLowerCase();
     const bName = (b.locality || b.name || "").toLowerCase();
     return aName.localeCompare(bName);
-  });
-  const filteredClients = sortedClients.filter(c =>
+  }), [clients]);
+
+  const filteredClients = useMemo(() => sortedClients.filter(c =>
     (c.locality || c.name || "").toLowerCase().includes(search.toLowerCase())
-  );
+  ), [sortedClients, search]);
+
   const allVisibleIds = filteredClients.map(c => c.id);
   const allMarked = allVisibleIds.length > 0 && allVisibleIds.every(id => selected.includes(id));
 
@@ -490,7 +492,7 @@ export default function CalendarPage() {
     }
   };
 
-  const schoolYearMonths = getSchoolYearMonths(selectedSeason);
+  const schoolYearMonths = useMemo(() => getSchoolYearMonths(selectedSeason), [selectedSeason]);
 
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
@@ -722,7 +724,7 @@ export default function CalendarPage() {
               padding: "6px 14px",
               borderRadius: "7px",
               border: "1px solid #dbeafe"
-            }
+            }}
           >
             {seasons.map(season => (
               <option key={season.value} value={season.value}>
@@ -746,7 +748,7 @@ export default function CalendarPage() {
           </Typography>
         )}
         {activeClient && !loadingMarkedDays &&
-          getSchoolYearMonths(selectedSeason).map(({ name, month, year }) => (
+          schoolYearMonths.map(({ name, month, year }) => (
             <MonthCalendar
               key={name + year}
               name={name}
