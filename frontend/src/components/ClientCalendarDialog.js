@@ -23,13 +23,11 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import daLocale from 'date-fns/locale/da';
 import { getMarkedDays, getCurrentSeason } from "../api";
 
+// Datoformat: DD/MM/YYYY
 function formatDateShort(dt) {
-  return dt.toLocaleDateString("da-DK", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
+  return `${dt.getDate().toString().padStart(2, '0')}/${(dt.getMonth()+1).toString().padStart(2, '0')}/${dt.getFullYear()}`;
 }
+
 function getStatusAndTimesFromRaw(markedDays, dt) {
   const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
   const data = markedDays[dateKey];
@@ -42,6 +40,7 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
     powerOff: data.offTime || ""
   };
 }
+
 function StatusText({ status }) {
   return (
     <Typography
@@ -56,6 +55,7 @@ function StatusText({ status }) {
     </Typography>
   );
 }
+
 function getDaysInRange(start, end) {
   const days = [];
   let d = new Date(start);
@@ -65,6 +65,7 @@ function getDaysInRange(start, end) {
   }
   return days;
 }
+
 function ClientPowerPeriodTable({ markedDays, days }) {
   return (
     <TableContainer>
