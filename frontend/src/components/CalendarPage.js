@@ -14,10 +14,25 @@ const monthNames = [
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
-function getSeasons(start = 2025, end = 2040) {
+// --- NY getSeasons funktion: ---
+function getSeasons() {
+  // Beregn aktuel sæson ud fra dags dato
+  const now = new Date();
+  let seasonStartYear;
+  // Sæson starter 1. august
+  if (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)) {
+    // Hvis vi er i august eller senere, er sæsonen det nuværende år
+    seasonStartYear = now.getFullYear();
+  } else {
+    // Hvis vi er før august, er sæsonen sidste år
+    seasonStartYear = now.getFullYear() - 1;
+  }
+  // Lav listen med aktuel sæson + 2 næste
   const seasons = [];
-  for (let y = start; y <= end; y++) {
-    seasons.push({ label: `${y}/${(y + 1).toString().slice(-2)}`, value: y });
+  for (let i = 0; i < 3; i++) {
+    const start = seasonStartYear + i;
+    const end = (start + 1).toString().slice(-2);
+    seasons.push({ label: `${start}/${end}`, value: start });
   }
   return seasons;
 }
@@ -277,7 +292,7 @@ function MonthCalendar({
 
 export default function CalendarPage() {
   const { token } = useAuth();
-  const [selectedSeason, setSelectedSeason] = useState(2025);
+  const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
   const [clients, setClients] = useState([]);
   const [selectedClients, setSelectedClients] = useState([]);
   const [activeClient, setActiveClient] = useState(null);
@@ -299,7 +314,7 @@ export default function CalendarPage() {
   const lastDialogSavedMarkedDays = useRef({});
   const lastDialogSavedTimestamp = useRef(0);
 
-  const seasons = getSeasons(2025, 2040);
+  const seasons = getSeasons();
 
   const fetchClients = useCallback(async () => {
     setLoadingClients(true);
@@ -707,7 +722,7 @@ export default function CalendarPage() {
               padding: "6px 14px",
               borderRadius: "7px",
               border: "1px solid #dbeafe"
-            }}
+            }
           >
             {seasons.map(season => (
               <option key={season.value} value={season.value}>
