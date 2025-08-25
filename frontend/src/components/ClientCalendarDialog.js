@@ -162,10 +162,14 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  size="small"
                   variant="outlined"
                   fullWidth
-                  sx={{ minWidth: 140, bgcolor: "#fff" }}
+                  size="small"
+                  sx={{
+                    minWidth: 140,
+                    // bgcolor: "#fff", // Fjern/flyt denne hvis dialogen er hvid
+                    marginTop: 0,
+                  }}
                 />
               )}
             />
@@ -180,10 +184,14 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  size="small"
                   variant="outlined"
                   fullWidth
-                  sx={{ minWidth: 140, bgcolor: "#fff" }}
+                  size="small"
+                  sx={{
+                    minWidth: 140,
+                    // bgcolor: "#fff", // Fjern/flyt denne hvis dialogen er hvid
+                    marginTop: 0,
+                  }}
                 />
               )}
             />
