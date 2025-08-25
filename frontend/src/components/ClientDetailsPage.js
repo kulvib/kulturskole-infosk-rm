@@ -47,8 +47,6 @@ import {
   openTerminal,
   openRemoteDesktop,
   getClient,
-  getMarkedDays,
-  getCurrentSeason,
 } from "../api";
 
 function formatDateTime(dateStr, withSeconds = false) {
@@ -287,7 +285,14 @@ function ClientPowerShortTable({ markedDays }) {
 
 // ----------- SLUT KALENDER-TABEL -----------
 
-export default function ClientDetailsPage({ client, refreshing, handleRefresh, onOpenCalendarDialog }) {
+export default function ClientDetailsPage({
+  client,
+  refreshing,
+  handleRefresh,
+  markedDays,
+  calendarLoading,
+  onOpenCalendarDialog
+}) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
   const [savingLocality, setSavingLocality] = useState(false);
@@ -305,9 +310,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh, o
   const [uptime, setUptime] = useState(client?.uptime || null);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-
-  const [markedDays, setMarkedDays] = useState({});
-  const [calendarLoading, setCalendarLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -335,24 +337,6 @@ export default function ClientDetailsPage({ client, refreshing, handleRefresh, o
       } catch {}
     }, 1000); // 1 sekund
     return () => clearInterval(pollerStatus);
-  }, [client?.id]);
-
-  useEffect(() => {
-    async function fetchCalendar() {
-      if (!client?.id) return;
-      setCalendarLoading(true);
-      try {
-        const season = await getCurrentSeason();
-        const res = await getMarkedDays(season.id, client.id);
-        setMarkedDays(res?.markedDays || {});
-      } catch {
-        setMarkedDays({});
-      }
-      setCalendarLoading(false);
-    }
-    fetchCalendar();
-    const timer = setInterval(fetchCalendar, 15000); // 15 sekunder
-    return () => clearInterval(timer);
   }, [client?.id]);
 
   const showSnackbar = (message, severity = "success") => {
