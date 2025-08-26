@@ -704,6 +704,7 @@ export default function CalendarPage() {
             size="medium"
             disabled={isDisabled}
             sx={{ fontWeight: markMode === "on" ? 700 : 400, minWidth: 90 }}
+            onClick={() => setMarkMode("on")}
           >
             TÆNDT
           </Button>
@@ -713,6 +714,7 @@ export default function CalendarPage() {
             size="medium"
             disabled={isDisabled}
             sx={{ fontWeight: markMode === "off" ? 700 : 400, minWidth: 90 }}
+            onClick={() => setMarkMode("off")}
           >
             SLUKKET
           </Button>
