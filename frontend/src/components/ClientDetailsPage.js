@@ -687,7 +687,6 @@ export default function ClientDetailsPage({
           </Grid>
         </Grid>
         {/* ----------- SLUT NY TRE-KOLONNE SEKTION ----------- */}
-
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
@@ -829,4 +828,17 @@ export default function ClientDetailsPage({
                 fontSize: "0.95rem"
               }}>
                 Livestream placeholder (MJPEG/WebRTC)
-              </Box
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+      {/* Kalender-dialogen! */}
+      <ClientCalendarDialog
+        open={calendarDialogOpen}
+        onClose={() => setCalendarDialogOpen(false)}
+        clientId={client.id}
+      />
+    </Box>
+  );
+}
