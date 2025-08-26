@@ -273,7 +273,7 @@ function ClientPowerShortTable({ markedDays }) {
           {days.map((dt) => {
             const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
-              <TableRow key={dt.toISOString().slice(0, 10)}>
+              <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: 36 }}>
                 <TableCell sx={{ whiteSpace: "nowrap", py: 0.25 }}>{formatDateShort(dt)}</TableCell>
                 <TableCell sx={{ py: 0.25 }}><StatusText status={status} /></TableCell>
                 <TableCell sx={{ py: 0.25 }}>
@@ -297,29 +297,29 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
     <TableContainer>
       <Table size="small" aria-label="systeminfo">
         <TableBody>
-          <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+          <TableRow sx={{ height: 36 }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               Ubuntu version:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>{client.ubuntu_version || "ukendt"}</TableCell>
+            <TableCell sx={{ border: 0, pl: 0.5 }}>{client.ubuntu_version || "ukendt"}</TableCell>
           </TableRow>
-          <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+          <TableRow sx={{ height: 36 }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               Oppetid:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>{formatUptime(uptime)}</TableCell>
+            <TableCell sx={{ border: 0, pl: 0.5 }}>{formatUptime(uptime)}</TableCell>
           </TableRow>
-          <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+          <TableRow sx={{ height: 36 }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               Sidst set:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>{formatDateTime(lastSeen, true)}</TableCell>
+            <TableCell sx={{ border: 0, pl: 0.5 }}>{formatDateTime(lastSeen, true)}</TableCell>
           </TableRow>
-          <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+          <TableRow sx={{ height: 36 }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               Tilføjet:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>{formatDateTime(client.created_at, true)}</TableCell>
+            <TableCell sx={{ border: 0, pl: 0.5 }}>{formatDateTime(client.created_at, true)}</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -333,38 +333,38 @@ function NetworkInfoTable({ client }) {
     <TableContainer>
       <Table size="small" aria-label="netværksinfo">
         <TableBody>
-          <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+          <TableRow sx={{ height: 36 }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               IP-adresse WLAN:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
+            <TableCell sx={{ border: 0, pl: 0.5 }}>
               {client.wifi_ip_address || "ukendt"}
               <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
             </TableCell>
           </TableRow>
-          <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+          <TableRow sx={{ height: 36 }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               MAC-adresse WLAN:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
+            <TableCell sx={{ border: 0, pl: 0.5 }}>
               {client.wifi_mac_address || "ukendt"}
               <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
             </TableCell>
           </TableRow>
-          <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+          <TableRow sx={{ height: 36 }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               IP-adresse LAN:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
+            <TableCell sx={{ border: 0, pl: 0.5 }}>
               {client.lan_ip_address || "ukendt"}
               <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
             </TableCell>
           </TableRow>
-          <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+          <TableRow sx={{ height: 36 }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               MAC-adresse LAN:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
+            <TableCell sx={{ border: 0, pl: 0.5 }}>
               {client.lan_mac_address || "ukendt"}
               <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
             </TableCell>
