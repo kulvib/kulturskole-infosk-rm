@@ -113,11 +113,13 @@ function formatUptime(uptimeStr) {
 }
 
 function formatDateShort(dt) {
-  return dt.toLocaleDateString("da-DK", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
+  // Return: "Ukedag dd.mm yyyy"
+  const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
+  const dayName = ukedage[dt.getDay()];
+  const day = dt.getDate().toString().padStart(2, "0");
+  const month = (dt.getMonth() + 1).toString().padStart(2, "0");
+  const year = dt.getFullYear();
+  return `${dayName} ${day}.${month} ${year}`;
 }
 
 function getStatusAndTimesFromRaw(markedDays, dt) {
@@ -241,11 +243,12 @@ function StatusText({ status }) {
         textTransform: "lowercase"
       }}
     >
-      {status}
+      {status === "off" ? "off." : "on"}
     </Typography>
   );
 }
 
+// --------- OPDATERET KALENDER-TABEL ---------
 function ClientPowerShortTable({ markedDays }) {
   const days = [];
   const now = new Date();
@@ -273,8 +276,12 @@ function ClientPowerShortTable({ markedDays }) {
               <TableRow key={dt.toISOString().slice(0, 10)}>
                 <TableCell>{formatDateShort(dt)}</TableCell>
                 <TableCell><StatusText status={status} /></TableCell>
-                <TableCell>{powerOn}</TableCell>
-                <TableCell>{powerOff}</TableCell>
+                <TableCell>
+                  {status === "on" && powerOn ? powerOn : ""}
+                </TableCell>
+                <TableCell>
+                  {status === "on" && powerOff ? powerOff : ""}
+                </TableCell>
               </TableRow>
             );
           })}
@@ -573,26 +580,29 @@ export default function ClientDetailsPage({
               <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
                 <CardContent>
                   <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1 }}>
                       Kalender
                     </Typography>
-                    <Button
-                      size="small"
-                      variant="text"
-                      sx={{
-                        ml: 1,
-                        minWidth: 0,
-                        color: "text.secondary",
-                        fontSize: "0.85rem",
-                        textTransform: "none",
-                        px: 1,
-                        verticalAlign: "middle",
-                        borderRadius: 8
-                      }}
-                      onClick={() => setCalendarDialogOpen(true)}
-                    >
-                      <ArrowForwardIosIcon sx={{ fontSize: 16 }} />
-                    </Button>
+                    <Tooltip title="Vis kalender">
+                      <span>
+                        <Button
+                          size="small"
+                          variant="text"
+                          sx={{
+                            minWidth: 0,
+                            color: "text.secondary",
+                            fontSize: "0.85rem",
+                            textTransform: "none",
+                            px: 1,
+                            verticalAlign: "middle",
+                            borderRadius: 8
+                          }}
+                          onClick={() => setCalendarDialogOpen(true)}
+                        >
+                          <ArrowForwardIosIcon sx={{ fontSize: 16 }} />
+                        </Button>
+                      </span>
+                    </Tooltip>
                   </Box>
                   <ClientPowerShortTable markedDays={markedDays} />
                 </CardContent>
