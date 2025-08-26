@@ -601,6 +601,9 @@ export default function CalendarPage() {
     setSnackbar({ open: false, message: "", severity: "success" });
   };
 
+  // Disabled state når ingen klient er valgt
+  const isDisabled = !activeClient;
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
       <Snackbar
@@ -681,7 +684,7 @@ export default function CalendarPage() {
         )}
       </Paper>
 
-      {/* NY KNAPLINJE: Markering | Vis liste | Vælg sæson */}
+      {/* Knaprækken: Markering | Vis liste | Vælg sæson (alle disabled hvis ingen klient valgt) */}
       <Box sx={{
         display: "flex",
         alignItems: "center",
@@ -698,16 +701,18 @@ export default function CalendarPage() {
           <Button
             variant={markMode === "on" ? "contained" : "outlined"}
             color="success"
-            onClick={() => setMarkMode("on")}
-            sx={{ fontWeight: markMode === "on" ? 700 : 400 }}
+            size="medium"
+            disabled={isDisabled}
+            sx={{ fontWeight: markMode === "on" ? 700 : 400, minWidth: 90 }}
           >
             TÆNDT
           </Button>
           <Button
             variant={markMode === "off" ? "contained" : "outlined"}
             color="error"
-            onClick={() => setMarkMode("off")}
-            sx={{ fontWeight: markMode === "off" ? 700 : 400 }}
+            size="medium"
+            disabled={isDisabled}
+            sx={{ fontWeight: markMode === "off" ? 700 : 400, minWidth: 90 }}
           >
             SLUKKET
           </Button>
@@ -717,10 +722,10 @@ export default function CalendarPage() {
           <Button
             variant="outlined"
             color="primary"
-            size="medium"
+            size="large"
             sx={{ minWidth: 120, fontWeight: 700 }}
             onClick={() => setCalendarDialogOpen(true)}
-            disabled={!activeClient}
+            disabled={isDisabled}
           >
             Vis liste
           </Button>
@@ -742,6 +747,7 @@ export default function CalendarPage() {
               borderRadius: "7px",
               border: "1px solid #dbeafe"
             }}
+            disabled={isDisabled}
           >
             {seasons.map(season => (
               <option key={season.value} value={season.value}>
@@ -798,7 +804,7 @@ export default function CalendarPage() {
         localMarkedDays={markedDays[editDialogClient]}
       />
 
-      {/* NY DIALOG */}
+      {/* Dialog til listevisning */}
       <ClientCalendarDialog
         open={calendarDialogOpen}
         onClose={() => setCalendarDialogOpen(false)}
