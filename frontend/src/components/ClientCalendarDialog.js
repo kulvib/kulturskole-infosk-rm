@@ -167,8 +167,8 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
         <LocalizationProvider dateAdapter={AdapterDateFns} locale={daLocale}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            alignItems="flex-end"
+            spacing={3}
+            alignItems="center"   // Centrerer alle elementer vertikalt
             justifyContent="center"
             sx={{ mb: 2, mt: 1 }}
           >
@@ -218,7 +218,8 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                 borderRadius: 2,
                 boxShadow: 1,
                 whiteSpace: "nowrap",
-                px: 2
+                px: 2,
+                alignSelf: "center"
               }}
               onClick={handleFetch}
               disabled={loading || !startDate || !endDate}
@@ -240,7 +241,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
           />
         )}
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ justifyContent: "center" }}>
         <Button onClick={onClose} color="primary">
           Luk
         </Button>
