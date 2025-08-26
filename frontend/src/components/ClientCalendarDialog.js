@@ -224,7 +224,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               onClick={handleFetch}
               disabled={loading || !startDate || !endDate}
             >
-              Hent kalender
+              Vis kalender
             </Button>
           </Stack>
         </LocalizationProvider>
