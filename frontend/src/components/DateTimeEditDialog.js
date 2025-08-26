@@ -11,10 +11,7 @@ import {
   Box,
   Snackbar,
   Alert as MuiAlert,
-  InputAdornment,
-  IconButton,
 } from "@mui/material";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
 function getToken() {
@@ -53,11 +50,9 @@ export default function DateTimeEditDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Snackbar state
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const closeTimer = useRef(null);
 
-  // refs til inputfelterne
   const onTimeRef = useRef(null);
   const offTimeRef = useRef(null);
 
@@ -222,18 +217,7 @@ export default function DateTimeEditDialog({
                 onChange={e => setOnTime(e.target.value)}
                 inputRef={onTimeRef}
                 InputProps={{
-                  style: { backgroundColor: "#f6f6f6" },
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => onTimeRef.current && onTimeRef.current.focus()}
-                        edge="end"
-                        tabIndex={-1}
-                      >
-                        <AccessTimeIcon />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
+                  style: { backgroundColor: "#f6f6f6" }
                 }}
                 inputProps={{
                   step: 300,
@@ -254,18 +238,7 @@ export default function DateTimeEditDialog({
                 onChange={e => setOffTime(e.target.value)}
                 inputRef={offTimeRef}
                 InputProps={{
-                  style: { backgroundColor: "#f6f6f6" },
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => offTimeRef.current && offTimeRef.current.focus()}
-                        edge="end"
-                        tabIndex={-1}
-                      >
-                        <AccessTimeIcon />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
+                  style: { backgroundColor: "#f6f6f6" }
                 }}
                 inputProps={{
                   step: 300,
