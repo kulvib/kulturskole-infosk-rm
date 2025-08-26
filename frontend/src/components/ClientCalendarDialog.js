@@ -168,7 +168,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={3}
-            alignItems="center"   // Centrerer alle elementer vertikalt
+            alignItems="center"
             justifyContent="center"
             sx={{ mb: 2, mt: 1 }}
           >
@@ -212,14 +212,19 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               variant="contained"
               sx={{
                 minWidth: 120,
-                height: 40,
-                fontWeight: 500,
-                fontSize: "0.95rem",
+                height: 44,
+                fontWeight: 700,
+                fontSize: "1rem",
                 borderRadius: 2,
-                boxShadow: 1,
+                px: 3,
+                backgroundColor: "#1976d2", // Blå farve
+                color: "#fff",               // Hvid tekst
+                boxShadow: "none",
                 whiteSpace: "nowrap",
-                px: 2,
-                alignSelf: "center"
+                alignSelf: "center",
+                "&:hover": {
+                  backgroundColor: "#1565c0", // Mørkere blå ved hover
+                }
               }}
               onClick={handleFetch}
               disabled={loading || !startDate || !endDate}
