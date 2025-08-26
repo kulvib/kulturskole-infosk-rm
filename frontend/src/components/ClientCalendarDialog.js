@@ -22,7 +22,7 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import daLocale from "date-fns/locale/da";
 import { getMarkedDays, getCurrentSeason } from "../api";
 
-// Datoformat: Søndag d. 01/08 2025
+// Datoformat: Søndag 01.08 2025
 function formatDateLong(dt) {
   const weekdays = [
     "Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"
@@ -31,7 +31,7 @@ function formatDateLong(dt) {
   const day = dt.getDate().toString().padStart(2, "0");
   const month = (dt.getMonth() + 1).toString().padStart(2, "0");
   const year = dt.getFullYear();
-  return `${weekday} d. ${day}/${month} ${year}`;
+  return `${weekday} ${day}.${month} ${year}`;
 }
 
 function getStatusAndTimesFromRaw(markedDays, dt) {
@@ -188,7 +188,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   variant: "outlined",
                   fullWidth: true,
                   size: "medium",
-                  sx: { minWidth: 170 }, // Gør feltet bredere
+                  sx: { minWidth: 170 },
                   error: !startDate,
                   helperText: !startDate ? "Vælg startdato" : "",
                 },
@@ -206,7 +206,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   variant: "outlined",
                   fullWidth: true,
                   size: "medium",
-                  sx: { minWidth: 170 }, // Gør feltet bredere
+                  sx: { minWidth: 170 },
                   error: !endDate,
                   helperText: !endDate ? "Vælg slutdato" : "",
                 },
@@ -217,7 +217,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               color="primary"
               size="large"
               sx={{
-                minWidth: 165,         // Gør knappen lidt mindre bred
+                minWidth: 165,
                 whiteSpace: "nowrap"
               }}
               onClick={handleFetch}
