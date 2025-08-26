@@ -56,6 +56,10 @@ export default function DateTimeEditDialog({
   const onTimeRef = useRef(null);
   const offTimeRef = useRef(null);
 
+  // Time constraints for the date (always min="00:00", max="23:59" for a single date)
+  const minTime = "00:00";
+  const maxTime = "23:59";
+
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
@@ -102,6 +106,11 @@ export default function DateTimeEditDialog({
     const timeRegex = /^\d{2}:\d{2}$/;
     if (!timeRegex.test(onTime) || !timeRegex.test(offTime)) {
       setSnackbar({ open: true, message: "Tid skal være på formatet hh:mm!", severity: "error" });
+      return false;
+    }
+    // Check if onTime and offTime are within allowed range
+    if (onTime < minTime || onTime > maxTime || offTime < minTime || offTime > maxTime) {
+      setSnackbar({ open: true, message: "Tid skal være indenfor datoens interval!", severity: "error" });
       return false;
     }
     return true;
@@ -219,6 +228,8 @@ export default function DateTimeEditDialog({
                   style: { backgroundColor: "#f6f6f6" }
                 }}
                 inputProps={{
+                  min: minTime,
+                  max: maxTime,
                   step: 300,
                 }}
               />
@@ -240,6 +251,8 @@ export default function DateTimeEditDialog({
                   style: { backgroundColor: "#f6f6f6" }
                 }}
                 inputProps={{
+                  min: minTime,
+                  max: maxTime,
                   step: 300,
                 }}
               />
