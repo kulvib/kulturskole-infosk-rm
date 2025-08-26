@@ -48,7 +48,9 @@ import {
   openRemoteDesktop,
   getClient,
 } from "../api";
+import ClientCalendarDialog from "./ClientCalendarDialog";
 
+// ---------- Hjælpefunktioner ----------
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
@@ -110,6 +112,28 @@ function formatUptime(uptimeStr) {
   return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
 }
 
+function formatDateShort(dt) {
+  return dt.toLocaleDateString("da-DK", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+
+function getStatusAndTimesFromRaw(markedDays, dt) {
+  const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
+  const data = markedDays[dateKey];
+  if (!data || !data.status || data.status === "off") {
+    return { status: "off", powerOn: "", powerOff: "" };
+  }
+  return {
+    status: "on",
+    powerOn: data.onTime || "",
+    powerOff: data.offTime || ""
+  };
+}
+
+// ---------- Komponenter ----------
 function ClientStatusIcon({ isOnline }) {
   const theme = useTheme();
   return (
@@ -207,29 +231,6 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
   );
 }
 
-// ----------- KALENDER-TABEL (on/off, farvet tekst, kun 3 dage) -----------
-
-function formatDateShort(dt) {
-  return dt.toLocaleDateString("da-DK", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
-}
-
-function getStatusAndTimesFromRaw(markedDays, dt) {
-  const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
-  const data = markedDays[dateKey];
-  if (!data || !data.status || data.status === "off") {
-    return { status: "off", powerOn: "", powerOff: "" };
-  }
-  return {
-    status: "on",
-    powerOn: data.onTime || "",
-    powerOff: data.offTime || ""
-  };
-}
-
 function StatusText({ status }) {
   return (
     <Typography
@@ -283,15 +284,12 @@ function ClientPowerShortTable({ markedDays }) {
   );
 }
 
-// ----------- SLUT KALENDER-TABEL -----------
-
+// ---------- Hovedkomponent ----------
 export default function ClientDetailsPage({
   client,
   refreshing,
   handleRefresh,
   markedDays,
-  // calendarLoading, // du kan fjerne denne
-  onOpenCalendarDialog
 }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -310,6 +308,9 @@ export default function ClientDetailsPage({
   const [uptime, setUptime] = useState(client?.uptime || null);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
+  // NYT! State til kalender-dialogen
+  const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
 
   const navigate = useNavigate();
 
@@ -335,7 +336,7 @@ export default function ClientDetailsPage({
         setLastSeen(updated.last_seen || null);
         setUptime(updated.uptime || null);
       } catch {}
-    }, 1000); // 1 sekund
+    }, 1000);
     return () => clearInterval(pollerStatus);
   }, [client?.id]);
 
@@ -426,8 +427,6 @@ export default function ClientDetailsPage({
   const handleOpenTerminal = () => openTerminal(client.id);
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
-  const sectionSpacing = 2;
-
   if (!client) {
     return (
       <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4 }}>
@@ -478,7 +477,7 @@ export default function ClientDetailsPage({
           </span>
         </Tooltip>
       </Box>
-      <Grid container spacing={sectionSpacing}>
+      <Grid container spacing={2}>
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent>
@@ -567,7 +566,6 @@ export default function ClientDetailsPage({
             </CardContent>
           </Card>
         </Grid>
-
         {/* ----------- NY TRE-KOLONNE SEKTION ----------- */}
         <Grid item xs={12}>
           <Grid container spacing={2}>
@@ -591,7 +589,7 @@ export default function ClientDetailsPage({
                         verticalAlign: "middle",
                         borderRadius: 8
                       }}
-                      onClick={onOpenCalendarDialog}
+                      onClick={() => setCalendarDialogOpen(true)}
                     >
                       <ArrowForwardIosIcon sx={{ fontSize: 16 }} />
                     </Button>
@@ -831,11 +829,4 @@ export default function ClientDetailsPage({
                 fontSize: "0.95rem"
               }}>
                 Livestream placeholder (MJPEG/WebRTC)
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    </Box>
-  );
-}
+              </Box
