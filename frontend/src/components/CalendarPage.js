@@ -722,7 +722,7 @@ export default function CalendarPage() {
           <Button
             variant="outlined"
             color="primary"
-            size="large"
+            size="medium"
             sx={{ minWidth: 120, fontWeight: 700 }}
             onClick={() => setCalendarDialogOpen(true)}
             disabled={isDisabled}
