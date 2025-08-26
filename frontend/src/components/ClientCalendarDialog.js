@@ -212,7 +212,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               color="primary"
               size="large"
               sx={{
-                minWidth: 175,         // Gør knappen lidt mindre bred
+                minWidth: 165,         // Gør knappen lidt mindre bred
                 whiteSpace: "nowrap"
               }}
               onClick={handleFetch}
