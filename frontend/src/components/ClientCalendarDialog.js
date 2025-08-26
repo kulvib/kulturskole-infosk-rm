@@ -210,8 +210,8 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
             <Button
               variant="contained"
               color="primary"
-              size="large"
-              sx={{ minWidth: 200 }}
+              size="medium"
+              sx={{ minWidth: 120 }}
               onClick={handleFetch}
               disabled={loading || !startDate || !endDate}
             >
