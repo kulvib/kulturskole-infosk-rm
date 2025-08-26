@@ -727,4 +727,55 @@ export default function CalendarPage() {
             onChange={e => setSelectedSeason(Number(e.target.value))}
             style={{
               minWidth: 120,
-              fontWeight: 
+              fontWeight: 700, // HER er syntax-fejlen rettet!
+            }}
+          >
+            {seasons.map(season => (
+              <option key={season.value} value={season.value}>
+                {season.label}
+              </option>
+            ))}
+          </select>
+        </Box>
+      </Box>
+      {/* Kalender-visning */}
+      {activeClient && (
+        <Box sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(3, 1fr)" },
+          gap: 2
+        }}>
+          {schoolYearMonths.map(({ name, month, year }) => (
+            <MonthCalendar
+              key={`${name}-${year}`}
+              name={name}
+              month={month}
+              year={year}
+              clientId={activeClient}
+              markedDays={markedDays}
+              markMode={markMode}
+              onDayClick={handleDayClick}
+              onDateShiftLeftClick={handleDateShiftLeftClick}
+              loadingDialogDate={loadingDialogDate}
+              loadingDialogClient={loadingDialogClient}
+            />
+          ))}
+        </Box>
+      )}
+      {editDialogOpen && (
+        <DateTimeEditDialog
+          open={editDialogOpen}
+          onClose={() => setEditDialogOpen(false)}
+          date={editDialogDate}
+          clientId={editDialogClient}
+          onSave={handleSaveDateTime}
+        />
+      )}
+      <ClientCalendarDialog
+        open={calendarDialogOpen}
+        clientId={calendarDialogClientId}
+        onClose={() => setCalendarDialogOpen(false)}
+      />
+    </Box>
+  );
+}
