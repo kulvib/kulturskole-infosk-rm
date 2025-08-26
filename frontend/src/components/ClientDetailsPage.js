@@ -75,7 +75,6 @@ function formatDateTime(dateStr, withSeconds = false) {
   const hour = parts.find(p => p.type === "hour")?.value || "";
   const minute = parts.find(p => p.type === "minute")?.value || "";
   const second = withSeconds ? (parts.find(p => p.type === "second")?.value || "00") : undefined;
-  // Format: dd.mm yyyy, kl. tt:mm:ss
   return withSeconds
     ? `${day}.${month} ${year}, kl. ${hour}:${minute}:${second}`
     : `${day}.${month} ${year}, kl. ${hour}:${minute}`;
@@ -113,7 +112,6 @@ function formatUptime(uptimeStr) {
 }
 
 function formatDateShort(dt) {
-  // Return: "Ukedag dd.mm yyyy"
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
   const dayName = ukedage[dt.getDay()];
   const day = dt.getDate().toString().padStart(2, "0");
@@ -224,7 +222,20 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
         <IconButton
           size="small"
           onClick={handleCopy}
-          sx={{ ml: 1, p: 0.5 }}
+          sx={{
+            width: 24,
+            height: 24,
+            minWidth: 24,
+            minHeight: 24,
+            maxWidth: 24,
+            maxHeight: 24,
+            p: 0,
+            m: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            verticalAlign: "middle",
+          }}
           disabled={disabled}
         >
           <ContentCopyIcon sx={{ fontSize: iconSize }} color={copied ? "success" : "inherit"} />
@@ -249,7 +260,6 @@ function StatusText({ status }) {
   );
 }
 
-// --------- Kalender-tabel med ens rækkeafstand ---------
 function ClientPowerShortTable({ markedDays }) {
   const days = [];
   const now = new Date();
@@ -263,7 +273,7 @@ function ClientPowerShortTable({ markedDays }) {
     <TableContainer>
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ height: 30 }}>
+          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
             <TableCell>Dato</TableCell>
             <TableCell>Status</TableCell>
             <TableCell>Tænd</TableCell>
@@ -274,13 +284,13 @@ function ClientPowerShortTable({ markedDays }) {
           {days.map((dt) => {
             const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
-              <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: 30 }}>
-                <TableCell sx={{ whiteSpace: "nowrap", py: 0.25 }}>{formatDateShort(dt)}</TableCell>
-                <TableCell sx={{ py: 0.25 }}><StatusText status={status} /></TableCell>
-                <TableCell sx={{ py: 0.25 }}>
+              <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+                <TableCell sx={{ whiteSpace: "nowrap", py: 0 }}>{formatDateShort(dt)}</TableCell>
+                <TableCell sx={{ py: 0 }}><StatusText status={status} /></TableCell>
+                <TableCell sx={{ py: 0 }}>
                   {status === "on" && powerOn ? powerOn : ""}
                 </TableCell>
-                <TableCell sx={{ py: 0.25 }}>
+                <TableCell sx={{ py: 0 }}>
                   {status === "on" && powerOff ? powerOff : ""}
                 </TableCell>
               </TableRow>
@@ -294,36 +304,60 @@ function ClientPowerShortTable({ markedDays }) {
 
 // --------- Systeminfo med ens rækkeafstand ---------
 function SystemInfoTable({ client, uptime, lastSeen }) {
+  const cellStyle = {
+    border: 0,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    pr: 0.5,
+    py: 0,
+    verticalAlign: "middle",
+    height: 30,
+    minHeight: 30,
+    maxHeight: 30,
+  };
+  const valueCellStyle = {
+    border: 0,
+    pl: 0.5,
+    py: 0,
+    verticalAlign: "middle",
+    height: 30,
+    minHeight: 30,
+    maxHeight: 30,
+  };
   return (
     <TableContainer>
       <Table size="small" aria-label="systeminfo">
         <TableBody>
-          <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
-              Ubuntu version:
-            </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>{client.ubuntu_version || "ukendt"}</TableCell>
-          </TableRow>
-          <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
-              Oppetid:
-            </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>{formatUptime(uptime)}</TableCell>
-          </TableRow>
-          <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
-              Sidst set:
-            </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
-              {formatDateTime(lastSeen, true)}
+          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+            <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {client.ubuntu_version || "ukendt"}
+              </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
-              Tilføjet:
+          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+            <TableCell sx={cellStyle}>Oppetid:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {formatUptime(uptime)}
+              </Box>
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
-              {formatDateTime(client.created_at, true)}
+          </TableRow>
+          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+            <TableCell sx={cellStyle}>Sidst set:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {formatDateTime(lastSeen, true)}
+              </Box>
+            </TableCell>
+          </TableRow>
+          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+            <TableCell sx={cellStyle}>Tilføjet:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {formatDateTime(client.created_at, true)}
+              </Box>
             </TableCell>
           </TableRow>
         </TableBody>
@@ -334,44 +368,64 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
 
 // --------- Netværksinfo med ens rækkeafstand ---------
 function NetworkInfoTable({ client }) {
+  const cellStyle = {
+    border: 0,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    pr: 0.5,
+    py: 0,
+    verticalAlign: "middle",
+    height: 30,
+    minHeight: 30,
+    maxHeight: 30,
+  };
+  const valueCellStyle = {
+    border: 0,
+    pl: 0.5,
+    py: 0,
+    verticalAlign: "middle",
+    height: 30,
+    minHeight: 30,
+    maxHeight: 30,
+  };
   return (
     <TableContainer>
       <Table size="small" aria-label="netværksinfo">
         <TableBody>
-          <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
-              IP-adresse WLAN:
-            </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
-              {client.wifi_ip_address || "ukendt"}
-              <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
-            </TableCell>
-          </TableRow>
-          <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
-              MAC-adresse WLAN:
-            </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
-              {client.wifi_mac_address || "ukendt"}
-              <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
+          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+            <TableCell sx={cellStyle}>IP-adresse WLAN:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {client.wifi_ip_address || "ukendt"}
+                <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
+              </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
-              IP-adresse LAN:
-            </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
-              {client.lan_ip_address || "ukendt"}
-              <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
+          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+            <TableCell sx={cellStyle}>MAC-adresse WLAN:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {client.wifi_mac_address || "ukendt"}
+                <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
+              </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
-              MAC-adresse LAN:
+          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+            <TableCell sx={cellStyle}>IP-adresse LAN:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {client.lan_ip_address || "ukendt"}
+                <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
+              </Box>
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
-              {client.lan_mac_address || "ukendt"}
-              <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
+          </TableRow>
+          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+            <TableCell sx={cellStyle}>MAC-adresse LAN:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {client.lan_mac_address || "ukendt"}
+                <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
+              </Box>
             </TableCell>
           </TableRow>
         </TableBody>
@@ -594,74 +648,80 @@ export default function ClientDetailsPage({
                 <TableContainer>
                   <Table size="small" aria-label="client-details">
                     <TableBody>
-                      <TableRow sx={{ height: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
                           Klient ID:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem", display: "inline" }}
-                          >
-                            {client.id}
-                          </Typography>
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                            <Typography 
+                              variant="body2" 
+                              sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem", display: "inline" }}
+                            >
+                              {client.id}
+                            </Typography>
+                          </Box>
                         </TableCell>
                       </TableRow>
-                      <TableRow sx={{ height: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
                           Lokation:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
-                          <TextField
-                            size="small"
-                            value={locality}
-                            onChange={handleLocalityChange}
-                            sx={inputStyle}
-                            disabled={savingLocality}
-                          />
-                          <CopyIconButton value={locality} disabled={!locality} iconSize={15} />
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={handleLocalitySave}
-                            disabled={savingLocality}
-                            sx={{ minWidth: 44, maxWidth: 44, ml: 1 }}
-                          >
-                            {savingLocality ? <CircularProgress size={16} /> : "Gem"}
-                          </Button>
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                            <TextField
+                              size="small"
+                              value={locality}
+                              onChange={handleLocalityChange}
+                              sx={inputStyle}
+                              disabled={savingLocality}
+                            />
+                            <CopyIconButton value={locality} disabled={!locality} iconSize={15} />
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={handleLocalitySave}
+                              disabled={savingLocality}
+                              sx={{ minWidth: 44, maxWidth: 44, ml: 1 }}
+                            >
+                              {savingLocality ? <CircularProgress size={16} /> : "Gem"}
+                            </Button>
+                          </Box>
                         </TableCell>
                       </TableRow>
-                      <TableRow sx={{ height: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
                           Kiosk URL:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
-                          <TextField
-                            size="small"
-                            value={kioskUrl}
-                            onChange={handleKioskUrlChange}
-                            sx={kioskInputStyle}
-                            disabled={savingKioskUrl}
-                          />
-                          <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={15} />
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="primary"
-                            onClick={handleKioskUrlSave}
-                            disabled={savingKioskUrl}
-                            sx={{ minWidth: 44, maxWidth: 44, ml: 1 }}
-                          >
-                            {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
-                          </Button>
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                            <TextField
+                              size="small"
+                              value={kioskUrl}
+                              onChange={handleKioskUrlChange}
+                              sx={kioskInputStyle}
+                              disabled={savingKioskUrl}
+                            />
+                            <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={15} />
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="primary"
+                              onClick={handleKioskUrlSave}
+                              disabled={savingKioskUrl}
+                              sx={{ minWidth: 44, maxWidth: 44, ml: 1 }}
+                            >
+                              {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
+                            </Button>
+                          </Box>
                         </TableCell>
                       </TableRow>
-                      <TableRow sx={{ height: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
                           Kiosk browser status:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
-                          <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle" }}>
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                          <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "30px" }}>
                             <ClientStatusIcon isOnline={client.isOnline} />
                             <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
                           </Box>
