@@ -218,8 +218,8 @@ export default function DateTimeEditDialog({
         </Box>
       </DialogTitle>
       <DialogContent>
-        {/* Lidt ekstra afstand fra overskriften til felterne */}
-        <Box sx={{ mt: 3 }}>
+        {/* Afstand fra overskriften til felterne er nu mt: 2 */}
+        <Box sx={{ mt: 2 }}>
           {loading ? (
             <Box sx={{ minHeight: 80, display: "flex", alignItems: "center" }}>
               <CircularProgress sx={{ mr: 2 }} /> Henter tider...
@@ -246,7 +246,7 @@ export default function DateTimeEditDialog({
                     min: EARLIEST,
                     max: onTimeMax,
                     step: 300,
-                    // Ingen mouseover tekst, ingen title attribut
+                    title: "Angiv her hvornår klienten tænder", // Mouseover tekst
                   }}
                 />
               </Box>
@@ -270,7 +270,7 @@ export default function DateTimeEditDialog({
                     min: offTimeMin,
                     max: LATEST,
                     step: 300,
-                    // Ingen mouseover tekst, ingen title attribut
+                    title: "Angiv her hvornår klienten slukker", // Mouseover tekst
                   }}
                 />
               </Box>
