@@ -183,7 +183,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   variant: "outlined",
                   fullWidth: true,
                   size: "medium",
-                  sx: { minWidth: 180 },
+                  sx: { minWidth: 140 }, // Mindre bredde
                   error: !startDate,
                   helperText: !startDate ? "Vælg startdato" : "",
                 },
@@ -201,7 +201,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   variant: "outlined",
                   fullWidth: true,
                   size: "medium",
-                  sx: { minWidth: 180 },
+                  sx: { minWidth: 140 }, // Mindre bredde
                   error: !endDate,
                   helperText: !endDate ? "Vælg slutdato" : "",
                 },
@@ -210,8 +210,8 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
             <Button
               variant="contained"
               color="primary"
-              size="medium"
-              sx={{ minWidth: 120 }}
+              size="large"
+              sx={{ minWidth: 200 }}
               onClick={handleFetch}
               disabled={loading || !startDate || !endDate}
             >
