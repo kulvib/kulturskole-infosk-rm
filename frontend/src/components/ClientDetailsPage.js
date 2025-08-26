@@ -290,6 +290,7 @@ export default function ClientDetailsPage({
   refreshing,
   handleRefresh,
   markedDays,
+  calendarLoading,
 }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -815,30 +816,4 @@ export default function ClientDetailsPage({
                 <VideocamIcon color="action" fontSize="large" />
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
                   Livestream fra klient
-                </Typography>
-              </Stack>
-              <Box sx={{
-                p: 2,
-                border: "1px solid #eee",
-                borderRadius: 2,
-                background: "#fafafa",
-                textAlign: "center",
-                color: "#888",
-                fontStyle: "italic",
-                fontSize: "0.95rem"
-              }}>
-                Livestream placeholder (MJPEG/WebRTC)
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-      {/* Kalender-dialogen! */}
-      <ClientCalendarDialog
-        open={calendarDialogOpen}
-        onClose={() => setCalendarDialogOpen(false)}
-        clientId={client.id}
-      />
-    </Box>
-  );
-}
+                </Typography
