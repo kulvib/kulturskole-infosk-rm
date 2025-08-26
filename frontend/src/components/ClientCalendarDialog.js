@@ -112,52 +112,17 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
   const [markedDays, setMarkedDays] = useState({});
   const [loading, setLoading] = useState(false);
   const [showTable, setShowTable] = useState(false);
-  const [seasonError, setSeasonError] = useState("");
-
-  // Hjælpefunktion: Tjek om dato er gyldig
-  const isDateInvalid = (date, season) => {
-    if (!date || !season) return true;
-    const d = new Date(date);
-    const start = new Date(season.start_date);
-    const end = new Date(season.end_date);
-    return d < start || d > end;
-  };
-
-  // Hent sæson-data (med debug og retry):
-  const fetchSeason = async () => {
-    setSeasonError("");
-    setSeason(null);
-    setStartDate(null);
-    setEndDate(null);
-
-    try {
-      const s = await getCurrentSeason();
-      console.log("getCurrentSeason response:", s);
-      if (s && s.start_date && s.end_date) {
-        setSeason(s);
-        setStartDate(new Date(s.start_date));
-        setEndDate(new Date(s.end_date));
-        setSeasonError("");
-      } else {
-        setSeasonError("Kunne ikke hente sæson-data. Prøv igen senere.");
-        setSeason(null);
-        setStartDate(null);
-        setEndDate(null);
-      }
-      setMarkedDays({});
-      setShowTable(false);
-    } catch (err) {
-      console.error("Fejl ved hentning af sæson-data:", err);
-      setSeasonError("Kunne ikke hente sæson-data. Prøv igen senere.");
-      setSeason(null);
-      setStartDate(null);
-      setEndDate(null);
-    }
-  };
 
   useEffect(() => {
     if (open) {
-      fetchSeason();
+      (async () => {
+        const s = await getCurrentSeason();
+        setSeason(s);
+        setStartDate(new Date(s.start_date));
+        setEndDate(new Date(s.end_date));
+        setMarkedDays({});
+        setShowTable(false);
+      })();
     }
   }, [open]);
 
@@ -168,8 +133,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
       const res = await getMarkedDays(season.id, clientId, startDate, endDate);
       setMarkedDays(res?.markedDays || {});
       setShowTable(true);
-    } catch (err) {
-      console.error("Fejl ved hentning af kalenderdata:", err);
+    } catch {
       setMarkedDays({});
       setShowTable(true);
     }
@@ -180,20 +144,6 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Vis kalender for periode</DialogTitle>
       <DialogContent>
-        {seasonError && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="error" sx={{ mb: 1 }}>
-              {seasonError}
-            </Typography>
-            <Button
-              variant="outlined"
-              color="primary"
-              onClick={fetchSeason}
-            >
-              Prøv igen
-            </Button>
-          </Box>
-        )}
         <LocalizationProvider dateAdapter={AdapterDateFns} locale={daLocale}>
           <Stack
             direction="row"
@@ -208,22 +158,19 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               minDate={season ? new Date(season.start_date) : undefined}
               maxDate={season ? new Date(season.end_date) : undefined}
               format="dd/MM/yyyy"
+              inputFormat="dd/MM/yyyy"
               renderInput={(params) => (
                 <TextField
                   {...params}
                   variant="outlined"
                   fullWidth
                   size="small"
-                  sx={{ width: 200 }}
-                  error={isDateInvalid(startDate, season)}
-                  helperText={
-                    isDateInvalid(startDate, season)
-                      ? "Vælg gyldig startdato"
-                      : ""
-                  }
+                  sx={{
+                    minWidth: 140,
+                    marginTop: 0,
+                  }}
                 />
               )}
-              disabled={!season}
             />
             <DatePicker
               label="Slutdato"
@@ -232,35 +179,24 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               minDate={season ? new Date(season.start_date) : undefined}
               maxDate={season ? new Date(season.end_date) : undefined}
               format="dd/MM/yyyy"
+              inputFormat="dd/MM/yyyy"
               renderInput={(params) => (
                 <TextField
                   {...params}
                   variant="outlined"
                   fullWidth
                   size="small"
-                  sx={{ width: 200 }}
-                  error={isDateInvalid(endDate, season)}
-                  helperText={
-                    isDateInvalid(endDate, season)
-                      ? "Vælg gyldig slutdato"
-                      : ""
-                  }
+                  sx={{
+                    minWidth: 140,
+                    marginTop: 0,
+                  }}
                 />
               )}
-              disabled={!season}
             />
             <Button
               variant="contained"
               onClick={handleFetch}
-              disabled={
-                loading ||
-                !startDate ||
-                !endDate ||
-                isDateInvalid(startDate, season) ||
-                isDateInvalid(endDate, season) ||
-                !!seasonError ||
-                !season
-              }
+              disabled={loading || !startDate || !endDate}
             >
               Hent kalender
             </Button>
