@@ -290,7 +290,7 @@ export default function ClientDetailsPage({
   refreshing,
   handleRefresh,
   markedDays,
-  calendarLoading,
+  // calendarLoading, // du kan fjerne denne
   onOpenCalendarDialog
 }) {
   const [locality, setLocality] = useState("");
@@ -596,14 +596,7 @@ export default function ClientDetailsPage({
                       <ArrowForwardIosIcon sx={{ fontSize: 16 }} />
                     </Button>
                   </Box>
-                  {calendarLoading ? (
-                    <Box sx={{ textAlign: "center", py: 3 }}>
-                      <CircularProgress size={32} />
-                      <Typography sx={{ mt: 2 }}>Indlæser Tænd/Sluk kalender...</Typography>
-                    </Box>
-                  ) : (
-                    <ClientPowerShortTable markedDays={markedDays} />
-                  )}
+                  <ClientPowerShortTable markedDays={markedDays} />
                 </CardContent>
               </Card>
             </Grid>
