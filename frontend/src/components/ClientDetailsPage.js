@@ -233,6 +233,7 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
   );
 }
 
+// --------- OPDATERET KALENDER-TABEL ---------
 function StatusText({ status }) {
   return (
     <Typography
@@ -243,12 +244,11 @@ function StatusText({ status }) {
         textTransform: "lowercase"
       }}
     >
-      {status === "off" ? "off." : "on"}
+      {status}
     </Typography>
   );
 }
 
-// --------- OPDATERET KALENDER-TABEL ---------
 function ClientPowerShortTable({ markedDays }) {
   const days = [];
   const now = new Date();
