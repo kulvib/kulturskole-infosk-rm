@@ -158,7 +158,6 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               minDate={season ? new Date(season.start_date) : undefined}
               maxDate={season ? new Date(season.end_date) : undefined}
               format="dd/MM/yyyy"
-              inputFormat="dd/MM/yyyy"
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -166,9 +165,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   fullWidth
                   size="small"
                   sx={{
-                    minWidth: 140,
-                    // bgcolor: "#fff", // Fjern/flyt denne hvis dialogen er hvid
-                    marginTop: 0,
+                    width: 200,
                   }}
                 />
               )}
@@ -180,7 +177,6 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               minDate={season ? new Date(season.start_date) : undefined}
               maxDate={season ? new Date(season.end_date) : undefined}
               format="dd/MM/yyyy"
-              inputFormat="dd/MM/yyyy"
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -188,9 +184,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   fullWidth
                   size="small"
                   sx={{
-                    minWidth: 140,
-                    // bgcolor: "#fff", // Fjern/flyt denne hvis dialogen er hvid
-                    marginTop: 0,
+                    width: 200,
                   }}
                 />
               )}
