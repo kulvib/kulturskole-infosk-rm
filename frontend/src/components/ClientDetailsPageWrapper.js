@@ -2,13 +2,11 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getClient, getMarkedDays, getCurrentSeason } from "../api";
 import ClientDetailsPage from "./ClientDetailsPage";
-import ClientCalendarDialog from "./ClientCalendarDialog";
 
 export default function ClientDetailsPageWrapper() {
   const { clientId } = useParams();
   const [client, setClient] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [calendarOpen, setCalendarOpen] = useState(false);
   const [markedDays, setMarkedDays] = useState({});
   const [calendarLoading, setCalendarLoading] = useState(false);
 
@@ -49,20 +47,12 @@ export default function ClientDetailsPageWrapper() {
   };
 
   return (
-    <>
-      <ClientDetailsPage
-        client={client}
-        refreshing={refreshing}
-        handleRefresh={handleRefresh}
-        markedDays={markedDays}
-        calendarLoading={calendarLoading}
-        onOpenCalendarDialog={() => setCalendarOpen(true)}
-      />
-      <ClientCalendarDialog
-        open={calendarOpen}
-        onClose={() => setCalendarOpen(false)}
-        clientId={client?.id}
-      />
-    </>
+    <ClientDetailsPage
+      client={client}
+      refreshing={refreshing}
+      handleRefresh={handleRefresh}
+      markedDays={markedDays}
+      calendarLoading={calendarLoading}
+    />
   );
 }
