@@ -113,13 +113,23 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
   const [loading, setLoading] = useState(false);
   const [showTable, setShowTable] = useState(false);
 
+  // Hjælpefunktion: Tjek om dato er gyldig
+  const isDateInvalid = (date, season) => {
+    if (!date || !season) return true;
+    const d = new Date(date);
+    const start = new Date(season.start_date);
+    const end = new Date(season.end_date);
+    return d < start || d > end;
+  };
+
   useEffect(() => {
     if (open) {
       (async () => {
         const s = await getCurrentSeason();
         setSeason(s);
-        setStartDate(new Date(s.start_date));
-        setEndDate(new Date(s.end_date));
+        // Sæt start/slutdato automatisk ud fra sæson
+        setStartDate(s ? new Date(s.start_date) : null);
+        setEndDate(s ? new Date(s.end_date) : null);
         setMarkedDays({});
         setShowTable(false);
       })();
@@ -164,9 +174,13 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   variant="outlined"
                   fullWidth
                   size="small"
-                  sx={{
-                    width: 200,
-                  }}
+                  sx={{ width: 200 }}
+                  error={isDateInvalid(startDate, season)}
+                  helperText={
+                    isDateInvalid(startDate, season)
+                      ? "Vælg gyldig startdato"
+                      : ""
+                  }
                 />
               )}
             />
@@ -183,16 +197,26 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   variant="outlined"
                   fullWidth
                   size="small"
-                  sx={{
-                    width: 200,
-                  }}
+                  sx={{ width: 200 }}
+                  error={isDateInvalid(endDate, season)}
+                  helperText={
+                    isDateInvalid(endDate, season)
+                      ? "Vælg gyldig slutdato"
+                      : ""
+                  }
                 />
               )}
             />
             <Button
               variant="contained"
               onClick={handleFetch}
-              disabled={loading || !startDate || !endDate}
+              disabled={
+                loading ||
+                !startDate ||
+                !endDate ||
+                isDateInvalid(startDate, season) ||
+                isDateInvalid(endDate, season)
+              }
             >
               Hent kalender
             </Button>
