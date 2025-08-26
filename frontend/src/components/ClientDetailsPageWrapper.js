@@ -2,17 +2,15 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getClient, getMarkedDays, getCurrentSeason } from "../api";
 import ClientDetailsPage from "./ClientDetailsPage";
-import ClientCalendarDialog from "./ClientCalendarDialog";
+// Fjern import af ClientCalendarDialog!
 
 export default function ClientDetailsPageWrapper() {
   const { clientId } = useParams();
   const [client, setClient] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [calendarOpen, setCalendarOpen] = useState(false);
   const [markedDays, setMarkedDays] = useState({});
   const [calendarLoading, setCalendarLoading] = useState(false);
 
-  // Hent klientdata og kalenderdata samtidig
   const fetchAllData = async (forceUpdate = false) => {
     if (!clientId) return;
     setCalendarLoading(true);
@@ -22,7 +20,6 @@ export default function ClientDetailsPageWrapper() {
         getCurrentSeason()
       ]);
       const calendarData = await getMarkedDays(season.id, clientId);
-
       setClient(prev => {
         if (forceUpdate || JSON.stringify(clientData) !== JSON.stringify(prev)) {
           return clientData;
@@ -38,7 +35,7 @@ export default function ClientDetailsPageWrapper() {
 
   useEffect(() => {
     fetchAllData();
-    const timer = setInterval(() => fetchAllData(false), 15000); // 15 sekunder
+    const timer = setInterval(() => fetchAllData(false), 15000);
     return () => clearInterval(timer);
   }, [clientId]);
 
@@ -49,20 +46,12 @@ export default function ClientDetailsPageWrapper() {
   };
 
   return (
-    <>
-      <ClientDetailsPage
-        client={client}
-        refreshing={refreshing}
-        handleRefresh={handleRefresh}
-        markedDays={markedDays}
-        calendarLoading={calendarLoading}
-        onOpenCalendarDialog={() => setCalendarOpen(true)}
-      />
-      <ClientCalendarDialog
-        open={calendarOpen}
-        onClose={() => setCalendarOpen(false)}
-        clientId={client?.id}
-      />
-    </>
+    <ClientDetailsPage
+      client={client}
+      refreshing={refreshing}
+      handleRefresh={handleRefresh}
+      markedDays={markedDays}
+      calendarLoading={calendarLoading}
+    />
   );
 }
