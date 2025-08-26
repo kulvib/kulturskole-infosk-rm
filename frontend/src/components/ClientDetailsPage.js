@@ -6,7 +6,6 @@ import {
   CardContent,
   Typography,
   Button,
-  Stack,
   TextField,
   CircularProgress,
   Tooltip,
@@ -190,7 +189,7 @@ function ChromeStatusIcon({ status, color }) {
   }
 
   return (
-    <Stack direction="row" spacing={1} alignItems="center">
+    <TableCell sx={{ border: 0, fontWeight: 700 }}>
       <Box
         sx={{
           width: 14,
@@ -199,10 +198,13 @@ function ChromeStatusIcon({ status, color }) {
           bgcolor: dotColor,
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
+          display: "inline-block",
+          verticalAlign: "middle",
+          mr: 1,
         }}
       />
-      <Typography variant="body2" sx={{ fontWeight: 700 }}>{text}</Typography>
-    </Stack>
+      <Typography variant="body2" sx={{ fontWeight: 700, display: "inline", verticalAlign: "middle" }}>{text}</Typography>
+    </TableCell>
   );
 }
 
@@ -233,7 +235,6 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
   );
 }
 
-// --------- OPDATERET KALENDER-TABEL ---------
 function StatusText({ status }) {
   return (
     <Typography
@@ -249,6 +250,7 @@ function StatusText({ status }) {
   );
 }
 
+// --------- OPDATERET KALENDER-TABEL ---------
 function ClientPowerShortTable({ markedDays }) {
   const days = [];
   const now = new Date();
@@ -285,6 +287,98 @@ function ClientPowerShortTable({ markedDays }) {
               </TableRow>
             );
           })}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+// --------- OPDATERET SYSTEMINFO-TABEL ---------
+function SystemInfoTable({ client, uptime, lastSeen }) {
+  return (
+    <TableContainer>
+      <Table size="small" aria-label="systeminfo">
+        <TableBody>
+          <TableRow>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+              <MemoryIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+              Ubuntu version:
+            </TableCell>
+            <TableCell sx={{ border: 0 }}>{client.ubuntu_version || "ukendt"}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+              <AccessTimeIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+              Oppetid:
+            </TableCell>
+            <TableCell sx={{ border: 0 }}>{formatUptime(uptime)}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+              <AccessTimeIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+              Sidst set:
+            </TableCell>
+            <TableCell sx={{ border: 0 }}>{formatDateTime(lastSeen, true)}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+              <AccessTimeIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+              Tilføjet:
+            </TableCell>
+            <TableCell sx={{ border: 0 }}>{formatDateTime(client.created_at, true)}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+// --------- OPDATERET NETVÆRKSINFO-TABEL ---------
+function NetworkInfoTable({ client }) {
+  return (
+    <TableContainer>
+      <Table size="small" aria-label="netværksinfo">
+        <TableBody>
+          <TableRow>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+              <LanIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+              IP-adresse WLAN:
+            </TableCell>
+            <TableCell sx={{ border: 0 }}>
+              {client.wifi_ip_address || "ukendt"}
+              <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+              <LanIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+              MAC-adresse WLAN:
+            </TableCell>
+            <TableCell sx={{ border: 0 }}>
+              {client.wifi_mac_address || "ukendt"}
+              <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+              <LanIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+              IP-adresse LAN:
+            </TableCell>
+            <TableCell sx={{ border: 0 }}>
+              {client.lan_ip_address || "ukendt"}
+              <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+              <LanIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+              MAC-adresse LAN:
+            </TableCell>
+            <TableCell sx={{ border: 0 }}>
+              {client.lan_mac_address || "ukendt"}
+              <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
+            </TableCell>
+          </TableRow>
         </TableBody>
       </Table>
     </TableContainer>
@@ -488,88 +582,104 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent>
-              <Stack spacing={2}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 700,
-                      lineHeight: 1.2,
-                      letterSpacing: 0.5,
-                      fontSize: { xs: "1rem", sm: "1.15rem", md: "1.25rem" },
-                    }}
-                  >
-                    {client.name}
-                  </Typography>
-                  <ClientStatusIcon isOnline={client.isOnline} />
-                </Stack>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <LanIcon color="primary" />
-                  <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                    Klient ID:
-                  </Typography>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem" }}
-                  >
-                    {client.id}
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <LocationOnIcon color="primary" />
-                  <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 90 }}>
-                    Lokation:
-                  </Typography>
-                  <TextField
-                    size="small"
-                    value={locality}
-                    onChange={handleLocalityChange}
-                    sx={inputStyle}
-                    disabled={savingLocality}
-                  />
-                  <CopyIconButton value={locality} disabled={!locality} iconSize={15} />
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={handleLocalitySave}
-                    disabled={savingLocality}
-                    sx={{ minWidth: 44, maxWidth: 44 }}
-                  >
-                    {savingLocality ? <CircularProgress size={16} /> : "Gem"}
-                  </Button>
-                </Stack>
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <ChromeReaderModeIcon color="primary" />
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Kiosk URL:
-                  </Typography>
-                  <TextField
-                    size="small"
-                    value={kioskUrl}
-                    onChange={handleKioskUrlChange}
-                    sx={kioskInputStyle}
-                    disabled={savingKioskUrl}
-                  />
-                  <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={15} />
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="primary"
-                    onClick={handleKioskUrlSave}
-                    disabled={savingKioskUrl}
-                    sx={{ minWidth: 44, maxWidth: 44 }}
-                  >
-                    {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
-                  </Button>
-                </Stack>
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <ChromeReaderModeIcon color="primary" />
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Kiosk browser status:
-                  </Typography>
-                  <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
-                </Stack>
-              </Stack>
+              <Box>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    letterSpacing: 0.5,
+                    fontSize: { xs: "1rem", sm: "1.15rem", md: "1.25rem" },
+                  }}
+                >
+                  {client.name}
+                </Typography>
+              </Box>
+              <Box mt={2}>
+                <TableContainer>
+                  <Table size="small" aria-label="client-details">
+                    <TableBody>
+                      <TableRow>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+                          <LanIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+                          Klient ID:
+                        </TableCell>
+                        <TableCell sx={{ border: 0 }}>
+                          <Typography 
+                            variant="body2" 
+                            sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem", display: "inline" }}
+                          >
+                            {client.id}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+                          <LocationOnIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+                          Lokation:
+                        </TableCell>
+                        <TableCell sx={{ border: 0 }}>
+                          <TextField
+                            size="small"
+                            value={locality}
+                            onChange={handleLocalityChange}
+                            sx={inputStyle}
+                            disabled={savingLocality}
+                          />
+                          <CopyIconButton value={locality} disabled={!locality} iconSize={15} />
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={handleLocalitySave}
+                            disabled={savingLocality}
+                            sx={{ minWidth: 44, maxWidth: 44, ml: 1 }}
+                          >
+                            {savingLocality ? <CircularProgress size={16} /> : "Gem"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+                          <ChromeReaderModeIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+                          Kiosk URL:
+                        </TableCell>
+                        <TableCell sx={{ border: 0 }}>
+                          <TextField
+                            size="small"
+                            value={kioskUrl}
+                            onChange={handleKioskUrlChange}
+                            sx={kioskInputStyle}
+                            disabled={savingKioskUrl}
+                          />
+                          <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={15} />
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                            onClick={handleKioskUrlSave}
+                            disabled={savingKioskUrl}
+                            sx={{ minWidth: 44, maxWidth: 44, ml: 1 }}
+                          >
+                            {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+                          <ChromeReaderModeIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
+                          Kiosk browser status:
+                        </TableCell>
+                        <TableCell sx={{ border: 0 }}>
+                          <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle" }}>
+                            <ClientStatusIcon isOnline={client.isOnline} />
+                            <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
@@ -614,40 +724,7 @@ export default function ClientDetailsPage({
                   <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                     Systeminfo
                   </Typography>
-                  <Stack spacing={1} sx={{ width: "100%" }} alignItems="flex-start">
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <MemoryIcon color="primary" />
-                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                        Ubuntu version:
-                      </Typography>
-                      <Typography variant="body2">{client.ubuntu_version || "ukendt"}</Typography>
-                    </Stack>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <AccessTimeIcon color="primary" />
-                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                        Oppetid:
-                      </Typography>
-                      <Typography variant="body2">{formatUptime(uptime)}</Typography>
-                    </Stack>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <AccessTimeIcon color="primary" />
-                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                        Sidst set:
-                      </Typography>
-                      <Typography variant="body2">
-                        {formatDateTime(lastSeen, true)}
-                      </Typography>
-                    </Stack>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <AccessTimeIcon color="primary" />
-                      <Typography sx={{ fontWeight: 600, minWidth: 90 }} variant="body2">
-                        Tilføjet:
-                      </Typography>
-                      <Typography variant="body2">
-                        {formatDateTime(client.created_at, true)}
-                      </Typography>
-                    </Stack>
-                  </Stack>
+                  <SystemInfoTable client={client} uptime={uptime} lastSeen={lastSeen} />
                 </CardContent>
               </Card>
             </Grid>
@@ -657,40 +734,7 @@ export default function ClientDetailsPage({
                   <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                     Netværksinfo
                   </Typography>
-                  <Stack spacing={1} sx={{ width: "100%" }} alignItems="flex-start">
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <LanIcon color="primary" />
-                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
-                        IP-adresse WLAN:
-                      </Typography>
-                      <Typography variant="body2">{client.wifi_ip_address || "ukendt"}</Typography>
-                      <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
-                    </Stack>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <LanIcon color="primary" />
-                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
-                        MAC-adresse WLAN:
-                      </Typography>
-                      <Typography variant="body2">{client.wifi_mac_address || "ukendt"}</Typography>
-                      <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
-                    </Stack>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <LanIcon color="primary" />
-                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
-                        IP-adresse LAN:
-                      </Typography>
-                      <Typography variant="body2">{client.lan_ip_address || "ukendt"}</Typography>
-                      <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
-                    </Stack>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <LanIcon color="primary" />
-                      <Typography sx={{ fontWeight: 600, minWidth: 170 }} variant="body2">
-                        MAC-adresse LAN:
-                      </Typography>
-                      <Typography variant="body2">{client.lan_mac_address || "ukendt"}</Typography>
-                      <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
-                    </Stack>
-                  </Stack>
+                  <NetworkInfoTable client={client} />
                 </CardContent>
               </Card>
             </Grid>
@@ -700,7 +744,7 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
-              <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%", mb: 2 }}>
+              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", mb: 2 }}>
                 <Tooltip title="Start kiosk browser">
                   <span>
                     <Button
@@ -757,8 +801,8 @@ export default function ClientDetailsPage({
                     </Button>
                   </span>
                 </Tooltip>
-              </Stack>
-              <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
+              </Box>
+              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%" }}>
                 <Tooltip title="Genstart klient">
                   <span>
                     <Button
@@ -789,7 +833,7 @@ export default function ClientDetailsPage({
                     </Button>
                   </span>
                 </Tooltip>
-              </Stack>
+              </Box>
               <Dialog open={shutdownDialogOpen} onClose={() => setShutdownDialogOpen(false)}>
                 <DialogTitle>Bekræft slukning af klient</DialogTitle>
                 <DialogContent>
@@ -821,12 +865,12 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2 }}>
             <CardContent>
-              <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2 }}>
                 <VideocamIcon color="action" fontSize="large" />
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
                   Livestream fra klient
                 </Typography>
-              </Stack>
+              </Box>
               <Box sx={{
                 p: 2,
                 border: "1px solid #eee",
