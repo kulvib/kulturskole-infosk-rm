@@ -274,7 +274,7 @@ function ClientPowerShortTable({ markedDays }) {
             const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
               <TableRow key={dt.toISOString().slice(0, 10)}>
-                <TableCell>{formatDateShort(dt)}</TableCell>
+                <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDateShort(dt)}</TableCell>
                 <TableCell><StatusText status={status} /></TableCell>
                 <TableCell>
                   {status === "on" && powerOn ? powerOn : ""}
