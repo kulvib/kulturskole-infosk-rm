@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
@@ -8,6 +7,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
+import ClientCalendarDialog from "./ClientCalendarDialog"; // <-- NYT IMPORT
 
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
@@ -17,18 +17,13 @@ const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
 // --- NY getSeasons funktion: ---
 function getSeasons() {
-  // Beregn aktuel sæson ud fra dags dato
   const now = new Date();
   let seasonStartYear;
-  // Sæson starter 1. august
   if (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)) {
-    // Hvis vi er i august eller senere, er sæsonen det nuværende år
     seasonStartYear = now.getFullYear();
   } else {
-    // Hvis vi er før august, er sæsonen sidste år
     seasonStartYear = now.getFullYear() - 1;
   }
-  // Lav listen med aktuel sæson + 2 næste
   const seasons = [];
   for (let i = 0; i < 3; i++) {
     const start = seasonStartYear + i;
@@ -78,7 +73,7 @@ function deepEqual(obj1, obj2) {
 }
 
 // ClientSelectorInline med 2/3/5 klienter pr. række
-function ClientSelectorInline({ clients, selected, onChange }) {
+function ClientSelectorInline({ clients, selected, onChange, onShiftClickClient }) {
   const [search, setSearch] = useState("");
   const sortedClients = useMemo(() => [...clients].sort((a, b) => {
     const aName = (a.locality || a.name || "").toLowerCase();
@@ -141,7 +136,13 @@ function ClientSelectorInline({ clients, selected, onChange }) {
               cursor: "pointer",
               ":hover": { background: "#f3f6fa" }
             }}
-            onClick={() => {
+            onClick={e => {
+              if (e.shiftKey && e.button === 0 && onShiftClickClient) {
+                e.preventDefault();
+                onShiftClickClient(client.id); // <-- Client ID sendes til dialogen
+                return;
+              }
+              // Normal toggling
               if (selected.includes(client.id)) {
                 onChange(selected.filter(sid => sid !== client.id));
               } else {
@@ -308,6 +309,10 @@ export default function CalendarPage() {
   const [loadingDialogDate, setLoadingDialogDate] = useState(null);
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
   const [savingCalendar, setSavingCalendar] = useState(false);
+
+  // STATE FOR NY KLIENT-KALENDER DIALOG
+  const [clientCalendarDialogOpen, setClientCalendarDialogOpen] = useState(false);
+  const [clientCalendarDialogClientId, setClientCalendarDialogClientId] = useState(null);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const snackbarTimer = useRef(null);
@@ -493,6 +498,12 @@ export default function CalendarPage() {
     }
   };
 
+  // NY HANDLER TIL SHIFT+VENSTREKLIK PÅ KLIENT
+  const handleShiftClickClient = (clientId) => {
+    setClientCalendarDialogClientId(clientId);
+    setClientCalendarDialogOpen(true);
+  };
+
   const schoolYearMonths = useMemo(() => getSchoolYearMonths(selectedSeason), [selectedSeason]);
 
   const handleSave = useCallback(
@@ -643,6 +654,7 @@ export default function CalendarPage() {
           clients={clients}
           selected={selectedClients}
           onChange={handleClientSelectorChange}
+          onShiftClickClient={handleShiftClickClient}
         />
         {selectedClients.length > 1 && (
           <Box sx={{
@@ -779,6 +791,12 @@ export default function CalendarPage() {
         clientId={editDialogClient}
         onSaved={handleSaveDateTime}
         localMarkedDays={markedDays[editDialogClient]}
+      />
+      {/* NY DIALOG FOR KLIENTKALENDER */}
+      <ClientCalendarDialog
+        open={clientCalendarDialogOpen}
+        onClose={() => setClientCalendarDialogOpen(false)}
+        clientId={clientCalendarDialogClientId}
       />
     </Box>
   );
