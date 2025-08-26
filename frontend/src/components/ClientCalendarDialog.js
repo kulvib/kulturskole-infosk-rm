@@ -211,7 +211,10 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               variant="contained"
               color="primary"
               size="large"
-              sx={{ minWidth: 200 }}
+              sx={{
+                minWidth: 220,         // Sikrer teksten står på én linje
+                whiteSpace: "nowrap"   // Forhindrer linjeskift
+              }}
               onClick={handleFetch}
               disabled={loading || !startDate || !endDate}
             >
