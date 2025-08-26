@@ -7,6 +7,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
+import ClientCalendarDialog from "./ClientCalendarDialog"; // NY!
 
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
@@ -14,20 +15,14 @@ const monthNames = [
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
-// --- NY getSeasons funktion: ---
 function getSeasons() {
-  // Beregn aktuel sæson ud fra dags dato
   const now = new Date();
   let seasonStartYear;
-  // Sæson starter 1. august
   if (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)) {
-    // Hvis vi er i august eller senere, er sæsonen det nuværende år
     seasonStartYear = now.getFullYear();
   } else {
-    // Hvis vi er før august, er sæsonen sidste år
     seasonStartYear = now.getFullYear() - 1;
   }
-  // Lav listen med aktuel sæson + 2 næste
   const seasons = [];
   for (let i = 0; i < 3; i++) {
     const start = seasonStartYear + i;
@@ -76,8 +71,8 @@ function deepEqual(obj1, obj2) {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
 
-// ClientSelectorInline med 2/3/5 klienter pr. række
-function ClientSelectorInline({ clients, selected, onChange }) {
+// NY: ClientSelectorInline med dobbeltklik og mouseover
+function ClientSelectorInline({ clients, selected, onChange, onDoubleClickClient }) {
   const [search, setSearch] = useState("");
   const sortedClients = useMemo(() => [...clients].sort((a, b) => {
     const aName = (a.locality || a.name || "").toLowerCase();
@@ -140,12 +135,16 @@ function ClientSelectorInline({ clients, selected, onChange }) {
               cursor: "pointer",
               ":hover": { background: "#f3f6fa" }
             }}
+            title="Dobbeltklik for kalenderliste"
             onClick={() => {
               if (selected.includes(client.id)) {
                 onChange(selected.filter(sid => sid !== client.id));
               } else {
                 onChange([...selected, client.id]);
               }
+            }}
+            onDoubleClick={() => {
+              if (onDoubleClickClient) onDoubleClickClient(client.id);
             }}
           >
             <Checkbox
@@ -307,6 +306,10 @@ export default function CalendarPage() {
   const [loadingDialogDate, setLoadingDialogDate] = useState(null);
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
   const [savingCalendar, setSavingCalendar] = useState(false);
+
+  // NY: State til ClientCalendarDialog
+  const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
+  const [calendarDialogClientId, setCalendarDialogClientId] = useState(null);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const snackbarTimer = useRef(null);
@@ -642,6 +645,10 @@ export default function CalendarPage() {
           clients={clients}
           selected={selectedClients}
           onChange={handleClientSelectorChange}
+          onDoubleClickClient={id => {
+            setCalendarDialogClientId(id);
+            setCalendarDialogOpen(true);
+          }}
         />
         {selectedClients.length > 1 && (
           <Box sx={{
@@ -726,59 +733,4 @@ export default function CalendarPage() {
               border: "1px solid #dbeafe"
             }}
           >
-            {seasons.map(season => (
-              <option key={season.value} value={season.value}>
-                {season.label}
-              </option>
-            ))}
-          </select>
-        </Box>
-      </Box>
-      {/* Kalender */}
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "2fr 2fr", md: "repeat(4, 1fr)" },
-          gap: 3,
-        }}
-      >
-        {!activeClient && (
-          <Typography sx={{ mt: 4, textAlign: "center", gridColumn: "1/-1" }}>
-            Vælg en klient for at se kalenderen.
-          </Typography>
-        )}
-        {activeClient && !loadingMarkedDays &&
-          schoolYearMonths.map(({ name, month, year }) => (
-            <MonthCalendar
-              key={name + year}
-              name={name}
-              month={month}
-              year={year}
-              clientId={activeClient}
-              markedDays={markedDays}
-              markMode={markMode}
-              onDayClick={handleDayClick}
-              onDateShiftLeftClick={handleDateShiftLeftClick}
-              loadingDialogDate={loadingDialogDate}
-              loadingDialogClient={loadingDialogClient}
-            />
-          ))
-        }
-        {activeClient && loadingMarkedDays && (
-          <Box sx={{ textAlign: "center", mt: 6, gridColumn: "1/-1" }}>
-            <CircularProgress />
-            <Typography variant="body2" sx={{ mt: 2 }}>Henter kalender...</Typography>
-          </Box>
-        )}
-      </Box>
-      <DateTimeEditDialog
-        open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
-        date={editDialogDate}
-        clientId={editDialogClient}
-        onSaved={handleSaveDateTime}
-        localMarkedDays={markedDays[editDialogClient]}
-      />
-    </Box>
-  );
-}
+            {seasons.map(season =>
