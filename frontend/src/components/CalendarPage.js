@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Checkbox, TextField, Snackbar, Alert as MuiAlert
+  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
-import ClientCalendarDialog from "./ClientCalendarDialog"; // <- NY IMPORT
+import ClientCalendarDialog from "./ClientCalendarDialog";
 
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
@@ -301,7 +301,7 @@ export default function CalendarPage() {
   const [loadingDialogDate, setLoadingDialogDate] = useState(null);
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
   const [savingCalendar, setSavingCalendar] = useState(false);
-  const [calendarDialogOpen, setCalendarDialogOpen] = useState(false); // NYT!
+  const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const snackbarTimer = useRef(null);
@@ -312,6 +312,13 @@ export default function CalendarPage() {
   const lastDialogSavedTimestamp = useRef(0);
 
   const seasons = getSeasons();
+
+  // Opdateringsknap - funktion
+  const handleRefresh = async () => {
+    setLoadingClients(true);
+    await fetchClients();
+    setLoadingClients(false);
+  };
 
   const fetchClients = useCallback(async () => {
     setLoadingClients(true);
@@ -613,7 +620,7 @@ export default function CalendarPage() {
       <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
         <IconButton
           aria-label="Opdater klienter"
-          onClick={fetchClients}
+          onClick={handleRefresh}
           disabled={loadingClients}
           sx={{
             position: "absolute",
@@ -674,7 +681,7 @@ export default function CalendarPage() {
         )}
       </Paper>
 
-      {/* NY KNAPLINJE: Vælg sæson | Markering | Vis liste */}
+      {/* NY KNAPLINJE: Markering | Vis liste | Vælg sæson */}
       <Box sx={{
         display: "flex",
         alignItems: "center",
@@ -683,7 +690,42 @@ export default function CalendarPage() {
         gap: 2,
         flexWrap: "wrap"
       }}>
-        {/* Venstre: Sæsonvælger */}
+        {/* Venstre: Markering-knapper */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="h6" sx={{ mr: 1, fontWeight: 700 }}>
+            Markering:
+          </Typography>
+          <Button
+            variant={markMode === "on" ? "contained" : "outlined"}
+            color="success"
+            onClick={() => setMarkMode("on")}
+            sx={{ fontWeight: markMode === "on" ? 700 : 400 }}
+          >
+            TÆNDT
+          </Button>
+          <Button
+            variant={markMode === "off" ? "contained" : "outlined"}
+            color="error"
+            onClick={() => setMarkMode("off")}
+            sx={{ fontWeight: markMode === "off" ? 700 : 400 }}
+          >
+            SLUKKET
+          </Button>
+        </Box>
+        {/* Midten: Vis liste-knap */}
+        <Box>
+          <Button
+            variant="outlined"
+            color="primary"
+            size="large"
+            sx={{ minWidth: 120, fontWeight: 700 }}
+            onClick={() => setCalendarDialogOpen(true)}
+            disabled={!activeClient}
+          >
+            Vis liste
+          </Button>
+        </Box>
+        {/* Højre: Sæsonvælger */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
             Vælg sæson:
@@ -707,43 +749,6 @@ export default function CalendarPage() {
               </option>
             ))}
           </select>
-        </Box>
-
-        {/* Midten: Markering-knapper */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography variant="h6" sx={{ mr: 1, fontWeight: 700 }}>
-            Markering
-          </Typography>
-          <Button
-            variant={markMode === "on" ? "contained" : "outlined"}
-            color="success"
-            onClick={() => setMarkMode("on")}
-            sx={{ fontWeight: markMode === "on" ? 700 : 400 }}
-          >
-            TÆNDT
-          </Button>
-          <Button
-            variant={markMode === "off" ? "contained" : "outlined"}
-            color="error"
-            onClick={() => setMarkMode("off")}
-            sx={{ fontWeight: markMode === "off" ? 700 : 400 }}
-          >
-            SLUKKET
-          </Button>
-        </Box>
-
-        {/* Højre: Vis liste-knap */}
-        <Box>
-          <Button
-            variant="outlined"
-            color="primary"
-            size="large"
-            sx={{ minWidth: 120, fontWeight: 700 }}
-            onClick={() => setCalendarDialogOpen(true)}
-            disabled={!activeClient}
-          >
-            Vis liste
-          </Button>
         </Box>
       </Box>
 
