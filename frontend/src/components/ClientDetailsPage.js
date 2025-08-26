@@ -189,7 +189,7 @@ function ChromeStatusIcon({ status, color }) {
   }
 
   return (
-    <TableCell sx={{ border: 0, fontWeight: 700 }}>
+    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
       <Box
         sx={{
           width: 14,
@@ -198,13 +198,11 @@ function ChromeStatusIcon({ status, color }) {
           bgcolor: dotColor,
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
-          display: "inline-block",
-          verticalAlign: "middle",
           mr: 1,
         }}
       />
-      <Typography variant="body2" sx={{ fontWeight: 700, display: "inline", verticalAlign: "middle" }}>{text}</Typography>
-    </TableCell>
+      <Typography variant="body2" sx={{ fontWeight: 700 }}>{text}</Typography>
+    </Box>
   );
 }
 
@@ -276,12 +274,12 @@ function ClientPowerShortTable({ markedDays }) {
             const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
               <TableRow key={dt.toISOString().slice(0, 10)}>
-                <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDateShort(dt)}</TableCell>
-                <TableCell><StatusText status={status} /></TableCell>
-                <TableCell>
+                <TableCell sx={{ whiteSpace: "nowrap", py: 0.5 }}>{formatDateShort(dt)}</TableCell>
+                <TableCell sx={{ py: 0.5 }}><StatusText status={status} /></TableCell>
+                <TableCell sx={{ py: 0.5 }}>
                   {status === "on" && powerOn ? powerOn : ""}
                 </TableCell>
-                <TableCell>
+                <TableCell sx={{ py: 0.5 }}>
                   {status === "on" && powerOff ? powerOff : ""}
                 </TableCell>
               </TableRow>
@@ -300,32 +298,32 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
       <Table size="small" aria-label="systeminfo">
         <TableBody>
           <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
               <MemoryIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
               Ubuntu version:
             </TableCell>
-            <TableCell sx={{ border: 0 }}>{client.ubuntu_version || "ukendt"}</TableCell>
+            <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>{client.ubuntu_version || "ukendt"}</TableCell>
           </TableRow>
           <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
               <AccessTimeIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
               Oppetid:
             </TableCell>
-            <TableCell sx={{ border: 0 }}>{formatUptime(uptime)}</TableCell>
+            <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>{formatUptime(uptime)}</TableCell>
           </TableRow>
           <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
               <AccessTimeIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
               Sidst set:
             </TableCell>
-            <TableCell sx={{ border: 0 }}>{formatDateTime(lastSeen, true)}</TableCell>
+            <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>{formatDateTime(lastSeen, true)}</TableCell>
           </TableRow>
           <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
               <AccessTimeIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
               Tilføjet:
             </TableCell>
-            <TableCell sx={{ border: 0 }}>{formatDateTime(client.created_at, true)}</TableCell>
+            <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>{formatDateTime(client.created_at, true)}</TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -340,41 +338,41 @@ function NetworkInfoTable({ client }) {
       <Table size="small" aria-label="netværksinfo">
         <TableBody>
           <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
               <LanIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
               IP-adresse WLAN:
             </TableCell>
-            <TableCell sx={{ border: 0 }}>
+            <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>
               {client.wifi_ip_address || "ukendt"}
               <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
             </TableCell>
           </TableRow>
           <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
               <LanIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
               MAC-adresse WLAN:
             </TableCell>
-            <TableCell sx={{ border: 0 }}>
+            <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>
               {client.wifi_mac_address || "ukendt"}
               <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
             </TableCell>
           </TableRow>
           <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
               <LanIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
               IP-adresse LAN:
             </TableCell>
-            <TableCell sx={{ border: 0 }}>
+            <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>
               {client.lan_ip_address || "ukendt"}
               <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
             </TableCell>
           </TableRow>
           <TableRow>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
               <LanIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
               MAC-adresse LAN:
             </TableCell>
-            <TableCell sx={{ border: 0 }}>
+            <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>
               {client.lan_mac_address || "ukendt"}
               <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
             </TableCell>
@@ -600,11 +598,11 @@ export default function ClientDetailsPage({
                   <Table size="small" aria-label="client-details">
                     <TableBody>
                       <TableRow>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
                           <LanIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
                           Klient ID:
                         </TableCell>
-                        <TableCell sx={{ border: 0 }}>
+                        <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>
                           <Typography 
                             variant="body2" 
                             sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem", display: "inline" }}
@@ -614,11 +612,11 @@ export default function ClientDetailsPage({
                         </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
                           <LocationOnIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
                           Lokation:
                         </TableCell>
-                        <TableCell sx={{ border: 0 }}>
+                        <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>
                           <TextField
                             size="small"
                             value={locality}
@@ -639,11 +637,11 @@ export default function ClientDetailsPage({
                         </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
                           <ChromeReaderModeIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
                           Kiosk URL:
                         </TableCell>
-                        <TableCell sx={{ border: 0 }}>
+                        <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>
                           <TextField
                             size="small"
                             value={kioskUrl}
@@ -665,11 +663,11 @@ export default function ClientDetailsPage({
                         </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap" }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 1, py: 0.5 }}>
                           <ChromeReaderModeIcon color="primary" sx={{ verticalAlign: "middle", mr: 1 }} />
                           Kiosk browser status:
                         </TableCell>
-                        <TableCell sx={{ border: 0 }}>
+                        <TableCell sx={{ border: 0, pl: 1, py: 0.5 }}>
                           <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle" }}>
                             <ClientStatusIcon isOnline={client.isOnline} />
                             <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
