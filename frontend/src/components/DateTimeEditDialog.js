@@ -170,7 +170,6 @@ export default function DateTimeEditDialog({
         setOffTime(dayObj2.offTime || "");
       }
 
-      // Luk dialogen automatisk efter success
       closeTimer.current = setTimeout(() => {
         setSnackbar({ open: false, message: "", severity: "success" });
         if (onClose) onClose();
@@ -202,8 +201,8 @@ export default function DateTimeEditDialog({
             <CircularProgress sx={{ mr: 2 }} /> Henter tider...
           </Box>
         ) : (
-          <>
-            <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <Box sx={{ flex: 1 }}>
               <Typography
                 variant="subtitle2"
                 sx={{ mb: 0.5, fontWeight: 500 }}
@@ -224,7 +223,7 @@ export default function DateTimeEditDialog({
                 }}
               />
             </Box>
-            <Box sx={{ mb: 2 }}>
+            <Box sx={{ flex: 1 }}>
               <Typography
                 variant="subtitle2"
                 sx={{ mb: 0.5, fontWeight: 500 }}
@@ -245,7 +244,7 @@ export default function DateTimeEditDialog({
                 }}
               />
             </Box>
-          </>
+          </Box>
         )}
       </DialogContent>
       <DialogActions>
