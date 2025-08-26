@@ -11,7 +11,9 @@ import {
   Box,
   Snackbar,
   Alert as MuiAlert,
+  InputAdornment,
 } from "@mui/material";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
 function getToken() {
@@ -215,7 +217,12 @@ export default function DateTimeEditDialog({
                 value={onTime}
                 onChange={e => setOnTime(e.target.value)}
                 InputProps={{
-                  style: { backgroundColor: "#f6f6f6" }
+                  style: { backgroundColor: "#f6f6f6" },
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <AccessTimeIcon />
+                    </InputAdornment>
+                  ),
                 }}
                 inputProps={{
                   step: 300,
@@ -235,7 +242,12 @@ export default function DateTimeEditDialog({
                 value={offTime}
                 onChange={e => setOffTime(e.target.value)}
                 InputProps={{
-                  style: { backgroundColor: "#f6f6f6" }
+                  style: { backgroundColor: "#f6f6f6" },
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <AccessTimeIcon />
+                    </InputAdornment>
+                  ),
                 }}
                 inputProps={{
                   step: 300,
