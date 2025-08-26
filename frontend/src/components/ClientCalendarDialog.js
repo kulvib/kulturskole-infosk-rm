@@ -22,11 +22,16 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import daLocale from "date-fns/locale/da";
 import { getMarkedDays, getCurrentSeason } from "../api";
 
-// Datoformat: DD/MM/YYYY
-function formatDateShort(dt) {
-  return `${dt.getDate().toString().padStart(2, "0")}/${(dt.getMonth() + 1)
-    .toString()
-    .padStart(2, "0")}/${dt.getFullYear()}`;
+// Datoformat: Søndag d. 01/08 2025
+function formatDateLong(dt) {
+  const weekdays = [
+    "Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"
+  ];
+  const weekday = weekdays[dt.getDay()];
+  const day = dt.getDate().toString().padStart(2, "0");
+  const month = (dt.getMonth() + 1).toString().padStart(2, "0");
+  const year = dt.getFullYear();
+  return `${weekday} d. ${day}/${month} ${year}`;
 }
 
 function getStatusAndTimesFromRaw(markedDays, dt) {
@@ -89,7 +94,7 @@ function ClientPowerPeriodTable({ markedDays, days }) {
             );
             return (
               <TableRow key={dt.toISOString().slice(0, 10)}>
-                <TableCell>{formatDateShort(dt)}</TableCell>
+                <TableCell>{formatDateLong(dt)}</TableCell>
                 <TableCell>
                   <StatusText status={status} />
                 </TableCell>
