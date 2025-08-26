@@ -30,11 +30,6 @@ import TerminalIcon from "@mui/icons-material/Terminal";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import ChromeReaderModeIcon from "@mui/icons-material/ChromeReaderMode";
-import LocationOnIcon from "@mui/icons-material/LocationOn";
-import LanIcon from "@mui/icons-material/Lan";
-import MemoryIcon from "@mui/icons-material/Memory";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
@@ -75,7 +70,6 @@ function formatDateTime(dateStr, withSeconds = false) {
   const hour = parts.find(p => p.type === "hour")?.value || "";
   const minute = parts.find(p => p.type === "minute")?.value || "";
   const second = withSeconds ? (parts.find(p => p.type === "second")?.value || "00") : undefined;
-  // Format: dd.mm yyyy, kl. tt:mm:ss
   return withSeconds
     ? `${day}.${month} ${year}, kl. ${hour}:${minute}:${second}`
     : `${day}.${month} ${year}, kl. ${hour}:${minute}`;
@@ -113,7 +107,6 @@ function formatUptime(uptimeStr) {
 }
 
 function formatDateShort(dt) {
-  // Return: "Ukedag dd.mm yyyy"
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
   const dayName = ukedage[dt.getDay()];
   const day = dt.getDate().toString().padStart(2, "0");
@@ -224,7 +217,17 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
         <IconButton
           size="small"
           onClick={handleCopy}
-          sx={{ ml: 1, p: 0.5 }}
+          sx={{
+            ml: 1,
+            p: 0.5,
+            height: 20,
+            width: 20,
+            minHeight: 20,
+            maxHeight: 20,
+            verticalAlign: "middle",
+            display: "inline-flex",
+            alignItems: "center"
+          }}
           disabled={disabled}
         >
           <ContentCopyIcon sx={{ fontSize: iconSize }} color={copied ? "success" : "inherit"} />
@@ -264,10 +267,10 @@ function ClientPowerShortTable({ markedDays }) {
       <Table size="small">
         <TableHead>
           <TableRow sx={{ height: 30 }}>
-            <TableCell>Dato</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Tænd</TableCell>
-            <TableCell>Sluk</TableCell>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle" }}>Dato</TableCell>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle" }}>Status</TableCell>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle" }}>Tænd</TableCell>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle" }}>Sluk</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -275,12 +278,12 @@ function ClientPowerShortTable({ markedDays }) {
             const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
               <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: 30 }}>
-                <TableCell sx={{ whiteSpace: "nowrap", py: 0.25 }}>{formatDateShort(dt)}</TableCell>
-                <TableCell sx={{ py: 0.25 }}><StatusText status={status} /></TableCell>
-                <TableCell sx={{ py: 0.25 }}>
+                <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", whiteSpace: "nowrap" }}>{formatDateShort(dt)}</TableCell>
+                <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle" }}><StatusText status={status} /></TableCell>
+                <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle" }}>
                   {status === "on" && powerOn ? powerOn : ""}
                 </TableCell>
-                <TableCell sx={{ py: 0.25 }}>
+                <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle" }}>
                   {status === "on" && powerOff ? powerOff : ""}
                 </TableCell>
               </TableRow>
@@ -299,30 +302,30 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
       <Table size="small" aria-label="systeminfo">
         <TableBody>
           <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               Ubuntu version:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>{client.ubuntu_version || "ukendt"}</TableCell>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5 }}>{client.ubuntu_version || "ukendt"}</TableCell>
           </TableRow>
           <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               Oppetid:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>{formatUptime(uptime)}</TableCell>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5 }}>{formatUptime(uptime)}</TableCell>
           </TableRow>
           <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               Sidst set:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5 }}>
               {formatDateTime(lastSeen, true)}
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               Tilføjet:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5 }}>
               {formatDateTime(client.created_at, true)}
             </TableCell>
           </TableRow>
@@ -339,37 +342,37 @@ function NetworkInfoTable({ client }) {
       <Table size="small" aria-label="netværksinfo">
         <TableBody>
           <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               IP-adresse WLAN:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5 }}>
               {client.wifi_ip_address || "ukendt"}
               <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               MAC-adresse WLAN:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5 }}>
               {client.wifi_mac_address || "ukendt"}
               <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               IP-adresse LAN:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5 }}>
               {client.lan_ip_address || "ukendt"}
               <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: 30 }}>
-            <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5 }}>
               MAC-adresse LAN:
             </TableCell>
-            <TableCell sx={{ border: 0, pl: 0.5 }}>
+            <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5 }}>
               {client.lan_mac_address || "ukendt"}
               <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
             </TableCell>
@@ -405,7 +408,6 @@ export default function ClientDetailsPage({
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  // NYT! State til kalender-dialogen
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
 
   const navigate = useNavigate();
@@ -419,7 +421,6 @@ export default function ClientDetailsPage({
       setLastSeen(client.last_seen || null);
       setUptime(client.uptime || null);
     }
-    // eslint-disable-next-line
   }, [client]);
 
   useEffect(() => {
@@ -595,10 +596,10 @@ export default function ClientDetailsPage({
                   <Table size="small" aria-label="client-details">
                     <TableBody>
                       <TableRow sx={{ height: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+                        <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
                           Klient ID:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
+                        <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5, py: 0.25 }}>
                           <Typography 
                             variant="body2" 
                             sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem", display: "inline" }}
@@ -608,10 +609,10 @@ export default function ClientDetailsPage({
                         </TableCell>
                       </TableRow>
                       <TableRow sx={{ height: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+                        <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
                           Lokation:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
+                        <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5, py: 0.25 }}>
                           <TextField
                             size="small"
                             value={locality}
@@ -632,10 +633,10 @@ export default function ClientDetailsPage({
                         </TableCell>
                       </TableRow>
                       <TableRow sx={{ height: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+                        <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
                           Kiosk URL:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
+                        <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5, py: 0.25 }}>
                           <TextField
                             size="small"
                             value={kioskUrl}
@@ -657,10 +658,10 @@ export default function ClientDetailsPage({
                         </TableCell>
                       </TableRow>
                       <TableRow sx={{ height: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
+                        <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
                           Kiosk browser status:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0.25 }}>
+                        <TableCell sx={{ height: 30, py: 0, verticalAlign: "middle", border: 0, pl: 0.5, py: 0.25 }}>
                           <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle" }}>
                             <ClientStatusIcon isOnline={client.isOnline} />
                             <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
@@ -674,7 +675,6 @@ export default function ClientDetailsPage({
             </CardContent>
           </Card>
         </Grid>
-        {/* ----------- NY TRE-KOLONNE SEKTION ----------- */}
         <Grid item xs={12}>
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
@@ -731,7 +731,6 @@ export default function ClientDetailsPage({
             </Grid>
           </Grid>
         </Grid>
-        {/* ----------- SLUT NY TRE-KOLONNE SEKTION ----------- */}
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
@@ -878,7 +877,6 @@ export default function ClientDetailsPage({
           </Card>
         </Grid>
       </Grid>
-      {/* Kalender-dialogen! */}
       <ClientCalendarDialog
         open={calendarDialogOpen}
         onClose={() => setCalendarDialogOpen(false)}
