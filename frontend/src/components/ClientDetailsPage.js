@@ -32,8 +32,6 @@ import VideocamIcon from "@mui/icons-material/Videocam";
 import ChromeReaderModeIcon from "@mui/icons-material/ChromeReaderMode";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import LanIcon from "@mui/icons-material/Lan";
-import MemoryIcon from "@mui/icons-material/Memory";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
@@ -58,26 +56,15 @@ function formatDateTime(dateStr, withSeconds = false) {
   } else {
     d = new Date(dateStr + "Z");
   }
-  const formatter = new Intl.DateTimeFormat("da-DK", {
-    timeZone: "Europe/Copenhagen",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: withSeconds ? "2-digit" : undefined,
-    hour12: false
-  });
-  const parts = formatter.formatToParts(d);
-  const day = parts.find(p => p.type === "day")?.value || "";
-  const month = parts.find(p => p.type === "month")?.value || "";
-  const year = parts.find(p => p.type === "year")?.value || "";
-  const hour = parts.find(p => p.type === "hour")?.value || "";
-  const minute = parts.find(p => p.type === "minute")?.value || "";
-  const second = withSeconds ? (parts.find(p => p.type === "second")?.value || "00") : undefined;
+  const day = d.getDate().toString().padStart(2, "0");
+  const month = (d.getMonth() + 1).toString().padStart(2, "0");
+  const year = d.getFullYear();
+  const hour = d.getHours().toString().padStart(2, "0");
+  const minute = d.getMinutes().toString().padStart(2, "0");
+  const second = d.getSeconds().toString().padStart(2, "0");
   return withSeconds
-    ? `${day}-${month}-${year}, Kl. ${hour}:${minute}:${second}`
-    : `${day}-${month}-${year}, Kl. ${hour}:${minute}`;
+    ? `${day}.${month} ${year}, kl. ${hour}:${minute}:${second}`
+    : `${day}.${month} ${year}, kl. ${hour}:${minute}`;
 }
 
 function formatUptime(uptimeStr) {
