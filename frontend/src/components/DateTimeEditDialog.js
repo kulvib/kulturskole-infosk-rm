@@ -38,6 +38,10 @@ function formatFullDate(dateStr) {
   return `${weekday} d. ${day}.${month} ${year}`;
 }
 
+// Helper to get earliest/latest time for time input
+const EARLIEST = "00:00";
+const LATEST = "23:59";
+
 export default function DateTimeEditDialog({
   open,
   onClose,
@@ -56,9 +60,13 @@ export default function DateTimeEditDialog({
   const onTimeRef = useRef(null);
   const offTimeRef = useRef(null);
 
-  // Time constraints for the date (always min="00:00", max="23:59" for a single date)
-  const minTime = "00:00";
-  const maxTime = "23:59";
+  // Validation helpers
+  function isValidTimeFormat(t) {
+    return /^\d{2}:\d{2}$/.test(t);
+  }
+  function isOnBeforeOff(on, off) {
+    return isValidTimeFormat(on) && isValidTimeFormat(off) && on <= off;
+  }
 
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
@@ -103,18 +111,24 @@ export default function DateTimeEditDialog({
       setSnackbar({ open: true, message: "Begge tider skal udfyldes!", severity: "error" });
       return false;
     }
-    const timeRegex = /^\d{2}:\d{2}$/;
-    if (!timeRegex.test(onTime) || !timeRegex.test(offTime)) {
+    if (!isValidTimeFormat(onTime) || !isValidTimeFormat(offTime)) {
       setSnackbar({ open: true, message: "Tid skal være på formatet hh:mm!", severity: "error" });
       return false;
     }
-    // Check if onTime and offTime are within allowed range
-    if (onTime < minTime || onTime > maxTime || offTime < minTime || offTime > maxTime) {
+    if (onTime < EARLIEST || onTime > LATEST || offTime < EARLIEST || offTime > LATEST) {
       setSnackbar({ open: true, message: "Tid skal være indenfor datoens interval!", severity: "error" });
+      return false;
+    }
+    if (!isOnBeforeOff(onTime, offTime)) {
+      setSnackbar({ open: true, message: "Tænd tid skal være før sluk tid!", severity: "error" });
       return false;
     }
     return true;
   };
+
+  // Dynamisk min/max for inputs:
+  const onTimeMax = offTime && isValidTimeFormat(offTime) ? offTime : LATEST;
+  const offTimeMin = onTime && isValidTimeFormat(onTime) ? onTime : EARLIEST;
 
   const handleSave = async () => {
     if (!validate()) return;
@@ -205,60 +219,63 @@ export default function DateTimeEditDialog({
         </Box>
       </DialogTitle>
       <DialogContent>
-        {loading ? (
-          <Box sx={{ minHeight: 80, display: "flex", alignItems: "center" }}>
-            <CircularProgress sx={{ mr: 2 }} /> Henter tider...
-          </Box>
-        ) : (
-          <Box sx={{ display: "flex", gap: 2 }}>
-            <Box sx={{ flex: 1 }}>
-              <Typography
-                variant="subtitle2"
-                sx={{ mb: 0.5, fontWeight: 500 }}
-              >
-                Tænd tid
-              </Typography>
-              <TextField
-                type="time"
-                fullWidth
-                value={onTime}
-                onChange={e => setOnTime(e.target.value)}
-                inputRef={onTimeRef}
-                InputProps={{
-                  style: { backgroundColor: "#f6f6f6" }
-                }}
-                inputProps={{
-                  min: minTime,
-                  max: maxTime,
-                  step: 300,
-                }}
-              />
+        {/* Lidt ekstra afstand fra overskrift til felterne */}
+        <Box sx={{ mt: 2 }}>
+          {loading ? (
+            <Box sx={{ minHeight: 80, display: "flex", alignItems: "center" }}>
+              <CircularProgress sx={{ mr: 2 }} /> Henter tider...
             </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography
-                variant="subtitle2"
-                sx={{ mb: 0.5, fontWeight: 500 }}
-              >
-                Sluk tid
-              </Typography>
-              <TextField
-                type="time"
-                fullWidth
-                value={offTime}
-                onChange={e => setOffTime(e.target.value)}
-                inputRef={offTimeRef}
-                InputProps={{
-                  style: { backgroundColor: "#f6f6f6" }
-                }}
-                inputProps={{
-                  min: minTime,
-                  max: maxTime,
-                  step: 300,
-                }}
-              />
+          ) : (
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ mb: 0.5, fontWeight: 500 }}
+                >
+                  Tænd tid
+                </Typography>
+                <TextField
+                  type="time"
+                  fullWidth
+                  value={onTime}
+                  onChange={e => setOnTime(e.target.value)}
+                  inputRef={onTimeRef}
+                  InputProps={{
+                    style: { backgroundColor: "#f6f6f6" }
+                  }}
+                  inputProps={{
+                    min: EARLIEST,
+                    max: onTimeMax,
+                    step: 300,
+                  }}
+                />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ mb: 0.5, fontWeight: 500 }}
+                >
+                  Sluk tid
+                </Typography>
+                <TextField
+                  type="time"
+                  fullWidth
+                  value={offTime}
+                  onChange={e => setOffTime(e.target.value)}
+                  inputRef={offTimeRef}
+                  InputProps={{
+                    style: { backgroundColor: "#f6f6f6" }
+                  }}
+                  inputProps={{
+                    min: offTimeMin,
+                    max: LATEST,
+                    step: 300,
+                  }}
+                />
+              </Box>
             </Box>
-          </Box>
-        )}
+          )}
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} color="inherit" disabled={saving || loading}>
