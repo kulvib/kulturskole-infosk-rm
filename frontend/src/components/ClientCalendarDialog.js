@@ -183,7 +183,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   variant: "outlined",
                   fullWidth: true,
                   size: "medium",
-                  sx: { minWidth: 140 }, // Mindre bredde
+                  sx: { minWidth: 170 }, // Gør feltet bredere
                   error: !startDate,
                   helperText: !startDate ? "Vælg startdato" : "",
                 },
@@ -201,7 +201,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   variant: "outlined",
                   fullWidth: true,
                   size: "medium",
-                  sx: { minWidth: 140 }, // Mindre bredde
+                  sx: { minWidth: 170 }, // Gør feltet bredere
                   error: !endDate,
                   helperText: !endDate ? "Vælg slutdato" : "",
                 },
@@ -212,8 +212,8 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               color="primary"
               size="large"
               sx={{
-                minWidth: 220,         // Sikrer teksten står på én linje
-                whiteSpace: "nowrap"   // Forhindrer linjeskift
+                minWidth: 180,         // Gør knappen lidt mindre bred
+                whiteSpace: "nowrap"
               }}
               onClick={handleFetch}
               disabled={loading || !startDate || !endDate}
