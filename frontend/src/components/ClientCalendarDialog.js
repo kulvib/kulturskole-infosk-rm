@@ -123,30 +123,41 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
     return d < start || d > end;
   };
 
+  // Hent sæson-data (med debug og retry):
+  const fetchSeason = async () => {
+    setSeasonError("");
+    setSeason(null);
+    setStartDate(null);
+    setEndDate(null);
+
+    try {
+      const s = await getCurrentSeason();
+      console.log("getCurrentSeason response:", s);
+      if (s && s.start_date && s.end_date) {
+        setSeason(s);
+        setStartDate(new Date(s.start_date));
+        setEndDate(new Date(s.end_date));
+        setSeasonError("");
+      } else {
+        setSeasonError("Kunne ikke hente sæson-data. Prøv igen senere.");
+        setSeason(null);
+        setStartDate(null);
+        setEndDate(null);
+      }
+      setMarkedDays({});
+      setShowTable(false);
+    } catch (err) {
+      console.error("Fejl ved hentning af sæson-data:", err);
+      setSeasonError("Kunne ikke hente sæson-data. Prøv igen senere.");
+      setSeason(null);
+      setStartDate(null);
+      setEndDate(null);
+    }
+  };
+
   useEffect(() => {
     if (open) {
-      (async () => {
-        try {
-          const s = await getCurrentSeason();
-          setSeason(s);
-          setSeasonError("");
-          if (s && s.start_date && s.end_date) {
-            setStartDate(new Date(s.start_date));
-            setEndDate(new Date(s.end_date));
-          } else {
-            setStartDate(null);
-            setEndDate(null);
-            setSeasonError("Kunne ikke hente sæson-data. Prøv igen senere.");
-          }
-          setMarkedDays({});
-          setShowTable(false);
-        } catch (err) {
-          setSeasonError("Kunne ikke hente sæson-data. Prøv igen senere.");
-          setSeason(null);
-          setStartDate(null);
-          setEndDate(null);
-        }
-      })();
+      fetchSeason();
     }
   }, [open]);
 
@@ -157,7 +168,8 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
       const res = await getMarkedDays(season.id, clientId, startDate, endDate);
       setMarkedDays(res?.markedDays || {});
       setShowTable(true);
-    } catch {
+    } catch (err) {
+      console.error("Fejl ved hentning af kalenderdata:", err);
       setMarkedDays({});
       setShowTable(true);
     }
@@ -169,9 +181,18 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
       <DialogTitle>Vis kalender for periode</DialogTitle>
       <DialogContent>
         {seasonError && (
-          <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-            {seasonError}
-          </Typography>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+              {seasonError}
+            </Typography>
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={fetchSeason}
+            >
+              Prøv igen
+            </Button>
+          </Box>
         )}
         <LocalizationProvider dateAdapter={AdapterDateFns} locale={daLocale}>
           <Stack
@@ -202,6 +223,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   }
                 />
               )}
+              disabled={!season}
             />
             <DatePicker
               label="Slutdato"
@@ -225,6 +247,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                   }
                 />
               )}
+              disabled={!season}
             />
             <Button
               variant="contained"
@@ -235,7 +258,8 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                 !endDate ||
                 isDateInvalid(startDate, season) ||
                 isDateInvalid(endDate, season) ||
-                !!seasonError
+                !!seasonError ||
+                !season
               }
             >
               Hent kalender
