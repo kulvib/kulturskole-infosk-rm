@@ -15,7 +15,6 @@ import {
   TableHead,
   TableRow,
   Stack,
-  TextField,
 } from "@mui/material";
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { DatePicker } from "@mui/x-date-pickers";
@@ -210,22 +209,9 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
             />
             <Button
               variant="contained"
-              sx={{
-                minWidth: 120,
-                height: 44,
-                fontWeight: 700,
-                fontSize: "1rem",
-                borderRadius: 2,
-                px: 3,
-                backgroundColor: "#1976d2", // Blå farve
-                color: "#fff",               // Hvid tekst
-                boxShadow: "none",
-                whiteSpace: "nowrap",
-                alignSelf: "center",
-                "&:hover": {
-                  backgroundColor: "#1565c0", // Mørkere blå ved hover
-                }
-              }}
+              color="primary"
+              size="large"
+              sx={{ minWidth: 200 }}
               onClick={handleFetch}
               disabled={loading || !startDate || !endDate}
             >
