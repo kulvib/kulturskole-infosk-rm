@@ -75,7 +75,7 @@ function formatDateTime(dateStr, withSeconds = false) {
   const hour = parts.find(p => p.type === "hour")?.value || "";
   const minute = parts.find(p => p.type === "minute")?.value || "";
   const second = withSeconds ? (parts.find(p => p.type === "second")?.value || "00") : undefined;
-  // Ændret format: dd.mm yyyy, kl. tt:mm:ss
+  // Format: dd.mm yyyy, kl. tt:mm:ss
   return withSeconds
     ? `${day}.${month} ${year}, kl. ${hour}:${minute}:${second}`
     : `${day}.${month} ${year}, kl. ${hour}:${minute}`;
@@ -249,7 +249,7 @@ function StatusText({ status }) {
   );
 }
 
-// --------- OPDATERET KALENDER-TABEL ---------
+// --------- Kalender-tabel med ens rækkeafstand ---------
 function ClientPowerShortTable({ markedDays }) {
   const days = [];
   const now = new Date();
@@ -263,7 +263,7 @@ function ClientPowerShortTable({ markedDays }) {
     <TableContainer>
       <Table size="small">
         <TableHead>
-          <TableRow>
+          <TableRow sx={{ height: 30 }}>
             <TableCell>Dato</TableCell>
             <TableCell>Status</TableCell>
             <TableCell>Tænd</TableCell>
@@ -292,7 +292,7 @@ function ClientPowerShortTable({ markedDays }) {
   );
 }
 
-// --------- SYSTEMINFO-TABEL UDEN IKONER ---------
+// --------- Systeminfo med ens rækkeafstand ---------
 function SystemInfoTable({ client, uptime, lastSeen }) {
   return (
     <TableContainer>
@@ -332,7 +332,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
   );
 }
 
-// --------- NETVÆRKSINFO-TABEL UDEN IKONER ---------
+// --------- Netværksinfo med ens rækkeafstand ---------
 function NetworkInfoTable({ client }) {
   return (
     <TableContainer>
@@ -594,7 +594,7 @@ export default function ClientDetailsPage({
                 <TableContainer>
                   <Table size="small" aria-label="client-details">
                     <TableBody>
-                      <TableRow>
+                      <TableRow sx={{ height: 30 }}>
                         <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
                           Klient ID:
                         </TableCell>
@@ -607,7 +607,7 @@ export default function ClientDetailsPage({
                           </Typography>
                         </TableCell>
                       </TableRow>
-                      <TableRow>
+                      <TableRow sx={{ height: 30 }}>
                         <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
                           Lokation:
                         </TableCell>
@@ -631,7 +631,7 @@ export default function ClientDetailsPage({
                           </Button>
                         </TableCell>
                       </TableRow>
-                      <TableRow>
+                      <TableRow sx={{ height: 30 }}>
                         <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
                           Kiosk URL:
                         </TableCell>
@@ -656,7 +656,7 @@ export default function ClientDetailsPage({
                           </Button>
                         </TableCell>
                       </TableRow>
-                      <TableRow>
+                      <TableRow sx={{ height: 30 }}>
                         <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0.25 }}>
                           Kiosk browser status:
                         </TableCell>
