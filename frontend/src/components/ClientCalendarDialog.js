@@ -112,6 +112,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
   const [markedDays, setMarkedDays] = useState({});
   const [loading, setLoading] = useState(false);
   const [showTable, setShowTable] = useState(false);
+  const [seasonError, setSeasonError] = useState("");
 
   // Hjælpefunktion: Tjek om dato er gyldig
   const isDateInvalid = (date, season) => {
@@ -125,13 +126,26 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
   useEffect(() => {
     if (open) {
       (async () => {
-        const s = await getCurrentSeason();
-        setSeason(s);
-        // Sæt start/slutdato automatisk ud fra sæson
-        setStartDate(s ? new Date(s.start_date) : null);
-        setEndDate(s ? new Date(s.end_date) : null);
-        setMarkedDays({});
-        setShowTable(false);
+        try {
+          const s = await getCurrentSeason();
+          setSeason(s);
+          setSeasonError("");
+          if (s && s.start_date && s.end_date) {
+            setStartDate(new Date(s.start_date));
+            setEndDate(new Date(s.end_date));
+          } else {
+            setStartDate(null);
+            setEndDate(null);
+            setSeasonError("Kunne ikke hente sæson-data. Prøv igen senere.");
+          }
+          setMarkedDays({});
+          setShowTable(false);
+        } catch (err) {
+          setSeasonError("Kunne ikke hente sæson-data. Prøv igen senere.");
+          setSeason(null);
+          setStartDate(null);
+          setEndDate(null);
+        }
       })();
     }
   }, [open]);
@@ -154,6 +168,11 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Vis kalender for periode</DialogTitle>
       <DialogContent>
+        {seasonError && (
+          <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+            {seasonError}
+          </Typography>
+        )}
         <LocalizationProvider dateAdapter={AdapterDateFns} locale={daLocale}>
           <Stack
             direction="row"
@@ -215,7 +234,8 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
                 !startDate ||
                 !endDate ||
                 isDateInvalid(startDate, season) ||
-                isDateInvalid(endDate, season)
+                isDateInvalid(endDate, season) ||
+                !!seasonError
               }
             >
               Hent kalender
