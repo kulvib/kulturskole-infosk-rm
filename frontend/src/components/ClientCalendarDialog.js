@@ -20,7 +20,6 @@ import {
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { DatePicker } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import daLocale from "date-fns/locale/da";
 import { getMarkedDays, getCurrentSeason } from "../api";
 
@@ -211,20 +210,20 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
             />
             <Button
               variant="contained"
-              startIcon={<CalendarMonthIcon />}
               sx={{
-                minWidth: 170,
-                height: 56,
-                fontWeight: 600,
-                fontSize: "1rem",
+                minWidth: 120,
+                height: 40,
+                fontWeight: 500,
+                fontSize: "0.95rem",
                 borderRadius: 2,
                 boxShadow: 1,
                 whiteSpace: "nowrap",
+                px: 2
               }}
               onClick={handleFetch}
               disabled={loading || !startDate || !endDate}
             >
-              HENT KALENDER
+              Hent kalender
             </Button>
           </Stack>
         </LocalizationProvider>
