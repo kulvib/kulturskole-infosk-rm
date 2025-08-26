@@ -20,10 +20,11 @@ import {
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { DatePicker } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import daLocale from "date-fns/locale/da";
 import { getMarkedDays, getCurrentSeason } from "../api";
 
-// Hjælpefunktion: Datoformat: DD/MM/YYYY
+// Datoformat: DD/MM/YYYY
 function formatDateShort(dt) {
   return `${dt.getDate().toString().padStart(2, "0")}/${(dt.getMonth() + 1)
     .toString()
@@ -72,14 +73,14 @@ function getDaysInRange(start, end) {
 
 function ClientPowerPeriodTable({ markedDays, days }) {
   return (
-    <TableContainer>
-      <Table size="small">
+    <TableContainer sx={{ maxHeight: 340, overflowY: "auto", mt: 2 }}>
+      <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
-            <TableCell>Dato</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Tænd</TableCell>
-            <TableCell>Sluk</TableCell>
+            <TableCell sx={{ fontWeight: 500 }}>Dato</TableCell>
+            <TableCell sx={{ fontWeight: 500 }}>Status</TableCell>
+            <TableCell sx={{ fontWeight: 500 }}>Tænd</TableCell>
+            <TableCell sx={{ fontWeight: 500 }}>Sluk</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -124,7 +125,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
       (async () => {
         const s = await getCurrentSeason();
         setSeason(s);
-        // Sæt start/slutdato til dags dato og +1 måned, men klip til sæson-grænser hvis nødvendigt
+        // Sæt start/slutdato til dags dato og +1 måned, klip til sæson-grænser hvis nødvendigt
         const today = new Date();
         let start = today;
         let end = addMonths(today, 1);
@@ -160,17 +161,17 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ pb: 1, fontWeight: 500 }}>
+      <DialogTitle sx={{ pb: 2, pt: 1, fontWeight: 500 }}>
         Vis kalender for periode
       </DialogTitle>
-      <DialogContent sx={{ pt: 2 }}>
+      <DialogContent sx={{ pt: 1 }}>
         <LocalizationProvider dateAdapter={AdapterDateFns} locale={daLocale}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
-            spacing={3}
+            spacing={2}
             alignItems="flex-end"
             justifyContent="center"
-            sx={{ mb: 3, mt: 1 }}
+            sx={{ mb: 2, mt: 1 }}
           >
             <DatePicker
               label={<span style={{ fontWeight: 500 }}>Startdato</span>}
@@ -179,17 +180,16 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               minDate={season ? new Date(season.start_date) : undefined}
               maxDate={season ? new Date(season.end_date) : undefined}
               format="dd/MM/yyyy"
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  variant="outlined"
-                  fullWidth
-                  size="medium"
-                  error={!startDate}
-                  helperText={!startDate ? "Vælg startdato" : ""}
-                  sx={{ minWidth: 180 }}
-                />
-              )}
+              slotProps={{
+                textField: {
+                  variant: "outlined",
+                  fullWidth: true,
+                  size: "medium",
+                  sx: { minWidth: 180 },
+                  error: !startDate,
+                  helperText: !startDate ? "Vælg startdato" : "",
+                },
+              }}
             />
             <DatePicker
               label={<span style={{ fontWeight: 500 }}>Slutdato</span>}
@@ -198,29 +198,30 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               minDate={season ? new Date(season.start_date) : undefined}
               maxDate={season ? new Date(season.end_date) : undefined}
               format="dd/MM/yyyy"
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  variant="outlined"
-                  fullWidth
-                  size="medium"
-                  error={!endDate}
-                  helperText={!endDate ? "Vælg slutdato" : ""}
-                  sx={{ minWidth: 180 }}
-                />
-              )}
+              slotProps={{
+                textField: {
+                  variant: "outlined",
+                  fullWidth: true,
+                  size: "medium",
+                  sx: { minWidth: 180 },
+                  error: !endDate,
+                  helperText: !endDate ? "Vælg slutdato" : "",
+                },
+              }}
             />
             <Button
               variant="contained"
-              onClick={handleFetch}
-              startIcon={<span className="material-icons">calendar_month</span>}
+              startIcon={<CalendarMonthIcon />}
               sx={{
+                minWidth: 170,
                 height: 56,
                 fontWeight: 600,
                 fontSize: "1rem",
                 borderRadius: 2,
                 boxShadow: 1,
+                whiteSpace: "nowrap",
               }}
+              onClick={handleFetch}
               disabled={loading || !startDate || !endDate}
             >
               HENT KALENDER
@@ -234,12 +235,10 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
           </Box>
         )}
         {showTable && !loading && (
-          <Box sx={{ mt: 2 }}>
-            <ClientPowerPeriodTable
-              markedDays={markedDays}
-              days={getDaysInRange(startDate, endDate)}
-            />
-          </Box>
+          <ClientPowerPeriodTable
+            markedDays={markedDays}
+            days={getDaysInRange(startDate, endDate)}
+          />
         )}
       </DialogContent>
       <DialogActions>
