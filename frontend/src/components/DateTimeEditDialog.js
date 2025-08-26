@@ -38,7 +38,6 @@ function formatFullDate(dateStr) {
   return `${weekday} d. ${day}.${month} ${year}`;
 }
 
-// Helper to get earliest/latest time for time input
 const EARLIEST = "00:00";
 const LATEST = "23:59";
 
@@ -219,8 +218,8 @@ export default function DateTimeEditDialog({
         </Box>
       </DialogTitle>
       <DialogContent>
-        {/* Lidt ekstra afstand fra overskrift til felterne */}
-        <Box sx={{ mt: 2 }}>
+        {/* Lidt ekstra afstand fra overskriften til felterne */}
+        <Box sx={{ mt: 3 }}>
           {loading ? (
             <Box sx={{ minHeight: 80, display: "flex", alignItems: "center" }}>
               <CircularProgress sx={{ mr: 2 }} /> Henter tider...
@@ -247,6 +246,7 @@ export default function DateTimeEditDialog({
                     min: EARLIEST,
                     max: onTimeMax,
                     step: 300,
+                    // Ingen mouseover tekst, ingen title attribut
                   }}
                 />
               </Box>
@@ -270,6 +270,7 @@ export default function DateTimeEditDialog({
                     min: offTimeMin,
                     max: LATEST,
                     step: 300,
+                    // Ingen mouseover tekst, ingen title attribut
                   }}
                 />
               </Box>
