@@ -1,6 +1,6 @@
 export const apiUrl = process.env.REACT_APP_API_URL || "https://kulturskole-infosk-rm.onrender.com";
 
-function getToken() {
+export function getToken() {
   return localStorage.getItem("token");
 }
 
