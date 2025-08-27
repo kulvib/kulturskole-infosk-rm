@@ -147,6 +147,22 @@ def shutdown_client(
     session.refresh(client)
     return {"ok": True, "action": "shutdown"}
 
+@router.post("/clients/{id}/action-clear")
+def clear_client_action(
+    id: int,
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    client.pending_reboot = False
+    client.pending_shutdown = False
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return {"ok": True}
+
 @router.post("/clients/", response_model=Client)
 async def create_client(
     client_in: ClientCreate,
