@@ -343,14 +343,12 @@ export default function CalendarPage() {
 
   const seasons = getSeasons();
 
-  // Hent skoler ved første load
   useEffect(() => {
     getSchools(token)
       .then(setSchools)
       .catch(() => setSchools([]));
   }, [token]);
 
-  // Hent klienter
   const fetchClients = useCallback(async () => {
     setLoadingClients(true);
     try {
@@ -368,7 +366,6 @@ export default function CalendarPage() {
     fetchClients();
   }, [fetchClients]);
 
-  // Filtrer klienter pr. valgt skole eller alle
   const filteredClients = useMemo(() =>
     selectedSchool === ""
       ? clients
@@ -378,7 +375,6 @@ export default function CalendarPage() {
     [clients, selectedSchool]
   );
 
-  // Kalender data fetching
   useEffect(() => {
     if (!activeClient) return;
     setMarkedDays(prev => ({ ...prev, [activeClient]: undefined }));
@@ -649,7 +645,7 @@ export default function CalendarPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* Skolevælger øverst - nu med "Alle skoler" mulighed */}
+      {/* Skolevælger øverst - nu med "Alle skoler" og separator */}
       <Paper elevation={2} sx={{ p: 2, mb: 3, display: "flex", alignItems: "center", gap: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
           Vælg skole:
@@ -662,6 +658,7 @@ export default function CalendarPage() {
           sx={{ minWidth: 180 }}
         >
           <MenuItem value="">Alle skoler</MenuItem>
+          <MenuItem disabled>--------</MenuItem>
           {schools.map(school => (
             <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
           ))}
