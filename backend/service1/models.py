@@ -1,6 +1,15 @@
 from sqlmodel import SQLModel, Field, Column, JSON
 from typing import Optional, Dict, Any
 from datetime import datetime
+from enum import Enum
+
+# Enum for chrome actions
+class ChromeAction(str, Enum):
+    START = "start"
+    STOP = "stop"
+    RESTART = "restart"
+    SHUTDOWN = "shutdown"
+    NONE = "none"
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -27,12 +36,12 @@ class Client(ClientBase, table=True):
     ubuntu_version: Optional[str] = None
     uptime: Optional[str] = None
     created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, nullable=False)
-    chrome_status: Optional[str] = "unknown"  # 'running', 'stopped', 'unknown'
+    chrome_status: Optional[str] = "unknown"
     chrome_last_updated: Optional[datetime] = None
     pending_reboot: Optional[bool] = False
     pending_shutdown: Optional[bool] = False
     chrome_color: Optional[str] = None
-    pending_chrome_action: Optional[str] = None  # <-- NYT FELT! Kommando fra backend
+    pending_chrome_action: Optional[ChromeAction] = Field(default=ChromeAction.NONE)  # <-- Enum in use
 
 class ClientCreate(ClientBase):
     sort_order: Optional[int] = None
@@ -45,7 +54,7 @@ class ClientCreate(ClientBase):
     lan_mac_address: Optional[str] = None
     chrome_status: Optional[str] = None
     chrome_color: Optional[str] = None
-    pending_chrome_action: Optional[str] = None  # <-- NYT FELT FOR CREATE
+    pending_chrome_action: Optional[ChromeAction] = ChromeAction.NONE
 
 class ClientUpdate(SQLModel):
     locality: Optional[str] = None
@@ -62,7 +71,7 @@ class ClientUpdate(SQLModel):
     chrome_status: Optional[str] = None
     chrome_last_updated: Optional[datetime] = None
     chrome_color: Optional[str] = None
-    pending_chrome_action: Optional[str] = None  # <-- NYT FELT!
+    pending_chrome_action: Optional[ChromeAction] = None
 
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
