@@ -10,6 +10,10 @@ class ChromeAction(str, Enum):
     SHUTDOWN = "shutdown"
     NONE = "none"
 
+class School(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True, unique=True)
+
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str
@@ -41,7 +45,7 @@ class Client(ClientBase, table=True):
     pending_shutdown: Optional[bool] = False
     chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = Field(default=ChromeAction.NONE)
-    school: Optional[str] = Field(default=None, index=True)  # NYT FELT
+    school_id: Optional[int] = Field(default=None, foreign_key="school.id")  # relation til skole
 
 class ClientCreate(ClientBase):
     sort_order: Optional[int] = None
@@ -55,7 +59,7 @@ class ClientCreate(ClientBase):
     chrome_status: Optional[str] = None
     chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = ChromeAction.NONE
-    school: Optional[str] = None  # NYT FELT
+    school_id: Optional[int] = None  # relation til skole
 
 class ClientUpdate(SQLModel):
     locality: Optional[str] = None
@@ -73,7 +77,7 @@ class ClientUpdate(SQLModel):
     chrome_last_updated: Optional[datetime] = None
     chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = None
-    school: Optional[str] = None  # NYT FELT
+    school_id: Optional[int] = None  # relation til skole
 
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
