@@ -799,7 +799,16 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
-              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", mb: 2, columnGap: "20px" }}>
+              {/* ÆNDRET: 20px horisontal spacing mellem knapper */}
+              <Box sx={{ 
+                display: "flex", 
+                flexDirection: "row", 
+                alignItems: "center", 
+                justifyContent: "center", 
+                width: "100%", 
+                mb: 2,
+                gap: "20px" // <-- HER er spacing!
+              }}>
                 <Tooltip title="Start kiosk browser">
                   <span>
                     <Button
@@ -857,7 +866,14 @@ export default function ClientDetailsPage({
                   </span>
                 </Tooltip>
               </Box>
-              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", columnGap: "20px" }}>
+              <Box sx={{ 
+                display: "flex", 
+                flexDirection: "row", 
+                alignItems: "center", 
+                justifyContent: "center", 
+                width: "100%",
+                gap: "20px" // <-- HER er spacing!
+              }}>
                 <Tooltip title="Genstart klient">
                   <span>
                     <Button
@@ -938,4 +954,16 @@ export default function ClientDetailsPage({
               }}>
                 Livestream placeholder (MJPEG/WebRTC)
               </Box>
-            </Card>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+      {/* Kalender-dialogen! */}
+      <ClientCalendarDialog
+        open={calendarDialogOpen}
+        onClose={() => setCalendarDialogOpen(false)}
+        clientId={client.id}
+      />
+    </Box>
+  );
+}
