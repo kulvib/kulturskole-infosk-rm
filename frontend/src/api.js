@@ -77,13 +77,16 @@ export async function updateClient(id, updates) {
   return await res.json();
 }
 
-export async function approveClient(id) {
+export async function approveClient(id, school_id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
-  const res = await fetch(`${apiUrl}/api/clients/${id}/approve`, {
+  // Mulighed for at sende school_id med ved godkendelse
+  const opts = {
     method: "POST",
-    headers: { Authorization: "Bearer " + token },
-  });
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: school_id ? JSON.stringify({ school_id }) : undefined,
+  };
+  const res = await fetch(`${apiUrl}/api/clients/${id}/approve`, opts);
   if (!res.ok) {
     let msg = "Kunne ikke godkende klient";
     try {
@@ -290,6 +293,47 @@ export async function getCurrentSeason() {
   });
   if (!res.ok) {
     throw new Error("Kunne ikke hente aktuel sæson");
+  }
+  return await res.json();
+}
+
+// Hent alle godkendte skoler fra backend
+export async function getSchools() {
+  const token = getToken();
+  if (!token) throw new Error("Token mangler - du er ikke logget ind");
+  const res = await fetch(`${apiUrl}/api/schools/`, {
+    headers: { Authorization: "Bearer " + token },
+  });
+  if (!res.ok) {
+    let msg = "Kunne ikke hente skoler";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
+// Opret ny skole i backend
+export async function addSchool(name) {
+  const token = getToken();
+  if (!token) throw new Error("Token mangler - du er ikke logget ind");
+  const res = await fetch(`${apiUrl}/api/schools/`, {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    let msg = "Kunne ikke tilføje skole";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
   }
   return await res.json();
 }
