@@ -9,7 +9,6 @@ import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
 import ClientCalendarDialog from "./ClientCalendarDialog";
 
-// Danish month and weekday names
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
@@ -474,7 +473,6 @@ export default function CalendarPage() {
     }
   };
 
-  // Denne håndterer reset ved skift af skole
   const handleSchoolChange = (e) => {
     setSelectedSchool(e.target.value);
     setSelectedClients([]);
@@ -487,7 +485,6 @@ export default function CalendarPage() {
     setLoadingDialogClient(null);
     setSavingCalendar(false);
     setCalendarDialogOpen(false);
-    // evt. reset yderligere state hvis nødvendigt
   };
 
   const handleClientSelectorChange = (newSelected) => {
@@ -661,7 +658,7 @@ export default function CalendarPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* Skolevælger øverst - nu med "Alle skoler" og separator */}
+      {/* Skolevælger øverst */}
       <Paper elevation={2} sx={{ p: 2, mb: 3, display: "flex", alignItems: "center", gap: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
           Vælg skole:
@@ -749,18 +746,17 @@ export default function CalendarPage() {
         )}
       </Paper>
 
-      {/* Knaprækken: Markering | Vis liste | Vælg sæson - nu på samme linje under feltet med godkendte klienter */}
+      {/* Knaprækken: Markering | Vis liste | Vælg sæson - på samme linje med placeringer */}
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: 3,
           mb: 3,
-          flexWrap: "wrap"
+          width: "100%",
         }}
       >
-        {/* Markering */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        {/* Venstre: Markering */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
           <Typography variant="h6" sx={{ mr: 1, fontWeight: 700 }}>
             Markering:
           </Typography>
@@ -785,8 +781,8 @@ export default function CalendarPage() {
             SLUKKET
           </Button>
         </Box>
-        {/* Vis liste */}
-        <Box>
+        {/* Midten: Vis liste */}
+        <Box sx={{ flex: 1, display: "flex", justifyContent: "center" }}>
           <Button
             variant="outlined"
             color="primary"
@@ -798,8 +794,8 @@ export default function CalendarPage() {
             Vis liste
           </Button>
         </Box>
-        {/* Vælg sæson */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        {/* Højre: Vælg sæson */}
+        <Box sx={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
             Vælg sæson:
           </Typography>
