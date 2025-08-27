@@ -16,7 +16,6 @@ const monthNames = [
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
-// Get current and next seasons (school years)
 function getSeasons() {
   const now = new Date();
   let seasonStartYear;
@@ -34,7 +33,6 @@ function getSeasons() {
   return seasons;
 }
 
-// Get months for a Danish school year
 function getSchoolYearMonths(seasonStart) {
   const months = [];
   for (let i = 0; i < 5; i++) {
@@ -56,7 +54,6 @@ function formatDate(year, month, day) {
   return `${year}-${mm}-${dd}`;
 }
 
-// Get default times from localStorage for a schoolId (or fallback)
 function getDefaultTimes(dateStr, client, clients) {
   const date = new Date(dateStr);
   const day = date.getDay();
@@ -321,7 +318,7 @@ export default function CalendarPage() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
   const [schools, setSchools] = useState([]);
-  const [selectedSchool, setSelectedSchool] = useState("");
+  const [selectedSchool, setSelectedSchool] = useState(""); // "" = alle
   const [clients, setClients] = useState([]);
   const [selectedClients, setSelectedClients] = useState([]);
   const [activeClient, setActiveClient] = useState(null);
@@ -346,7 +343,7 @@ export default function CalendarPage() {
 
   const seasons = getSeasons();
 
-  // Hent skoler ved første load (bruger token)
+  // Hent skoler ved første load
   useEffect(() => {
     getSchools(token)
       .then(setSchools)
@@ -371,11 +368,13 @@ export default function CalendarPage() {
     fetchClients();
   }, [fetchClients]);
 
-  // Filtrer klienter pr. valgt skole
+  // Filtrer klienter pr. valgt skole eller alle
   const filteredClients = useMemo(() =>
-    clients.filter(c =>
-      String(c.schoolId || c.school_id) === String(selectedSchool)
-    ),
+    selectedSchool === ""
+      ? clients
+      : clients.filter(c =>
+          String(c.schoolId || c.school_id) === String(selectedSchool)
+        ),
     [clients, selectedSchool]
   );
 
@@ -646,24 +645,23 @@ export default function CalendarPage() {
     setSnackbar({ open: false, message: "", severity: "success" });
   };
 
-  // Disabled state når ingen klient er valgt
   const isDisabled = !activeClient;
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* Skolevælger øverst - brug MUI Select/MenuItem som i Godkendte klienter */}
+      {/* Skolevælger øverst - nu med "Alle skoler" mulighed */}
       <Paper elevation={2} sx={{ p: 2, mb: 3, display: "flex", alignItems: "center", gap: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
           Vælg skole:
         </Typography>
         <Select
           size="small"
-          value={selectedSchool || ""}
+          value={selectedSchool}
           displayEmpty
           onChange={e => setSelectedSchool(e.target.value)}
           sx={{ minWidth: 180 }}
         >
-          <MenuItem value="">Vælg skole</MenuItem>
+          <MenuItem value="">Alle skoler</MenuItem>
           {schools.map(school => (
             <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
           ))}
@@ -750,7 +748,7 @@ export default function CalendarPage() {
         )}
       </Paper>
 
-      {/* Knaprækken: Markering | Vis liste | Vælg sæson (alle disabled hvis ingen klient valgt) */}
+      {/* Knaprækken: Markering | Vis liste | Vælg sæson */}
       <Box sx={{
         display: "flex",
         alignItems: "center",
@@ -759,7 +757,6 @@ export default function CalendarPage() {
         gap: 2,
         flexWrap: "wrap"
       }}>
-        {/* Venstre: Markering-knapper */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="h6" sx={{ mr: 1, fontWeight: 700 }}>
             Markering:
@@ -785,7 +782,6 @@ export default function CalendarPage() {
             SLUKKET
           </Button>
         </Box>
-        {/* Midten: Vis liste-knap */}
         <Box>
           <Button
             variant="outlined"
@@ -798,7 +794,6 @@ export default function CalendarPage() {
             Vis liste
           </Button>
         </Box>
-        {/* Højre: Sæsonvælger */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
             Vælg sæson:
@@ -872,7 +867,6 @@ export default function CalendarPage() {
         localMarkedDays={markedDays[editDialogClient]}
       />
 
-      {/* Dialog til listevisning */}
       <ClientCalendarDialog
         open={calendarDialogOpen}
         onClose={() => setCalendarDialogOpen(false)}
