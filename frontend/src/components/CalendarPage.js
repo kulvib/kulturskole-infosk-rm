@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip
+  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays, getSchools } from "../api";
@@ -63,8 +63,8 @@ function getDefaultTimes(dateStr, client, clients) {
 
   let schoolId = null;
   if (client && clients && clients.length > 0) {
-    const clientObj = clients.find(c => c.id === client);
-    schoolId = clientObj && clientObj.schoolId ? clientObj.schoolId : null;
+    const clientObj = clients.find(c => String(c.id) === String(client));
+    schoolId = clientObj && (clientObj.schoolId || clientObj.school_id) ? (clientObj.schoolId || clientObj.school_id) : null;
   }
 
   const TIMES_STORAGE_KEY = schoolId
@@ -321,7 +321,7 @@ export default function CalendarPage() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
   const [schools, setSchools] = useState([]);
-  const [selectedSchool, setSelectedSchool] = useState(null);
+  const [selectedSchool, setSelectedSchool] = useState("");
   const [clients, setClients] = useState([]);
   const [selectedClients, setSelectedClients] = useState([]);
   const [activeClient, setActiveClient] = useState(null);
@@ -346,21 +346,14 @@ export default function CalendarPage() {
 
   const seasons = getSeasons();
 
-  // Fetch schools on mount
+  // Hent skoler ved første load (bruger token)
   useEffect(() => {
-    async function fetchSchools() {
-      try {
-        const data = await getSchools(token);
-        setSchools(data || []);
-        setSelectedSchool(data?.[0]?.id || null);
-      } catch {
-        setSchools([]);
-      }
-    }
-    fetchSchools();
+    getSchools(token)
+      .then(setSchools)
+      .catch(() => setSchools([]));
   }, [token]);
 
-  // Fetch clients (all)
+  // Hent klienter
   const fetchClients = useCallback(async () => {
     setLoadingClients(true);
     try {
@@ -378,13 +371,15 @@ export default function CalendarPage() {
     fetchClients();
   }, [fetchClients]);
 
-  // Filter clients by selected school
+  // Filtrer klienter pr. valgt skole
   const filteredClients = useMemo(() =>
-    clients.filter(c => c.schoolId === selectedSchool),
+    clients.filter(c =>
+      String(c.schoolId || c.school_id) === String(selectedSchool)
+    ),
     [clients, selectedSchool]
   );
 
-  // Calendar data fetching
+  // Kalender data fetching
   useEffect(() => {
     if (!activeClient) return;
     setMarkedDays(prev => ({ ...prev, [activeClient]: undefined }));
@@ -656,30 +651,23 @@ export default function CalendarPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* Skolevælger øverst */}
+      {/* Skolevælger øverst - brug MUI Select/MenuItem som i Godkendte klienter */}
       <Paper elevation={2} sx={{ p: 2, mb: 3, display: "flex", alignItems: "center", gap: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
           Vælg skole:
         </Typography>
-        <select
+        <Select
+          size="small"
           value={selectedSchool || ""}
+          displayEmpty
           onChange={e => setSelectedSchool(e.target.value)}
-          style={{
-            minWidth: 180,
-            fontWeight: 700,
-            background: "#fff",
-            fontSize: "1rem",
-            padding: "6px 14px",
-            borderRadius: "7px",
-            border: "1px solid #dbeafe"
-          }}
+          sx={{ minWidth: 180 }}
         >
+          <MenuItem value="">Vælg skole</MenuItem>
           {schools.map(school => (
-            <option key={school.id} value={school.id}>
-              {school.name}
-            </option>
+            <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
           ))}
-        </select>
+        </Select>
       </Paper>
 
       {/* Snackbar */}
