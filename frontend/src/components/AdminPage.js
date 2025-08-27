@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import {
   Typography, Box, TextField, Button, List, ListItem, MenuItem,
   Select, FormControl, InputLabel, IconButton, Dialog,
-  DialogTitle, DialogContent, DialogActions
+  DialogTitle, DialogContent, DialogActions, Table, TableHead,
+  TableRow, TableCell, TableBody
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import axios from "axios";
@@ -48,6 +49,7 @@ export default function AdminPage() {
   const [schoolToDelete, setSchoolToDelete] = useState(null);
   const [clientsToDelete, setClientsToDelete] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
+  const [deleteStep, setDeleteStep] = useState(1);
 
   // Hent skoler
   useEffect(() => {
@@ -112,6 +114,7 @@ export default function AdminPage() {
     setClientsToDelete([]);
     setDeleteDialogOpen(true);
     setLoadingClients(true);
+    setDeleteStep(1);
     axios.get(`${apiUrl}/api/schools/${school.id}/clients/`, {
       headers: { Authorization: "Bearer " + getToken() }
     })
@@ -125,8 +128,11 @@ export default function AdminPage() {
       });
   };
 
-  // Bekræft sletning
-  const handleConfirmDeleteSchool = () => {
+  // Første bekræftelse
+  const handleFirstDeleteConfirm = () => setDeleteStep(2);
+
+  // Endelig sletning
+  const handleFinalDeleteSchool = () => {
     if (!schoolToDelete) return;
     axios.delete(`${apiUrl}/api/schools/${schoolToDelete.id}/`, {
       headers: { Authorization: "Bearer " + getToken() }
@@ -142,6 +148,7 @@ export default function AdminPage() {
         setDeleteDialogOpen(false);
         setSchoolToDelete(null);
         setClientsToDelete([]);
+        setDeleteStep(1);
       })
       .catch(e => {
         setDeleteError("Kunne ikke slette skole: " + (e.response?.data?.detail || ""));
@@ -155,6 +162,7 @@ export default function AdminPage() {
     setSchoolToDelete(null);
     setClientsToDelete([]);
     setDeleteError("");
+    setDeleteStep(1);
   };
 
   return (
@@ -277,12 +285,15 @@ export default function AdminPage() {
         </List>
       </Box>
 
-      {/* SLET DIALOG */}
-      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
-        <DialogTitle>Slet skole</DialogTitle>
+      {/* SLET DIALOG MED DOBBELT BEKRÆFTELSE OG TABEL */}
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Slet skole: {schoolToDelete?.name}
+        </DialogTitle>
         <DialogContent>
-          <Typography gutterBottom>
-            Er du sikker på at du vil slette skolen <strong>{schoolToDelete?.name}</strong>?
+          <Typography color="error" gutterBottom>
+            Advarsel: Du er ved at slette skolen <b>{schoolToDelete?.name}</b>.<br />
+            Alle tilknyttede klienter vil også blive slettet!
           </Typography>
           {loadingClients ? (
             <Typography>Henter tilknyttede klienter...</Typography>
@@ -290,19 +301,40 @@ export default function AdminPage() {
             <>
               {clientsToDelete.length > 0 ? (
                 <>
-                  <Typography sx={{ mt: 2, mb: 1 }}>Følgende klienter vil også blive slettet:</Typography>
-                  <List>
-                    {clientsToDelete.map(client => (
-                      <ListItem key={client.id}>
-                        {client.locality || client.name || "Klient"}
-                      </ListItem>
-                    ))}
-                  </List>
+                  <Table sx={{ mt: 2, mb: 1 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><b>Klient ID</b></TableCell>
+                        <TableCell><b>Lokation</b></TableCell>
+                        <TableCell><b>Skole</b></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {clientsToDelete.map(client => (
+                        <TableRow key={client.id}>
+                          <TableCell>{client.id}</TableCell>
+                          <TableCell>{client.locality || client.name || "-"}</TableCell>
+                          <TableCell>{schoolToDelete?.name}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </>
               ) : (
                 <Typography sx={{ mt: 2, mb: 1 }}>Ingen klienter er tilknyttet denne skole.</Typography>
               )}
             </>
+          )}
+          {deleteStep === 1 && (
+            <Typography sx={{ mt: 2 }}>
+              Er du sikker på at du vil slette denne skole og alle dens klienter?
+            </Typography>
+          )}
+          {deleteStep === 2 && (
+            <Typography color="error" sx={{ mt: 2 }}>
+              Denne handling kan <b>ikke fortrydes!</b><br />
+              Tryk <b>Slet endeligt</b> for at bekræfte.
+            </Typography>
           )}
           {deleteError && (
             <Typography color="error" sx={{ mt: 2 }}>
@@ -312,14 +344,15 @@ export default function AdminPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDeleteDialog}>Annuller</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={handleConfirmDeleteSchool}
-            disabled={loadingClients}
-          >
-            Slet skole
-          </Button>
+          {deleteStep === 1 ? (
+            <Button color="warning" variant="contained" onClick={handleFirstDeleteConfirm} disabled={loadingClients}>
+              Bekræft sletning
+            </Button>
+          ) : (
+            <Button color="error" variant="contained" onClick={handleFinalDeleteSchool} disabled={loadingClients}>
+              Slet endeligt
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>
