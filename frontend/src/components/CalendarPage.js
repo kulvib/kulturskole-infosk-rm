@@ -4,17 +4,19 @@ import {
   Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { getClients, saveMarkedDays, getMarkedDays } from "../api";
+import { getClients, saveMarkedDays, getMarkedDays, getSchools } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
 import ClientCalendarDialog from "./ClientCalendarDialog";
 
+// Danish month and weekday names
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
+// Get current and next seasons (school years)
 function getSeasons() {
   const now = new Date();
   let seasonStartYear;
@@ -32,6 +34,7 @@ function getSeasons() {
   return seasons;
 }
 
+// Get months for a Danish school year
 function getSchoolYearMonths(seasonStart) {
   const months = [];
   for (let i = 0; i < 5; i++) {
@@ -53,12 +56,11 @@ function formatDate(year, month, day) {
   return `${year}-${mm}-${dd}`;
 }
 
-// OPDATERET FUNKTION: Hent tider fra localStorage for klientens skole hvis muligt
+// Get default times from localStorage for a schoolId (or fallback)
 function getDefaultTimes(dateStr, client, clients) {
   const date = new Date(dateStr);
   const day = date.getDay();
 
-  // Find skoleId for den pågældende klient
   let schoolId = null;
   if (client && clients && clients.length > 0) {
     const clientObj = clients.find(c => c.id === client);
@@ -318,6 +320,8 @@ function MonthCalendar({
 export default function CalendarPage() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
+  const [schools, setSchools] = useState([]);
+  const [selectedSchool, setSelectedSchool] = useState(null);
   const [clients, setClients] = useState([]);
   const [selectedClients, setSelectedClients] = useState([]);
   const [activeClient, setActiveClient] = useState(null);
@@ -342,13 +346,21 @@ export default function CalendarPage() {
 
   const seasons = getSeasons();
 
-  // Opdateringsknap - funktion
-  const handleRefresh = async () => {
-    setLoadingClients(true);
-    await fetchClients();
-    setLoadingClients(false);
-  };
+  // Fetch schools on mount
+  useEffect(() => {
+    async function fetchSchools() {
+      try {
+        const data = await getSchools(token);
+        setSchools(data || []);
+        setSelectedSchool(data?.[0]?.id || null);
+      } catch {
+        setSchools([]);
+      }
+    }
+    fetchSchools();
+  }, [token]);
 
+  // Fetch clients (all)
   const fetchClients = useCallback(async () => {
     setLoadingClients(true);
     try {
@@ -366,6 +378,13 @@ export default function CalendarPage() {
     fetchClients();
   }, [fetchClients]);
 
+  // Filter clients by selected school
+  const filteredClients = useMemo(() =>
+    clients.filter(c => c.schoolId === selectedSchool),
+    [clients, selectedSchool]
+  );
+
+  // Calendar data fetching
   useEffect(() => {
     if (!activeClient) return;
     setMarkedDays(prev => ({ ...prev, [activeClient]: undefined }));
@@ -431,7 +450,7 @@ export default function CalendarPage() {
     payloadMarkedDays[String(clientId)] = {};
     allDates.forEach(dateStr => {
       const md = markedDays[clientId]?.[dateStr];
-      const defTimes = getDefaultTimes(dateStr, clientId, clients);
+      const defTimes = getDefaultTimes(dateStr, clientId, filteredClients);
       if (md && md.status === "on") {
         const onTime = md.onTime || defTimes.onTime;
         const offTime = md.offTime || defTimes.offTime;
@@ -553,7 +572,7 @@ export default function CalendarPage() {
         payloadMarkedDays[clientKey] = {};
         allDates.forEach(dateStr => {
           const md = sourceMarkedDays[dateStr];
-          const defTimes = getDefaultTimes(dateStr, cid, clients);
+          const defTimes = getDefaultTimes(dateStr, cid, filteredClients);
           if (md && md.status === "on") {
             const onTime = md.onTime || defTimes.onTime;
             const offTime = md.offTime || defTimes.offTime;
@@ -605,7 +624,7 @@ export default function CalendarPage() {
       } finally {
         setSavingCalendar(false);
       }
-    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, clients]
+    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients]
   );
 
   useEffect(() => {
@@ -618,10 +637,10 @@ export default function CalendarPage() {
   const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
 
   const activeClientName = activeClient
-    ? clients.find(c => c.id === activeClient)?.locality || clients.find(c => c.id === activeClient)?.name || "Automatisk"
+    ? filteredClients.find(c => c.id === activeClient)?.locality || filteredClients.find(c => c.id === activeClient)?.name || "Automatisk"
     : "Automatisk";
   const otherClientNames = selectedClients.length > 1
-    ? clients
+    ? filteredClients
         .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
         .map(c => c.locality || c.name)
         .filter(Boolean)
@@ -637,6 +656,33 @@ export default function CalendarPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
+      {/* Skolevælger øverst */}
+      <Paper elevation={2} sx={{ p: 2, mb: 3, display: "flex", alignItems: "center", gap: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+          Vælg skole:
+        </Typography>
+        <select
+          value={selectedSchool || ""}
+          onChange={e => setSelectedSchool(e.target.value)}
+          style={{
+            minWidth: 180,
+            fontWeight: 700,
+            background: "#fff",
+            fontSize: "1rem",
+            padding: "6px 14px",
+            borderRadius: "7px",
+            border: "1px solid #dbeafe"
+          }}
+        >
+          {schools.map(school => (
+            <option key={school.id} value={school.id}>
+              {school.name}
+            </option>
+          ))}
+        </select>
+      </Paper>
+
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={2000}
@@ -647,14 +693,15 @@ export default function CalendarPage() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
-      {/* Godkendte klienter øverst */}
+
+      {/* Godkendte klienter for valgt skole */}
       <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
         Godkendte klienter
       </Typography>
       <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
         <IconButton
           aria-label="Opdater klienter"
-          onClick={handleRefresh}
+          onClick={fetchClients}
           disabled={loadingClients}
           sx={{
             position: "absolute",
@@ -675,7 +722,7 @@ export default function CalendarPage() {
           )}
         </IconButton>
         <ClientSelectorInline
-          clients={clients}
+          clients={filteredClients}
           selected={selectedClients}
           onChange={handleClientSelectorChange}
         />
