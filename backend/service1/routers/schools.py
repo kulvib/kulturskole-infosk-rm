@@ -18,3 +18,12 @@ def create_school(school: School, session=Depends(get_session)):
     session.commit()
     session.refresh(school)
     return school
+
+@router.delete("/schools/{school_id}/", status_code=204)
+def delete_school(school_id: int, session=Depends(get_session)):
+    school = session.get(School, school_id)
+    if not school:
+        raise HTTPException(status_code=404, detail="Skole ikke fundet")
+    session.delete(school)
+    session.commit()
+    return
