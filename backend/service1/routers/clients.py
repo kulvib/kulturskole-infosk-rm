@@ -190,7 +190,7 @@ async def create_client(
         pending_reboot=False,
         pending_shutdown=False,
         pending_chrome_action=getattr(client_in, "pending_chrome_action", ChromeAction.NONE),
-        school=getattr(client_in, "school", None),  # NYT: Tager school med fra ClientCreate
+        school_id=getattr(client_in, "school_id", None),  # NYT: Tager school_id med fra ClientCreate
     )
     session.add(client)
     session.commit()
@@ -239,8 +239,8 @@ async def update_client(
             client.pending_chrome_action = ChromeAction(getattr(client_update, "pending_chrome_action"))
         except (ValueError, TypeError):
             client.pending_chrome_action = ChromeAction.NONE
-    if getattr(client_update, "school", None) is not None:
-        client.school = client_update.school  # NYT: Opdater school hvis medsendt
+    if getattr(client_update, "school_id", None) is not None:
+        client.school_id = client_update.school_id  # NYT: Opdater school_id hvis medsendt
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -283,7 +283,7 @@ def client_action(
 @router.post("/clients/{id}/approve", response_model=Client)
 async def approve_client(
     id: int,
-    data: dict = Body(None),  # NYT: Muligt at sende "school" med fra frontend
+    data: dict = Body(None),  # fx: {"school_id": 3}
     session=Depends(get_session),
     user=Depends(get_current_admin_user)
 ):
@@ -297,8 +297,8 @@ async def approve_client(
         .order_by(Client.sort_order.desc())
     ).first()
     client.sort_order = (max_sort_order or 0) + 1
-    if data and "school" in data:
-        client.school = data["school"]  # NYT: Sæt school ved approval hvis sendt med
+    if data and "school_id" in data:
+        client.school_id = data["school_id"]  # NYT: Sæt school_id ved approval hvis sendt med
     session.add(client)
     session.commit()
     session.refresh(client)
