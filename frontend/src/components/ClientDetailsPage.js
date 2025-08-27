@@ -738,7 +738,7 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
-              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+              <Card elevation={2} sx={{ borderRadius: 2 }}>
                 <CardContent>
                   <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1 }}>
@@ -770,7 +770,7 @@ export default function ClientDetailsPage({
               </Card>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+              <Card elevation={2} sx={{ borderRadius: 2 }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                     Systeminfo
@@ -780,7 +780,7 @@ export default function ClientDetailsPage({
               </Card>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+              <Card elevation={2} sx={{ borderRadius: 2 }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                     Netværksinfo
