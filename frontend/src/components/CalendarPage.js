@@ -474,6 +474,22 @@ export default function CalendarPage() {
     }
   };
 
+  // Denne håndterer reset ved skift af skole
+  const handleSchoolChange = (e) => {
+    setSelectedSchool(e.target.value);
+    setSelectedClients([]);
+    setActiveClient(null);
+    setMarkedDays({});
+    setEditDialogOpen(false);
+    setEditDialogDate(null);
+    setEditDialogClient(null);
+    setLoadingDialogDate(null);
+    setLoadingDialogClient(null);
+    setSavingCalendar(false);
+    setCalendarDialogOpen(false);
+    // evt. reset yderligere state hvis nødvendigt
+  };
+
   const handleClientSelectorChange = (newSelected) => {
     setSelectedClients(newSelected);
     if (!newSelected.includes(activeClient)) {
@@ -654,7 +670,7 @@ export default function CalendarPage() {
           size="small"
           value={selectedSchool}
           displayEmpty
-          onChange={e => setSelectedSchool(e.target.value)}
+          onChange={handleSchoolChange}
           sx={{ minWidth: 180 }}
         >
           <MenuItem value="">Alle skoler</MenuItem>
@@ -664,87 +680,6 @@ export default function CalendarPage() {
           ))}
         </Select>
       </Paper>
-
-      {/* Knaprækken: Markering | Vis liste | Vælg sæson (nu med MUI Select til sæson) */}
-      <Box sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        mb: 2,
-        gap: 2,
-        flexWrap: "wrap"
-      }}>
-        {/* Venstre: Markering-knapper */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography variant="h6" sx={{ mr: 1, fontWeight: 700 }}>
-            Markering:
-          </Typography>
-          <Button
-            variant={markMode === "on" ? "contained" : "outlined"}
-            color="success"
-            size="medium"
-            disabled={isDisabled}
-            sx={{ fontWeight: markMode === "on" ? 700 : 400, minWidth: 90 }}
-            onClick={() => setMarkMode("on")}
-          >
-            TÆNDT
-          </Button>
-          <Button
-            variant={markMode === "off" ? "contained" : "outlined"}
-            color="error"
-            size="medium"
-            disabled={isDisabled}
-            sx={{ fontWeight: markMode === "off" ? 700 : 400, minWidth: 90 }}
-            onClick={() => setMarkMode("off")}
-          >
-            SLUKKET
-          </Button>
-        </Box>
-        {/* Midten: Vis liste-knap */}
-        <Box>
-          <Button
-            variant="outlined"
-            color="primary"
-            size="medium"
-            sx={{ minWidth: 120, fontWeight: 700 }}
-            onClick={() => setCalendarDialogOpen(true)}
-            disabled={isDisabled}
-          >
-            Vis liste
-          </Button>
-        </Box>
-        {/* Højre: Sæsonvælger med MUI Select/MenuItem */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
-            Vælg sæson:
-          </Typography>
-          <Select
-            size="small"
-            value={selectedSeason}
-            onChange={e => setSelectedSeason(Number(e.target.value))}
-            sx={{ minWidth: 120 }}
-            disabled={isDisabled}
-          >
-            {seasons.map(season => (
-              <MenuItem key={season.value} value={season.value}>
-                {season.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </Box>
-      </Box>
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={2000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
-          {snackbar.message}
-        </MuiAlert>
-      </Snackbar>
 
       {/* Godkendte klienter for valgt skole */}
       <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
@@ -813,6 +748,86 @@ export default function CalendarPage() {
           </Box>
         )}
       </Paper>
+
+      {/* Sæsonvælger - nu under feltet med godkendte klienter */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
+          Vælg sæson:
+        </Typography>
+        <Select
+          size="small"
+          value={selectedSeason}
+          onChange={e => setSelectedSeason(Number(e.target.value))}
+          sx={{ minWidth: 120 }}
+          disabled={isDisabled}
+        >
+          {seasons.map(season => (
+            <MenuItem key={season.value} value={season.value}>
+              {season.label}
+            </MenuItem>
+          ))}
+        </Select>
+      </Box>
+
+      {/* Knaprækken: Markering | Vis liste */}
+      <Box sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        mb: 2,
+        gap: 2,
+        flexWrap: "wrap"
+      }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="h6" sx={{ mr: 1, fontWeight: 700 }}>
+            Markering:
+          </Typography>
+          <Button
+            variant={markMode === "on" ? "contained" : "outlined"}
+            color="success"
+            size="medium"
+            disabled={isDisabled}
+            sx={{ fontWeight: markMode === "on" ? 700 : 400, minWidth: 90 }}
+            onClick={() => setMarkMode("on")}
+          >
+            TÆNDT
+          </Button>
+          <Button
+            variant={markMode === "off" ? "contained" : "outlined"}
+            color="error"
+            size="medium"
+            disabled={isDisabled}
+            sx={{ fontWeight: markMode === "off" ? 700 : 400, minWidth: 90 }}
+            onClick={() => setMarkMode("off")}
+          >
+            SLUKKET
+          </Button>
+        </Box>
+        <Box>
+          <Button
+            variant="outlined"
+            color="primary"
+            size="medium"
+            sx={{ minWidth: 120, fontWeight: 700 }}
+            onClick={() => setCalendarDialogOpen(true)}
+            disabled={isDisabled}
+          >
+            Vis liste
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={2000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
 
       {/* Kalender */}
       <Box
