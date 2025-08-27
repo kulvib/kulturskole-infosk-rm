@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from "react";
 import { Typography, Box, TextField, Button, List, ListItem } from "@mui/material";
 import axios from "axios";
+import { apiUrl, getToken } from "../api"; // Husk at rette stien
 
 export default function AdminPage() {
   const [schoolName, setSchoolName] = useState("");
   const [schools, setSchools] = useState([]);
   const [error, setError] = useState("");
 
-  // Hent skolelisten fra backend ved load
   useEffect(() => {
-    axios.get("/api/schools/")
+    axios.get(`${apiUrl}/api/schools/`, {
+      headers: { Authorization: "Bearer " + getToken() }
+    })
       .then(res => setSchools(res.data))
-      .catch(() => setSchools([]));
+      .catch((err) => {
+        setSchools([]);
+        setError("Kunne ikke hente skoler");
+        console.error("FEJL VED HENTNING AF SKOLER", err);
+      });
   }, []);
 
-  // Tilføj skole til backend og opdater listen
   const handleAddSchool = () => {
     const name = schoolName.trim();
     setError("");
@@ -23,13 +28,16 @@ export default function AdminPage() {
       setError("Skolen findes allerede!");
       return;
     }
-    axios.post("/api/schools/", { name })
+    axios.post(`${apiUrl}/api/schools/`, { name }, {
+      headers: { Authorization: "Bearer " + getToken() }
+    })
       .then(res => {
         setSchools([...schools, res.data]);
         setSchoolName("");
       })
       .catch(e => {
         setError(e.response?.data?.detail || "Fejl ved oprettelse");
+        console.error("FEJL VED OPRETTELSE", e);
       });
   };
 
@@ -57,9 +65,13 @@ export default function AdminPage() {
           </Button>
         </Box>
         <List sx={{ mt: 2 }}>
-          {schools.map((school) => (
-            <ListItem key={school.id}>{school.name}</ListItem>
-          ))}
+          {schools.length === 0 ? (
+            <ListItem>Ingen skoler oprettet endnu</ListItem>
+          ) : (
+            schools.map((school) => (
+              <ListItem key={school.id ?? school.name}>{school.name}</ListItem>
+            ))
+          )}
         </List>
       </Box>
     </Box>
