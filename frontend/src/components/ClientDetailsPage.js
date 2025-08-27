@@ -270,8 +270,8 @@ function ClientPowerShortTable({ markedDays }) {
     days.push(d);
   }
 
-  // 13px = 1.625 spacing units (8px per unit)
-  const cellStyle = { whiteSpace: "nowrap", py: 0, px: 1.625 };
+  // 20px = 2.5 spacing units (8px per unit)
+  const cellStyle = { whiteSpace: "nowrap", py: 0, px: 2.5 };
 
   return (
     <TableContainer>
@@ -799,7 +799,8 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
-              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", mb: 2 }}>
+              {/* ØVERSTE KNAPRÆKKE MED HORISONTAL AFSTAND */}
+              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", mb: 2, gap: 2.5 }}>
                 <Tooltip title="Start kiosk browser">
                   <span>
                     <Button
@@ -857,7 +858,8 @@ export default function ClientDetailsPage({
                   </span>
                 </Tooltip>
               </Box>
-              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%" }}>
+              {/* NEDERSTE KNAPRÆKKE MED HORISONTAL AFSTAND */}
+              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", gap: 2.5 }}>
                 <Tooltip title="Genstart klient">
                   <span>
                     <Button
