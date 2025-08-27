@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 from db import get_session
-from models import School, Client
+from models import School, Client, CalendarMarking
 
 router = APIRouter()
 
@@ -28,10 +28,18 @@ def delete_school(school_id: int, session=Depends(get_session)):
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
-    # Slet alle klienter tilknyttet skolen
+    # Hent alle klienter til skolen
     clients = session.exec(select(Client).where(Client.school_id == school_id)).all()
     for client in clients:
+        # Slet alle calendar-markinger for denne klient
+        markings = session.exec(
+            select(CalendarMarking).where(CalendarMarking.client_id == client.id)
+        ).all()
+        for marking in markings:
+            session.delete(marking)
+        # Slet klienten
         session.delete(client)
+    # Slet skolen
     session.delete(school)
     session.commit()
     return
