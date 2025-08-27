@@ -41,12 +41,42 @@ function formatFullDate(dateStr) {
 const EARLIEST = "00:00";
 const LATEST = "23:59";
 
+// Hent standardtider for skoleId
+function getDefaultTimes(dateStr, schoolId) {
+  const date = new Date(dateStr);
+  const day = date.getDay();
+  const TIMES_STORAGE_KEY = schoolId ? `standard_times_settings_${schoolId}` : "standard_times_settings";
+
+  let defaultTimes = {
+    weekday: { onTime: "09:00", offTime: "22:30" },
+    weekend: { onTime: "08:00", offTime: "18:00" }
+  };
+
+  const saved = localStorage.getItem(TIMES_STORAGE_KEY);
+  if (saved) {
+    try {
+      const settings = JSON.parse(saved);
+      defaultTimes = {
+        weekday: settings.weekday || defaultTimes.weekday,
+        weekend: settings.weekend || defaultTimes.weekend
+      };
+    } catch {}
+  }
+
+  if (day === 0 || day === 6) {
+    return defaultTimes.weekend;
+  } else {
+    return defaultTimes.weekday;
+  }
+}
+
 export default function DateTimeEditDialog({
   open,
   onClose,
   date,
   clientId,
   onSaved,
+  schoolId // <-- NY PROP!
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
@@ -90,14 +120,25 @@ export default function DateTimeEditDialog({
       .then(res => res.json())
       .then(data => {
         const dayObj = findDayObj(data.markedDays || {}, normDate);
-        setOnTime(dayObj.onTime || "");
-        setOffTime(dayObj.offTime || "");
+        if (dayObj.onTime && dayObj.offTime) {
+          setOnTime(dayObj.onTime);
+          setOffTime(dayObj.offTime);
+        } else {
+          // Brug standardtid for skole
+          const def = getDefaultTimes(normDate, schoolId);
+          setOnTime(def.onTime);
+          setOffTime(def.offTime);
+        }
       })
       .catch(() => {
         setSnackbar({ open: true, message: "Fejl ved hentning!", severity: "error" });
+        // Brug standardtid for skole ved fejl
+        const def = getDefaultTimes(normDate, schoolId);
+        setOnTime(def.onTime);
+        setOffTime(def.offTime);
       })
       .finally(() => setLoading(false));
-  }, [open, date, clientId]);
+  }, [open, date, clientId, schoolId]);
 
   useEffect(() => {
     return () => {
