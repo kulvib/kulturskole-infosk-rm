@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from typing import List, Optional
-
 from models import User
 from db import get_session
 from auth import get_current_admin_user, get_password_hash
