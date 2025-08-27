@@ -234,7 +234,6 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            verticalAlign: "middle",
           }}
           disabled={disabled}
         >
@@ -260,6 +259,7 @@ function StatusText({ status }) {
   );
 }
 
+// --------- Kalender-tabel med ens rækkeafstand ---------
 function ClientPowerShortTable({ markedDays }) {
   const days = [];
   const now = new Date();
@@ -270,10 +270,10 @@ function ClientPowerShortTable({ markedDays }) {
   }
 
   return (
-    <TableContainer>
+    <TableContainer sx={{ width: "100%", overflow: "visible" }}>
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+          <TableRow sx={{ height: 30 }}>
             <TableCell>Dato</TableCell>
             <TableCell>Status</TableCell>
             <TableCell>Tænd</TableCell>
@@ -284,7 +284,7 @@ function ClientPowerShortTable({ markedDays }) {
           {days.map((dt) => {
             const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
-              <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+              <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: 30 }}>
                 <TableCell sx={{ whiteSpace: "nowrap", py: 0 }}>{formatDateShort(dt)}</TableCell>
                 <TableCell sx={{ py: 0 }}><StatusText status={status} /></TableCell>
                 <TableCell sx={{ py: 0 }}>
@@ -312,8 +312,6 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
     py: 0,
     verticalAlign: "middle",
     height: 30,
-    minHeight: 30,
-    maxHeight: 30,
   };
   const valueCellStyle = {
     border: 0,
@@ -321,14 +319,12 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
     py: 0,
     verticalAlign: "middle",
     height: 30,
-    minHeight: 30,
-    maxHeight: 30,
   };
   return (
-    <TableContainer>
+    <TableContainer sx={{ width: "100%", overflow: "visible" }}>
       <Table size="small" aria-label="systeminfo">
         <TableBody>
-          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+          <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
@@ -336,7 +332,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+          <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>Oppetid:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
@@ -344,7 +340,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+          <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>Sidst set:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
@@ -352,7 +348,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+          <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>Tilføjet:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
@@ -376,8 +372,6 @@ function NetworkInfoTable({ client }) {
     py: 0,
     verticalAlign: "middle",
     height: 30,
-    minHeight: 30,
-    maxHeight: 30,
   };
   const valueCellStyle = {
     border: 0,
@@ -385,14 +379,12 @@ function NetworkInfoTable({ client }) {
     py: 0,
     verticalAlign: "middle",
     height: 30,
-    minHeight: 30,
-    maxHeight: 30,
   };
   return (
-    <TableContainer>
+    <TableContainer sx={{ width: "100%", overflow: "visible" }}>
       <Table size="small" aria-label="netværksinfo">
         <TableBody>
-          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+          <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>IP-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
@@ -401,7 +393,7 @@ function NetworkInfoTable({ client }) {
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+          <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
@@ -410,7 +402,7 @@ function NetworkInfoTable({ client }) {
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+          <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>IP-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
@@ -419,7 +411,7 @@ function NetworkInfoTable({ client }) {
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
+          <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
@@ -524,6 +516,7 @@ export default function ClientDetailsPage({
     height: 32,
     "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
     "& .MuiInputBase-root": { height: "32px" },
+    maxWidth: "100%",
   };
 
   const handleLocalityChange = (e) => {
@@ -648,11 +641,11 @@ export default function ClientDetailsPage({
                 <TableContainer>
                   <Table size="small" aria-label="client-details">
                     <TableBody>
-                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                      <TableRow sx={{ height: 30 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30 }}>
                           Klient ID:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30 }}>
                           <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
                             <Typography 
                               variant="body2" 
@@ -663,11 +656,11 @@ export default function ClientDetailsPage({
                           </Box>
                         </TableCell>
                       </TableRow>
-                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                      <TableRow sx={{ height: 30 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30 }}>
                           Lokation:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30 }}>
                           <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
                             <TextField
                               size="small"
@@ -689,11 +682,11 @@ export default function ClientDetailsPage({
                           </Box>
                         </TableCell>
                       </TableRow>
-                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                      <TableRow sx={{ height: 30 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30 }}>
                           Kiosk URL:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30 }}>
                           <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
                             <TextField
                               size="small"
@@ -716,11 +709,11 @@ export default function ClientDetailsPage({
                           </Box>
                         </TableCell>
                       </TableRow>
-                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                      <TableRow sx={{ height: 30 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30 }}>
                           Kiosk browser status:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30 }}>
                           <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "30px" }}>
                             <ClientStatusIcon isOnline={client.isOnline} />
                             <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
@@ -738,7 +731,7 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
-              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+              <Card elevation={2} sx={{ borderRadius: 2, width: "100%" }}>
                 <CardContent>
                   <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1 }}>
@@ -755,7 +748,6 @@ export default function ClientDetailsPage({
                             fontSize: "0.85rem",
                             textTransform: "none",
                             px: 1,
-                            verticalAlign: "middle",
                             borderRadius: 8
                           }}
                           onClick={() => setCalendarDialogOpen(true)}
@@ -770,7 +762,7 @@ export default function ClientDetailsPage({
               </Card>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+              <Card elevation={2} sx={{ borderRadius: 2, width: "100%" }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                     Systeminfo
@@ -780,7 +772,7 @@ export default function ClientDetailsPage({
               </Card>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+              <Card elevation={2} sx={{ borderRadius: 2, width: "100%" }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                     Netværksinfo
@@ -925,25 +917,4 @@ export default function ClientDetailsPage({
               <Box sx={{
                 p: 2,
                 border: "1px solid #eee",
-                borderRadius: 2,
-                background: "#fafafa",
-                textAlign: "center",
-                color: "#888",
-                fontStyle: "italic",
-                fontSize: "0.95rem"
-              }}>
-                Livestream placeholder (MJPEG/WebRTC)
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-      {/* Kalender-dialogen! */}
-      <ClientCalendarDialog
-        open={calendarDialogOpen}
-        onClose={() => setCalendarDialogOpen(false)}
-        clientId={client.id}
-      />
-    </Box>
-  );
-}
+                borderRadius
