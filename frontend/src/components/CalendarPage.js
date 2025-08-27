@@ -53,13 +53,32 @@ function formatDate(year, month, day) {
   return `${year}-${mm}-${dd}`;
 }
 
+// OPDATERET FUNKTION: Hent tider fra localStorage hvis muligt
 function getDefaultTimes(dateStr) {
   const date = new Date(dateStr);
   const day = date.getDay();
+  const TIMES_STORAGE_KEY = "standard_times_settings";
+
+  let defaultTimes = {
+    weekday: { onTime: "09:00", offTime: "22:30" },
+    weekend: { onTime: "08:00", offTime: "18:00" }
+  };
+
+  const saved = localStorage.getItem(TIMES_STORAGE_KEY);
+  if (saved) {
+    try {
+      const settings = JSON.parse(saved);
+      defaultTimes = {
+        weekday: settings.weekday || defaultTimes.weekday,
+        weekend: settings.weekend || defaultTimes.weekend
+      };
+    } catch {}
+  }
+
   if (day === 0 || day === 6) {
-    return { onTime: "08:00", offTime: "18:00" };
+    return defaultTimes.weekend;
   } else {
-    return { onTime: "09:00", offTime: "22:30" };
+    return defaultTimes.weekday;
   }
 }
 
