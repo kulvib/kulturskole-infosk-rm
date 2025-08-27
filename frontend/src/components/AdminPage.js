@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import {
   Typography, Box, TextField, Button, List, ListItem, MenuItem,
-  Select, FormControl, InputLabel, IconButton
+  Select, FormControl, InputLabel, IconButton, Dialog,
+  DialogTitle, DialogContent, DialogActions
 } from "@mui/material";
-import axios from "axios";
 import DeleteIcon from "@mui/icons-material/Delete";
+import axios from "axios";
 import { apiUrl, getToken } from "../api";
 
 const TIMES_STORAGE_PREFIX = "standard_times_settings_";
@@ -42,8 +43,18 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
 
+  // SLET SKOLE FLOW
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [schoolToDelete, setSchoolToDelete] = useState(null);
+  const [clientsToDelete, setClientsToDelete] = useState([]);
+  const [loadingClients, setLoadingClients] = useState(false);
+
   // Hent skoler
   useEffect(() => {
+    fetchSchools();
+  }, []);
+
+  const fetchSchools = () => {
     axios.get(`${apiUrl}/api/schools/`, {
       headers: { Authorization: "Bearer " + getToken() }
     })
@@ -53,7 +64,7 @@ export default function AdminPage() {
         setError("Kunne ikke hente skoler");
         console.error("FEJL VED HENTNING AF SKOLER", err);
       });
-  }, []);
+  };
 
   // Hent tider for valgt skole
   useEffect(() => {
@@ -94,25 +105,56 @@ export default function AdminPage() {
     alert("Standard tider gemt for skole!");
   };
 
-  // Slet skole
-  const handleDeleteSchool = (schoolId) => {
+  // Slet skole: Åben dialog og hent klienter
+  const handleOpenDeleteDialog = (school) => {
     setDeleteError("");
-    axios.delete(`${apiUrl}/api/schools/${schoolId}/`, {
+    setSchoolToDelete(school);
+    setClientsToDelete([]);
+    setDeleteDialogOpen(true);
+    setLoadingClients(true);
+    axios.get(`${apiUrl}/api/schools/${school.id}/clients/`, {
+      headers: { Authorization: "Bearer " + getToken() }
+    })
+      .then(res => {
+        setClientsToDelete(res.data);
+        setLoadingClients(false);
+      })
+      .catch(e => {
+        setClientsToDelete([]);
+        setLoadingClients(false);
+      });
+  };
+
+  // Bekræft sletning
+  const handleConfirmDeleteSchool = () => {
+    if (!schoolToDelete) return;
+    axios.delete(`${apiUrl}/api/schools/${schoolToDelete.id}/`, {
       headers: { Authorization: "Bearer " + getToken() }
     })
       .then(() => {
-        setSchools(schools.filter(s => s.id !== schoolId));
-        if (selectedSchool === schoolId) {
+        setSchools(schools.filter(s => s.id !== schoolToDelete.id));
+        if (selectedSchool === schoolToDelete.id) {
           setSelectedSchool("");
           setWeekdayTimes({ onTime: "09:00", offTime: "22:30" });
           setWeekendTimes({ onTime: "08:00", offTime: "18:00" });
         }
-        localStorage.removeItem(TIMES_STORAGE_PREFIX + schoolId);
+        localStorage.removeItem(TIMES_STORAGE_PREFIX + schoolToDelete.id);
+        setDeleteDialogOpen(false);
+        setSchoolToDelete(null);
+        setClientsToDelete([]);
       })
       .catch(e => {
         setDeleteError("Kunne ikke slette skole: " + (e.response?.data?.detail || ""));
         console.error("FEJL VED SLETNING AF SKOLE", e);
       });
+  };
+
+  // Luk dialog
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setSchoolToDelete(null);
+    setClientsToDelete([]);
+    setDeleteError("");
   };
 
   return (
@@ -222,7 +264,7 @@ export default function AdminPage() {
                     edge="end"
                     aria-label="slet"
                     color="error"
-                    onClick={() => handleDeleteSchool(school.id)}
+                    onClick={() => handleOpenDeleteDialog(school)}
                   >
                     <DeleteIcon />
                   </IconButton>
@@ -234,6 +276,52 @@ export default function AdminPage() {
           )}
         </List>
       </Box>
+
+      {/* SLET DIALOG */}
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
+        <DialogTitle>Slet skole</DialogTitle>
+        <DialogContent>
+          <Typography gutterBottom>
+            Er du sikker på at du vil slette skolen <strong>{schoolToDelete?.name}</strong>?
+          </Typography>
+          {loadingClients ? (
+            <Typography>Henter tilknyttede klienter...</Typography>
+          ) : (
+            <>
+              {clientsToDelete.length > 0 ? (
+                <>
+                  <Typography sx={{ mt: 2, mb: 1 }}>Følgende klienter vil også blive slettet:</Typography>
+                  <List>
+                    {clientsToDelete.map(client => (
+                      <ListItem key={client.id}>
+                        {client.locality || client.name || "Klient"}
+                      </ListItem>
+                    ))}
+                  </List>
+                </>
+              ) : (
+                <Typography sx={{ mt: 2, mb: 1 }}>Ingen klienter er tilknyttet denne skole.</Typography>
+              )}
+            </>
+          )}
+          {deleteError && (
+            <Typography color="error" sx={{ mt: 2 }}>
+              {deleteError}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog}>Annuller</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleConfirmDeleteSchool}
+            disabled={loadingClients}
+          >
+            Slet skole
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
