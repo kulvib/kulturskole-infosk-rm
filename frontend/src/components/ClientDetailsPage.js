@@ -260,7 +260,6 @@ function StatusText({ status }) {
   );
 }
 
-// --------- ÆNDRET: Netop denne komponent ---------
 function ClientPowerShortTable({ markedDays }) {
   const days = [];
   const now = new Date();
@@ -269,10 +268,7 @@ function ClientPowerShortTable({ markedDays }) {
     d.setDate(now.getDate() + i);
     days.push(d);
   }
-
-  // 13px = 1.625 spacing units (8px per unit)
   const cellStyle = { whiteSpace: "nowrap", py: 0, px: 1.625 };
-
   return (
     <TableContainer>
       <Table size="small">
@@ -306,7 +302,6 @@ function ClientPowerShortTable({ markedDays }) {
   );
 }
 
-// --------- Systeminfo med ens rækkeafstand ---------
 function SystemInfoTable({ client, uptime, lastSeen }) {
   const cellStyle = {
     border: 0,
@@ -370,7 +365,6 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
   );
 }
 
-// --------- Netværksinfo med ens rækkeafstand ---------
 function NetworkInfoTable({ client }) {
   const cellStyle = {
     border: 0,
@@ -438,7 +432,6 @@ function NetworkInfoTable({ client }) {
   );
 }
 
-// ---------- Hovedkomponent ----------
 export default function ClientDetailsPage({
   client,
   refreshing,
@@ -463,7 +456,6 @@ export default function ClientDetailsPage({
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  // NYT! State til kalender-dialogen
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
 
   const navigate = useNavigate();
@@ -477,7 +469,6 @@ export default function ClientDetailsPage({
       setLastSeen(client.last_seen || null);
       setUptime(client.uptime || null);
     }
-    // eslint-disable-next-line
   }, [client]);
 
   useEffect(() => {
@@ -635,7 +626,7 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent>
-              <Box>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography
                   variant="h6"
                   sx={{
@@ -647,17 +638,20 @@ export default function ClientDetailsPage({
                 >
                   {client.name}
                 </Typography>
+                <Box sx={{ ml: 2 }}>
+                  <ClientStatusIcon isOnline={client.isOnline} />
+                </Box>
               </Box>
               <Box mt={2}>
                 <TableContainer>
                   <Table size="small" aria-label="client-details">
                     <TableBody>
-                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                      <TableRow sx={{ height: 40, minHeight: 40, maxHeight: 40 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40, minHeight: 40, maxHeight: 40 }}>
                           Klient ID:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40, minHeight: 40, maxHeight: 40 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", lineHeight: "40px" }}>
                             <Typography 
                               variant="body2" 
                               sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem", display: "inline" }}
@@ -667,12 +661,17 @@ export default function ClientDetailsPage({
                           </Box>
                         </TableCell>
                       </TableRow>
-                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                      <TableRow sx={{ height: 40, minHeight: 40, maxHeight: 40 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40, minHeight: 40, maxHeight: 40 }}>
                           Lokation:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40, minHeight: 40, maxHeight: 40 }}>
+                          <Box sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            lineHeight: "40px",
+                            gap: "8px"
+                          }}>
                             <TextField
                               size="small"
                               value={locality}
@@ -686,19 +685,24 @@ export default function ClientDetailsPage({
                               variant="outlined"
                               onClick={handleLocalitySave}
                               disabled={savingLocality}
-                              sx={{ minWidth: 44, maxWidth: 44, ml: 1 }}
+                              sx={{ minWidth: 44, maxWidth: 44 }}
                             >
                               {savingLocality ? <CircularProgress size={16} /> : "Gem"}
                             </Button>
                           </Box>
                         </TableCell>
                       </TableRow>
-                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                      <TableRow sx={{ height: 40, minHeight: 40, maxHeight: 40 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40, minHeight: 40, maxHeight: 40 }}>
                           Kiosk URL:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40, minHeight: 40, maxHeight: 40 }}>
+                          <Box sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            lineHeight: "40px",
+                            gap: "8px"
+                          }}>
                             <TextField
                               size="small"
                               value={kioskUrl}
@@ -713,20 +717,19 @@ export default function ClientDetailsPage({
                               color="primary"
                               onClick={handleKioskUrlSave}
                               disabled={savingKioskUrl}
-                              sx={{ minWidth: 44, maxWidth: 44, ml: 1 }}
+                              sx={{ minWidth: 44, maxWidth: 44 }}
                             >
                               {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
                             </Button>
                           </Box>
                         </TableCell>
                       </TableRow>
-                      <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
+                      <TableRow sx={{ height: 40, minHeight: 40, maxHeight: 40 }}>
+                        <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40, minHeight: 40, maxHeight: 40 }}>
                           Kiosk browser status:
                         </TableCell>
-                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 30, minHeight: 30, maxHeight: 30 }}>
-                          <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "30px" }}>
-                            <ClientStatusIcon isOnline={client.isOnline} />
+                        <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40, minHeight: 40, maxHeight: 40 }}>
+                          <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
                             <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
                           </Box>
                         </TableCell>
@@ -799,7 +802,6 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
-              {/* ÆNDRET: 20px horisontal spacing mellem knapper */}
               <Box sx={{ 
                 display: "flex", 
                 flexDirection: "row", 
@@ -807,7 +809,7 @@ export default function ClientDetailsPage({
                 justifyContent: "center", 
                 width: "100%", 
                 mb: 2,
-                gap: "20px" // <-- HER er spacing!
+                gap: "20px"
               }}>
                 <Tooltip title="Start kiosk browser">
                   <span>
@@ -872,7 +874,7 @@ export default function ClientDetailsPage({
                 alignItems: "center", 
                 justifyContent: "center", 
                 width: "100%",
-                gap: "20px" // <-- HER er spacing!
+                gap: "20px"
               }}>
                 <Tooltip title="Genstart klient">
                   <span>
@@ -958,12 +960,4 @@ export default function ClientDetailsPage({
           </Card>
         </Grid>
       </Grid>
-      {/* Kalender-dialogen! */}
       <ClientCalendarDialog
-        open={calendarDialogOpen}
-        onClose={() => setCalendarDialogOpen(false)}
-        clientId={client.id}
-      />
-    </Box>
-  );
-}
