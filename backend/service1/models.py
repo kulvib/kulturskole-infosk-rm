@@ -3,7 +3,6 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
 
-# Enum for chrome actions
 class ChromeAction(str, Enum):
     START = "start"
     STOP = "stop"
