@@ -664,6 +664,25 @@ export default function CalendarPage() {
           ))}
         </Select>
       </Paper>
+      {/* Sæsonvælger med samme grafik */}
+      <Paper elevation={2} sx={{ p: 2, mb: 3, display: "flex", alignItems: "center", gap: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+          Vælg sæson:
+        </Typography>
+        <Select
+          size="small"
+          value={selectedSeason}
+          onChange={e => setSelectedSeason(Number(e.target.value))}
+          sx={{ minWidth: 120 }}
+          disabled={isDisabled}
+        >
+          {seasons.map(season => (
+            <MenuItem key={season.value} value={season.value}>
+              {season.label}
+            </MenuItem>
+          ))}
+        </Select>
+      </Paper>
 
       {/* Snackbar */}
       <Snackbar
@@ -745,7 +764,7 @@ export default function CalendarPage() {
         )}
       </Paper>
 
-      {/* Knaprækken: Markering | Vis liste | Vælg sæson */}
+      {/* Knaprækken: Markering | Vis liste */}
       <Box sx={{
         display: "flex",
         alignItems: "center",
@@ -790,31 +809,6 @@ export default function CalendarPage() {
           >
             Vis liste
           </Button>
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
-            Vælg sæson:
-          </Typography>
-          <select
-            value={selectedSeason}
-            onChange={e => setSelectedSeason(Number(e.target.value))}
-            style={{
-              minWidth: 120,
-              fontWeight: 700,
-              background: "#fff",
-              fontSize: "1rem",
-              padding: "6px 14px",
-              borderRadius: "7px",
-              border: "1px solid #dbeafe"
-            }}
-            disabled={isDisabled}
-          >
-            {seasons.map(season => (
-              <option key={season.value} value={season.value}>
-                {season.label}
-              </option>
-            ))}
-          </select>
         </Box>
       </Box>
 
