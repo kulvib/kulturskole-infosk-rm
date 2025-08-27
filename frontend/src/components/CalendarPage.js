@@ -53,11 +53,21 @@ function formatDate(year, month, day) {
   return `${year}-${mm}-${dd}`;
 }
 
-// OPDATERET FUNKTION: Hent tider fra localStorage hvis muligt
-function getDefaultTimes(dateStr) {
+// OPDATERET FUNKTION: Hent tider fra localStorage for klientens skole hvis muligt
+function getDefaultTimes(dateStr, client, clients) {
   const date = new Date(dateStr);
   const day = date.getDay();
-  const TIMES_STORAGE_KEY = "standard_times_settings";
+
+  // Find skoleId for den pågældende klient
+  let schoolId = null;
+  if (client && clients && clients.length > 0) {
+    const clientObj = clients.find(c => c.id === client);
+    schoolId = clientObj && clientObj.schoolId ? clientObj.schoolId : null;
+  }
+
+  const TIMES_STORAGE_KEY = schoolId
+    ? `standard_times_settings_${schoolId}`
+    : "standard_times_settings";
 
   let defaultTimes = {
     weekday: { onTime: "09:00", offTime: "22:30" },
@@ -421,9 +431,10 @@ export default function CalendarPage() {
     payloadMarkedDays[String(clientId)] = {};
     allDates.forEach(dateStr => {
       const md = markedDays[clientId]?.[dateStr];
+      const defTimes = getDefaultTimes(dateStr, clientId, clients);
       if (md && md.status === "on") {
-        const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
-        const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
+        const onTime = md.onTime || defTimes.onTime;
+        const offTime = md.offTime || defTimes.offTime;
         payloadMarkedDays[String(clientId)][dateStr] = {
           status: "on",
           onTime,
@@ -542,9 +553,10 @@ export default function CalendarPage() {
         payloadMarkedDays[clientKey] = {};
         allDates.forEach(dateStr => {
           const md = sourceMarkedDays[dateStr];
+          const defTimes = getDefaultTimes(dateStr, cid, clients);
           if (md && md.status === "on") {
-            const onTime = md.onTime || getDefaultTimes(dateStr).onTime;
-            const offTime = md.offTime || getDefaultTimes(dateStr).offTime;
+            const onTime = md.onTime || defTimes.onTime;
+            const offTime = md.offTime || defTimes.offTime;
             payloadMarkedDays[clientKey][dateStr] = {
               status: "on",
               onTime,
@@ -593,7 +605,7 @@ export default function CalendarPage() {
       } finally {
         setSavingCalendar(false);
       }
-    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason]
+    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, clients]
   );
 
   useEffect(() => {
