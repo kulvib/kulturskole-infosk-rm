@@ -41,7 +41,7 @@ class Client(ClientBase, table=True):
     pending_reboot: Optional[bool] = False
     pending_shutdown: Optional[bool] = False
     chrome_color: Optional[str] = None
-    pending_chrome_action: Optional[ChromeAction] = Field(default=ChromeAction.NONE)  # <-- Enum in use
+    pending_chrome_action: Optional[ChromeAction] = Field(default=ChromeAction.NONE)  # Enum in use
 
 class ClientCreate(ClientBase):
     sort_order: Optional[int] = None
