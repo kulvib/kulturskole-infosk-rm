@@ -260,7 +260,6 @@ function StatusText({ status }) {
   );
 }
 
-// --------- ÆNDRET: Netop denne komponent ---------
 function ClientPowerShortTable({ markedDays }) {
   const days = [];
   const now = new Date();
@@ -270,18 +269,15 @@ function ClientPowerShortTable({ markedDays }) {
     days.push(d);
   }
 
-  // 20px = 2.5 spacing units (8px per unit)
-  const cellStyle = { whiteSpace: "nowrap", py: 0, px: 2.5 };
-
   return (
     <TableContainer>
       <Table size="small">
         <TableHead>
           <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-            <TableCell sx={cellStyle}>Dato</TableCell>
-            <TableCell sx={cellStyle}>Status</TableCell>
-            <TableCell sx={cellStyle}>Tænd</TableCell>
-            <TableCell sx={cellStyle}>Sluk</TableCell>
+            <TableCell sx={{ whiteSpace: "nowrap", py: 0 }}>Dato</TableCell>
+            <TableCell sx={{ whiteSpace: "nowrap", py: 0 }}>Status</TableCell>
+            <TableCell sx={{ whiteSpace: "nowrap", py: 0 }}>Tænd</TableCell>
+            <TableCell sx={{ whiteSpace: "nowrap", py: 0 }}>Sluk</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -289,12 +285,12 @@ function ClientPowerShortTable({ markedDays }) {
             const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
               <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-                <TableCell sx={cellStyle}>{formatDateShort(dt)}</TableCell>
-                <TableCell sx={cellStyle}><StatusText status={status} /></TableCell>
-                <TableCell sx={cellStyle}>
+                <TableCell sx={{ whiteSpace: "nowrap", py: 0 }}>{formatDateShort(dt)}</TableCell>
+                <TableCell sx={{ whiteSpace: "nowrap", py: 0 }}><StatusText status={status} /></TableCell>
+                <TableCell sx={{ whiteSpace: "nowrap", py: 0 }}>
                   {status === "on" && powerOn ? powerOn : ""}
                 </TableCell>
-                <TableCell sx={cellStyle}>
+                <TableCell sx={{ whiteSpace: "nowrap", py: 0 }}>
                   {status === "on" && powerOff ? powerOff : ""}
                 </TableCell>
               </TableRow>
