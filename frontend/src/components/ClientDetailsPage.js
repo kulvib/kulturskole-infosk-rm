@@ -938,4 +938,4 @@ export default function ClientDetailsPage({
               }}>
                 Livestream placeholder (MJPEG/WebRTC)
               </Box>
-            </Card
+            </Card>
