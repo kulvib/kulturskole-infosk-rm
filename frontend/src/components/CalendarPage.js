@@ -749,35 +749,17 @@ export default function CalendarPage() {
         )}
       </Paper>
 
-      {/* Sæsonvælger - nu under feltet med godkendte klienter */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
-          Vælg sæson:
-        </Typography>
-        <Select
-          size="small"
-          value={selectedSeason}
-          onChange={e => setSelectedSeason(Number(e.target.value))}
-          sx={{ minWidth: 120 }}
-          disabled={isDisabled}
-        >
-          {seasons.map(season => (
-            <MenuItem key={season.value} value={season.value}>
-              {season.label}
-            </MenuItem>
-          ))}
-        </Select>
-      </Box>
-
-      {/* Knaprækken: Markering | Vis liste */}
-      <Box sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        mb: 2,
-        gap: 2,
-        flexWrap: "wrap"
-      }}>
+      {/* Knaprækken: Markering | Vis liste | Vælg sæson - nu på samme linje under feltet med godkendte klienter */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 3,
+          mb: 3,
+          flexWrap: "wrap"
+        }}
+      >
+        {/* Markering */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="h6" sx={{ mr: 1, fontWeight: 700 }}>
             Markering:
@@ -803,6 +785,7 @@ export default function CalendarPage() {
             SLUKKET
           </Button>
         </Box>
+        {/* Vis liste */}
         <Box>
           <Button
             variant="outlined"
@@ -814,6 +797,25 @@ export default function CalendarPage() {
           >
             Vis liste
           </Button>
+        </Box>
+        {/* Vælg sæson */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
+            Vælg sæson:
+          </Typography>
+          <Select
+            size="small"
+            value={selectedSeason}
+            onChange={e => setSelectedSeason(Number(e.target.value))}
+            sx={{ minWidth: 120 }}
+            disabled={isDisabled}
+          >
+            {seasons.map(season => (
+              <MenuItem key={season.value} value={season.value}>
+                {season.label}
+              </MenuItem>
+            ))}
+          </Select>
         </Box>
       </Box>
 
