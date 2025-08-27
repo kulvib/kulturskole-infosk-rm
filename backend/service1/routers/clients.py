@@ -73,11 +73,10 @@ def update_chrome_status(
     session.refresh(client)
     return {"ok": True}
 
-# PATCHED ENDPOINT MED ENUM!
 @router.post("/clients/{id}/chrome-command")
 def set_chrome_command(
     id: int,
-    data: dict = Body(...),  # fx {"action": "start"} eller {"action": "stop"}
+    data: dict = Body(...),
     session=Depends(get_session),
     user=Depends(get_current_admin_user)
 ):
@@ -85,7 +84,6 @@ def set_chrome_command(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     action = data.get("action")
-    # Valider med Enum
     try:
         chrome_action = ChromeAction(action)
     except ValueError:
@@ -192,6 +190,7 @@ async def create_client(
         pending_reboot=False,
         pending_shutdown=False,
         pending_chrome_action=getattr(client_in, "pending_chrome_action", ChromeAction.NONE),
+        school=getattr(client_in, "school", None),  # NYT: Tager school med fra ClientCreate
     )
     session.add(client)
     session.commit()
@@ -236,11 +235,12 @@ async def update_client(
     if getattr(client_update, "chrome_color", None) is not None:
         client.chrome_color = client_update.chrome_color
     if getattr(client_update, "pending_chrome_action", None) is not None:
-        # Enum håndtering
         try:
             client.pending_chrome_action = ChromeAction(getattr(client_update, "pending_chrome_action"))
         except (ValueError, TypeError):
             client.pending_chrome_action = ChromeAction.NONE
+    if getattr(client_update, "school", None) is not None:
+        client.school = client_update.school  # NYT: Opdater school hvis medsendt
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -281,7 +281,12 @@ def client_action(
     return {"ok": True, "action": action}
 
 @router.post("/clients/{id}/approve", response_model=Client)
-async def approve_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+async def approve_client(
+    id: int,
+    data: dict = Body(None),  # NYT: Muligt at sende "school" med fra frontend
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user)
+):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -292,6 +297,8 @@ async def approve_client(id: int, session=Depends(get_session), user=Depends(get
         .order_by(Client.sort_order.desc())
     ).first()
     client.sort_order = (max_sort_order or 0) + 1
+    if data and "school" in data:
+        client.school = data["school"]  # NYT: Sæt school ved approval hvis sendt med
     session.add(client)
     session.commit()
     session.refresh(client)
