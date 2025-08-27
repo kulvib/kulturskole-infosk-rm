@@ -3,7 +3,7 @@ from sqlmodel import select, delete
 from typing import List
 from datetime import datetime, timedelta
 from db import get_session
-from models import Client, ClientCreate, ClientUpdate, CalendarMarking
+from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction
 from auth import get_current_admin_user
 
 router = APIRouter()
@@ -73,7 +73,7 @@ def update_chrome_status(
     session.refresh(client)
     return {"ok": True}
 
-# NYE ENDPOINTS TIL KOMMANDO:
+# PATCHED ENDPOINT MED ENUM!
 @router.post("/clients/{id}/chrome-command")
 def set_chrome_command(
     id: int,
@@ -85,13 +85,16 @@ def set_chrome_command(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     action = data.get("action")
-    if action not in ["start", "stop"]:
-        raise HTTPException(status_code=400, detail="Invalid action")
-    client.pending_chrome_action = action
+    # Valider med Enum
+    try:
+        chrome_action = ChromeAction(action)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid action '{action}'")
+    client.pending_chrome_action = chrome_action
     session.add(client)
     session.commit()
     session.refresh(client)
-    return {"ok": True, "pending_chrome_action": client.pending_chrome_action}
+    return {"ok": True, "pending_chrome_action": client.pending_chrome_action.value}
 
 @router.get("/clients/{id}/chrome-command")
 def get_chrome_command(
@@ -101,7 +104,7 @@ def get_chrome_command(
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    return {"action": client.pending_chrome_action}
+    return {"action": client.pending_chrome_action.value if client.pending_chrome_action else None}
 
 @router.post("/clients/{id}/chrome-command-clear")
 def clear_chrome_command(
@@ -111,7 +114,7 @@ def clear_chrome_command(
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    client.pending_chrome_action = None
+    client.pending_chrome_action = ChromeAction.NONE
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -188,7 +191,7 @@ async def create_client(
         chrome_color=getattr(client_in, "chrome_color", None),
         pending_reboot=False,
         pending_shutdown=False,
-        pending_chrome_action=getattr(client_in, "pending_chrome_action", None),
+        pending_chrome_action=getattr(client_in, "pending_chrome_action", ChromeAction.NONE),
     )
     session.add(client)
     session.commit()
@@ -233,7 +236,11 @@ async def update_client(
     if getattr(client_update, "chrome_color", None) is not None:
         client.chrome_color = client_update.chrome_color
     if getattr(client_update, "pending_chrome_action", None) is not None:
-        client.pending_chrome_action = client_update.pending_chrome_action
+        # Enum håndtering
+        try:
+            client.pending_chrome_action = ChromeAction(getattr(client_update, "pending_chrome_action"))
+        except (ValueError, TypeError):
+            client.pending_chrome_action = ChromeAction.NONE
     session.add(client)
     session.commit()
     session.refresh(client)
