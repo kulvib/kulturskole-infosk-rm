@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Typography, Box, TextField, Button, List, ListItem, MenuItem, Select, FormControl, InputLabel } from "@mui/material";
+import {
+  Typography, Box, TextField, Button, List, ListItem, MenuItem,
+  Select, FormControl, InputLabel, IconButton
+} from "@mui/material";
 import axios from "axios";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { apiUrl, getToken } from "../api";
 
 const TIMES_STORAGE_PREFIX = "standard_times_settings_";
@@ -36,6 +40,7 @@ export default function AdminPage() {
   // NY SKOLE
   const [schoolName, setSchoolName] = useState("");
   const [error, setError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
 
   // Hent skoler
   useEffect(() => {
@@ -87,6 +92,27 @@ export default function AdminPage() {
       weekend: weekendTimes
     }));
     alert("Standard tider gemt for skole!");
+  };
+
+  // Slet skole
+  const handleDeleteSchool = (schoolId) => {
+    setDeleteError("");
+    axios.delete(`${apiUrl}/api/schools/${schoolId}/`, {
+      headers: { Authorization: "Bearer " + getToken() }
+    })
+      .then(() => {
+        setSchools(schools.filter(s => s.id !== schoolId));
+        if (selectedSchool === schoolId) {
+          setSelectedSchool("");
+          setWeekdayTimes({ onTime: "09:00", offTime: "22:30" });
+          setWeekendTimes({ onTime: "08:00", offTime: "18:00" });
+        }
+        localStorage.removeItem(TIMES_STORAGE_PREFIX + schoolId);
+      })
+      .catch(e => {
+        setDeleteError("Kunne ikke slette skole: " + (e.response?.data?.detail || ""));
+        console.error("FEJL VED SLETNING AF SKOLE", e);
+      });
   };
 
   return (
@@ -179,12 +205,31 @@ export default function AdminPage() {
             Tilføj skole
           </Button>
         </Box>
+        {deleteError && (
+          <Typography color="error" sx={{ mt: 2 }}>
+            {deleteError}
+          </Typography>
+        )}
         <List sx={{ mt: 2 }}>
           {schools.length === 0 ? (
             <ListItem>Ingen skoler oprettet endnu</ListItem>
           ) : (
             schools.map((school) => (
-              <ListItem key={school.id ?? school.name}>{school.name}</ListItem>
+              <ListItem
+                key={school.id ?? school.name}
+                secondaryAction={
+                  <IconButton
+                    edge="end"
+                    aria-label="slet"
+                    color="error"
+                    onClick={() => handleDeleteSchool(school.id)}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                }
+              >
+                {school.name}
+              </ListItem>
             ))
           )}
         </List>
