@@ -799,7 +799,7 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
             <CardContent sx={{ px: 2 }}>
-              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", mb: 2 }}>
+              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", mb: 2, columnGap: "20px" }}>
                 <Tooltip title="Start kiosk browser">
                   <span>
                     <Button
@@ -857,7 +857,7 @@ export default function ClientDetailsPage({
                   </span>
                 </Tooltip>
               </Box>
-              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%" }}>
+              <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", columnGap: "20px" }}>
                 <Tooltip title="Genstart klient">
                   <span>
                     <Button
@@ -938,16 +938,4 @@ export default function ClientDetailsPage({
               }}>
                 Livestream placeholder (MJPEG/WebRTC)
               </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-      {/* Kalender-dialogen! */}
-      <ClientCalendarDialog
-        open={calendarDialogOpen}
-        onClose={() => setCalendarDialogOpen(false)}
-        clientId={client.id}
-      />
-    </Box>
-  );
-}
+            </Card
