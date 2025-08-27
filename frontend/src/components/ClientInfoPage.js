@@ -19,6 +19,10 @@ import {
   Alert as MuiAlert,
   Select,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -135,6 +139,10 @@ export default function ClientInfoPage() {
   const [dragClients, setDragClients] = useState([]);
   const lastFetchedClients = useRef([]);
 
+  // Dialog state for delete
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmClientId, setConfirmClientId] = useState(null);
+
   // Snackbar state
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
@@ -198,6 +206,26 @@ export default function ClientInfoPage() {
   const unapprovedClients = (clients?.filter((c) => c.status !== "approved") || [])
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Dialog: Åbn
+  const openRemoveDialog = (clientId) => {
+    setConfirmClientId(clientId);
+    setConfirmOpen(true);
+  };
+
+  // Dialog: Luk
+  const closeRemoveDialog = () => {
+    setConfirmOpen(false);
+    setConfirmClientId(null);
+  };
+
+  // Dialog: Bekræft sletning
+  const confirmRemoveClient = async () => {
+    if (confirmClientId) {
+      await handleRemoveClient(confirmClientId);
+      closeRemoveDialog();
+    }
+  };
 
   const handleRemoveClient = async (clientId) => {
     try {
@@ -270,6 +298,17 @@ export default function ClientInfoPage() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
+      {/* Dialog til bekræft sletning */}
+      <Dialog open={confirmOpen} onClose={closeRemoveDialog}>
+        <DialogTitle>Er du sikker?</DialogTitle>
+        <DialogContent>
+          <Typography>Vil du virkelig fjerne denne klient? Dette kan ikke fortrydes.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeRemoveDialog}>Annullér</Button>
+          <Button onClick={confirmRemoveClient} color="error" variant="contained">Fjern</Button>
+        </DialogActions>
+      </Dialog>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           Godkendte klienter
@@ -378,7 +417,7 @@ export default function ClientInfoPage() {
                                 <Tooltip title="Fjern klient">
                                   <IconButton
                                     color="error"
-                                    onClick={() => handleRemoveClient(client.id)}
+                                    onClick={() => openRemoveDialog(client.id)}
                                   >
                                     <DeleteIcon />
                                   </IconButton>
@@ -501,7 +540,7 @@ export default function ClientInfoPage() {
                       <Tooltip title="Fjern klient">
                         <IconButton
                           color="error"
-                          onClick={() => handleRemoveClient(client.id)}
+                          onClick={() => openRemoveDialog(client.id)}
                         >
                           <DeleteIcon />
                         </IconButton>
