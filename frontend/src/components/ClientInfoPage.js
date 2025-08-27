@@ -17,6 +17,8 @@ import {
   useTheme,
   Snackbar,
   Alert as MuiAlert,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -24,7 +26,7 @@ import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { Link } from "react-router-dom";
-import { getClients, approveClient, removeClient, updateClient } from "../api";
+import { getClients, approveClient, removeClient, updateClient, getSchools } from "../api";
 import { useAuth } from "../auth/authcontext";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
@@ -91,7 +93,8 @@ function isClientListEqual(a, b) {
       ca.locality !== cb.locality ||
       ca.status !== cb.status ||
       ca.sort_order !== cb.sort_order ||
-      ca.isOnline !== cb.isOnline
+      ca.isOnline !== cb.isOnline ||
+      ca.school_id !== cb.school_id
     ) {
       return false;
     }
@@ -125,6 +128,8 @@ function ClientStatusCell({ isOnline }) {
 export default function ClientInfoPage() {
   const { token } = useAuth();
   const [clients, setClients] = useState([]);
+  const [schools, setSchools] = useState([]);
+  const [schoolSelections, setSchoolSelections] = useState({});
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dragClients, setDragClients] = useState([]);
@@ -164,6 +169,11 @@ export default function ClientInfoPage() {
       fetchClients(false, false); // Polling uden overlay!
     }, 5000); // 5 sekunder
     return () => clearInterval(timer);
+  }, [token]);
+
+  // Hent skoler ved første load
+  useEffect(() => {
+    getSchools(token).then(setSchools).catch(() => setSchools([]));
   }, [token]);
 
   useEffect(() => {
@@ -223,14 +233,29 @@ export default function ClientInfoPage() {
     setRefreshing(false);
   };
 
+  const handleSchoolChange = (clientId, schoolId) => {
+    setSchoolSelections({ ...schoolSelections, [clientId]: schoolId });
+  };
+
   const handleApproveClient = async (clientId) => {
+    const school_id = schoolSelections[clientId];
+    if (!school_id) {
+      showSnackbar("Vælg en skole først!", "warning");
+      return;
+    }
     try {
-      await approveClient(clientId, token);
+      await approveClient(clientId, school_id, token);
       showSnackbar("Klient godkendt!", "success");
       fetchClients(true, true); // force update med overlay
     } catch (err) {
       showSnackbar("Kunne ikke godkende klient: " + err.message, "error");
     }
+  };
+
+  // Hjælpefunktion til at vise skolenavn ud fra client.school_id
+  const getSchoolName = (schoolId) => {
+    const school = schools.find(s => s.id === schoolId);
+    return school ? school.name : <span style={{ color: "#888" }}>Ingen skole</span>;
   };
 
   return (
@@ -295,6 +320,7 @@ export default function ClientInfoPage() {
                       <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Skole</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
                       <TableCell sx={{ fontWeight: 700, width: 60, textAlign: "right" }}>Sortering</TableCell>
@@ -303,7 +329,7 @@ export default function ClientInfoPage() {
                   <TableBody>
                     {dragClients.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} align="center">
+                        <TableCell colSpan={8} align="center">
                           Ingen godkendte klienter.
                         </TableCell>
                       </TableRow>
@@ -333,6 +359,9 @@ export default function ClientInfoPage() {
                               </TableCell>
                               <TableCell align="center">
                                 <ClientStatusCell isOnline={client.isOnline} />
+                              </TableCell>
+                              <TableCell align="center">
+                                {getSchoolName(client.school_id)}
                               </TableCell>
                               <TableCell align="center">
                                 <Tooltip title="Info">
@@ -380,32 +409,29 @@ export default function ClientInfoPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>Klient ID</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>Klientnavn</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>IP-adresser</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>MAC-adresser</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "14.28%" }}>Tilføjet</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "14.28%", textAlign: "center" }}>Godkend</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "14.28%", textAlign: "center" }}>Fjern</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Klient ID</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Klientnavn</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>IP-adresser</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>MAC-adresser</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Tilføjet</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Skole</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "12.5%", textAlign: "center" }}>Godkend</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: "12.5%", textAlign: "center" }}>Fjern</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {unapprovedClients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={8} align="center">
                     Ingen ikke-godkendte klienter.
                   </TableCell>
                 </TableRow>
               ) : (
                 unapprovedClients.map((client) => (
                   <TableRow key={client.id} hover>
-                    <TableCell sx={{ width: "14.28%" }}>
-                      {client.id}
-                    </TableCell>
-                    <TableCell sx={{ width: "14.28%" }}>
-                      {client.name || "Ukendt navn"}
-                    </TableCell>
-                    <TableCell sx={{ width: "14.28%" }}>
+                    <TableCell>{client.id}</TableCell>
+                    <TableCell>{client.name || "Ukendt navn"}</TableCell>
+                    <TableCell>
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
                           <b>WiFi:</b>&nbsp;
@@ -419,7 +445,7 @@ export default function ClientInfoPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell sx={{ width: "14.28%" }}>
+                    <TableCell>
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
                           <b>WiFi:</b>&nbsp;
@@ -433,7 +459,7 @@ export default function ClientInfoPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell sx={{ width: "14.28%" }}>
+                    <TableCell>
                       {(() => {
                         const ts = formatTimestamp(client.created_at);
                         return (
@@ -445,7 +471,21 @@ export default function ClientInfoPage() {
                         );
                       })()}
                     </TableCell>
-                    <TableCell sx={{ width: "14.28%", textAlign: "center" }}>
+                    <TableCell>
+                      <Select
+                        size="small"
+                        value={schoolSelections[client.id] || ""}
+                        displayEmpty
+                        onChange={e => handleSchoolChange(client.id, e.target.value)}
+                        sx={{ minWidth: 120 }}
+                      >
+                        <MenuItem value="">Vælg skole</MenuItem>
+                        {schools.map(school => (
+                          <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                        ))}
+                      </Select>
+                    </TableCell>
+                    <TableCell align="center">
                       <Button
                         variant="contained"
                         color="success"
@@ -457,7 +497,7 @@ export default function ClientInfoPage() {
                         Godkend
                       </Button>
                     </TableCell>
-                    <TableCell sx={{ width: "14.28%", textAlign: "center" }}>
+                    <TableCell align="center">
                       <Tooltip title="Fjern klient">
                         <IconButton
                           color="error"
