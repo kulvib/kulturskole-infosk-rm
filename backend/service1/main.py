@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 
-from routers import clients, calendar, meta
+from routers import clients, calendar, meta, schools
 from auth import router as auth_router, get_password_hash
 from db import create_db_and_tables, engine
 from models import User
@@ -52,3 +52,4 @@ app.include_router(clients.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
 app.include_router(calendar.router, prefix="/api")
 app.include_router(meta.router, prefix="/api")
+app.include_router(schools.router, prefix="/api")  # NYT!
