@@ -260,6 +260,7 @@ function StatusText({ status }) {
   );
 }
 
+// --------- ÆNDRET: Netop denne komponent ---------
 function ClientPowerShortTable({ markedDays }) {
   const days = [];
   const now = new Date();
@@ -269,15 +270,18 @@ function ClientPowerShortTable({ markedDays }) {
     days.push(d);
   }
 
+  // 13px = 1.625 spacing units (8px per unit)
+  const cellStyle = { whiteSpace: "nowrap", py: 0, px: 1.625 };
+
   return (
     <TableContainer>
       <Table size="small">
         <TableHead>
           <TableRow sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-            <TableCell>Dato</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Tænd</TableCell>
-            <TableCell>Sluk</TableCell>
+            <TableCell sx={cellStyle}>Dato</TableCell>
+            <TableCell sx={cellStyle}>Status</TableCell>
+            <TableCell sx={cellStyle}>Tænd</TableCell>
+            <TableCell sx={cellStyle}>Sluk</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -285,12 +289,12 @@ function ClientPowerShortTable({ markedDays }) {
             const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
               <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: 30, minHeight: 30, maxHeight: 30 }}>
-                <TableCell sx={{ whiteSpace: "nowrap", py: 0 }}>{formatDateShort(dt)}</TableCell>
-                <TableCell sx={{ py: 0 }}><StatusText status={status} /></TableCell>
-                <TableCell sx={{ py: 0 }}>
+                <TableCell sx={cellStyle}>{formatDateShort(dt)}</TableCell>
+                <TableCell sx={cellStyle}><StatusText status={status} /></TableCell>
+                <TableCell sx={cellStyle}>
                   {status === "on" && powerOn ? powerOn : ""}
                 </TableCell>
-                <TableCell sx={{ py: 0 }}>
+                <TableCell sx={cellStyle}>
                   {status === "on" && powerOff ? powerOff : ""}
                 </TableCell>
               </TableRow>
@@ -738,7 +742,7 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
-              <Card elevation={2} sx={{ borderRadius: 2 }}>
+              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
                 <CardContent>
                   <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1 }}>
@@ -770,7 +774,7 @@ export default function ClientDetailsPage({
               </Card>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Card elevation={2} sx={{ borderRadius: 2 }}>
+              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                     Systeminfo
@@ -780,7 +784,7 @@ export default function ClientDetailsPage({
               </Card>
             </Grid>
             <Grid item xs={12} md={4}>
-              <Card elevation={2} sx={{ borderRadius: 2 }}>
+              <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                     Netværksinfo
