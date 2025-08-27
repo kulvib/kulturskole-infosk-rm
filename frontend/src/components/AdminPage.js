@@ -6,6 +6,7 @@ import {
   TableRow, TableCell, TableBody
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
 import axios from "axios";
 import { apiUrl, getToken } from "../api";
 
@@ -50,6 +51,13 @@ export default function AdminPage() {
   const [clientsToDelete, setClientsToDelete] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
   const [deleteStep, setDeleteStep] = useState(1);
+
+  // USER ADMINISTRATION
+  const [users, setUsers] = useState([]);
+  const [userError, setUserError] = useState("");
+  const [newUser, setNewUser] = useState({ username: "", password: "", role: "elev", is_active: true });
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [editUser, setEditUser] = useState(null);
 
   // Hent skoler
   useEffect(() => {
@@ -163,6 +171,75 @@ export default function AdminPage() {
     setClientsToDelete([]);
     setDeleteError("");
     setDeleteStep(1);
+  };
+
+  // ----------- USER ADMINISTRATION -----------
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = () => {
+    axios.get(`${apiUrl}/api/users/`, {
+      headers: { Authorization: "Bearer " + getToken() }
+    })
+      .then(res => setUsers(res.data))
+      .catch(err => {
+        setUsers([]);
+        setUserError("Kunne ikke hente brugere (kun admin kan se listen)");
+      });
+  };
+
+  const handleAddUser = () => {
+    setUserError("");
+    const { username, password, role, is_active } = newUser;
+    if (!username || !password) {
+      setUserError("Brugernavn og kodeord skal udfyldes");
+      return;
+    }
+    axios.post(`${apiUrl}/api/users/`, null, {
+      params: { username, password, role, is_active },
+      headers: { Authorization: "Bearer " + getToken() }
+    })
+      .then(res => {
+        setUsers([...users, res.data]);
+        setNewUser({ username: "", password: "", role: "elev", is_active: true });
+      })
+      .catch(e => {
+        setUserError(e.response?.data?.detail || "Fejl ved oprettelse");
+      });
+  };
+
+  const handleDeleteUser = (id) => {
+    axios.delete(`${apiUrl}/api/users/${id}`, {
+      headers: { Authorization: "Bearer " + getToken() }
+    })
+      .then(() => setUsers(users.filter(u => u.id !== id)))
+      .catch(e => setUserError(e.response?.data?.detail || "Fejl ved sletning"));
+  };
+
+  const openEditUserDialog = (user) => {
+    setEditUser({ ...user, password: "" });
+    setUserDialogOpen(true);
+    setUserError("");
+  };
+
+  const handleEditUser = () => {
+    if (!editUser) return;
+    const { id, role, is_active, password } = editUser;
+    axios.patch(`${apiUrl}/api/users/${id}`, null, {
+      params: {
+        role,
+        is_active,
+        password: password ? password : undefined
+      },
+      headers: { Authorization: "Bearer " + getToken() }
+    })
+      .then(res => {
+        setUsers(users.map(u => u.id === res.data.id ? res.data : u));
+        setUserDialogOpen(false);
+        setEditUser(null);
+      })
+      .catch(e => setUserError(e.response?.data?.detail || "Fejl ved opdatering"));
   };
 
   return (
@@ -355,6 +432,85 @@ export default function AdminPage() {
           )}
         </DialogActions>
       </Dialog>
+
+      {/* ----------- BRUGERADMINISTRATION ----------- */}
+      <Box sx={{ mt: 6 }}>
+        <Typography variant="h6">Brugeradministration</Typography>
+        <Typography variant="body2" sx={{ mb: 2 }}>
+          Opret, redigér og slet brugere (kræver admin-rettigheder)
+        </Typography>
+
+        {/* Opret ny bruger */}
+        <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+          <TextField label="Brugernavn" value={newUser.username} onChange={e => setNewUser({ ...newUser, username: e.target.value })} />
+          <TextField label="Kodeord" type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} />
+          <Select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} sx={{ minWidth: 120 }}>
+            <MenuItem value="admin">Admin</MenuItem>
+            <MenuItem value="laerer">Lærer</MenuItem>
+            <MenuItem value="elev">Elev</MenuItem>
+          </Select>
+          <Select value={newUser.is_active ? "true" : "false"} onChange={e => setNewUser({ ...newUser, is_active: e.target.value === "true" })} sx={{ minWidth: 120 }}>
+            <MenuItem value="true">Aktiv</MenuItem>
+            <MenuItem value="false">Spærret</MenuItem>
+          </Select>
+          <Button variant="contained" onClick={handleAddUser}>Opret bruger</Button>
+        </Box>
+        {userError && <Typography color="error">{userError}</Typography>}
+
+        {/* Liste over brugere */}
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>ID</TableCell>
+              <TableCell>Brugernavn</TableCell>
+              <TableCell>Rolle</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Handlinger</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {users.map(user => (
+              <TableRow key={user.id}>
+                <TableCell>{user.id}</TableCell>
+                <TableCell>{user.username}</TableCell>
+                <TableCell>{user.role}</TableCell>
+                <TableCell>{user.is_active ? "Aktiv" : "Spærret"}</TableCell>
+                <TableCell>
+                  <IconButton onClick={() => openEditUserDialog(user)}><EditIcon /></IconButton>
+                  <IconButton color="error" onClick={() => handleDeleteUser(user.id)}><DeleteIcon /></IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+
+        {/* Dialog til redigering */}
+        <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)}>
+          <DialogTitle>Rediger bruger</DialogTitle>
+          <DialogContent>
+            {editUser && (
+              <>
+                <TextField label="Brugernavn" value={editUser.username} disabled fullWidth sx={{ mb: 2 }} />
+                <Select value={editUser.role} onChange={e => setEditUser({ ...editUser, role: e.target.value })} fullWidth sx={{ mb: 2 }}>
+                  <MenuItem value="admin">Admin</MenuItem>
+                  <MenuItem value="laerer">Lærer</MenuItem>
+                  <MenuItem value="elev">Elev</MenuItem>
+                </Select>
+                <Select value={editUser.is_active ? "true" : "false"} onChange={e => setEditUser({ ...editUser, is_active: e.target.value === "true" })} fullWidth sx={{ mb: 2 }}>
+                  <MenuItem value="true">Aktiv</MenuItem>
+                  <MenuItem value="false">Spærret</MenuItem>
+                </Select>
+                <TextField label="Nyt kodeord" type="password" value={editUser.password || ""} onChange={e => setEditUser({ ...editUser, password: e.target.value })} fullWidth sx={{ mb: 2 }} />
+              </>
+            )}
+            {userError && <Typography color="error">{userError}</Typography>}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setUserDialogOpen(false)}>Annuller</Button>
+            <Button variant="contained" onClick={handleEditUser}>Gem ændringer</Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
     </Box>
   );
 }
