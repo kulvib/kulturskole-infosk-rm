@@ -73,6 +73,34 @@ def update_chrome_status(
     session.refresh(client)
     return {"ok": True}
 
+@router.put("/clients/{id}/state")
+def update_client_state(
+    id: int,
+    data: dict = Body(...),  # fx: {"state": "sleep"}
+    session=Depends(get_session)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    state = data.get("state")
+    if not state:
+        raise HTTPException(status_code=400, detail="Missing state")
+    client.state = state
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return {"ok": True, "state": client.state}
+
+@router.get("/clients/{id}/state")
+def get_client_state(
+    id: int,
+    session=Depends(get_session)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return {"state": client.state}
+
 @router.post("/clients/{id}/chrome-command")
 def set_chrome_command(
     id: int,
@@ -190,7 +218,8 @@ async def create_client(
         pending_reboot=False,
         pending_shutdown=False,
         pending_chrome_action=getattr(client_in, "pending_chrome_action", ChromeAction.NONE),
-        school_id=getattr(client_in, "school_id", None),  # NYT: Tager school_id med fra ClientCreate
+        school_id=getattr(client_in, "school_id", None),
+        state=getattr(client_in, "state", "normal"),
     )
     session.add(client)
     session.commit()
@@ -240,7 +269,9 @@ async def update_client(
         except (ValueError, TypeError):
             client.pending_chrome_action = ChromeAction.NONE
     if getattr(client_update, "school_id", None) is not None:
-        client.school_id = client_update.school_id  # NYT: Opdater school_id hvis medsendt
+        client.school_id = client_update.school_id
+    if getattr(client_update, "state", None) is not None:
+        client.state = client_update.state
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -283,7 +314,7 @@ def client_action(
 @router.post("/clients/{id}/approve", response_model=Client)
 async def approve_client(
     id: int,
-    data: dict = Body(None),  # fx: {"school_id": 3}
+    data: dict = Body(None),
     session=Depends(get_session),
     user=Depends(get_current_admin_user)
 ):
@@ -298,7 +329,7 @@ async def approve_client(
     ).first()
     client.sort_order = (max_sort_order or 0) + 1
     if data and "school_id" in data:
-        client.school_id = data["school_id"]  # NYT: Sæt school_id ved approval hvis sendt med
+        client.school_id = data["school_id"]
     session.add(client)
     session.commit()
     session.refresh(client)
