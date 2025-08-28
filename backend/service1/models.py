@@ -45,7 +45,8 @@ class Client(ClientBase, table=True):
     pending_shutdown: Optional[bool] = False
     chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = Field(default=ChromeAction.NONE)
-    school_id: Optional[int] = Field(default=None, foreign_key="school.id")  # NYT: relation til School
+    school_id: Optional[int] = Field(default=None, foreign_key="school.id")
+    state: Optional[str] = Field(default="normal", description="Driftstilstand: normal, sleep, wakeup, shutdown, error")
 
 class ClientCreate(ClientBase):
     sort_order: Optional[int] = None
@@ -59,7 +60,8 @@ class ClientCreate(ClientBase):
     chrome_status: Optional[str] = None
     chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = ChromeAction.NONE
-    school_id: Optional[int] = None  # NYT
+    school_id: Optional[int] = None
+    state: Optional[str] = Field(default="normal")
 
 class ClientUpdate(SQLModel):
     locality: Optional[str] = None
@@ -77,7 +79,8 @@ class ClientUpdate(SQLModel):
     chrome_last_updated: Optional[datetime] = None
     chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = None
-    school_id: Optional[int] = None  # NYT
+    school_id: Optional[int] = None
+    state: Optional[str] = None
 
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
