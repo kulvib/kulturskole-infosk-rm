@@ -80,7 +80,6 @@ export async function updateClient(id, updates) {
 export async function approveClient(id, school_id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
-  // Mulighed for at sende school_id med ved godkendelse
   const opts = {
     method: "POST",
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
@@ -272,10 +271,18 @@ export async function saveMarkedDays(payload) {
   return await res.json();
 }
 
-export async function getMarkedDays(season, client_id) {
+// OPDATERET! Nu med startDate og endDate som optionale parametre
+export async function getMarkedDays(season, client_id, startDate, endDate) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
-  const res = await fetch(`${apiUrl}/api/calendar/marked-days?season=${season}&client_id=${client_id}`, {
+  const params = new URLSearchParams({
+    season,
+    client_id,
+  });
+  if (startDate) params.append("start_date", startDate.toISOString().slice(0, 10));
+  if (endDate) params.append("end_date", endDate.toISOString().slice(0, 10));
+
+  const res = await fetch(`${apiUrl}/api/calendar/marked-days?${params.toString()}`, {
     headers: { Authorization: "Bearer " + token },
   });
   if (!res.ok) {
@@ -284,7 +291,6 @@ export async function getMarkedDays(season, client_id) {
   return await res.json();
 }
 
-// Tilføj denne funktion for at hente aktuel sæson
 export async function getCurrentSeason() {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -297,7 +303,6 @@ export async function getCurrentSeason() {
   return await res.json();
 }
 
-// Hent alle godkendte skoler fra backend
 export async function getSchools() {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -315,7 +320,6 @@ export async function getSchools() {
   return await res.json();
 }
 
-// Opret ny skole i backend
 export async function addSchool(name) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
