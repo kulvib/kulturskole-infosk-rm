@@ -12,7 +12,7 @@ import {
   openTerminal,
   openRemoteDesktop,
   getClient,
-} from "../api";
+} from "../../api";
 
 export default function ClientDetailsPage({
   client,
