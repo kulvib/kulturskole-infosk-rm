@@ -5,7 +5,7 @@ import ClientDetailsHeader from "./ClientDetailsHeader";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
 import ClientDetailsActions from "./ClientDetailsActions";
 import ClientDetailsLivestream from "./ClientDetailsLivestream";
-import ClientCalendarDialog from "./ClientCalendarDialog";
+import ClientCalendarDialog from "../CalendarPage/ClientCalendarDialog";
 
 export default function ClientDetailsPage({
   client,
