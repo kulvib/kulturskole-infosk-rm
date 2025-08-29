@@ -1,8 +1,96 @@
 import React from "react";
-import { Grid, Card, CardContent, Box, Typography, Button, Tooltip, Table, TableBody, TableCell, TableContainer, TableRow } from "@mui/material";
+import {
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Tooltip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableRow,
+  Box,
+} from "@mui/material";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
-import ClientPowerShortTable from "./ClientPowerShortTable";
 
+function formatDateShort(dt) {
+  const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
+  const dayName = ukedage[dt.getDay()];
+  const day = dt.getDate().toString().padStart(2, "0");
+  const month = (dt.getMonth() + 1).toString().padStart(2, "0");
+  const year = dt.getFullYear();
+  return `${dayName} ${day}.${month} ${year}`;
+}
+function getStatusAndTimesFromRaw(markedDays, dt) {
+  const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
+  const data = markedDays[dateKey];
+  if (!data || !data.status || data.status === "off") {
+    return { status: "off", powerOn: "", powerOff: "" };
+  }
+  return {
+    status: "on",
+    powerOn: data.onTime || "",
+    powerOff: data.offTime || ""
+  };
+}
+function StatusText({ status }) {
+  return (
+    <Typography
+      variant="body2"
+      sx={{
+        fontWeight: 600,
+        color: status === "on" ? "#43a047" : "#e53935",
+        textTransform: "lowercase"
+      }}
+    >
+      {status}
+    </Typography>
+  );
+}
+function ClientPowerShortTable({ markedDays }) {
+  const days = [];
+  const now = new Date();
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    days.push(d);
+  }
+  const cellStyle = { whiteSpace: "nowrap", py: 0, px: 1.625 };
+
+  return (
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow sx={{ height: 30 }}>
+            <TableCell sx={cellStyle}>Dato</TableCell>
+            <TableCell sx={cellStyle}>Status</TableCell>
+            <TableCell sx={cellStyle}>Tænd</TableCell>
+            <TableCell sx={cellStyle}>Sluk</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {days.map((dt) => {
+            const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
+            return (
+              <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: 30 }}>
+                <TableCell sx={cellStyle}>{formatDateShort(dt)}</TableCell>
+                <TableCell sx={cellStyle}><StatusText status={status} /></TableCell>
+                <TableCell sx={cellStyle}>
+                  {status === "on" && powerOn ? powerOn : ""}
+                </TableCell>
+                <TableCell sx={cellStyle}>
+                  {status === "on" && powerOff ? powerOff : ""}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
@@ -32,7 +120,6 @@ function formatDateTime(dateStr, withSeconds = false) {
     ? `${day}.${month} ${year}, kl. ${hour}:${minute}:${second}`
     : `${day}.${month} ${year}, kl. ${hour}:${minute}`;
 }
-
 function formatUptime(uptimeStr) {
   if (!uptimeStr) return "ukendt";
   let totalSeconds = 0;
@@ -63,45 +150,7 @@ function formatUptime(uptimeStr) {
 
   return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
 }
-
-function CopyIconButton({ value, disabled, iconSize = 16 }) {
-  const [copied, setCopied] = React.useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (err) {}
-  };
-
-  return (
-    <Tooltip title={copied ? "Kopieret!" : "Kopiér"}>
-      <span>
-        <Button
-          variant="text"
-          size="small"
-          onClick={handleCopy}
-          disabled={disabled}
-          sx={{
-            minWidth: 24,
-            minHeight: 24,
-            p: 0,
-            m: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            verticalAlign: "middle"
-          }}
-        >
-          <span style={{ fontSize: iconSize }}>{copied ? "✅" : "📋"}</span>
-        </Button>
-      </span>
-    </Tooltip>
-  );
-}
-
-function SystemAndNetworkInfoTable({ client, uptime, lastSeen }) {
+function SystemInfoTable({ client, uptime, lastSeen }) {
   const cellStyle = {
     border: 0,
     fontWeight: 600,
@@ -118,110 +167,116 @@ function SystemAndNetworkInfoTable({ client, uptime, lastSeen }) {
     verticalAlign: "middle",
     height: 30,
   };
-
   return (
-    <>
-      {/* Systeminfo */}
-      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-        Systeminfo
-      </Typography>
-      <TableContainer>
-        <Table size="small" aria-label="systeminfo">
-          <TableBody>
-            <TableRow sx={{ height: 30 }}>
-              <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
-              <TableCell sx={valueCellStyle}>
-                <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                  {client.ubuntu_version || "ukendt"}
-                </Box>
-              </TableCell>
-            </TableRow>
-            <TableRow sx={{ height: 30 }}>
-              <TableCell sx={cellStyle}>Oppetid:</TableCell>
-              <TableCell sx={valueCellStyle}>
-                <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                  {formatUptime(uptime)}
-                </Box>
-              </TableCell>
-            </TableRow>
-            <TableRow sx={{ height: 30 }}>
-              <TableCell sx={cellStyle}>Sidst set:</TableCell>
-              <TableCell sx={valueCellStyle}>
-                <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                  {formatDateTime(lastSeen, true)}
-                </Box>
-              </TableCell>
-            </TableRow>
-            <TableRow sx={{ height: 30 }}>
-              <TableCell sx={cellStyle}>Tilføjet:</TableCell>
-              <TableCell sx={valueCellStyle}>
-                <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                  {formatDateTime(client.created_at, true)}
-                </Box>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </TableContainer>
-      {/* Netværksinfo */}
-      <Typography variant="h6" sx={{ fontWeight: 700, mt: 3, mb: 1 }}>
-        Netværksinfo
-      </Typography>
-      <TableContainer>
-        <Table size="small" aria-label="netværksinfo">
-          <TableBody>
-            <TableRow sx={{ height: 30 }}>
-              <TableCell sx={cellStyle}>IP-adresse WLAN:</TableCell>
-              <TableCell sx={valueCellStyle}>
-                <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                  {client.wifi_ip_address || "ukendt"}
-                  <CopyIconButton value={client.wifi_ip_address || "ukendt"} disabled={!client.wifi_ip_address} iconSize={14} />
-                </Box>
-              </TableCell>
-            </TableRow>
-            <TableRow sx={{ height: 30 }}>
-              <TableCell sx={cellStyle}>MAC-adresse WLAN:</TableCell>
-              <TableCell sx={valueCellStyle}>
-                <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                  {client.wifi_mac_address || "ukendt"}
-                  <CopyIconButton value={client.wifi_mac_address || "ukendt"} disabled={!client.wifi_mac_address} iconSize={14} />
-                </Box>
-              </TableCell>
-            </TableRow>
-            <TableRow sx={{ height: 30 }}>
-              <TableCell sx={cellStyle}>IP-adresse LAN:</TableCell>
-              <TableCell sx={valueCellStyle}>
-                <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                  {client.lan_ip_address || "ukendt"}
-                  <CopyIconButton value={client.lan_ip_address || "ukendt"} disabled={!client.lan_ip_address} iconSize={14} />
-                </Box>
-              </TableCell>
-            </TableRow>
-            <TableRow sx={{ height: 30 }}>
-              <TableCell sx={cellStyle}>MAC-adresse LAN:</TableCell>
-              <TableCell sx={valueCellStyle}>
-                <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                  {client.lan_mac_address || "ukendt"}
-                  <CopyIconButton value={client.lan_mac_address || "ukendt"} disabled={!client.lan_mac_address} iconSize={14} />
-                </Box>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </>
+    <TableContainer>
+      <Table size="small" aria-label="systeminfo">
+        <TableBody>
+          <TableRow sx={{ height: 30 }}>
+            <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {client.ubuntu_version || "ukendt"}
+              </Box>
+            </TableCell>
+          </TableRow>
+          <TableRow sx={{ height: 30 }}>
+            <TableCell sx={cellStyle}>Oppetid:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {formatUptime(uptime)}
+              </Box>
+            </TableCell>
+          </TableRow>
+          <TableRow sx={{ height: 30 }}>
+            <TableCell sx={cellStyle}>Sidst set:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {formatDateTime(lastSeen, true)}
+              </Box>
+            </TableCell>
+          </TableRow>
+          <TableRow sx={{ height: 30 }}>
+            <TableCell sx={cellStyle}>Tilføjet:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {formatDateTime(client.created_at, true)}
+              </Box>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+function NetworkInfoTable({ client }) {
+  const cellStyle = {
+    border: 0,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    pr: 0.5,
+    py: 0,
+    verticalAlign: "middle",
+    height: 30,
+  };
+  const valueCellStyle = {
+    border: 0,
+    pl: 0.5,
+    py: 0,
+    verticalAlign: "middle",
+    height: 30,
+  };
+  return (
+    <TableContainer>
+      <Table size="small" aria-label="netværksinfo">
+        <TableBody>
+          <TableRow sx={{ height: 30 }}>
+            <TableCell sx={cellStyle}>IP-adresse WLAN:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {client.wifi_ip_address || "ukendt"}
+              </Box>
+            </TableCell>
+          </TableRow>
+          <TableRow sx={{ height: 30 }}>
+            <TableCell sx={cellStyle}>MAC-adresse WLAN:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {client.wifi_mac_address || "ukendt"}
+              </Box>
+            </TableCell>
+          </TableRow>
+          <TableRow sx={{ height: 30 }}>
+            <TableCell sx={cellStyle}>IP-adresse LAN:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {client.lan_ip_address || "ukendt"}
+              </Box>
+            </TableCell>
+          </TableRow>
+          <TableRow sx={{ height: 30 }}>
+            <TableCell sx={cellStyle}>MAC-adresse LAN:</TableCell>
+            <TableCell sx={valueCellStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+                {client.lan_mac_address || "ukendt"}
+              </Box>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 }
 
 export default function ClientDetailsInfoSection({
   client,
   markedDays,
+  uptime,
+  lastSeen,
   calendarDialogOpen,
   setCalendarDialogOpen,
 }) {
   return (
     <Grid container spacing={2}>
-      {/* Kalender paper */}
       <Grid item xs={12} md={4}>
         <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
           <CardContent>
@@ -254,11 +309,23 @@ export default function ClientDetailsInfoSection({
           </CardContent>
         </Card>
       </Grid>
-      {/* Systeminfo og Netværksinfo samlet paper */}
-      <Grid item xs={12} md={8}>
+      <Grid item xs={12} md={4}>
         <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
           <CardContent>
-            <SystemAndNetworkInfoTable client={client} uptime={client.uptime} lastSeen={client.last_seen} />
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+              Systeminfo
+            </Typography>
+            <SystemInfoTable client={client} uptime={uptime} lastSeen={lastSeen} />
+          </CardContent>
+        </Card>
+      </Grid>
+      <Grid item xs={12} md={4}>
+        <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+              Netværksinfo
+            </Typography>
+            <NetworkInfoTable client={client} />
           </CardContent>
         </Card>
       </Grid>
