@@ -20,8 +20,7 @@ const menuItems = [
   { text: "Klienter", path: "/clients", match: "/clients" },
   { text: "Kalender", path: "/calendar", match: "/calendar" },
   { text: "Administration", path: "/administration", match: "/administration" },
-  // Ny menu: Klientdetaljer (hvis du ønsker et generisk menupunkt)
-  { text: "Klientdetaljer", path: "/client-details", match: "/client-details" },
+  // Fjernet: Klientdetaljer
 ];
 
 export default function Dashboard() {
