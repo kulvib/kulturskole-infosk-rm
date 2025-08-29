@@ -9,7 +9,7 @@ import NotFound from "./components/NotFound";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import CalendarPage from "./components/CalendarPage";
 import AdminPage from "./components/AdminPage";
-import RemoteDesktop from "./components/RemoteDesktop"; // NYT!
+import RemoteDesktop from "./components/RemoteDesktop";
 
 export default function App() {
   return (
@@ -29,8 +29,9 @@ export default function App() {
           <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="administration" element={<AdminPage />} />
+          {/* Tilføj menupunkt og route for Klientdetaljer her, hvis du ønsker en generisk side */}
+          {/* <Route path="client-details" element={<ClientDetailsPageWrapper />} /> */}
         </Route>
-        {/* NY ROUTE: Remote Desktop, åbnes i ny fane */}
         <Route path="/remote-desktop/:clientId" element={<RemoteDesktop />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
