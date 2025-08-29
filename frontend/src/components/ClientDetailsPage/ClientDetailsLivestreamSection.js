@@ -2,7 +2,7 @@ import React from "react";
 import { Card, CardContent, Box, Typography } from "@mui/material";
 import VideocamIcon from "@mui/icons-material/Videocam";
 
-export default function ClientDetailsLivestream() {
+export default function ClientDetailsLivestreamSection() {
   return (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
       <CardContent>
