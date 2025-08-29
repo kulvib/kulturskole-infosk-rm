@@ -20,7 +20,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers";
 import { DatePicker } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import daLocale from "date-fns/locale/da";
-import { getMarkedDays, getCurrentSeason } from "../api";
+import { getMarkedDays, getCurrentSeason } from "../../api";
 
 // Datoformat: Søndag 01.08 2025
 function formatDateLong(dt) {
