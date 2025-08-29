@@ -1,16 +1,31 @@
-import React, { useState } from "react";
-import { Card, CardContent, Box, Button, Tooltip, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, Typography } from "@mui/material";
+import React from "react";
+import {
+  Card,
+  CardContent,
+  Box,
+  Button,
+  Tooltip,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Typography,
+} from "@mui/material";
 import ChromeReaderModeIcon from "@mui/icons-material/ChromeReaderMode";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
-import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import TerminalIcon from "@mui/icons-material/Terminal";
-import { clientAction, openTerminal, openRemoteDesktop, getClient } from "../../api";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 
-export default function ClientDetailsActions({ client, showSnackbar }) {
-  const [actionLoading, setActionLoading] = useState({});
-  const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
-
+export default function ClientDetailsActionsSection({
+  actionLoading,
+  handleClientAction,
+  handleOpenTerminal,
+  handleOpenRemoteDesktop,
+  shutdownDialogOpen,
+  setShutdownDialogOpen,
+}) {
   const actionBtnStyle = {
     minWidth: 200,
     maxWidth: 200,
@@ -26,22 +41,7 @@ export default function ClientDetailsActions({ client, showSnackbar }) {
     display: "inline-flex",
     justifyContent: "center"
   };
-
-  const handleClientAction = async (action) => {
-    setActionLoading((prev) => ({ ...prev, [action]: true }));
-    try {
-      await clientAction(client.id, action);
-      showSnackbar("Handlingen blev udført!", "success");
-      await getClient(client.id); // evt. opdatering
-    } catch (err) {
-      showSnackbar("Fejl: " + err.message, "error");
-    }
-    setActionLoading((prev) => ({ ...prev, [action]: false }));
-  };
-
-  const handleOpenTerminal = () => openTerminal(client.id);
-  const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
-
+  
   return (
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
       <CardContent sx={{ px: 2 }}>
