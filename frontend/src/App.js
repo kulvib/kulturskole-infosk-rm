@@ -29,8 +29,8 @@ export default function App() {
           <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="administration" element={<AdminPage />} />
-          {/* Tilføj menupunkt og route for Klientdetaljer her, hvis du ønsker en generisk side */}
-          {/* <Route path="client-details" element={<ClientDetailsPageWrapper />} /> */}
+          {/* Nu aktiv: generisk klientdetaljer-side */}
+          <Route path="client-details" element={<ClientDetailsPageWrapper />} />
         </Route>
         <Route path="/remote-desktop/:clientId" element={<RemoteDesktop />} />
         <Route path="*" element={<NotFound />} />
