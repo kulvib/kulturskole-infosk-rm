@@ -46,13 +46,11 @@ export default function ClientDetailsPageWrapper() {
     setRefreshing(false);
   };
 
-  // Hvis clientId mangler, redirect/vis besked
   if (!clientId) {
     return <div style={{ padding: 40, textAlign: "center" }}>
       <h2>Ingen klient valgt</h2>
       <p>Vælg en klient fra oversigten.</p>
     </div>;
-    // Eller: return <Navigate to="/clients" />;
   }
 
   return (
