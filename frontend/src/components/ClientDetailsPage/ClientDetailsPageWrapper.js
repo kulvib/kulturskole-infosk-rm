@@ -18,7 +18,10 @@ export default function ClientDetailsPageWrapper() {
       // Hent markedDays for klienten
       const season = clientData.season || ""; // eller hent fra backend
       const markedDaysData = await getMarkedDays(season, clientId);
-      setMarkedDays(markedDaysData.markedDays || {});
+
+      // PATCH: Sæt altid ny reference!
+      setMarkedDays({ ...markedDaysData.markedDays }); // <-- PATCH
+
     } catch (err) {
       setClient(null);
     }
