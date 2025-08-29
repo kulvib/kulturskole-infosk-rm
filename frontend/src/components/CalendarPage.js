@@ -7,7 +7,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays, getSchools } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./DateTimeEditDialog";
-import ClientCalendarDialog from "./ClientCalendarDialog";
+import ClientCalendarDialog from "./CalendarPage/ClientCalendarDialog";
 
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
