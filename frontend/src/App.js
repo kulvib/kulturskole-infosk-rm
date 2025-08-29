@@ -29,7 +29,8 @@ export default function App() {
           <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="administration" element={<AdminPage />} />
-          <Route path="client-details" element={<ClientDetailsPageWrapper />} />
+          {/* Fjern denne hvis du ikke har en separat client-details side */}
+          {/* <Route path="client-details" element={<ClientDetailsPageWrapper />} /> */}
         </Route>
         <Route path="/remote-desktop/:clientId" element={<RemoteDesktop />} />
         <Route path="*" element={<NotFound />} />
