@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Grid, Snackbar } from "@mui/material";
+import { Box, Grid, Snackbar, Typography, Card } from "@mui/material";
 import MuiAlert from "@mui/material/Alert";
 import ClientDetailsHeader from "./ClientDetailsHeader";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
