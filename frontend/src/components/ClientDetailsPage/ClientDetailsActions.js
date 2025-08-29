@@ -5,7 +5,7 @@ import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import TerminalIcon from "@mui/icons-material/Terminal";
-import { clientAction, openTerminal, openRemoteDesktop, getClient } from "../api";
+import { clientAction, openTerminal, openRemoteDesktop, getClient } from "../../api";
 
 export default function ClientDetailsActions({ client, showSnackbar }) {
   const [actionLoading, setActionLoading] = useState({});
