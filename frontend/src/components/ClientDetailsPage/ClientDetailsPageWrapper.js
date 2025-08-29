@@ -1,65 +1,41 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Navigate } from "react-router-dom";
-import { getClient, getMarkedDays, getCurrentSeason } from "../../api";
+import { useParams } from "react-router-dom";
 import ClientDetailsPage from "./ClientDetailsPage";
+import { getClient, getMarkedDays } from "../../api";
 
 export default function ClientDetailsPageWrapper() {
   const { clientId } = useParams();
   const [client, setClient] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [markedDays, setMarkedDays] = useState({});
-  const [calendarLoading, setCalendarLoading] = useState(false);
 
-  const fetchAllData = async (forceUpdate = false) => {
-    if (!clientId) return;
-    setCalendarLoading(true);
-    try {
-      const [clientData, season] = await Promise.all([
-        getClient(clientId),
-        getCurrentSeason()
-      ]);
-      const calendarData = await getMarkedDays(season.id, clientId);
-      setClient(prev => {
-        if (forceUpdate || JSON.stringify(clientData) !== JSON.stringify(prev)) {
-          return clientData;
-        }
-        return prev;
-      });
-      setMarkedDays(calendarData?.markedDays || {});
-    } catch (err) {
-      setMarkedDays({});
-    }
-    setCalendarLoading(false);
-  };
-
-  useEffect(() => {
-    if (clientId) {
-      fetchAllData();
-      const timer = setInterval(() => fetchAllData(false), 15000);
-      return () => clearInterval(timer);
-    }
-  }, [clientId]);
-
-  const handleRefresh = async () => {
+  const fetchData = async () => {
     setRefreshing(true);
-    await fetchAllData(true);
+    try {
+      const clientData = await getClient(clientId);
+      setClient(clientData);
+
+      // Hent markedDays for klienten
+      const season = clientData.season || ""; // eller hent fra backend
+      const markedDaysData = await getMarkedDays(season, clientId);
+      setMarkedDays(markedDaysData.markedDays || {});
+    } catch (err) {
+      setClient(null);
+    }
     setRefreshing(false);
   };
 
-  if (!clientId) {
-    return <div style={{ padding: 40, textAlign: "center" }}>
-      <h2>Ingen klient valgt</h2>
-      <p>Vælg en klient fra oversigten.</p>
-    </div>;
-  }
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line
+  }, [clientId]);
 
   return (
     <ClientDetailsPage
       client={client}
       refreshing={refreshing}
-      handleRefresh={handleRefresh}
+      handleRefresh={fetchData}
       markedDays={markedDays}
-      calendarLoading={calendarLoading}
     />
   );
 }
