@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getClient, getMarkedDays, getCurrentSeason } from "../api";
 import ClientDetailsPage from "./ClientDetailsPage";
-// Fjern import af ClientCalendarDialog!
 
 export default function ClientDetailsPageWrapper() {
   const { clientId } = useParams();
@@ -20,13 +19,17 @@ export default function ClientDetailsPageWrapper() {
         getCurrentSeason()
       ]);
       const calendarData = await getMarkedDays(season.id, clientId);
+
       setClient(prev => {
         if (forceUpdate || JSON.stringify(clientData) !== JSON.stringify(prev)) {
           return clientData;
         }
         return prev;
       });
-      setMarkedDays(calendarData?.markedDays || {});
+
+      // PATCH: Sæt altid ny reference, så kalender-paper re-renderer!
+      setMarkedDays({ ...calendarData?.markedDays }); // <-- PATCH
+
     } catch (err) {
       setMarkedDays({});
     }
