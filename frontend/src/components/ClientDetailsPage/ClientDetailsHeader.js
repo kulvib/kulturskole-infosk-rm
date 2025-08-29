@@ -6,7 +6,7 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useNavigate } from "react-router-dom";
-import { updateClient, pushKioskUrl } from "../api";
+import { updateClient, pushKioskUrl } from "../../api";
 import ClientStatusIcon from "./ClientStatusIcon";
 import ChromeStatusIcon from "./ChromeStatusIcon";
 import CopyIconButton from "./CopyIconButton";
