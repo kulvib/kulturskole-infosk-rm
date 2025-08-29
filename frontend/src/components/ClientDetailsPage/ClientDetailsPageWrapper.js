@@ -16,14 +16,15 @@ export default function ClientDetailsPageWrapper() {
       setClient(clientData);
 
       // Hent markedDays for klienten
-      const season = clientData.season || ""; // eller hent fra backend
+      const season = clientData.season || "";
       const markedDaysData = await getMarkedDays(season, clientId);
 
       // PATCH: Sæt altid ny reference!
-      setMarkedDays({ ...markedDaysData.markedDays }); // <-- PATCH
+      setMarkedDays({ ...markedDaysData.markedDays });
 
     } catch (err) {
       setClient(null);
+      setMarkedDays({});
     }
     setRefreshing(false);
   };
