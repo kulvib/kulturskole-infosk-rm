@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getClient, getMarkedDays, getCurrentSeason } from "../api";
+import { getClient, getMarkedDays, getCurrentSeason } from "../../api";
 import ClientDetailsPage from "./ClientDetailsPage";
 
 export default function ClientDetailsPageWrapper() {
