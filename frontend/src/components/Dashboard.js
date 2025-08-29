@@ -15,12 +15,13 @@ import {
 
 const drawerWidth = 230;
 
-// Tilføjet Administration til menuItems
 const menuItems = [
   { text: "Forside", path: "/", match: "/" },
   { text: "Klienter", path: "/clients", match: "/clients" },
   { text: "Kalender", path: "/calendar", match: "/calendar" },
-  { text: "Administration", path: "/administration", match: "/administration" }, // NYT
+  { text: "Administration", path: "/administration", match: "/administration" },
+  // Ny menu: Klientdetaljer (hvis du ønsker et generisk menupunkt)
+  { text: "Klientdetaljer", path: "/client-details", match: "/client-details" },
 ];
 
 export default function Dashboard() {
