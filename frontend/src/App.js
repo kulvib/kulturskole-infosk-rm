@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import ClientInfoPage from "./components/ClientInfoPage";
-import ClientDetailsPageWrapper from "./components/ClientDetailsPageWrapper";
+import ClientDetailsPageWrapper from "./components/ClientDetailsPage/ClientDetailsPageWrapper";
 import LoginPage from "./components/LoginPage";
 import HomePage from "./components/HomePage";
 import NotFound from "./components/NotFound";
@@ -29,7 +29,6 @@ export default function App() {
           <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="administration" element={<AdminPage />} />
-          {/* Nu aktiv: generisk klientdetaljer-side */}
           <Route path="client-details" element={<ClientDetailsPageWrapper />} />
         </Route>
         <Route path="/remote-desktop/:clientId" element={<RemoteDesktop />} />
