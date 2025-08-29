@@ -1,45 +1,57 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { getClient, getMarkedDays, getCurrentSeason } from "../api";
 import ClientDetailsPage from "./ClientDetailsPage";
-import { getClient, getMarkedDays } from "../../api";
+// Fjern import af ClientCalendarDialog!
 
 export default function ClientDetailsPageWrapper() {
   const { clientId } = useParams();
   const [client, setClient] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [markedDays, setMarkedDays] = useState({});
+  const [calendarLoading, setCalendarLoading] = useState(false);
 
-  const fetchData = async () => {
-    setRefreshing(true);
+  const fetchAllData = async (forceUpdate = false) => {
+    if (!clientId) return;
+    setCalendarLoading(true);
     try {
-      const clientData = await getClient(clientId);
-      setClient(clientData);
-
-      // Hent markedDays for klienten
-      const season = clientData.season || "";
-      const markedDaysData = await getMarkedDays(season, clientId);
-
-      // PATCH: Sæt altid ny reference!
-      setMarkedDays({ ...markedDaysData.markedDays });
-
+      const [clientData, season] = await Promise.all([
+        getClient(clientId),
+        getCurrentSeason()
+      ]);
+      const calendarData = await getMarkedDays(season.id, clientId);
+      setClient(prev => {
+        if (forceUpdate || JSON.stringify(clientData) !== JSON.stringify(prev)) {
+          return clientData;
+        }
+        return prev;
+      });
+      setMarkedDays(calendarData?.markedDays || {});
     } catch (err) {
-      setClient(null);
       setMarkedDays({});
     }
-    setRefreshing(false);
+    setCalendarLoading(false);
   };
 
   useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line
+    fetchAllData();
+    const timer = setInterval(() => fetchAllData(false), 15000);
+    return () => clearInterval(timer);
   }, [clientId]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchAllData(true);
+    setRefreshing(false);
+  };
 
   return (
     <ClientDetailsPage
       client={client}
       refreshing={refreshing}
-      handleRefresh={fetchData}
+      handleRefresh={handleRefresh}
       markedDays={markedDays}
+      calendarLoading={calendarLoading}
     />
   );
 }
