@@ -4,7 +4,7 @@ import ClientDetailsHeaderSection from "./ClientDetailsHeaderSection";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
 import ClientDetailsActionsSection from "./ClientDetailsActionsSection";
 import ClientDetailsLivestreamSection from "./ClientDetailsLivestreamSection";
-import ClientCalendarDialog from "./ClientCalendarDialog";
+import ClientCalendarDialog from "../CalendarPage/ClientCalendarDialog";
 import {
   updateClient,
   pushKioskUrl,
