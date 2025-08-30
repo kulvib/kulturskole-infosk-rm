@@ -217,10 +217,10 @@ export default function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": { height: "32px" },
   };
 
-  // Lidt mindre padding-left på value-celler for mere kompakt udseende
+  // Endnu mindre padding-left på value-celler for at rykke værdierne længere mod venstre
   const valueCellStyle = {
     border: 0,
-    pl: 0.2, // mindre padding-left end standard
+    pl: 0.05, // meget lidt padding-left!
     py: 0,
     verticalAlign: "middle",
     height: 40,
