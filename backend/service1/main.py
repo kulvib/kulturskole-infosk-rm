@@ -1,10 +1,10 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 
-from routers import clients, calendar, meta, schools, users  # NYT: import users-router
+from routers import clients, calendar, meta, schools, users
 from auth import router as auth_router, get_password_hash
 from db import create_db_and_tables, engine
 from models import User
@@ -53,4 +53,21 @@ app.include_router(schools.router, prefix="/api")
 app.include_router(auth_router, prefix="/auth")
 app.include_router(calendar.router, prefix="/api")
 app.include_router(meta.router, prefix="/api")
-app.include_router(users.router, prefix="/api")  # NYT: tilføj users-router
+app.include_router(users.router, prefix="/api")
+
+# --- WebSocket livestream endpoint ---
+websocket_clients = []
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    websocket_clients.append(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Broadcast data til alle andre connected clients
+            for client in websocket_clients:
+                if client != websocket:
+                    await client.send_text(data)
+    except WebSocketDisconnect:
+        websocket_clients.remove(websocket)
