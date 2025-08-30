@@ -123,6 +123,7 @@ function ChromeStatusIcon({ status, color }) {
   );
 }
 
+// Ikke fed badge, label og badge vises efter online/offline
 function StateBadge({ state }) {
   let dotColor = "grey.400";
   let text = state || "Ukendt";
@@ -149,6 +150,7 @@ function StateBadge({ state }) {
   }
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
+      <span style={{ fontWeight: 400, fontSize: "0.95rem", marginRight: 6 }}>Drifttilstand:</span>
       <Box sx={{
         width: 14,
         height: 14,
@@ -158,7 +160,7 @@ function StateBadge({ state }) {
         border: "1px solid #ddd",
         mr: 1,
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 700 }}>{text}</Typography>
+      <span style={{ fontWeight: 400, fontSize: "0.95rem" }}>{text}</span>
     </Box>
   );
 }
