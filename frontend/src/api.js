@@ -341,3 +341,57 @@ export async function addSchool(name) {
   }
   return await res.json();
 }
+
+// --- LIVESTREAM API FUNKTIONER START ---
+
+export async function getLivestreamStatus() {
+  const token = getToken();
+  const res = await fetch(`${apiUrl}/api/livestream/status`, {
+    headers: token ? { Authorization: "Bearer " + token } : {},
+  });
+  if (!res.ok) {
+    let msg = "Kunne ikke hente livestream-status";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json(); // {active: true/false}
+}
+
+export async function startLivestream() {
+  const token = getToken();
+  const res = await fetch(`${apiUrl}/api/livestream/start`, {
+    method: "POST",
+    headers: token ? { Authorization: "Bearer " + token } : {},
+  });
+  if (!res.ok) {
+    let msg = "Kunne ikke starte livestream";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
+export async function stopLivestream() {
+  const token = getToken();
+  const res = await fetch(`${apiUrl}/api/livestream/stop`, {
+    method: "POST",
+    headers: token ? { Authorization: "Bearer " + token } : {},
+  });
+  if (!res.ok) {
+    let msg = "Kunne ikke stoppe livestream";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
+// --- LIVESTREAM API FUNKTIONER SLUT ---
