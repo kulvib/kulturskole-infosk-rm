@@ -31,9 +31,9 @@ function OnlineStatusBadge({ isOnline }) {
         border: "1px solid #ddd",
         mr: 1,
       }} />
-      <Typography variant="body1" sx={{ fontWeight: 400 }}>
+      <Box sx={{ fontWeight: 400 }}>
         {text}
-      </Typography>
+      </Box>
     </Box>
   );
 }
@@ -76,9 +76,9 @@ function StateBadge({ state }) {
           mr: 1,
         }}
       />
-      <Typography variant="body1" sx={{ fontWeight: 400 }}>
+      <Box sx={{ fontWeight: 400 }}>
         {text.charAt(0).toUpperCase() + text.slice(1)}
-      </Typography>
+      </Box>
     </Box>
   );
 }
@@ -105,16 +105,13 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
 }
 function StatusText({ status }) {
   return (
-    <Typography
-      variant="body1"
-      sx={{
-        fontWeight: 600,
-        color: status === "on" ? "#43a047" : "#e53935",
-        textTransform: "lowercase"
-      }}
-    >
+    <Box sx={{
+      fontWeight: 600,
+      color: status === "on" ? "#43a047" : "#e53935",
+      textTransform: "lowercase"
+    }}>
       {status}
-    </Typography>
+    </Box>
   );
 }
 function ClientPowerShortTable({ markedDays }) {
