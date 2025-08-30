@@ -299,9 +299,9 @@ function CopyField({ value }) {
             aria-label="kopier"
             onClick={handleCopy}
             size="small"
-            sx={{ ml: 0.5, p: 0, height: "1.25em", width: "1.25em" }}
+            sx={{ ml: 0.5, p: 0, height: "1em", width: "1em" }}  // mindre ikonknap
           >
-            <ContentCopyIcon sx={{ fontSize: "1em", verticalAlign: "middle" }} />
+            <ContentCopyIcon sx={{ fontSize: "0.8em", verticalAlign: "middle" }} /> {/* mindre kopiikon */}
           </IconButton>
         </Tooltip>
       )}
