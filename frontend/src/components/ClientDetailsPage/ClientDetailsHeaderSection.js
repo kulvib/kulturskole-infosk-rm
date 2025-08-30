@@ -82,6 +82,49 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
+// Ikke fed skrift på badge/tekst
+function StateBadge({ state }) {
+  let dotColor = "grey.400";
+  let text = state || "Ukendt";
+  if (state) {
+    switch (state.toLowerCase()) {
+      case "normal":
+        dotColor = "#43a047";
+        break;
+      case "sleep":
+        dotColor = "#1976d2";
+        break;
+      case "maintenance":
+        dotColor = "#ffa000";
+        break;
+      case "error":
+        dotColor = "#e53935";
+        break;
+      case "offline":
+        dotColor = "#757575";
+        break;
+      default:
+        dotColor = "grey.400";
+    }
+  }
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 3 }}>
+      <span style={{ fontWeight: 400, fontSize: "0.95rem", marginRight: 6 }}>Drifttilstand:</span>
+      <Box sx={{
+        width: 14,
+        height: 14,
+        borderRadius: "50%",
+        bgcolor: dotColor,
+        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+        border: "1px solid #ddd",
+        mr: 1,
+      }} />
+      <span style={{ fontWeight: 400, fontSize: "0.95rem" }}>{text}</span>
+    </Box>
+  );
+}
+
+// Ikke fed skrift på status
 function ChromeStatusIcon({ status, color }) {
   let fallbackColor = "grey.400";
   let text = status || "Ukendt";
@@ -118,49 +161,7 @@ function ChromeStatusIcon({ status, color }) {
         border: "1px solid #ddd",
         mr: 1,
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 700 }}>{text}</Typography>
-    </Box>
-  );
-}
-
-// Ikke fed badge, label og badge vises efter online/offline
-function StateBadge({ state }) {
-  let dotColor = "grey.400";
-  let text = state || "Ukendt";
-  if (state) {
-    switch (state.toLowerCase()) {
-      case "normal":
-        dotColor = "#43a047";
-        break;
-      case "sleep":
-        dotColor = "#1976d2";
-        break;
-      case "maintenance":
-        dotColor = "#ffa000";
-        break;
-      case "error":
-        dotColor = "#e53935";
-        break;
-      case "offline":
-        dotColor = "#757575";
-        break;
-      default:
-        dotColor = "grey.400";
-    }
-  }
-  return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
-      <span style={{ fontWeight: 400, fontSize: "0.95rem", marginRight: 6 }}>Drifttilstand:</span>
-      <Box sx={{
-        width: 14,
-        height: 14,
-        borderRadius: "50%",
-        bgcolor: dotColor,
-        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-        border: "1px solid #ddd",
-        mr: 1,
-      }} />
-      <span style={{ fontWeight: 400, fontSize: "0.95rem" }}>{text}</span>
+      <Typography variant="body2" sx={{ fontWeight: 400 }}>{text}</Typography>
     </Box>
   );
 }
@@ -328,7 +329,7 @@ export default function ClientDetailsHeaderSection({
                       </Box>
                     </TableCell>
                   </TableRow>
-                  {/* Kiosk URL først, derefter Kiosk browser status */}
+                  {/* Byttet om: Kiosk URL først, derefter Kiosk browser status */}
                   <TableRow sx={{ height: 40 }}>
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
                       Kiosk URL:
