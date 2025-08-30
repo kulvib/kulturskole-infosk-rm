@@ -12,3 +12,4 @@ paho-mqtt
 alembic
 fastapi[all]
 requests
+websockets==12.0
