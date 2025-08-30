@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 
-// Online/offline badge, skrifttype og størrelse matcher TableCell
+// Online/offline badge - skrifttypen matcher TableCell
 function OnlineStatusBadge({ isOnline }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "Online" : "Offline";
@@ -38,7 +38,7 @@ function OnlineStatusBadge({ isOnline }) {
   );
 }
 
-// State badge, skrifttype og størrelse matcher TableCell
+// State badge - skrifttypen matcher TableCell
 function StateBadge({ state }) {
   let dotColor = "grey.400";
   let text = state || "Ukendt";
@@ -72,6 +72,7 @@ function StateBadge({ state }) {
   );
 }
 
+// Format dato
 function formatDateShort(dt) {
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
   const dayName = ukedage[dt.getDay()];
