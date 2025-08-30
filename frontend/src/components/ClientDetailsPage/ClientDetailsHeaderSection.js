@@ -123,27 +123,25 @@ function ChromeStatusIcon({ status, color }) {
   );
 }
 
-// NY BADGE COMPONENT, samme stil som browser-status
 function StateBadge({ state }) {
-  // Farve afhænger af state
   let dotColor = "grey.400";
   let text = state || "Ukendt";
   if (state) {
     switch (state.toLowerCase()) {
       case "normal":
-        dotColor = "#43a047"; // grøn
+        dotColor = "#43a047";
         break;
       case "sleep":
-        dotColor = "#1976d2"; // blå
+        dotColor = "#1976d2";
         break;
       case "maintenance":
-        dotColor = "#ffa000"; // gul
+        dotColor = "#ffa000";
         break;
       case "error":
-        dotColor = "#e53935"; // rød
+        dotColor = "#e53935";
         break;
       case "offline":
-        dotColor = "#757575"; // grå
+        dotColor = "#757575";
         break;
       default:
         dotColor = "grey.400";
@@ -262,32 +260,41 @@ export default function ClientDetailsHeaderSection({
               <Table size="small" aria-label="client-details">
                 <TableBody>
                   <TableRow sx={{ height: 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                    <TableCell
+                      sx={{
+                        border: 0,
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                        pr: 0.5,
+                        py: 0,
+                        verticalAlign: "middle",
+                        height: 40,
+                        width: "50%",
+                      }}
+                    >
                       Klient ID:
-                    </TableCell>
-                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
-                      <Box sx={{ display: "flex", alignItems: "center", lineHeight: "40px" }}>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ color: "text.primary", fontWeight: 700, fontSize: "0.9rem", display: "inline" }}
-                        >
-                          {client.id}
-                        </Typography>
+                      <Box component="span" sx={{ ml: 1, fontWeight: 700, fontSize: "0.9rem", color: "text.primary", verticalAlign: "middle" }}>
+                        {client.id}
                       </Box>
                     </TableCell>
-                  </TableRow>
-                  {/* NYT BADGE: STATE */}
-                  <TableRow sx={{ height: 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
-                      Nyt badge
-                    </TableCell>
-                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
-                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
+                    <TableCell
+                      sx={{
+                        border: 0,
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                        pr: 0.5,
+                        py: 0,
+                        verticalAlign: "middle",
+                        height: 40,
+                        width: "50%",
+                      }}
+                    >
+                      Drifttilstand:
+                      <Box component="span" sx={{ ml: 1, display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
                         <StateBadge state={client.state} />
                       </Box>
                     </TableCell>
                   </TableRow>
-                  {/* SLUT NYT BADGE */}
                   <TableRow sx={{ height: 40 }}>
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
                       Lokation:
@@ -316,6 +323,17 @@ export default function ClientDetailsHeaderSection({
                         >
                           {savingLocality ? <CircularProgress size={16} /> : "Gem"}
                         </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                  {/* Kiosk browser status og Kiosk URL byttet om */}
+                  <TableRow sx={{ height: 40 }}>
+                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                      Kiosk browser status:
+                    </TableCell>
+                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
+                        <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -351,16 +369,7 @@ export default function ClientDetailsHeaderSection({
                       </Box>
                     </TableCell>
                   </TableRow>
-                  <TableRow sx={{ height: 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
-                      Kiosk browser status:
-                    </TableCell>
-                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
-                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
-                        <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
-                      </Box>
-                    </TableCell>
-                  </TableRow>
+                  {/* --- */}
                 </TableBody>
               </Table>
             </TableContainer>
