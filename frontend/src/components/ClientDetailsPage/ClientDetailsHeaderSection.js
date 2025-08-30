@@ -82,7 +82,6 @@ function ClientStatusIcon({ isOnline }) {
   );
 }
 
-// Ikke fed skrift på badge/tekst
 function StateBadge({ state }) {
   let dotColor = "grey.400";
   let text = state || "Ukendt";
@@ -109,22 +108,40 @@ function StateBadge({ state }) {
   }
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 3 }}>
-      <span style={{ fontWeight: 400, fontSize: "0.95rem", marginRight: 6 }}>Drifttilstand:</span>
-      <Box sx={{
-        width: 14,
-        height: 14,
-        borderRadius: "50%",
-        bgcolor: dotColor,
-        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-        border: "1px solid #ddd",
-        mr: 1,
-      }} />
-      <span style={{ fontWeight: 400, fontSize: "0.95rem" }}>{text}</span>
+      <Typography
+        variant="body2"
+        sx={{
+          fontWeight: 700,
+          fontSize: "0.9rem",
+          mr: 1,
+        }}
+      >
+        Drifttilstand:
+      </Typography>
+      <Box
+        sx={{
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
+          bgcolor: dotColor,
+          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+          border: "1px solid #ddd",
+          mr: 1,
+        }}
+      />
+      <Typography
+        variant="body2"
+        sx={{
+          fontWeight: 700,
+          fontSize: "0.9rem",
+        }}
+      >
+        {text}
+      </Typography>
     </Box>
   );
 }
 
-// Ikke fed skrift på status
 function ChromeStatusIcon({ status, color }) {
   let fallbackColor = "grey.400";
   let text = status || "Ukendt";
@@ -329,7 +346,17 @@ export default function ClientDetailsHeaderSection({
                       </Box>
                     </TableCell>
                   </TableRow>
-                  {/* Byttet om: Kiosk URL først, derefter Kiosk browser status */}
+                  {/* Byttet om: Kiosk browser status først, derefter Kiosk URL */}
+                  <TableRow sx={{ height: 40 }}>
+                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                      Kiosk browser status:
+                    </TableCell>
+                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
+                        <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
+                      </Box>
+                    </TableCell>
+                  </TableRow>
                   <TableRow sx={{ height: 40 }}>
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
                       Kiosk URL:
@@ -359,16 +386,6 @@ export default function ClientDetailsHeaderSection({
                         >
                           {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
                         </Button>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow sx={{ height: 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
-                      Kiosk browser status:
-                    </TableCell>
-                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
-                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
-                        <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
                       </Box>
                     </TableCell>
                   </TableRow>
