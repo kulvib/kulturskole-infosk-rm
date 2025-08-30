@@ -31,6 +31,7 @@ function OnlineStatusBadge({ isOnline }) {
         border: "1px solid #ddd",
         mr: 1,
       }} />
+      {/* Status-tekst matcher skrifttypen og størrelsen i TableCell */}
       <Box sx={{ fontWeight: 400 }}>
         {text}
       </Box>
@@ -76,6 +77,7 @@ function StateBadge({ state }) {
           mr: 1,
         }}
       />
+      {/* Status-tekst matcher skrifttypen og størrelsen i TableCell */}
       <Box sx={{ fontWeight: 400 }}>
         {text.charAt(0).toUpperCase() + text.slice(1)}
       </Box>
@@ -239,6 +241,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
           <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
             <TableCell sx={valueCellStyle}>
+              {/* Værdi matcher fonten for status-tekst */}
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
                 {client.ubuntu_version || "ukendt"}
               </Box>
