@@ -62,12 +62,17 @@ websocket_clients = []
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     websocket_clients.append(websocket)
+    print(f"WebSocket connection opened: {websocket.client.host}")
     try:
         while True:
             data = await websocket.receive_text()
+            print(f"Modtog data via websocket: {len(data)} bytes")
+            # Hvis du vil se de første 100 tegn, brug:
+            # print(f"Data preview: {data[:100]}...")
             # Broadcast data til alle andre connected clients
             for client in websocket_clients:
                 if client != websocket:
                     await client.send_text(data)
     except WebSocketDisconnect:
         websocket_clients.remove(websocket)
+        print(f"WebSocket connection closed: {websocket.client.host}")
