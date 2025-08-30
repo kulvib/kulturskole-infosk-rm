@@ -16,6 +16,73 @@ import {
 } from "@mui/material";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 
+// Online/offline badge
+function OnlineStatusBadge({ isOnline }) {
+  const color = isOnline ? "#43a047" : "#e53935";
+  const text = isOnline ? "Online" : "Offline";
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
+      <Box sx={{
+        width: 14,
+        height: 14,
+        borderRadius: "50%",
+        bgcolor: color,
+        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+        border: "1px solid #ddd",
+        mr: 1,
+      }} />
+      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.95rem" }}>
+        {text}
+      </Typography>
+    </Box>
+  );
+}
+
+// State badge
+function StateBadge({ state }) {
+  let dotColor = "grey.400";
+  let text = state || "Ukendt";
+  if (state) {
+    switch (state.toLowerCase()) {
+      case "normal":
+        dotColor = "#43a047";
+        break;
+      case "sleep":
+        dotColor = "#1976d2";
+        break;
+      case "maintenance":
+        dotColor = "#ffa000";
+        break;
+      case "error":
+        dotColor = "#e53935";
+        break;
+      case "offline":
+        dotColor = "#757575";
+        break;
+      default:
+        dotColor = "grey.400";
+    }
+  }
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
+      <Box
+        sx={{
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
+          bgcolor: dotColor,
+          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+          border: "1px solid #ddd",
+          mr: 1,
+        }}
+      />
+      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.95rem" }}>
+        {text.charAt(0).toUpperCase() + text.slice(1)}
+      </Typography>
+    </Box>
+  );
+}
+
 function formatDateShort(dt) {
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
   const dayName = ukedage[dt.getDay()];
@@ -313,9 +380,12 @@ export default function ClientDetailsInfoSection({
       <Grid item xs={12} md={4}>
         <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
           <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-              Systeminfo
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Systeminfo
+              </Typography>
+              <StateBadge state={client.state} />
+            </Box>
             <SystemInfoTable client={client} uptime={uptime} lastSeen={lastSeen} />
           </CardContent>
         </Card>
@@ -323,9 +393,12 @@ export default function ClientDetailsInfoSection({
       <Grid item xs={12} md={4}>
         <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
           <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-              Netværksinfo
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Netværksinfo
+              </Typography>
+              <OnlineStatusBadge isOnline={client.isOnline} />
+            </Box>
             <NetworkInfoTable client={client} />
           </CardContent>
         </Card>
