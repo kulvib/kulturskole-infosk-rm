@@ -123,6 +123,48 @@ function ChromeStatusIcon({ status, color }) {
   );
 }
 
+// NY BADGE COMPONENT, samme stil som browser-status
+function StateBadge({ state }) {
+  // Farve afhænger af state
+  let dotColor = "grey.400";
+  let text = state || "Ukendt";
+  if (state) {
+    switch (state.toLowerCase()) {
+      case "normal":
+        dotColor = "#43a047"; // grøn
+        break;
+      case "sleep":
+        dotColor = "#1976d2"; // blå
+        break;
+      case "maintenance":
+        dotColor = "#ffa000"; // gul
+        break;
+      case "error":
+        dotColor = "#e53935"; // rød
+        break;
+      case "offline":
+        dotColor = "#757575"; // grå
+        break;
+      default:
+        dotColor = "grey.400";
+    }
+  }
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+      <Box sx={{
+        width: 14,
+        height: 14,
+        borderRadius: "50%",
+        bgcolor: dotColor,
+        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+        border: "1px solid #ddd",
+        mr: 1,
+      }} />
+      <Typography variant="body2" sx={{ fontWeight: 700 }}>{text}</Typography>
+    </Box>
+  );
+}
+
 export default function ClientDetailsHeaderSection({
   client,
   locality,
@@ -234,6 +276,18 @@ export default function ClientDetailsHeaderSection({
                       </Box>
                     </TableCell>
                   </TableRow>
+                  {/* NYT BADGE: STATE */}
+                  <TableRow sx={{ height: 40 }}>
+                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                      Nyt badge
+                    </TableCell>
+                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
+                        <StateBadge state={client.state} />
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                  {/* SLUT NYT BADGE */}
                   <TableRow sx={{ height: 40 }}>
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
                       Lokation:
