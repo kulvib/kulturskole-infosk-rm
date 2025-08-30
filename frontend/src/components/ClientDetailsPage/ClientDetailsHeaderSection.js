@@ -59,6 +59,7 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
   );
 }
 
+// Ændret dot til 10x10 i ChromeStatusIcon
 function ChromeStatusIcon({ status, color }) {
   let fallbackColor = "grey.400";
   let text = status || "Ukendt";
@@ -87,8 +88,8 @@ function ChromeStatusIcon({ status, color }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
       <Box sx={{
-        width: 14,
-        height: 14,
+        width: 10,
+        height: 10,
         borderRadius: "50%",
         bgcolor: dotColor,
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
