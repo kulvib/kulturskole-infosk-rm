@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 
-// Online/offline badge
+// Online/offline badge, skrifttype og størrelse matcher TableCell
 function OnlineStatusBadge({ isOnline }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "Online" : "Offline";
@@ -31,7 +31,6 @@ function OnlineStatusBadge({ isOnline }) {
         border: "1px solid #ddd",
         mr: 1,
       }} />
-      {/* Status-tekst matcher skrifttypen og størrelsen i TableCell */}
       <Box sx={{ fontWeight: 400 }}>
         {text}
       </Box>
@@ -39,29 +38,18 @@ function OnlineStatusBadge({ isOnline }) {
   );
 }
 
-// State badge
+// State badge, skrifttype og størrelse matcher TableCell
 function StateBadge({ state }) {
   let dotColor = "grey.400";
   let text = state || "Ukendt";
   if (state) {
     switch (state.toLowerCase()) {
-      case "normal":
-        dotColor = "#43a047";
-        break;
-      case "sleep":
-        dotColor = "#1976d2";
-        break;
-      case "maintenance":
-        dotColor = "#ffa000";
-        break;
-      case "error":
-        dotColor = "#e53935";
-        break;
-      case "offline":
-        dotColor = "#757575";
-        break;
-      default:
-        dotColor = "grey.400";
+      case "normal": dotColor = "#43a047"; break;
+      case "sleep": dotColor = "#1976d2"; break;
+      case "maintenance": dotColor = "#ffa000"; break;
+      case "error": dotColor = "#e53935"; break;
+      case "offline": dotColor = "#757575"; break;
+      default: dotColor = "grey.400";
     }
   }
   return (
@@ -77,7 +65,6 @@ function StateBadge({ state }) {
           mr: 1,
         }}
       />
-      {/* Status-tekst matcher skrifttypen og størrelsen i TableCell */}
       <Box sx={{ fontWeight: 400 }}>
         {text.charAt(0).toUpperCase() + text.slice(1)}
       </Box>
@@ -241,7 +228,6 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
           <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
             <TableCell sx={valueCellStyle}>
-              {/* Værdi matcher fonten for status-tekst */}
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
                 {client.ubuntu_version || "ukendt"}
               </Box>
