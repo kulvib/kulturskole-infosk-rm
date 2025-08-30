@@ -23,15 +23,16 @@ function OnlineStatusBadge({ isOnline }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box sx={{
-        width: 14,
-        height: 14,
+        width: 13,
+        height: 13,
         borderRadius: "50%",
         bgcolor: color,
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
         border: "1px solid #ddd",
         mr: 1,
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "0.95rem" }}>
+      {/* Fonten matcher TableCell */}
+      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "1rem" }}>
         {text}
       </Typography>
     </Box>
@@ -67,8 +68,8 @@ function StateBadge({ state }) {
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box
         sx={{
-          width: 14,
-          height: 14,
+          width: 13,
+          height: 13,
           borderRadius: "50%",
           bgcolor: dotColor,
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
@@ -76,7 +77,8 @@ function StateBadge({ state }) {
           mr: 1,
         }}
       />
-      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "0.95rem" }}>
+      {/* Fonten matcher TableCell */}
+      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "1rem" }}>
         {text.charAt(0).toUpperCase() + text.slice(1)}
       </Typography>
     </Box>
