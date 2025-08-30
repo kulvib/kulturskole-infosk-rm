@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
-
-const API_BASE = "https://kulturskole-infosk-rm.onrender.com/api";
-const CLIENTS_API = `${API_BASE}/clients/public`;
+import {
+  getClientsPublic,
+  getClient,
+  getLivestreamStatus,
+  startLivestream,
+  stopLivestream,
+} from "./api";
 
 export default function LivestreamTest() {
   const [clients, setClients] = useState([]);
@@ -14,8 +18,7 @@ export default function LivestreamTest() {
   // Hent klienter ved opstart
   useEffect(() => {
     setLoading(true);
-    fetch(CLIENTS_API)
-      .then(res => res.json())
+    getClientsPublic()
       .then(data => {
         setClients(data.clients || []);
         setLoading(false);
@@ -34,53 +37,66 @@ export default function LivestreamTest() {
       setYoutubeId("");
       return;
     }
-    getStatus(selectedClientId);
-    fetch(`${API_BASE}/clients/${selectedClientId}/`)
-      .then(res => res.json())
-      .then(data => {
-        setYoutubeId(data.youtube_stream_id || "");
+    setLoading(true);
+    Promise.all([
+      getLivestreamStatus(selectedClientId),
+      getClient(selectedClientId),
+    ])
+      .then(([livestreamData, clientData]) => {
+        setStatus(livestreamData.active ? "TÆNDT" : "SLUKKET");
+        setYoutubeId(clientData.youtube_stream_id || "");
+        setLoading(false);
       })
-      .catch(() => setYoutubeId(""));
+      .catch(() => {
+        setStatus("FEJL");
+        setYoutubeId("");
+        setLoading(false);
+        setError("Kunne ikke hente status eller YouTube-id.");
+      });
   }, [selectedClientId]);
 
-  const getStatus = async (clientId) => {
+  const handleStartLivestream = async () => {
+    if (!selectedClientId) return;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/livestream/status/${clientId}`);
-      const data = await res.json();
+      await startLivestream(selectedClientId);
+      const data = await getLivestreamStatus(selectedClientId);
+      setStatus(data.active ? "TÆNDT" : "SLUKKET");
+    } catch (err) {
+      setStatus("FEJL");
+      setError("Kunne ikke starte livestream.");
+    }
+    setLoading(false);
+  };
+
+  const handleStopLivestream = async () => {
+    if (!selectedClientId) return;
+    setLoading(true);
+    setError("");
+    try {
+      await stopLivestream(selectedClientId);
+      const data = await getLivestreamStatus(selectedClientId);
+      setStatus(data.active ? "TÆNDT" : "SLUKKET");
+    } catch (err) {
+      setStatus("FEJL");
+      setError("Kunne ikke stoppe livestream.");
+    }
+    setLoading(false);
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!selectedClientId) return;
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getLivestreamStatus(selectedClientId);
       setStatus(data.active ? "TÆNDT" : "SLUKKET");
     } catch (err) {
       setStatus("FEJL");
       setError("Kunne ikke hente status.");
     }
     setLoading(false);
-  };
-
-  const startLivestream = async (clientId) => {
-    setLoading(true);
-    setError("");
-    try {
-      await fetch(`${API_BASE}/livestream/start/${clientId}`, { method: "POST" });
-      await getStatus(clientId);
-    } catch (err) {
-      setStatus("FEJL");
-      setError("Kunne ikke starte livestream.");
-      setLoading(false);
-    }
-  };
-
-  const stopLivestream = async (clientId) => {
-    setLoading(true);
-    setError("");
-    try {
-      await fetch(`${API_BASE}/livestream/stop/${clientId}`, { method: "POST" });
-      await getStatus(clientId);
-    } catch (err) {
-      setStatus("FEJL");
-      setError("Kunne ikke stoppe livestream.");
-      setLoading(false);
-    }
   };
 
   return (
@@ -104,9 +120,9 @@ export default function LivestreamTest() {
       {selectedClientId && (
         <>
           <p>Status: <strong>{loading ? "..." : status}</strong></p>
-          <button onClick={() => startLivestream(selectedClientId)} disabled={loading}>Tænd livestream</button>
-          <button onClick={() => stopLivestream(selectedClientId)} disabled={loading}>Sluk livestream</button>
-          <button onClick={() => getStatus(selectedClientId)} disabled={loading}>Opdater status</button>
+          <button onClick={handleStartLivestream} disabled={loading}>Tænd livestream</button>
+          <button onClick={handleStopLivestream} disabled={loading}>Sluk livestream</button>
+          <button onClick={handleUpdateStatus} disabled={loading}>Opdater status</button>
           {/* Vis YouTube player hvis stream er tændt */}
           {status === "TÆNDT" && youtubeId ? (
             <div style={{ marginTop: "2rem", maxWidth: 720 }}>
