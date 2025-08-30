@@ -33,7 +33,7 @@ function OnlineStatusBadge({ isOnline }) {
         border: "1px solid #ddd",
         mr: 1,
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "lowercase" }}>
+      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "lowercase", fontSize: "12px" }}>
         {text}
       </Typography>
     </Box>
@@ -78,7 +78,7 @@ function StateBadge({ state }) {
           mr: 1,
         }}
       />
-      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "lowercase" }}>
+      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "lowercase", fontSize: "12px" }}>
         {text.toLowerCase()}
       </Typography>
     </Box>
@@ -112,7 +112,8 @@ function StatusText({ status }) {
       sx={{
         fontWeight: 600,
         color: status === "on" ? "#43a047" : "#e53935",
-        textTransform: "lowercase"
+        textTransform: "lowercase",
+        fontSize: "12px"
       }}
     >
       {status.toLowerCase()}
@@ -236,6 +237,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
     py: 0,
     verticalAlign: "middle",
     height: 30,
+    fontSize: "12px",
   };
   return (
     <TableContainer>
@@ -245,7 +247,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
             <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {client.ubuntu_version || "ukendt"}
+                <span style={{ fontSize: "12px" }}>{client.ubuntu_version || "ukendt"}</span>
               </Box>
             </TableCell>
           </TableRow>
@@ -253,7 +255,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
             <TableCell sx={cellStyle}>Oppetid:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {formatUptime(uptime)}
+                <span style={{ fontSize: "12px" }}>{formatUptime(uptime)}</span>
               </Box>
             </TableCell>
           </TableRow>
@@ -261,7 +263,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
             <TableCell sx={cellStyle}>Sidst set:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {formatDateTime(lastSeen, true)}
+                <span style={{ fontSize: "12px" }}>{formatDateTime(lastSeen, true)}</span>
               </Box>
             </TableCell>
           </TableRow>
@@ -269,7 +271,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
             <TableCell sx={cellStyle}>Tilføjet:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {formatDateTime(client.created_at, true)}
+                <span style={{ fontSize: "12px" }}>{formatDateTime(client.created_at, true)}</span>
               </Box>
             </TableCell>
           </TableRow>
@@ -292,7 +294,7 @@ function CopyField({ value }) {
 
   return (
     <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-      <span>{value}</span>
+      <span style={{ fontSize: "12px" }}>{value}</span>
       {value && value !== "ukendt" && (
         <Tooltip title={copied ? "Kopieret!" : "Kopier"} arrow>
           <IconButton
@@ -325,6 +327,7 @@ function NetworkInfoTable({ client }) {
     py: 0,
     verticalAlign: "middle",
     height: 30,
+    fontSize: "12px",
   };
   return (
     <TableContainer>
