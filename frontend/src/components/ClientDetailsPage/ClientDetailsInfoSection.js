@@ -230,26 +230,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
             <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {/* Status-dot og status-tekst */}
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  <Box
-                    sx={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: "50%",
-                      bgcolor: client.state === "normal" ? "#43a047" : "#e53935",
-                      border: "1px solid #ddd",
-                      mr: 1,
-                    }}
-                  />
-                  <Box sx={{ fontWeight: 400, mr: 2 }}>
-                    {client.state || "Ukendt"}
-                  </Box>
-                </Box>
-                {/* Ubuntu-version - identisk font */}
-                <Box sx={{ fontWeight: 400 }}>
-                  {client.ubuntu_version || "ukendt"}
-                </Box>
+                {client.ubuntu_version || "ukendt"}
               </Box>
             </TableCell>
           </TableRow>
