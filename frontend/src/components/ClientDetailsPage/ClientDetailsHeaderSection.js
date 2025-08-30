@@ -132,7 +132,7 @@ function StateBadge({ state }) {
       <Typography
         variant="body2"
         sx={{
-          fontWeight: 700,
+          fontWeight: 400,
           fontSize: "0.9rem",
         }}
       >
