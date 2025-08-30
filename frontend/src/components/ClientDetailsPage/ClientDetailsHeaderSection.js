@@ -59,89 +59,6 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
   );
 }
 
-function ClientStatusIcon({ isOnline }) {
-  return (
-    <Box sx={{
-      display: "inline-flex",
-      alignItems: "center",
-      fontFamily: "Roboto, Helvetica, Arial, sans-serif",
-      fontSize: 13,
-      fontWeight: 400,
-      ml: 2,
-    }}>
-      <Box sx={{
-        width: 14,
-        height: 14,
-        borderRadius: "50%",
-        bgcolor: isOnline ? "#43a047" : "#e53935",
-        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-        border: "1px solid #ddd",
-      }} />
-      <span style={{ marginLeft: 6 }}>{isOnline ? "online" : "offline"}</span>
-    </Box>
-  );
-}
-
-function StateBadge({ state }) {
-  let dotColor = "grey.400";
-  let text = state || "Ukendt";
-  if (state) {
-    switch (state.toLowerCase()) {
-      case "normal":
-        dotColor = "#43a047";
-        break;
-      case "sleep":
-        dotColor = "#1976d2";
-        break;
-      case "maintenance":
-        dotColor = "#ffa000";
-        break;
-      case "error":
-        dotColor = "#e53935";
-        break;
-      case "offline":
-        dotColor = "#757575";
-        break;
-      default:
-        dotColor = "grey.400";
-    }
-  }
-  return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 3 }}>
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 700,
-          fontSize: "0.9rem",
-          mr: 1,
-        }}
-      >
-        Drifttilstand:
-      </Typography>
-      <Box
-        sx={{
-          width: 14,
-          height: 14,
-          borderRadius: "50%",
-          bgcolor: dotColor,
-          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-          border: "1px solid #ddd",
-          mr: 1,
-        }}
-      />
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 400,
-          fontSize: "0.9rem",
-        }}
-      >
-        {text}
-      </Typography>
-    </Box>
-  );
-}
-
 function ChromeStatusIcon({ status, color }) {
   let fallbackColor = "grey.400";
   let text = status || "Ukendt";
@@ -268,7 +185,7 @@ export default function ClientDetailsHeaderSection({
       </Box>
       <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
         <CardContent>
-          {/* TOP: Klientnavn, online/offline og drifttilstand i én række */}
+          {/* TOP: Kun Klientnavn i én række */}
           <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
             <Typography
               variant="h6"
@@ -281,8 +198,6 @@ export default function ClientDetailsHeaderSection({
             >
               {client.name}
             </Typography>
-            <ClientStatusIcon isOnline={client.isOnline} />
-            <StateBadge state={client.state} />
           </Box>
           <Box mt={2}>
             <TableContainer>
