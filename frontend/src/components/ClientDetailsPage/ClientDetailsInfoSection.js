@@ -31,7 +31,7 @@ function OnlineStatusBadge({ isOnline }) {
         border: "1px solid #ddd",
         mr: 1,
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.95rem" }}>
+      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "0.95rem" }}>
         {text}
       </Typography>
     </Box>
@@ -76,7 +76,7 @@ function StateBadge({ state }) {
           mr: 1,
         }}
       />
-      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.95rem" }}>
+      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "0.95rem" }}>
         {text.charAt(0).toUpperCase() + text.slice(1)}
       </Typography>
     </Box>
