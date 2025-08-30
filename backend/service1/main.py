@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 
-from routers import clients, calendar, meta, schools, users
+from routers import clients, calendar, meta, schools, users, livestream
 from auth import router as auth_router, get_password_hash
 from db import create_db_and_tables, engine
 from models import User
@@ -54,6 +54,7 @@ app.include_router(auth_router, prefix="/auth")
 app.include_router(calendar.router, prefix="/api")
 app.include_router(meta.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
+app.include_router(livestream.router, prefix="/api")
 
 # --- WebSocket livestream endpoint ---
 websocket_clients = []
@@ -67,8 +68,6 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_text()
             print(f"Modtog data via websocket: {len(data)} bytes")
-            # Hvis du vil se de første 100 tegn, brug:
-            # print(f"Data preview: {data[:100]}...")
             # Broadcast data til alle andre connected clients
             for client in websocket_clients:
                 if client != websocket:
