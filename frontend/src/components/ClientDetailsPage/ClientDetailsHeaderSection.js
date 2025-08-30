@@ -67,7 +67,7 @@ function ClientStatusIcon({ isOnline }) {
       fontFamily: "Roboto, Helvetica, Arial, sans-serif",
       fontSize: 13,
       fontWeight: 400,
-      ml: 1,
+      ml: 2,
     }}>
       <Box sx={{
         width: 14,
@@ -148,7 +148,7 @@ function StateBadge({ state }) {
     }
   }
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box sx={{
         width: 14,
         height: 14,
@@ -239,6 +239,7 @@ export default function ClientDetailsHeaderSection({
       </Box>
       <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
         <CardContent>
+          {/* TOP: Klientnavn, online/offline og drifttilstand i én række */}
           <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
             <Typography
               variant="h6"
@@ -251,9 +252,8 @@ export default function ClientDetailsHeaderSection({
             >
               {client.name}
             </Typography>
-            <Box sx={{ ml: 2 }}>
-              <ClientStatusIcon isOnline={client.isOnline} />
-            </Box>
+            <ClientStatusIcon isOnline={client.isOnline} />
+            <StateBadge state={client.state} />
           </Box>
           <Box mt={2}>
             <TableContainer>
@@ -271,27 +271,28 @@ export default function ClientDetailsHeaderSection({
                         height: 40,
                       }}
                     >
-                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          <span>Klient ID:</span>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              color: "text.primary",
-                              fontWeight: 700,
-                              fontSize: "0.9rem",
-                              display: "inline",
-                              ml: 1,
-                            }}
-                          >
-                            {client.id}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          <span style={{ fontWeight: 600, marginRight: 8 }}>Drifttilstand:</span>
-                          <StateBadge state={client.state} />
-                        </Box>
-                      </Box>
+                      Klient ID:
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        border: 0,
+                        pl: 0.5,
+                        py: 0,
+                        verticalAlign: "middle",
+                        height: 40,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: "text.primary",
+                          fontWeight: 700,
+                          fontSize: "0.9rem",
+                          display: "inline",
+                        }}
+                      >
+                        {client.id}
+                      </Typography>
                     </TableCell>
                   </TableRow>
                   <TableRow sx={{ height: 40 }}>
