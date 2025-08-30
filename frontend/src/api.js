@@ -1,9 +1,11 @@
 export const apiUrl = process.env.REACT_APP_API_URL || "https://kulturskole-infosk-rm.onrender.com";
 
+// TOKEN
 export function getToken() {
   return localStorage.getItem("token");
 }
 
+// LOGIN
 export async function login(username, password) {
   const res = await fetch(`${apiUrl}/auth/token`, {
     method: "POST",
@@ -21,6 +23,7 @@ export async function login(username, password) {
   return await res.json();
 }
 
+// HENT KLIENTER (login)
 export async function getClients() {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -38,6 +41,21 @@ export async function getClients() {
   return await res.json();
 }
 
+// HENT KLIENT-LISTE PUBLIC
+export async function getClientsPublic() {
+  const res = await fetch(`${apiUrl}/api/clients/public`);
+  if (!res.ok) {
+    let msg = "Kunne ikke hente klienter";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
+// HENT ÉN KLIENT (login)
 export async function getClient(id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -55,6 +73,7 @@ export async function getClient(id) {
   return await res.json();
 }
 
+// OPDATÉR KLIENT (login)
 export async function updateClient(id, updates) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -77,6 +96,7 @@ export async function updateClient(id, updates) {
   return await res.json();
 }
 
+// GODKEND KLIENT
 export async function approveClient(id, school_id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -97,6 +117,7 @@ export async function approveClient(id, school_id) {
   return await res.json();
 }
 
+// FJERN KLIENT
 export async function removeClient(id) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -114,6 +135,7 @@ export async function removeClient(id) {
   }
 }
 
+// KIOSK URL
 export async function pushKioskUrl(id, url) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -136,6 +158,7 @@ export async function pushKioskUrl(id, url) {
   return await res.json();
 }
 
+// KLIENT ACTIONS
 export async function clientAction(id, action) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -181,6 +204,7 @@ export async function clientAction(id, action) {
   return await res.json();
 }
 
+// ÅBN TERMINAL / REMOTE DESKTOP
 export function openTerminal(id) {
   window.open(`${apiUrl}/api/clients/${id}/terminal`, "_blank", "noopener");
 }
@@ -193,6 +217,7 @@ export function getClientStream(id) {
   return `${apiUrl}/api/clients/${id}/stream`;
 }
 
+// HELLIGDAGE / KALENDER
 export async function getHolidays() {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -303,6 +328,7 @@ export async function getCurrentSeason() {
   return await res.json();
 }
 
+// SKOLER
 export async function getSchools() {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
@@ -342,11 +368,10 @@ export async function addSchool(name) {
   return await res.json();
 }
 
-// --- LIVESTREAM API FUNKTIONER START ---
-
-export async function getLivestreamStatus() {
+// LIVESTREAM API FUNKTIONER PR. KLIENT
+export async function getLivestreamStatus(clientId) {
   const token = getToken();
-  const res = await fetch(`${apiUrl}/api/livestream/status`, {
+  const res = await fetch(`${apiUrl}/api/livestream/status/${clientId}`, {
     headers: token ? { Authorization: "Bearer " + token } : {},
   });
   if (!res.ok) {
@@ -360,9 +385,9 @@ export async function getLivestreamStatus() {
   return await res.json(); // {active: true/false}
 }
 
-export async function startLivestream() {
+export async function startLivestream(clientId) {
   const token = getToken();
-  const res = await fetch(`${apiUrl}/api/livestream/start`, {
+  const res = await fetch(`${apiUrl}/api/livestream/start/${clientId}`, {
     method: "POST",
     headers: token ? { Authorization: "Bearer " + token } : {},
   });
@@ -377,9 +402,9 @@ export async function startLivestream() {
   return await res.json();
 }
 
-export async function stopLivestream() {
+export async function stopLivestream(clientId) {
   const token = getToken();
-  const res = await fetch(`${apiUrl}/api/livestream/stop`, {
+  const res = await fetch(`${apiUrl}/api/livestream/stop/${clientId}`, {
     method: "POST",
     headers: token ? { Authorization: "Bearer " + token } : {},
   });
@@ -393,5 +418,3 @@ export async function stopLivestream() {
   }
   return await res.json();
 }
-
-// --- LIVESTREAM API FUNKTIONER SLUT ---
