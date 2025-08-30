@@ -19,19 +19,19 @@ import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 // Online/offline badge
 function OnlineStatusBadge({ isOnline }) {
   const color = isOnline ? "#43a047" : "#e53935";
-  const text = isOnline ? "Online" : "Offline";
+  const text = isOnline ? "online" : "offline"; // always lowercase
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box sx={{
-        width: 12,
-        height: 12,
+        width: 10, // changed from 12 to 10
+        height: 10, // changed from 12 to 10
         borderRadius: "50%",
         bgcolor: color,
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
         border: "1px solid #ddd",
         mr: 1,
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "1rem" }}>
+      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "1rem", textTransform: "lowercase" }}>
         {text}
       </Typography>
     </Box>
@@ -41,7 +41,7 @@ function OnlineStatusBadge({ isOnline }) {
 // State badge
 function StateBadge({ state }) {
   let dotColor = "grey.400";
-  let text = state || "Ukendt";
+  let text = state || "ukendt";
   if (state) {
     switch (state.toLowerCase()) {
       case "normal":
@@ -67,8 +67,8 @@ function StateBadge({ state }) {
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box
         sx={{
-          width: 12,
-          height: 12,
+          width: 10, // changed from 12 to 10
+          height: 10, // changed from 12 to 10
           borderRadius: "50%",
           bgcolor: dotColor,
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
@@ -76,8 +76,8 @@ function StateBadge({ state }) {
           mr: 1,
         }}
       />
-      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "1rem" }}>
-        {text.charAt(0).toUpperCase() + text.slice(1)}
+      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "1rem", textTransform: "lowercase" }}>
+        {text.toLowerCase()}
       </Typography>
     </Box>
   );
@@ -113,7 +113,7 @@ function StatusText({ status }) {
         textTransform: "lowercase"
       }}
     >
-      {status}
+      {status.toLowerCase()} {/* always lowercase */}
     </Typography>
   );
 }
