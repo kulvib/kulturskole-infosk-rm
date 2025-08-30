@@ -23,15 +23,15 @@ function OnlineStatusBadge({ isOnline }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box sx={{
-        width: 12,
-        height: 12,
+        width: 10,
+        height: 10,
         borderRadius: "50%",
         bgcolor: color,
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
         border: "1px solid #ddd",
         mr: 1,
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "1rem" }}>
+      <Typography variant="body1" sx={{ fontWeight: 400 }}>
         {text}
       </Typography>
     </Box>
@@ -67,8 +67,8 @@ function StateBadge({ state }) {
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box
         sx={{
-          width: 12,
-          height: 12,
+          width: 10,
+          height: 10,
           borderRadius: "50%",
           bgcolor: dotColor,
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
@@ -76,7 +76,7 @@ function StateBadge({ state }) {
           mr: 1,
         }}
       />
-      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "1rem" }}>
+      <Typography variant="body1" sx={{ fontWeight: 400 }}>
         {text.charAt(0).toUpperCase() + text.slice(1)}
       </Typography>
     </Box>
@@ -106,7 +106,7 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
 function StatusText({ status }) {
   return (
     <Typography
-      variant="body2"
+      variant="body1"
       sx={{
         fontWeight: 600,
         color: status === "on" ? "#43a047" : "#e53935",
