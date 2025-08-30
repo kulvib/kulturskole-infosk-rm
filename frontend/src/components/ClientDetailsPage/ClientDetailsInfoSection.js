@@ -33,7 +33,7 @@ function OnlineStatusBadge({ isOnline }) {
         border: "1px solid #ddd",
         mr: 1,
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "1rem", textTransform: "lowercase" }}>
+      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "lowercase" }}>
         {text}
       </Typography>
     </Box>
@@ -78,7 +78,7 @@ function StateBadge({ state }) {
           mr: 1,
         }}
       />
-      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "1rem", textTransform: "lowercase" }}>
+      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "lowercase" }}>
         {text.toLowerCase()}
       </Typography>
     </Box>
@@ -115,7 +115,7 @@ function StatusText({ status }) {
         textTransform: "lowercase"
       }}
     >
-      {status.toLowerCase()} {/* always lowercase */}
+      {status.toLowerCase()}
     </Typography>
   );
 }
