@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 
 const API_BASE = "https://kulturskole-infosk-rm.onrender.com/api/livestream";
+// Sæt din YouTube livestream video-id her:
+const YOUTUBE_ID = "DIN_YOUTUBE_STREAM_ID"; // fx "dQw4w9WgXcQ"
 
 export default function LivestreamTest() {
   const [status, setStatus] = useState(null);
@@ -51,6 +53,20 @@ export default function LivestreamTest() {
       <button onClick={startLivestream} disabled={loading}>Tænd livestream</button>
       <button onClick={stopLivestream} disabled={loading}>Sluk livestream</button>
       <button onClick={getStatus} disabled={loading}>Opdater status</button>
+      {/* Vis YouTube player hvis stream er tændt */}
+      {status === "TÆNDT" && (
+        <div style={{ marginTop: "2rem", maxWidth: 720 }}>
+          <iframe
+            width="100%"
+            height="405"
+            src={`https://www.youtube.com/embed/${YOUTUBE_ID}?autoplay=1`}
+            title="Youtube livestream"
+            frameBorder="0"
+            allow="autoplay; encrypted-media"
+            allowFullScreen
+          />
+        </div>
+      )}
     </div>
   );
 }
