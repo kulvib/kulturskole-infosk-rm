@@ -10,6 +10,7 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import CalendarPage from "./components/CalendarPage";
 import AdminPage from "./components/AdminPage";
 import RemoteDesktop from "./components/RemoteDesktop";
+import LivestreamTest from "./components/LivestreamTest"; // <-- TILFØJET
 
 export default function App() {
   return (
@@ -29,8 +30,7 @@ export default function App() {
           <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="administration" element={<AdminPage />} />
-          {/* Fjern denne hvis du ikke har en separat client-details side */}
-          {/* <Route path="client-details" element={<ClientDetailsPageWrapper />} /> */}
+          <Route path="livestream-test" element={<LivestreamTest />} /> {/* <-- TILFØJET */}
         </Route>
         <Route path="/remote-desktop/:clientId" element={<RemoteDesktop />} />
         <Route path="*" element={<NotFound />} />
