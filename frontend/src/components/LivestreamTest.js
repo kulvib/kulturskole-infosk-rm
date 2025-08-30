@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   getClientsPublic,
   getClient,
@@ -7,6 +7,8 @@ import {
   stopLivestream,
 } from "./api";
 
+const WS_URL = "wss://kulturskole-infosk-rm.onrender.com/ws";
+
 export default function LivestreamTest() {
   const [clients, setClients] = useState([]);
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -14,6 +16,8 @@ export default function LivestreamTest() {
   const [loading, setLoading] = useState(false);
   const [youtubeId, setYoutubeId] = useState("");
   const [error, setError] = useState("");
+  const [wsImage, setWsImage] = useState(null);
+  const ws = useRef(null);
 
   // Hent klienter ved opstart
   useEffect(() => {
@@ -35,6 +39,7 @@ export default function LivestreamTest() {
     if (!selectedClientId) {
       setStatus(null);
       setYoutubeId("");
+      setWsImage(null);
       return;
     }
     setLoading(true);
@@ -53,6 +58,26 @@ export default function LivestreamTest() {
         setLoading(false);
         setError("Kunne ikke hente status eller YouTube-id.");
       });
+  }, [selectedClientId]);
+
+  // WebSocket til billedstream fra valgt klient
+  useEffect(() => {
+    if (!selectedClientId) {
+      setWsImage(null);
+      ws.current && ws.current.close();
+      return;
+    }
+    ws.current = new window.WebSocket(WS_URL);
+    ws.current.onopen = () => {
+      ws.current.send(JSON.stringify({ type: "watch", client_id: selectedClientId }));
+    };
+    ws.current.onmessage = (event) => {
+      setWsImage(event.data); // base64 image
+    };
+    ws.current.onclose = () => {};
+    return () => {
+      ws.current && ws.current.close();
+    };
   }, [selectedClientId]);
 
   const handleStartLivestream = async () => {
@@ -139,6 +164,21 @@ export default function LivestreamTest() {
           ) : status === "TÆNDT" && !youtubeId && (
             <p>Ingen YouTube stream-id tilgængelig for denne klient.</p>
           )}
+          {/* Direkte billedstream fra klient via WebSocket */}
+          <div style={{marginTop: "2rem", maxWidth: 720}}>
+            <h3>Direkte billedstream (WebSocket)</h3>
+            {wsImage ? (
+              <img
+                src={`data:image/jpeg;base64,${wsImage}`}
+                alt="Livestream"
+                style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
+              />
+            ) : (
+              <p style={{color: "#888", fontStyle: "italic"}}>
+                Ingen livestream billede endnu...
+              </p>
+            )}
+          </div>
         </>
       )}
     </div>
