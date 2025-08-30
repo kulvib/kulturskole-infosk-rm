@@ -217,6 +217,15 @@ export default function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": { height: "32px" },
   };
 
+  // Lidt mindre padding-left på value-celler for mere kompakt udseende
+  const valueCellStyle = {
+    border: 0,
+    pl: 0.2, // mindre padding-left end standard
+    py: 0,
+    verticalAlign: "middle",
+    height: 40,
+  };
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 3 }}>
       <Snackbar
@@ -293,15 +302,7 @@ export default function ClientDetailsHeaderSection({
                     >
                       Klient ID:
                     </TableCell>
-                    <TableCell
-                      sx={{
-                        border: 0,
-                        pl: 0.5,
-                        py: 0,
-                        verticalAlign: "middle",
-                        height: 40,
-                      }}
-                    >
+                    <TableCell sx={valueCellStyle}>
                       <Typography
                         variant="body2"
                         sx={{
@@ -319,7 +320,7 @@ export default function ClientDetailsHeaderSection({
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
                       Lokation:
                     </TableCell>
-                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                    <TableCell sx={valueCellStyle}>
                       <Box sx={{
                         display: "flex",
                         alignItems: "center",
@@ -351,7 +352,7 @@ export default function ClientDetailsHeaderSection({
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
                       Kiosk browser status:
                     </TableCell>
-                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                    <TableCell sx={valueCellStyle}>
                       <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
                         <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
                       </Box>
@@ -361,7 +362,7 @@ export default function ClientDetailsHeaderSection({
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
                       Kiosk URL:
                     </TableCell>
-                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                    <TableCell sx={valueCellStyle}>
                       <Box sx={{
                         display: "flex",
                         alignItems: "center",
