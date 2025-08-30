@@ -272,9 +272,20 @@ export default function ClientDetailsHeaderSection({
                         width: "50%",
                       }}
                     >
-                      Klient ID:
-                      <Box component="span" sx={{ ml: 1, fontWeight: 700, fontSize: "0.9rem", color: "text.primary", verticalAlign: "middle" }}>
-                        {client.id}
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <span>Klient ID:</span>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: "text.primary",
+                            fontWeight: 700,
+                            fontSize: "0.9rem",
+                            display: "inline",
+                            ml: 1,
+                          }}
+                        >
+                          {client.id}
+                        </Typography>
                       </Box>
                     </TableCell>
                     <TableCell
@@ -287,11 +298,14 @@ export default function ClientDetailsHeaderSection({
                         verticalAlign: "middle",
                         height: 40,
                         width: "50%",
+                        textAlign: "right",
                       }}
                     >
-                      Drifttilstand:
-                      <Box component="span" sx={{ ml: 1, display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
-                        <StateBadge state={client.state} />
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                        <span>Drifttilstand:</span>
+                        <Box sx={{ ml: 1, display: "inline-flex", alignItems: "center", verticalAlign: "middle" }}>
+                          <StateBadge state={client.state} />
+                        </Box>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -326,7 +340,7 @@ export default function ClientDetailsHeaderSection({
                       </Box>
                     </TableCell>
                   </TableRow>
-                  {/* Kiosk browser status og Kiosk URL byttet om */}
+                  {/* Byttet om: Kiosk browser status først, derefter Kiosk URL */}
                   <TableRow sx={{ height: 40 }}>
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
                       Kiosk browser status:
