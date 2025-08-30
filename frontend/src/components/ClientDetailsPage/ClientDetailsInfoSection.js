@@ -31,7 +31,7 @@ function OnlineStatusBadge({ isOnline }) {
         border: "1px solid #ddd",
         mr: 1,
       }} />
-      <Box sx={{ fontWeight: 400 }}>
+      <Box sx={{ fontWeight: 400, fontFamily: "inherit", fontSize: "1rem" }}>
         {text}
       </Box>
     </Box>
@@ -65,7 +65,7 @@ function StateBadge({ state }) {
           mr: 1,
         }}
       />
-      <Box sx={{ fontWeight: 400 }}>
+      <Box sx={{ fontWeight: 400, fontFamily: "inherit", fontSize: "1rem" }}>
         {text.charAt(0).toUpperCase() + text.slice(1)}
       </Box>
     </Box>
@@ -98,7 +98,9 @@ function StatusText({ status }) {
     <Box sx={{
       fontWeight: 600,
       color: status === "on" ? "#43a047" : "#e53935",
-      textTransform: "lowercase"
+      textTransform: "lowercase",
+      fontFamily: "inherit",
+      fontSize: "1rem"
     }}>
       {status}
     </Box>
@@ -230,7 +232,26 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
             <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {client.ubuntu_version || "ukendt"}
+                {/* Dot + status-tekst med ENS font */}
+                <Box sx={{ display: "flex", alignItems: "center", mr: 2 }}>
+                  <Box
+                    sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      bgcolor: client.state === "normal" ? "#43a047" : "#e53935",
+                      border: "1px solid #ddd",
+                      mr: 1,
+                    }}
+                  />
+                  <Box sx={{ fontWeight: 400, fontFamily: "inherit", fontSize: "1rem" }}>
+                    {client.state || "Ukendt"}
+                  </Box>
+                </Box>
+                {/* Ubuntu-version - ENS font */}
+                <Box sx={{ fontWeight: 400, fontFamily: "inherit", fontSize: "1rem" }}>
+                  {client.ubuntu_version || "ukendt"}
+                </Box>
               </Box>
             </TableCell>
           </TableRow>
@@ -288,14 +309,33 @@ function NetworkInfoTable({ client }) {
             <TableCell sx={cellStyle}>IP-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {client.wifi_ip_address || "ukendt"}
+                {/* Dot + status-tekst med ENS font */}
+                <Box sx={{ display: "flex", alignItems: "center", mr: 2 }}>
+                  <Box
+                    sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      bgcolor: client.wifi_ip_address ? "#43a047" : "#e53935",
+                      border: "1px solid #ddd",
+                      mr: 1,
+                    }}
+                  />
+                  <Box sx={{ fontWeight: 400, fontFamily: "inherit", fontSize: "1rem" }}>
+                    {client.wifi_ip_address ? "Online" : "Offline"}
+                  </Box>
+                </Box>
+                {/* IP-adresse - ENS font */}
+                <Box sx={{ fontWeight: 400, fontFamily: "inherit", fontSize: "1rem" }}>
+                  {client.wifi_ip_address || "ukendt"}
+                </Box>
               </Box>
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+              <Box sx={{ fontWeight: 400, fontFamily: "inherit", fontSize: "1rem" }}>
                 {client.wifi_mac_address || "ukendt"}
               </Box>
             </TableCell>
@@ -304,14 +344,33 @@ function NetworkInfoTable({ client }) {
             <TableCell sx={cellStyle}>IP-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {client.lan_ip_address || "ukendt"}
+                {/* Dot + status-tekst med ENS font */}
+                <Box sx={{ display: "flex", alignItems: "center", mr: 2 }}>
+                  <Box
+                    sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      bgcolor: client.lan_ip_address ? "#43a047" : "#e53935",
+                      border: "1px solid #ddd",
+                      mr: 1,
+                    }}
+                  />
+                  <Box sx={{ fontWeight: 400, fontFamily: "inherit", fontSize: "1rem" }}>
+                    {client.lan_ip_address ? "Online" : "Offline"}
+                  </Box>
+                </Box>
+                {/* IP-adresse - ENS font */}
+                <Box sx={{ fontWeight: 400, fontFamily: "inherit", fontSize: "1rem" }}>
+                  {client.lan_ip_address || "ukendt"}
+                </Box>
               </Box>
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+              <Box sx={{ fontWeight: 400, fontFamily: "inherit", fontSize: "1rem" }}>
                 {client.lan_mac_address || "ukendt"}
               </Box>
             </TableCell>
