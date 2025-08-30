@@ -13,8 +13,10 @@ import {
   TableContainer,
   TableRow,
   Box,
+  IconButton
 } from "@mui/material";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
 // Online/offline badge
 function OnlineStatusBadge({ isOnline }) {
@@ -23,8 +25,8 @@ function OnlineStatusBadge({ isOnline }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box sx={{
-        width: 10, // changed from 12 to 10
-        height: 10, // changed from 12 to 10
+        width: 10,
+        height: 10,
         borderRadius: "50%",
         bgcolor: color,
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
@@ -67,8 +69,8 @@ function StateBadge({ state }) {
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box
         sx={{
-          width: 10, // changed from 12 to 10
-          height: 10, // changed from 12 to 10
+          width: 10,
+          height: 10,
           borderRadius: "50%",
           bgcolor: dotColor,
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
@@ -276,6 +278,37 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
     </TableContainer>
   );
 }
+
+// Helper for clipboard copy
+function CopyField({ value }) {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = () => {
+    if (!value || value === "ukendt") return;
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 800);
+  };
+
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+      <span>{value}</span>
+      {value && value !== "ukendt" && (
+        <Tooltip title={copied ? "Kopieret!" : "Kopier"} arrow>
+          <IconButton
+            aria-label="kopier"
+            onClick={handleCopy}
+            size="small"
+            sx={{ ml: 0.5, p: 0, height: "1.25em", width: "1.25em" }}
+          >
+            <ContentCopyIcon sx={{ fontSize: "1em", verticalAlign: "middle" }} />
+          </IconButton>
+        </Tooltip>
+      )}
+    </Box>
+  );
+}
+
 function NetworkInfoTable({ client }) {
   const cellStyle = {
     border: 0,
@@ -300,33 +333,25 @@ function NetworkInfoTable({ client }) {
           <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>IP-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {client.wifi_ip_address || "ukendt"}
-              </Box>
+              <CopyField value={client.wifi_ip_address || "ukendt"} />
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {client.wifi_mac_address || "ukendt"}
-              </Box>
+              <CopyField value={client.wifi_mac_address || "ukendt"} />
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>IP-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {client.lan_ip_address || "ukendt"}
-              </Box>
+              <CopyField value={client.lan_ip_address || "ukendt"} />
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-                {client.lan_mac_address || "ukendt"}
-              </Box>
+              <CopyField value={client.lan_mac_address || "ukendt"} />
             </TableCell>
           </TableRow>
         </TableBody>
@@ -344,7 +369,7 @@ export default function ClientDetailsInfoSection({
   setCalendarDialogOpen,
 }) {
   return (
-    <Grid container spacing={2}>
+    <Grid container spacing={1}>
       <Grid item xs={12} md={4}>
         <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
           <CardContent>
