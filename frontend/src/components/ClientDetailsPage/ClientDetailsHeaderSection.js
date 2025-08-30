@@ -269,41 +269,26 @@ export default function ClientDetailsHeaderSection({
                         py: 0,
                         verticalAlign: "middle",
                         height: 40,
-                        width: "50%",
                       }}
                     >
-                      <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <span>Klient ID:</span>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: "text.primary",
-                            fontWeight: 700,
-                            fontSize: "0.9rem",
-                            display: "inline",
-                            ml: 1,
-                          }}
-                        >
-                          {client.id}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        border: 0,
-                        fontWeight: 600,
-                        whiteSpace: "nowrap",
-                        pr: 0.5,
-                        py: 0,
-                        verticalAlign: "middle",
-                        height: 40,
-                        width: "50%",
-                        textAlign: "right",
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-                        <span>Drifttilstand:</span>
-                        <Box sx={{ ml: 1, display: "inline-flex", alignItems: "center", verticalAlign: "middle" }}>
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                          <span>Klient ID:</span>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: "text.primary",
+                              fontWeight: 700,
+                              fontSize: "0.9rem",
+                              display: "inline",
+                              ml: 1,
+                            }}
+                          >
+                            {client.id}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                          <span style={{ fontWeight: 600, marginRight: 8 }}>Drifttilstand:</span>
                           <StateBadge state={client.state} />
                         </Box>
                       </Box>
@@ -340,17 +325,7 @@ export default function ClientDetailsHeaderSection({
                       </Box>
                     </TableCell>
                   </TableRow>
-                  {/* Byttet om: Kiosk browser status først, derefter Kiosk URL */}
-                  <TableRow sx={{ height: 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
-                      Kiosk browser status:
-                    </TableCell>
-                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
-                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
-                        <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
-                      </Box>
-                    </TableCell>
-                  </TableRow>
+                  {/* Kiosk URL først, derefter Kiosk browser status */}
                   <TableRow sx={{ height: 40 }}>
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
                       Kiosk URL:
@@ -380,6 +355,16 @@ export default function ClientDetailsHeaderSection({
                         >
                           {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
                         </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow sx={{ height: 40 }}>
+                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                      Kiosk browser status:
+                    </TableCell>
+                    <TableCell sx={{ border: 0, pl: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
+                        <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
                       </Box>
                     </TableCell>
                   </TableRow>
