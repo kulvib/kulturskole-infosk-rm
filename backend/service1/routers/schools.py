@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import select
 from db import get_session
-from models import School, Client, CalendarMarking, StandardTimes
+from models import School, Client, CalendarMarking
 
 router = APIRouter()
 
@@ -44,48 +44,38 @@ def delete_school(school_id: int, session=Depends(get_session)):
     session.commit()
     return
 
-# ---------- STANDARDTIDER ENDPOINTS ----------
-
-@router.post("/schools/{school_id}/standard-times")
-def save_standard_times(
+# NYT ENDPOINT: Opdater tider for en skole
+@router.patch("/schools/{school_id}/times", response_model=School)
+def update_school_times(
     school_id: int,
-    weekday_on: str = Body(...),
-    weekday_off: str = Body(...),
-    weekend_on: str = Body(...),
-    weekend_off: str = Body(...),
+    weekday_on: str = Body(None),
+    weekday_off: str = Body(None),
+    weekend_on: str = Body(None),
+    weekend_off: str = Body(None),
     session=Depends(get_session)
 ):
-    existing = session.exec(
-        select(StandardTimes).where(StandardTimes.school_id == school_id)
-    ).first()
-    if existing:
-        existing.weekday_on = weekday_on
-        existing.weekday_off = weekday_off
-        existing.weekend_on = weekend_on
-        existing.weekend_off = weekend_off
-        session.add(existing)
-    else:
-        session.add(StandardTimes(
-            school_id=school_id,
-            weekday_on=weekday_on,
-            weekday_off=weekday_off,
-            weekend_on=weekend_on,
-            weekend_off=weekend_off
-        ))
+    school = session.get(School, school_id)
+    if not school:
+        raise HTTPException(status_code=404, detail="Skole ikke fundet")
+    if weekday_on is not None:
+        school.weekday_on = weekday_on
+    if weekday_off is not None:
+        school.weekday_off = weekday_off
+    if weekend_on is not None:
+        school.weekend_on = weekend_on
+    if weekend_off is not None:
+        school.weekend_off = weekend_off
+    session.add(school)
     session.commit()
-    return {"ok": True}
+    session.refresh(school)
+    return school
 
-@router.get("/schools/{school_id}/standard-times")
-def get_standard_times(school_id: int, session=Depends(get_session)):
-    st = session.exec(
-        select(StandardTimes).where(StandardTimes.school_id == school_id)
-    ).first()
-    if st:
-        return {
-            "weekday": {"onTime": st.weekday_on, "offTime": st.weekday_off},
-            "weekend": {"onTime": st.weekend_on, "offTime": st.weekend_off},
-        }
+@router.get("/schools/{school_id}/times")
+def get_school_times(school_id: int, session=Depends(get_session)):
+    school = session.get(School, school_id)
+    if not school:
+        raise HTTPException(status_code=404, detail="Skole ikke fundet")
     return {
-        "weekday": {"onTime": "09:00", "offTime": "22:30"},
-        "weekend": {"onTime": "08:00", "offTime": "18:00"},
+        "weekday": {"onTime": school.weekday_on, "offTime": school.weekday_off},
+        "weekend": {"onTime": school.weekend_on, "offTime": school.weekend_off},
     }
