@@ -74,7 +74,7 @@ export default function AdminPage() {
   useEffect(() => {
     setLoadingSchools(true);
     getSchools()
-      .then(res => setSchools(res))
+      .then(res => setSchools(Array.isArray(res) ? res : []))
       .catch(() => {
         setSchools([]);
         setError("Kunne ikke hente skoler");
@@ -99,13 +99,13 @@ export default function AdminPage() {
     const name = schoolName.trim();
     setError("");
     if (!name) return;
-    if (schools.some(s => s.name === name)) {
+    if (Array.isArray(schools) && schools.some(s => s.name === name)) {
       setError("Skolen findes allerede!");
       return;
     }
     addSchool(name)
       .then(school => {
-        setSchools([...schools, school]);
+        setSchools(Array.isArray(schools) ? [...schools, school] : [school]);
         setSchoolName("");
         showSnackbar("Skole oprettet!", "success");
       })
@@ -143,7 +143,7 @@ export default function AdminPage() {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
-        setClientsToDelete(res.data);
+        setClientsToDelete(Array.isArray(res.data) ? res.data : []);
         setLoadingClients(false);
       })
       .catch(() => {
@@ -162,7 +162,7 @@ export default function AdminPage() {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(() => {
-        setSchools(schools.filter(s => s.id !== schoolToDelete.id));
+        setSchools(Array.isArray(schools) ? schools.filter(s => s.id !== schoolToDelete.id) : []);
         if (selectedSchool === schoolToDelete.id) {
           setSelectedSchool("");
           setWeekdayTimes({ onTime: "09:00", offTime: "22:30" });
@@ -195,7 +195,7 @@ export default function AdminPage() {
     axios.get(`/api/users/`, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
-      .then(res => setUsers(res.data))
+      .then(res => setUsers(Array.isArray(res.data) ? res.data : []))
       .catch(() => {
         setUsers([]);
         setUserError("Kunne ikke hente brugere (kun admin kan se listen)");
@@ -215,7 +215,7 @@ export default function AdminPage() {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
-        setUsers([...users, res.data]);
+        setUsers(Array.isArray(users) ? [...users, res.data] : [res.data]);
         setNewUser({ username: "", password: "", role: "elev", is_active: true });
         showSnackbar("Bruger oprettet!", "success");
       })
@@ -241,7 +241,7 @@ export default function AdminPage() {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(() => {
-        setUsers(users.filter(u => u.id !== userToDelete.id));
+        setUsers(Array.isArray(users) ? users.filter(u => u.id !== userToDelete.id) : []);
         setDeleteUserDialogOpen(false);
         setUserToDelete(null);
         setDeleteUserStep(1);
@@ -277,7 +277,7 @@ export default function AdminPage() {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
-        setUsers(users.map(u => u.id === res.data.id ? res.data : u));
+        setUsers(Array.isArray(users) ? users.map(u => u.id === res.data.id ? res.data : u) : []);
         setUserDialogOpen(false);
         setEditUser(null);
         showSnackbar("Bruger opdateret!", "success");
@@ -325,15 +325,16 @@ export default function AdminPage() {
                 onChange={e => setSelectedSchool(e.target.value)}
                 disabled={loadingSchools}
               >
-                {schools.map(school => (
-                  <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-                ))}
+                {Array.isArray(schools) &&
+                  schools.map(school => (
+                    <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                  ))}
               </Select>
             </FormControl>
           </Box>
           <Box sx={{ flex: 2, minWidth: 300 }}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Standard tænd/sluk tider {selectedSchool ? `- ${schools.find(s => s.id === selectedSchool)?.name || ""}` : ""}
+              Standard tænd/sluk tider {selectedSchool ? `- ${Array.isArray(schools) ? (schools.find(s => s.id === selectedSchool)?.name || "") : ""}` : ""}
             </Typography>
             <Stack direction="row" gap={4} alignItems="center" sx={{ mt: 2 }}>
               <Box>
@@ -419,14 +420,14 @@ export default function AdminPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {schools.length === 0 ? (
+              {Array.isArray(schools) && schools.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={2} align="center" sx={{ color: "#888" }}>
                     Ingen skoler oprettet endnu
                   </TableCell>
                 </TableRow>
               ) : (
-                schools.map((school) => (
+                Array.isArray(schools) && schools.map((school) => (
                   <TableRow key={school.id ?? school.name} hover>
                     <TableCell>{school.name}</TableCell>
                     <TableCell align="right">
@@ -468,7 +469,7 @@ export default function AdminPage() {
             </Box>
           ) : (
             <>
-              {clientsToDelete.length > 0 ? (
+              {Array.isArray(clientsToDelete) && clientsToDelete.length > 0 ? (
                 <TableContainer sx={{ mb: 2 }}>
                   <Table size="small">
                     <TableHead>
@@ -591,14 +592,14 @@ export default function AdminPage() {
                     <CircularProgress size={24} />
                   </TableCell>
                 </TableRow>
-              ) : users.length === 0 ? (
+              ) : Array.isArray(users) && users.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ color: "#888" }}>
                     Ingen brugere oprettet endnu
                   </TableCell>
                 </TableRow>
               ) : (
-                users.map(user => (
+                Array.isArray(users) && users.map(user => (
                   <TableRow key={user.id} hover>
                     <TableCell>{user.id}</TableCell>
                     <TableCell>{user.username}</TableCell>
