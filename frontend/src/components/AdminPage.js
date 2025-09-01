@@ -30,7 +30,6 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import axios from "axios";
 
-// Brug din backend-URL her!
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
 export default function AdminPage() {
@@ -108,6 +107,7 @@ export default function AdminPage() {
       });
   }, [selectedSchool]);
 
+  // SKOLE OPRETTELSE
   const handleAddSchool = () => {
     const name = schoolName.trim();
     setError("");
@@ -325,7 +325,6 @@ export default function AdminPage() {
       });
   };
 
-  // ----------- RENDER -----------
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, minHeight: "60vh", p: 2 }}>
       <Snackbar
