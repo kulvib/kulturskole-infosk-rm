@@ -311,8 +311,8 @@ export default function AdminPage() {
 
       {/* Skolevalg + tænd/sluk tider */}
       <Paper sx={{ mb: 4, p: 3 }}>
-        <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-start">
-          <Box sx={{ flex: 1, minWidth: 240 }}>
+        <Stack direction="row" gap={4} alignItems="center" sx={{ width: "100%" }}>
+          <Box sx={{ flex: 1 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Vælg skole
             </Typography>
@@ -332,7 +332,7 @@ export default function AdminPage() {
               </Select>
             </FormControl>
           </Box>
-          <Box sx={{ flex: 2, minWidth: 300 }}>
+          <Box sx={{ flex: 1 }}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Standard tænd/sluk tider {selectedSchool ? `- ${Array.isArray(schools) ? (schools.find(s => s.id === selectedSchool)?.name || "") : ""}` : ""}
             </Typography>
@@ -534,46 +534,6 @@ export default function AdminPage() {
         <Typography variant="body2" sx={{ mb: 2 }}>
           Opret, redigér og slet brugere (kræver admin-rettigheder)
         </Typography>
-        <Stack direction={{ xs: "column", md: "row" }} gap={2} sx={{ mb: 2 }}>
-          <TextField
-            label="Brugernavn"
-            value={newUser.username}
-            onChange={e => setNewUser({ ...newUser, username: e.target.value })}
-          />
-          <TextField
-            label="Kodeord"
-            type="password"
-            value={newUser.password}
-            onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-          />
-          <FormControl sx={{ minWidth: 120 }}>
-            <InputLabel id="rolle-label">Rolle</InputLabel>
-            <Select
-              labelId="rolle-label"
-              value={newUser.role}
-              label="Rolle"
-              onChange={e => setNewUser({ ...newUser, role: e.target.value })}
-            >
-              <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="laerer">Lærer</MenuItem>
-              <MenuItem value="elev">Elev</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl sx={{ minWidth: 120 }}>
-            <InputLabel id="status-label">Status</InputLabel>
-            <Select
-              labelId="status-label"
-              value={newUser.is_active ? "true" : "false"}
-              label="Status"
-              onChange={e => setNewUser({ ...newUser, is_active: e.target.value === "true" })}
-            >
-              <MenuItem value="true">Aktiv</MenuItem>
-              <MenuItem value="false">Spærret</MenuItem>
-            </Select>
-          </FormControl>
-          <Button variant="contained" onClick={handleAddUser}>Opret bruger</Button>
-        </Stack>
-        {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
         <TableContainer>
           <Table size="small">
             <TableHead>
@@ -627,6 +587,47 @@ export default function AdminPage() {
             </TableBody>
           </Table>
         </TableContainer>
+        {/* Dialog til opret bruger */}
+        <Stack direction={{ xs: "column", md: "row" }} gap={2} sx={{ mt: 2 }}>
+          <TextField
+            label="Brugernavn"
+            value={newUser.username}
+            onChange={e => setNewUser({ ...newUser, username: e.target.value })}
+          />
+          <TextField
+            label="Kodeord"
+            type="password"
+            value={newUser.password}
+            onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+          />
+          <FormControl sx={{ minWidth: 120 }}>
+            <InputLabel id="rolle-label">Rolle</InputLabel>
+            <Select
+              labelId="rolle-label"
+              value={newUser.role}
+              label="Rolle"
+              onChange={e => setNewUser({ ...newUser, role: e.target.value })}
+            >
+              <MenuItem value="admin">Admin</MenuItem>
+              <MenuItem value="laerer">Lærer</MenuItem>
+              <MenuItem value="elev">Elev</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl sx={{ minWidth: 120 }}>
+            <InputLabel id="status-label">Status</InputLabel>
+            <Select
+              labelId="status-label"
+              value={newUser.is_active ? "true" : "false"}
+              label="Status"
+              onChange={e => setNewUser({ ...newUser, is_active: e.target.value === "true" })}
+            >
+              <MenuItem value="true">Aktiv</MenuItem>
+              <MenuItem value="false">Spærret</MenuItem>
+            </Select>
+          </FormControl>
+          <Button variant="contained" onClick={handleAddUser}>Opret bruger</Button>
+        </Stack>
+        {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
         {/* Dialog til redigering */}
         <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)}>
           <DialogTitle>Rediger bruger</DialogTitle>
