@@ -47,6 +47,7 @@ export default function ClientDetailsActionsSection({
   return (
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
       <CardContent sx={{ px: 2 }}>
+        {/* Første række: Kiosk + dvale/væk */}
         <Box sx={{ 
           display: "flex", 
           flexDirection: "row", 
@@ -86,7 +87,6 @@ export default function ClientDetailsActionsSection({
               </Button>
             </span>
           </Tooltip>
-          {/* NY: Dvale-knap */}
           <Tooltip title="Sæt klient i dvale">
             <span>
               <Button
@@ -102,7 +102,6 @@ export default function ClientDetailsActionsSection({
               </Button>
             </span>
           </Tooltip>
-          {/* NY: Væk-knap */}
           <Tooltip title="Væk klient fra dvale">
             <span>
               <Button
@@ -118,6 +117,16 @@ export default function ClientDetailsActionsSection({
               </Button>
             </span>
           </Tooltip>
+        </Box>
+        {/* Anden række: system og remote */}
+        <Box sx={{ 
+          display: "flex", 
+          flexDirection: "row", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          width: "100%",
+          gap: "20px"
+        }}>
           <Tooltip title="Fjernskrivebord på klient">
             <span>
               <Button
@@ -144,15 +153,6 @@ export default function ClientDetailsActionsSection({
               </Button>
             </span>
           </Tooltip>
-        </Box>
-        <Box sx={{ 
-          display: "flex", 
-          flexDirection: "row", 
-          alignItems: "center", 
-          justifyContent: "center", 
-          width: "100%",
-          gap: "20px"
-        }}>
           <Tooltip title="Genstart klient">
             <span>
               <Button
