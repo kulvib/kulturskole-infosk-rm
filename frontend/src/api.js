@@ -158,39 +158,27 @@ export async function pushKioskUrl(id, url) {
   return await res.json();
 }
 
-// KLIENT ACTIONS
+// KLIENT ACTIONS (OPDATERET TIL KUN AT BRUGE /chrome-command)
 export async function clientAction(id, action) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
 
-  let url = "";
-  let body = null;
-  let method = "POST";
+  // Map frontend action to backend action
+  let backendAction;
+  if (action === "chrome-start") backendAction = "start";
+  else if (action === "chrome-shutdown") backendAction = "stop";
+  else backendAction = action; // restart, shutdown, sleep, wakeup, etc.
 
-  if (action === "restart") {
-    url = `${apiUrl}/api/clients/${id}/restart`;
-  } else if (action === "shutdown") {
-    url = `${apiUrl}/api/clients/${id}/shutdown`;
-  } else if (action === "chrome-shutdown") {
-    url = `${apiUrl}/api/clients/${id}/chrome-command`;
-    body = JSON.stringify({ action: "stop" });
-  } else if (action === "chrome-start") {
-    url = `${apiUrl}/api/clients/${id}/chrome-command`;
-    body = JSON.stringify({ action: "start" });
-  } else {
-    url = `${apiUrl}/api/clients/${id}/action`;
-    body = JSON.stringify({ action });
-  }
-
+  const url = `${apiUrl}/api/clients/${id}/chrome-command`;
   const headers = {
     Authorization: "Bearer " + token,
     "Content-Type": "application/json",
   };
 
   const res = await fetch(url, {
-    method,
+    method: "POST",
     headers,
-    body: body,
+    body: JSON.stringify({ action: backendAction }),
   });
 
   if (!res.ok) {
