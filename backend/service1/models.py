@@ -16,6 +16,10 @@ class ChromeAction(str, Enum):
 class School(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, unique=True)
+    weekday_on: Optional[str] = Field(default="09:00")   # fx "09:00"
+    weekday_off: Optional[str] = Field(default="22:30")
+    weekend_on: Optional[str] = Field(default="08:00")
+    weekend_off: Optional[str] = Field(default="18:00")
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -93,12 +97,3 @@ class CalendarMarking(SQLModel, table=True):
     season: int = Field(index=True)
     client_id: int = Field(index=True)
     markings: Dict[str, Any] = Field(sa_column=Column(JSON))
-
-# NY MODEL: StandardTimes
-class StandardTimes(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    school_id: int = Field(index=True, foreign_key="school.id")
-    weekday_on: str  # fx "09:00"
-    weekday_off: str
-    weekend_on: str
-    weekend_off: str
