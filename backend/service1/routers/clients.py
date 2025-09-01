@@ -8,6 +8,7 @@ from auth import get_current_admin_user
 
 router = APIRouter()
 
+# Public endpoint: Liste af godkendte klienter
 @router.get("/clients/public")
 def get_clients_public(session=Depends(get_session)):
     clients = session.exec(select(Client).where(Client.status == "approved")).all()
@@ -15,6 +16,7 @@ def get_clients_public(session=Depends(get_session)):
         "clients": [{"id": c.id, "name": c.name} for c in clients]
     }
 
+# Admin: Liste af alle klienter
 @router.get("/clients/", response_model=List[Client])
 def get_clients(session=Depends(get_session), user=Depends(get_current_admin_user)):
     clients = session.exec(select(Client)).all()
@@ -26,6 +28,7 @@ def get_clients(session=Depends(get_session), user=Depends(get_current_admin_use
     clients.sort(key=lambda c: (c.sort_order is None, c.sort_order if c.sort_order is not None else 9999, c.id))
     return clients
 
+# Admin: Hent én klient
 @router.get("/clients/{id}/", response_model=Client)
 def get_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
     client = session.get(Client, id)
@@ -37,6 +40,7 @@ def get_client(id: int, session=Depends(get_session), user=Depends(get_current_a
     )
     return client
 
+# Chrome-status (til frontend visning)
 @router.get("/clients/{id}/chrome-status")
 def get_chrome_status(
     id: int,
@@ -53,6 +57,7 @@ def get_chrome_status(
         "chrome_color": getattr(client, "chrome_color", None)
     }
 
+# Opdater chrome-status
 @router.put("/clients/{id}/chrome-status")
 def update_chrome_status(
     id: int,
@@ -73,10 +78,11 @@ def update_chrome_status(
     session.refresh(client)
     return {"ok": True}
 
+# Klienten sender sin aktuelle state (uafhængigt af kommandoer)
 @router.put("/clients/{id}/state")
 def update_client_state(
     id: int,
-    data: dict = Body(...),  # fx: {"state": "sleep"}
+    data: dict = Body(...),
     session=Depends(get_session)
 ):
     client = session.get(Client, id)
@@ -91,6 +97,7 @@ def update_client_state(
     session.refresh(client)
     return {"ok": True, "state": client.state}
 
+# Hent klientens aktuelle state
 @router.get("/clients/{id}/state")
 def get_client_state(
     id: int,
@@ -101,6 +108,7 @@ def get_client_state(
         raise HTTPException(status_code=404, detail="Client not found")
     return {"state": client.state}
 
+# Backend/frontend sender kommando (fx fra knap)
 @router.post("/clients/{id}/chrome-command")
 def set_chrome_command(
     id: int,
@@ -122,6 +130,7 @@ def set_chrome_command(
     session.refresh(client)
     return {"ok": True, "pending_chrome_action": client.pending_chrome_action.value}
 
+# Klienten henter aktuel kommando
 @router.get("/clients/{id}/chrome-command")
 def get_chrome_command(
     id: int,
@@ -132,6 +141,7 @@ def get_chrome_command(
         raise HTTPException(status_code=404, detail="Client not found")
     return {"action": client.pending_chrome_action.value if client.pending_chrome_action else None}
 
+# Klienten kan rydde kommando efter udført handling
 @router.post("/clients/{id}/chrome-command-clear")
 def clear_chrome_command(
     id: int,
@@ -146,6 +156,7 @@ def clear_chrome_command(
     session.refresh(client)
     return {"ok": True}
 
+# Send restart-kommando
 @router.post("/clients/{id}/restart")
 def restart_client(
     id: int,
@@ -161,6 +172,7 @@ def restart_client(
     session.refresh(client)
     return {"ok": True, "action": "restart"}
 
+# Send shutdown-kommando
 @router.post("/clients/{id}/shutdown")
 def shutdown_client(
     id: int,
@@ -176,6 +188,7 @@ def shutdown_client(
     session.refresh(client)
     return {"ok": True, "action": "shutdown"}
 
+# Ryd reboot/shutdown kommando
 @router.post("/clients/{id}/action-clear")
 def clear_client_action(
     id: int,
@@ -192,6 +205,7 @@ def clear_client_action(
     session.refresh(client)
     return {"ok": True}
 
+# Opret ny klient
 @router.post("/clients/", response_model=Client)
 async def create_client(
     client_in: ClientCreate,
@@ -226,6 +240,7 @@ async def create_client(
     session.refresh(client)
     return client
 
+# Opdater klient
 @router.put("/clients/{id}/update", response_model=Client)
 async def update_client(
     id: int,
@@ -277,6 +292,7 @@ async def update_client(
     session.refresh(client)
     return client
 
+# Opdater kiosk_url
 @router.put("/clients/{id}/kiosk_url", response_model=Client)
 async def update_kiosk_url(
     id: int,
@@ -296,6 +312,7 @@ async def update_kiosk_url(
     session.refresh(client)
     return client
 
+# Generisk action-endpoint, hvis du vil udvide med custom actions
 @router.post("/clients/{id}/action")
 def client_action(
     id: int,
@@ -311,6 +328,7 @@ def client_action(
         raise HTTPException(status_code=400, detail="Missing action")
     return {"ok": True, "action": action}
 
+# Godkend klient
 @router.post("/clients/{id}/approve", response_model=Client)
 async def approve_client(
     id: int,
@@ -335,6 +353,7 @@ async def approve_client(
     session.refresh(client)
     return client
 
+# Heartbeat fra klient
 @router.post("/clients/{id}/heartbeat", response_model=Client)
 def client_heartbeat(
     id: int,
@@ -349,6 +368,7 @@ def client_heartbeat(
     session.refresh(client)
     return client
 
+# Slet klient + kalendermarkeringer
 @router.delete("/clients/{id}/remove")
 async def remove_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
     client = session.get(Client, id)
@@ -362,6 +382,7 @@ async def remove_client(id: int, session=Depends(get_session), user=Depends(get_
     session.commit()
     return {"ok": True}
 
+# Streaming, terminal og remote desktop endpoints (til integration)
 @router.get("/clients/{id}/stream")
 def client_stream(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
     return {"stream_url": f"/mjpeg/{id}"}
