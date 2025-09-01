@@ -28,8 +28,10 @@ import {
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import { getSchools, addSchool, getSchoolTimes, updateSchoolTimes } from "../api";
 import axios from "axios";
+
+// Brug din backend-URL her!
+const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
 export default function AdminPage() {
   // SKOLEVALG OG TIDER
@@ -73,8 +75,10 @@ export default function AdminPage() {
   // Hent skoler
   useEffect(() => {
     setLoadingSchools(true);
-    getSchools()
-      .then(res => setSchools(Array.isArray(res) ? res : []))
+    axios.get(`${API_URL}/api/schools/`, {
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
+    })
+      .then(res => setSchools(Array.isArray(res.data) ? res.data : []))
       .catch(() => {
         setSchools([]);
         setError("Kunne ikke hente skoler");
@@ -84,10 +88,12 @@ export default function AdminPage() {
   // Hent tider for valgt skole
   useEffect(() => {
     if (!selectedSchool) return;
-    getSchoolTimes(selectedSchool)
-      .then(times => {
-        setWeekdayTimes(times.weekday);
-        setWeekendTimes(times.weekend);
+    axios.get(`${API_URL}/api/schools/${selectedSchool}/times/`, {
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
+    })
+      .then(res => {
+        setWeekdayTimes(res.data.weekday || { onTime: "09:00", offTime: "22:30" });
+        setWeekendTimes(res.data.weekend || { onTime: "08:00", offTime: "18:00" });
       })
       .catch(() => {
         setWeekdayTimes({ onTime: "09:00", offTime: "22:30" });
@@ -103,9 +109,12 @@ export default function AdminPage() {
       setError("Skolen findes allerede!");
       return;
     }
-    addSchool(name)
-      .then(school => {
-        setSchools(Array.isArray(schools) ? [...schools, school] : [school]);
+    axios.post(`${API_URL}/api/schools/`, null, {
+      params: { name },
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
+    })
+      .then(res => {
+        setSchools(Array.isArray(schools) ? [...schools, res.data] : [res.data]);
         setSchoolName("");
         showSnackbar("Skole oprettet!", "success");
       })
@@ -119,11 +128,14 @@ export default function AdminPage() {
   const handleSaveTimes = async () => {
     if (!selectedSchool) return;
     try {
-      await updateSchoolTimes(selectedSchool, {
-        weekday_on: weekdayTimes.onTime,
-        weekday_off: weekdayTimes.offTime,
-        weekend_on: weekendTimes.onTime,
-        weekend_off: weekendTimes.offTime
+      await axios.patch(`${API_URL}/api/schools/${selectedSchool}/times/`, null, {
+        params: {
+          weekday_on: weekdayTimes.onTime,
+          weekday_off: weekdayTimes.offTime,
+          weekend_on: weekendTimes.onTime,
+          weekend_off: weekendTimes.offTime
+        },
+        headers: { Authorization: "Bearer " + localStorage.getItem("token") }
       });
       showSnackbar("Standard tider gemt for skole!", "success");
     } catch (e) {
@@ -139,7 +151,7 @@ export default function AdminPage() {
     setDeleteDialogOpen(true);
     setLoadingClients(true);
     setDeleteStep(1);
-    axios.get(`/api/schools/${school.id}/clients/`, {
+    axios.get(`${API_URL}/api/schools/${school.id}/clients/`, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
@@ -158,7 +170,7 @@ export default function AdminPage() {
   // Endelig sletning
   const handleFinalDeleteSchool = () => {
     if (!schoolToDelete) return;
-    axios.delete(`/api/schools/${schoolToDelete.id}/`, {
+    axios.delete(`${API_URL}/api/schools/${schoolToDelete.id}/`, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(() => {
@@ -192,10 +204,13 @@ export default function AdminPage() {
   // ----------- USER ADMINISTRATION -----------
   useEffect(() => {
     setLoadingUsers(true);
-    axios.get(`/api/users/`, {
+    axios.get(`${API_URL}/api/users/`, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
-      .then(res => setUsers(Array.isArray(res.data) ? res.data : []))
+      .then(res => {
+        console.log("Users response:", res.data); // Debug!
+        setUsers(Array.isArray(res.data) ? res.data : []);
+      })
       .catch(() => {
         setUsers([]);
         setUserError("Kunne ikke hente brugere (kun admin kan se listen)");
@@ -210,7 +225,7 @@ export default function AdminPage() {
       showSnackbar("Brugernavn og kodeord skal udfyldes", "error");
       return;
     }
-    axios.post(`/api/users/`, null, {
+    axios.post(`${API_URL}/api/users/`, null, {
       params: { username, password, role, is_active },
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
@@ -237,7 +252,7 @@ export default function AdminPage() {
   // Endelig sletning af bruger
   const handleFinalDeleteUser = () => {
     if (!userToDelete) return;
-    axios.delete(`/api/users/${userToDelete.id}`, {
+    axios.delete(`${API_URL}/api/users/${userToDelete.id}`, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(() => {
@@ -268,7 +283,7 @@ export default function AdminPage() {
   const handleEditUser = () => {
     if (!editUser) return;
     const { id, role, is_active, password } = editUser;
-    axios.patch(`/api/users/${id}`, null, {
+    axios.patch(`${API_URL}/api/users/${id}`, null, {
       params: {
         role,
         is_active,
@@ -599,7 +614,7 @@ export default function AdminPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                Array.isArray(users) && users.map(user => (
+                users.map(user => (
                   <TableRow key={user.id} hover>
                     <TableCell>{user.id}</TableCell>
                     <TableCell>{user.username}</TableCell>
