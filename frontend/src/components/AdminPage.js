@@ -30,7 +30,6 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import axios from "axios";
 
-// Brug din backend-URL her!
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
 export default function AdminPage() {
@@ -56,7 +55,14 @@ export default function AdminPage() {
   // USER ADMINISTRATION
   const [users, setUsers] = useState([]);
   const [userError, setUserError] = useState("");
-  const [newUser, setNewUser] = useState({ username: "", password: "", role: "elev", is_active: true });
+  const [newUser, setNewUser] = useState({
+    username: "",
+    password: "",
+    password2: "",
+    role: "bruger",
+    is_active: true,
+    school_id: ""
+  });
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -164,10 +170,8 @@ export default function AdminPage() {
       });
   };
 
-  // Første bekræftelse
   const handleFirstDeleteConfirm = () => setDeleteStep(2);
 
-  // Endelig sletning
   const handleFinalDeleteSchool = () => {
     if (!schoolToDelete) return;
     axios.delete(`${API_URL}/api/schools/${schoolToDelete.id}/`, {
@@ -192,7 +196,6 @@ export default function AdminPage() {
       });
   };
 
-  // Luk dialog
   const handleCloseDeleteDialog = () => {
     setDeleteDialogOpen(false);
     setSchoolToDelete(null);
@@ -208,7 +211,6 @@ export default function AdminPage() {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
-        console.log("Users response:", res.data); // Debug!
         setUsers(Array.isArray(res.data) ? res.data : []);
       })
       .catch(() => {
@@ -217,21 +219,38 @@ export default function AdminPage() {
       }).finally(() => setLoadingUsers(false));
   }, []);
 
+  // Opret bruger
   const handleAddUser = () => {
     setUserError("");
-    const { username, password, role, is_active } = newUser;
-    if (!username || !password) {
-      setUserError("Brugernavn og kodeord skal udfyldes");
-      showSnackbar("Brugernavn og kodeord skal udfyldes", "error");
+    const { username, password, password2, role, is_active, school_id } = newUser;
+    if (!username || !password || !password2) {
+      setUserError("Brugernavn og begge kodeord skal udfyldes");
+      showSnackbar("Brugernavn og begge kodeord skal udfyldes", "error");
+      return;
+    }
+    if (password !== password2) {
+      setUserError("Kodeordene matcher ikke");
+      showSnackbar("Kodeordene matcher ikke", "error");
+      return;
+    }
+    if (role === "bruger" && !school_id) {
+      setUserError("Bruger skal tilknyttes en skole");
+      showSnackbar("Bruger skal tilknyttes en skole", "error");
       return;
     }
     axios.post(`${API_URL}/api/users/`, null, {
-      params: { username, password, role, is_active },
+      params: {
+        username,
+        password,
+        role: role === "administrator" ? "admin" : "bruger",
+        is_active,
+        school_id: role === "bruger" ? school_id : undefined
+      },
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
         setUsers(Array.isArray(users) ? [...users, res.data] : [res.data]);
-        setNewUser({ username: "", password: "", role: "elev", is_active: true });
+        setNewUser({ username: "", password: "", password2: "", role: "bruger", is_active: true, school_id: "" });
         showSnackbar("Bruger oprettet!", "success");
       })
       .catch(e => {
@@ -275,19 +294,25 @@ export default function AdminPage() {
   };
 
   const openEditUserDialog = (user) => {
-    setEditUser({ ...user, password: "" });
+    setEditUser({ ...user, password: "", password2: "" });
     setUserDialogOpen(true);
     setUserError("");
   };
 
   const handleEditUser = () => {
     if (!editUser) return;
-    const { id, role, is_active, password } = editUser;
+    const { id, role, is_active, password, password2, school_id } = editUser;
+    if (password && password !== password2) {
+      setUserError("Kodeordene matcher ikke");
+      showSnackbar("Kodeordene matcher ikke", "error");
+      return;
+    }
     axios.patch(`${API_URL}/api/users/${id}`, null, {
       params: {
-        role,
+        role: role === "administrator" ? "admin" : "bruger",
         is_active,
-        password: password ? password : undefined
+        password: password ? password : undefined,
+        school_id: role === "bruger" ? school_id : undefined
       },
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
@@ -561,6 +586,12 @@ export default function AdminPage() {
             value={newUser.password}
             onChange={e => setNewUser({ ...newUser, password: e.target.value })}
           />
+          <TextField
+            label="Gentag kodeord"
+            type="password"
+            value={newUser.password2}
+            onChange={e => setNewUser({ ...newUser, password2: e.target.value })}
+          />
           <FormControl sx={{ minWidth: 120 }}>
             <InputLabel id="rolle-label">Rolle</InputLabel>
             <Select
@@ -569,11 +600,25 @@ export default function AdminPage() {
               label="Rolle"
               onChange={e => setNewUser({ ...newUser, role: e.target.value })}
             >
-              <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="laerer">Lærer</MenuItem>
-              <MenuItem value="elev">Elev</MenuItem>
+              <MenuItem value="administrator">Administrator</MenuItem>
+              <MenuItem value="bruger">Bruger</MenuItem>
             </Select>
           </FormControl>
+          {newUser.role === "bruger" && (
+            <FormControl sx={{ minWidth: 120 }}>
+              <InputLabel id="skole-label">Skole</InputLabel>
+              <Select
+                labelId="skole-label"
+                value={newUser.school_id}
+                label="Skole"
+                onChange={e => setNewUser({ ...newUser, school_id: e.target.value })}
+              >
+                {schools.map(school => (
+                  <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
           <FormControl sx={{ minWidth: 120 }}>
             <InputLabel id="status-label">Status</InputLabel>
             <Select
@@ -597,19 +642,20 @@ export default function AdminPage() {
                 <TableCell sx={{ fontWeight: 700 }}>Brugernavn</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Rolle</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Skole</TableCell>
                 <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loadingUsers ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
+                  <TableCell colSpan={6} align="center">
                     <CircularProgress size={24} />
                   </TableCell>
                 </TableRow>
               ) : Array.isArray(users) && users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ color: "#888" }}>
+                  <TableCell colSpan={6} align="center" sx={{ color: "#888" }}>
                     Ingen brugere oprettet endnu
                   </TableCell>
                 </TableRow>
@@ -618,8 +664,13 @@ export default function AdminPage() {
                   <TableRow key={user.id} hover>
                     <TableCell>{user.id}</TableCell>
                     <TableCell>{user.username}</TableCell>
-                    <TableCell>{user.role}</TableCell>
+                    <TableCell>{user.role === "admin" ? "administrator" : "bruger"}</TableCell>
                     <TableCell>{user.is_active ? "Aktiv" : "Spærret"}</TableCell>
+                    <TableCell>
+                      {user.school_id
+                        ? (schools.find(s => s.id === user.school_id)?.name ?? user.school_id)
+                        : "-"}
+                    </TableCell>
                     <TableCell align="right">
                       <Tooltip title="Rediger bruger">
                         <span>
@@ -657,11 +708,25 @@ export default function AdminPage() {
                     label="Rolle"
                     onChange={e => setEditUser({ ...editUser, role: e.target.value })}
                   >
-                    <MenuItem value="admin">Admin</MenuItem>
-                    <MenuItem value="laerer">Lærer</MenuItem>
-                    <MenuItem value="elev">Elev</MenuItem>
+                    <MenuItem value="administrator">Administrator</MenuItem>
+                    <MenuItem value="bruger">Bruger</MenuItem>
                   </Select>
                 </FormControl>
+                {editUser.role === "bruger" && (
+                  <FormControl fullWidth>
+                    <InputLabel id="edit-skole-label">Skole</InputLabel>
+                    <Select
+                      labelId="edit-skole-label"
+                      value={editUser.school_id || ""}
+                      label="Skole"
+                      onChange={e => setEditUser({ ...editUser, school_id: e.target.value })}
+                    >
+                      {schools.map(school => (
+                        <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
                 <FormControl fullWidth>
                   <InputLabel id="edit-status-label">Status</InputLabel>
                   <Select
@@ -679,6 +744,13 @@ export default function AdminPage() {
                   type="password"
                   value={editUser.password || ""}
                   onChange={e => setEditUser({ ...editUser, password: e.target.value })}
+                  fullWidth
+                />
+                <TextField
+                  label="Gentag nyt kodeord"
+                  type="password"
+                  value={editUser.password2 || ""}
+                  onChange={e => setEditUser({ ...editUser, password2: e.target.value })}
                   fullWidth
                 />
               </Stack>
