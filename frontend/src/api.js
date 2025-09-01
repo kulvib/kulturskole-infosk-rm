@@ -204,6 +204,29 @@ export async function clientAction(id, action) {
   return await res.json();
 }
 
+// SÆT KLIENTENS STATE (fx til 'normal' eller 'sleep')
+export async function setClientState(id, state) {
+  const token = getToken();
+  if (!token) throw new Error("Token mangler - du er ikke logget ind");
+  const res = await fetch(`${apiUrl}/api/clients/${id}/state`, {
+    method: "PUT",
+    headers: {
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ state }),
+  });
+  if (!res.ok) {
+    let msg = "Kunne ikke sætte klientens tilstand";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
 // ÅBN TERMINAL / REMOTE DESKTOP
 export function openTerminal(id) {
   window.open(`${apiUrl}/api/clients/${id}/terminal`, "_blank", "noopener");
@@ -418,3 +441,6 @@ export async function stopLivestream(clientId) {
   }
   return await res.json();
 }
+
+// SÆT KLIENTENS STATE TIL 'normal' EFTER DVALE
+// Brug: await setClientState(id, "normal");
