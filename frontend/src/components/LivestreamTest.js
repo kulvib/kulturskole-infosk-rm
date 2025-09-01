@@ -5,7 +5,7 @@ import {
   getLivestreamStatus,
   startLivestream,
   stopLivestream,
-} from "./api";
+} from "../api"; // FIXED: changed from "./api" to "../api"
 
 const WS_URL = "wss://kulturskole-infosk-rm.onrender.com/ws";
 
