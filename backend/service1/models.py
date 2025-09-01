@@ -27,6 +27,7 @@ class User(SQLModel, table=True):
     hashed_password: str
     role: str = "admin"
     is_active: bool = True
+    school_id: Optional[int] = Field(default=None, foreign_key="school.id")  # <-- TILFØJET
 
 class ClientBase(SQLModel):
     name: str
