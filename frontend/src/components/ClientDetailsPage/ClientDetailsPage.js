@@ -19,6 +19,7 @@ export default function ClientDetailsPage({
   refreshing,
   handleRefresh,
   markedDays,
+  calendarLoading,
 }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -168,6 +169,7 @@ export default function ClientDetailsPage({
         </Grid>
         <Grid item xs={12}>
           <ClientDetailsActionsSection
+            clientId={client?.id} // <---- VIGTIG LINJE!
             actionLoading={actionLoading}
             handleClientAction={handleClientAction}
             handleOpenTerminal={handleOpenTerminal}
