@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Card,
   CardContent,
@@ -17,17 +17,27 @@ import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import NightlightIcon from "@mui/icons-material/Nightlight"; // Dvale ikon
-import WbSunnyIcon from "@mui/icons-material/WbSunny"; // Væk ikon
+import NightlightIcon from "@mui/icons-material/Nightlight";
+import WbSunnyIcon from "@mui/icons-material/WbSunny";
+
+// ACTIONS mapping: frontend key -> backend action
+const ACTION_MAP = {
+  "chrome-start": "start",
+  "chrome-shutdown": "stop",
+  "restart": "restart",
+  "shutdown": "shutdown",
+  "sleep": "sleep",
+  "wakeup": "wakeup"
+};
 
 export default function ClientDetailsActionsSection({
-  actionLoading,
-  handleClientAction,
+  clientId,
   handleOpenTerminal,
   handleOpenRemoteDesktop,
-  shutdownDialogOpen,
-  setShutdownDialogOpen,
 }) {
+  const [actionLoading, setActionLoading] = useState({});
+  const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
+
   const actionBtnStyle = {
     minWidth: 200,
     maxWidth: 200,
@@ -44,16 +54,37 @@ export default function ClientDetailsActionsSection({
     justifyContent: "center"
   };
 
+  // Main action handler
+  async function handleClientAction(action) {
+    setActionLoading(prev => ({ ...prev, [action]: true }));
+
+    const backendAction = ACTION_MAP[action] || action;
+
+    try {
+      await fetch(`/api/clients/${clientId}/chrome-command`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: backendAction })
+      });
+      // Optionally: show feedback or refetch data
+    } catch (err) {
+      console.error("Fejl ved handling:", err);
+      // Optionally: show error feedback
+    } finally {
+      setActionLoading(prev => ({ ...prev, [action]: false }));
+    }
+  }
+
   return (
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
       <CardContent sx={{ px: 2 }}>
         {/* Første række: Kiosk + dvale/væk */}
-        <Box sx={{ 
-          display: "flex", 
-          flexDirection: "row", 
-          alignItems: "center", 
-          justifyContent: "center", 
-          width: "100%", 
+        <Box sx={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
           mb: 2,
           gap: "20px"
         }}>
@@ -119,11 +150,11 @@ export default function ClientDetailsActionsSection({
           </Tooltip>
         </Box>
         {/* Anden række: system og remote */}
-        <Box sx={{ 
-          display: "flex", 
-          flexDirection: "row", 
-          alignItems: "center", 
-          justifyContent: "center", 
+        <Box sx={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
           width: "100%",
           gap: "20px"
         }}>
