@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import select
 from db import get_session
-from models import School, Client, CalendarMarking
+from models import School, Client, CalendarMarking, StandardTimes
 
 router = APIRouter()
 
@@ -43,3 +43,49 @@ def delete_school(school_id: int, session=Depends(get_session)):
     session.delete(school)
     session.commit()
     return
+
+# ---------- STANDARDTIDER ENDPOINTS ----------
+
+@router.post("/schools/{school_id}/standard-times")
+def save_standard_times(
+    school_id: int,
+    weekday_on: str = Body(...),
+    weekday_off: str = Body(...),
+    weekend_on: str = Body(...),
+    weekend_off: str = Body(...),
+    session=Depends(get_session)
+):
+    existing = session.exec(
+        select(StandardTimes).where(StandardTimes.school_id == school_id)
+    ).first()
+    if existing:
+        existing.weekday_on = weekday_on
+        existing.weekday_off = weekday_off
+        existing.weekend_on = weekend_on
+        existing.weekend_off = weekend_off
+        session.add(existing)
+    else:
+        session.add(StandardTimes(
+            school_id=school_id,
+            weekday_on=weekday_on,
+            weekday_off=weekday_off,
+            weekend_on=weekend_on,
+            weekend_off=weekend_off
+        ))
+    session.commit()
+    return {"ok": True}
+
+@router.get("/schools/{school_id}/standard-times")
+def get_standard_times(school_id: int, session=Depends(get_session)):
+    st = session.exec(
+        select(StandardTimes).where(StandardTimes.school_id == school_id)
+    ).first()
+    if st:
+        return {
+            "weekday": {"onTime": st.weekday_on, "offTime": st.weekday_off},
+            "weekend": {"onTime": st.weekend_on, "offTime": st.weekend_off},
+        }
+    return {
+        "weekday": {"onTime": "09:00", "offTime": "22:30"},
+        "weekend": {"onTime": "08:00", "offTime": "18:00"},
+    }
