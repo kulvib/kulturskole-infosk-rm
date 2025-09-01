@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -14,7 +14,6 @@ import {
   Tooltip,
   CircularProgress,
   Stack,
-  useTheme,
   Snackbar,
   Alert as MuiAlert,
   Select,
@@ -24,35 +23,13 @@ import {
   DialogContent,
   DialogActions,
   FormControl,
-  InputLabel
+  InputLabel,
+  TextField,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import { apiUrl, getToken } from "../api";
+import { getSchools, addSchool, getSchoolTimes, updateSchoolTimes } from "../api";
 import axios from "axios";
-
-const TIMES_STORAGE_PREFIX = "standard_times_settings_";
-
-function loadStandardTimesForSchool(schoolId) {
-  if (!schoolId) return {
-    weekday: { onTime: "09:00", offTime: "22:30" },
-    weekend: { onTime: "08:00", offTime: "18:00" }
-  };
-  const saved = localStorage.getItem(TIMES_STORAGE_PREFIX + schoolId);
-  if (saved) {
-    try {
-      const t = JSON.parse(saved);
-      return {
-        weekday: t.weekday || { onTime: "09:00", offTime: "22:30" },
-        weekend: t.weekend || { onTime: "08:00", offTime: "18:00" }
-      };
-    } catch {}
-  }
-  return {
-    weekday: { onTime: "09:00", offTime: "22:30" },
-    weekend: { onTime: "08:00", offTime: "18:00" }
-  };
-}
 
 export default function AdminPage() {
   // SKOLEVALG OG TIDER
@@ -96,11 +73,9 @@ export default function AdminPage() {
   // Hent skoler
   useEffect(() => {
     setLoadingSchools(true);
-    axios.get(`${apiUrl}/api/schools/`, {
-      headers: { Authorization: "Bearer " + getToken() }
-    })
-      .then(res => setSchools(res.data))
-      .catch((err) => {
+    getSchools()
+      .then(res => setSchools(res))
+      .catch(() => {
         setSchools([]);
         setError("Kunne ikke hente skoler");
       }).finally(() => setLoadingSchools(false));
@@ -109,9 +84,15 @@ export default function AdminPage() {
   // Hent tider for valgt skole
   useEffect(() => {
     if (!selectedSchool) return;
-    const times = loadStandardTimesForSchool(selectedSchool);
-    setWeekdayTimes(times.weekday);
-    setWeekendTimes(times.weekend);
+    getSchoolTimes(selectedSchool)
+      .then(times => {
+        setWeekdayTimes(times.weekday);
+        setWeekendTimes(times.weekend);
+      })
+      .catch(() => {
+        setWeekdayTimes({ onTime: "09:00", offTime: "22:30" });
+        setWeekendTimes({ onTime: "08:00", offTime: "18:00" });
+      });
   }, [selectedSchool]);
 
   const handleAddSchool = () => {
@@ -122,28 +103,32 @@ export default function AdminPage() {
       setError("Skolen findes allerede!");
       return;
     }
-    axios.post(`${apiUrl}/api/schools/`, { name }, {
-      headers: { Authorization: "Bearer " + getToken() }
-    })
-      .then(res => {
-        setSchools([...schools, res.data]);
+    addSchool(name)
+      .then(school => {
+        setSchools([...schools, school]);
         setSchoolName("");
         showSnackbar("Skole oprettet!", "success");
       })
       .catch(e => {
-        setError(e.response?.data?.detail || "Fejl ved oprettelse");
+        setError(e.message || "Fejl ved oprettelse");
         showSnackbar("Fejl ved oprettelse af skole", "error");
       });
   };
 
   // Gem tider for valgt skole
-  const handleSaveTimes = () => {
+  const handleSaveTimes = async () => {
     if (!selectedSchool) return;
-    localStorage.setItem(TIMES_STORAGE_PREFIX + selectedSchool, JSON.stringify({
-      weekday: weekdayTimes,
-      weekend: weekendTimes
-    }));
-    showSnackbar("Standard tider gemt for skole!", "success");
+    try {
+      await updateSchoolTimes(selectedSchool, {
+        weekday_on: weekdayTimes.onTime,
+        weekday_off: weekdayTimes.offTime,
+        weekend_on: weekendTimes.onTime,
+        weekend_off: weekendTimes.offTime
+      });
+      showSnackbar("Standard tider gemt for skole!", "success");
+    } catch (e) {
+      showSnackbar("Kunne ikke gemme tider", "error");
+    }
   };
 
   // Slet skole: Åben dialog og hent klienter
@@ -154,8 +139,8 @@ export default function AdminPage() {
     setDeleteDialogOpen(true);
     setLoadingClients(true);
     setDeleteStep(1);
-    axios.get(`${apiUrl}/api/schools/${school.id}/clients/`, {
-      headers: { Authorization: "Bearer " + getToken() }
+    axios.get(`/api/schools/${school.id}/clients/`, {
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
         setClientsToDelete(res.data);
@@ -173,8 +158,8 @@ export default function AdminPage() {
   // Endelig sletning
   const handleFinalDeleteSchool = () => {
     if (!schoolToDelete) return;
-    axios.delete(`${apiUrl}/api/schools/${schoolToDelete.id}/`, {
-      headers: { Authorization: "Bearer " + getToken() }
+    axios.delete(`/api/schools/${schoolToDelete.id}/`, {
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(() => {
         setSchools(schools.filter(s => s.id !== schoolToDelete.id));
@@ -183,7 +168,6 @@ export default function AdminPage() {
           setWeekdayTimes({ onTime: "09:00", offTime: "22:30" });
           setWeekendTimes({ onTime: "08:00", offTime: "18:00" });
         }
-        localStorage.removeItem(TIMES_STORAGE_PREFIX + schoolToDelete.id);
         setDeleteDialogOpen(false);
         setSchoolToDelete(null);
         setClientsToDelete([]);
@@ -208,8 +192,8 @@ export default function AdminPage() {
   // ----------- USER ADMINISTRATION -----------
   useEffect(() => {
     setLoadingUsers(true);
-    axios.get(`${apiUrl}/api/users/`, {
-      headers: { Authorization: "Bearer " + getToken() }
+    axios.get(`/api/users/`, {
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => setUsers(res.data))
       .catch(() => {
@@ -226,9 +210,9 @@ export default function AdminPage() {
       showSnackbar("Brugernavn og kodeord skal udfyldes", "error");
       return;
     }
-    axios.post(`${apiUrl}/api/users/`, null, {
+    axios.post(`/api/users/`, null, {
       params: { username, password, role, is_active },
-      headers: { Authorization: "Bearer " + getToken() }
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
         setUsers([...users, res.data]);
@@ -248,14 +232,13 @@ export default function AdminPage() {
     setDeleteUserError("");
     setDeleteUserStep(1);
   };
-  // Første bekræftelse
   const handleFirstDeleteUserConfirm = () => setDeleteUserStep(2);
 
   // Endelig sletning af bruger
   const handleFinalDeleteUser = () => {
     if (!userToDelete) return;
-    axios.delete(`${apiUrl}/api/users/${userToDelete.id}`, {
-      headers: { Authorization: "Bearer " + getToken() }
+    axios.delete(`/api/users/${userToDelete.id}`, {
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(() => {
         setUsers(users.filter(u => u.id !== userToDelete.id));
@@ -269,7 +252,6 @@ export default function AdminPage() {
         showSnackbar("Fejl ved sletning af bruger", "error");
       });
   };
-  // Luk dialog
   const handleCloseDeleteUserDialog = () => {
     setDeleteUserDialogOpen(false);
     setUserToDelete(null);
@@ -286,13 +268,13 @@ export default function AdminPage() {
   const handleEditUser = () => {
     if (!editUser) return;
     const { id, role, is_active, password } = editUser;
-    axios.patch(`${apiUrl}/api/users/${id}`, null, {
+    axios.patch(`/api/users/${id}`, null, {
       params: {
         role,
         is_active,
         password: password ? password : undefined
       },
-      headers: { Authorization: "Bearer " + getToken() }
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
         setUsers(users.map(u => u.id === res.data.id ? res.data : u));
@@ -306,6 +288,7 @@ export default function AdminPage() {
       });
   };
 
+  // ----------- RENDER -----------
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, minHeight: "60vh", p: 2 }}>
       <Snackbar
@@ -329,7 +312,6 @@ export default function AdminPage() {
       {/* Skolevalg + tænd/sluk tider */}
       <Paper sx={{ mb: 4, p: 3 }}>
         <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-start">
-          {/* Vælg skole - venstre side */}
           <Box sx={{ flex: 1, minWidth: 240 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Vælg skole
@@ -349,7 +331,6 @@ export default function AdminPage() {
               </Select>
             </FormControl>
           </Box>
-          {/* Tænd/sluk tider - højre side */}
           <Box sx={{ flex: 2, minWidth: 300 }}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Standard tænd/sluk tider {selectedSchool ? `- ${schools.find(s => s.id === selectedSchool)?.name || ""}` : ""}
