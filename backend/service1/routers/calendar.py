@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from sqlmodel import select, delete
-from models import CalendarMarking, Client
+from models import CalendarMarking, Client, StandardTimes
 from db import get_session
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel
@@ -91,11 +91,7 @@ def get_marked_days(
 
 @router.get("/calendar/seasons")
 def get_seasons_list(count: int = 20):
-    """
-    Returnerer en liste af sæsoner (id og label), f.eks. [{"id":2025,"label":"2025/2026"}, ...].
-    """
     today = date.today()
-    # Første sæson: Hvis vi er fra august og frem, starter vi i år, ellers sidste år
     if today.month >= 8:
         first_season = today.year
     else:
@@ -113,13 +109,8 @@ def get_seasons_list(count: int = 20):
 
 @router.get("/calendar/season")
 def get_current_season():
-    """
-    Returnerer den aktuelle sæson, hvor sæsonen går fra 1. august til 31. juli året efter.
-    Eksempel: Hvis i dag er mellem 1. august 2024 og 31. juli 2025, returneres 2024/2025.
-    """
     today = date.today()
     year = today.year
-    # Fra august til december gælder sæsonen for dette år til næste år
     if today.month >= 8:  # August til December
         season_start = year
         season_end = year + 1
@@ -133,13 +124,7 @@ def get_current_season():
 
 @router.post("/calendar/cleanup-past-seasons")
 def cleanup_past_seasons(session=Depends(get_session)):
-    """
-    Slet alle CalendarMarking for den forrige sæson,
-    hvis vi er efter 10. august.
-    """
     today = date.today()
-    # Bestem hvilken sæson der skal slettes
-    # Hvis vi er efter 10. august, slettes sidste år
     if today.month > 8 or (today.month == 8 and today.day >= 10):
         season_to_delete = today.year - 1
         session.exec(
@@ -149,3 +134,48 @@ def cleanup_past_seasons(session=Depends(get_session)):
         return {"deleted_season": season_to_delete}
     else:
         return {"deleted_season": None, "message": "Ingen sæson slettet - ikke efter 10. august"}
+
+# NYE ENDPOINTS FOR STANDARDTIDER
+@router.post("/calendar/standard-times")
+def save_standard_times(
+    school_id: int = Body(...),
+    weekday_on: str = Body(...),
+    weekday_off: str = Body(...),
+    weekend_on: str = Body(...),
+    weekend_off: str = Body(...),
+    session=Depends(get_session)
+):
+    existing = session.exec(
+        select(StandardTimes).where(StandardTimes.school_id == school_id)
+    ).first()
+    if existing:
+        existing.weekday_on = weekday_on
+        existing.weekday_off = weekday_off
+        existing.weekend_on = weekend_on
+        existing.weekend_off = weekend_off
+        session.add(existing)
+    else:
+        session.add(StandardTimes(
+            school_id=school_id,
+            weekday_on=weekday_on,
+            weekday_off=weekday_off,
+            weekend_on=weekend_on,
+            weekend_off=weekend_off
+        ))
+    session.commit()
+    return {"ok": True}
+
+@router.get("/calendar/standard-times")
+def get_standard_times(school_id: int = Query(...), session=Depends(get_session)):
+    st = session.exec(
+        select(StandardTimes).where(StandardTimes.school_id == school_id)
+    ).first()
+    if st:
+        return {
+            "weekday": {"onTime": st.weekday_on, "offTime": st.weekday_off},
+            "weekend": {"onTime": st.weekend_on, "offTime": st.weekend_off},
+        }
+    return {
+        "weekday": {"onTime": "09:00", "offTime": "22:30"},
+        "weekend": {"onTime": "08:00", "offTime": "18:00"},
+    }
