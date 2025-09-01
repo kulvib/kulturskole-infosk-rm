@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
   Typography,
   Paper,
-  Stack,
   Table,
   TableBody,
   TableCell,
@@ -13,16 +12,19 @@ import {
   IconButton,
   Button,
   Tooltip,
-  TextField,
+  CircularProgress,
+  Stack,
+  useTheme,
+  Snackbar,
+  Alert as MuiAlert,
   Select,
   MenuItem,
-  FormControl,
-  InputLabel,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  CircularProgress
+  FormControl,
+  InputLabel
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
@@ -86,6 +88,11 @@ export default function AdminPage() {
   const [deleteUserError, setDeleteUserError] = useState("");
   const [deleteUserStep, setDeleteUserStep] = useState(1);
 
+  // SNACKBAR
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const showSnackbar = (message, severity = "success") => setSnackbar({ open: true, message, severity });
+  const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
+
   // Hent skoler
   useEffect(() => {
     setLoadingSchools(true);
@@ -121,9 +128,11 @@ export default function AdminPage() {
       .then(res => {
         setSchools([...schools, res.data]);
         setSchoolName("");
+        showSnackbar("Skole oprettet!", "success");
       })
       .catch(e => {
         setError(e.response?.data?.detail || "Fejl ved oprettelse");
+        showSnackbar("Fejl ved oprettelse af skole", "error");
       });
   };
 
@@ -134,7 +143,7 @@ export default function AdminPage() {
       weekday: weekdayTimes,
       weekend: weekendTimes
     }));
-    alert("Standard tider gemt for skole!");
+    showSnackbar("Standard tider gemt for skole!", "success");
   };
 
   // Slet skole: Åben dialog og hent klienter
@@ -179,9 +188,11 @@ export default function AdminPage() {
         setSchoolToDelete(null);
         setClientsToDelete([]);
         setDeleteStep(1);
+        showSnackbar("Skole og tilknyttede klienter er slettet!", "success");
       })
       .catch(e => {
         setDeleteError("Kunne ikke slette skole: " + (e.response?.data?.detail || ""));
+        showSnackbar("Fejl ved sletning af skole", "error");
       });
   };
 
@@ -212,6 +223,7 @@ export default function AdminPage() {
     const { username, password, role, is_active } = newUser;
     if (!username || !password) {
       setUserError("Brugernavn og kodeord skal udfyldes");
+      showSnackbar("Brugernavn og kodeord skal udfyldes", "error");
       return;
     }
     axios.post(`${apiUrl}/api/users/`, null, {
@@ -221,9 +233,11 @@ export default function AdminPage() {
       .then(res => {
         setUsers([...users, res.data]);
         setNewUser({ username: "", password: "", role: "elev", is_active: true });
+        showSnackbar("Bruger oprettet!", "success");
       })
       .catch(e => {
         setUserError(e.response?.data?.detail || "Fejl ved oprettelse");
+        showSnackbar("Fejl ved oprettelse af bruger", "error");
       });
   };
 
@@ -248,9 +262,11 @@ export default function AdminPage() {
         setDeleteUserDialogOpen(false);
         setUserToDelete(null);
         setDeleteUserStep(1);
+        showSnackbar("Bruger slettet!", "success");
       })
       .catch(e => {
         setDeleteUserError("Kunne ikke slette bruger: " + (e.response?.data?.detail || ""));
+        showSnackbar("Fejl ved sletning af bruger", "error");
       });
   };
   // Luk dialog
@@ -282,12 +298,27 @@ export default function AdminPage() {
         setUsers(users.map(u => u.id === res.data.id ? res.data : u));
         setUserDialogOpen(false);
         setEditUser(null);
+        showSnackbar("Bruger opdateret!", "success");
       })
-      .catch(e => setUserError(e.response?.data?.detail || "Fejl ved opdatering"));
+      .catch(e => {
+        setUserError(e.response?.data?.detail || "Fejl ved opdatering");
+        showSnackbar("Fejl ved opdatering af bruger", "error");
+      });
   };
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, minHeight: "60vh", p: 2 }}>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3400}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
+
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
         Administration
       </Typography>
