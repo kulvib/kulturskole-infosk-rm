@@ -379,6 +379,47 @@ export async function addSchool(name) {
   return await res.json();
 }
 
+// HENT TIDER FOR EN SKOLE
+export async function getSchoolTimes(schoolId) {
+  const token = getToken();
+  if (!token) throw new Error("Token mangler - du er ikke logget ind");
+  const res = await fetch(`${apiUrl}/api/schools/${schoolId}/times`, {
+    headers: { Authorization: "Bearer " + token },
+  });
+  if (!res.ok) {
+    let msg = "Kunne ikke hente skoletider";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
+// OPDATER TIDER FOR EN SKOLE
+export async function updateSchoolTimes(schoolId, updates) {
+  const token = getToken();
+  if (!token) throw new Error("Token mangler - du er ikke logget ind");
+  const res = await fetch(`${apiUrl}/api/schools/${schoolId}/times`, {
+    method: "PATCH",
+    headers: {
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) {
+    let msg = "Kunne ikke opdatere skoletider";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
 // LIVESTREAM API FUNKTIONER PR. KLIENT
 export async function getLivestreamStatus(clientId) {
   const token = getToken();
