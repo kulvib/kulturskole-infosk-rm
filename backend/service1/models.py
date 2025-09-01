@@ -9,6 +9,8 @@ class ChromeAction(str, Enum):
     STOP = "stop"
     RESTART = "restart"
     SHUTDOWN = "shutdown"
+    SLEEP = "sleep"         # <--- NY!
+    WAKEUP = "wakeup"       # <--- NY!
     NONE = "none"
 
 # Skole-tabellen (reference for client.school_id)
