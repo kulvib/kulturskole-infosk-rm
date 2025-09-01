@@ -17,6 +17,8 @@ import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import NightlightIcon from "@mui/icons-material/Nightlight"; // Dvale ikon
+import WbSunnyIcon from "@mui/icons-material/WbSunny"; // Væk ikon
 
 export default function ClientDetailsActionsSection({
   actionLoading,
@@ -41,7 +43,7 @@ export default function ClientDetailsActionsSection({
     display: "inline-flex",
     justifyContent: "center"
   };
-  
+
   return (
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
       <CardContent sx={{ px: 2 }}>
@@ -81,6 +83,38 @@ export default function ClientDetailsActionsSection({
               >
                 {actionLoading["chrome-shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
                 Luk kiosk browser
+              </Button>
+            </span>
+          </Tooltip>
+          {/* NY: Dvale-knap */}
+          <Tooltip title="Sæt klient i dvale">
+            <span>
+              <Button
+                variant="outlined"
+                color="info"
+                startIcon={<NightlightIcon />}
+                disabled={actionLoading["sleep"]}
+                onClick={() => handleClientAction("sleep")}
+                sx={actionBtnStyle}
+              >
+                {actionLoading["sleep"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+                Sæt i dvale
+              </Button>
+            </span>
+          </Tooltip>
+          {/* NY: Væk-knap */}
+          <Tooltip title="Væk klient fra dvale">
+            <span>
+              <Button
+                variant="outlined"
+                color="success"
+                startIcon={<WbSunnyIcon />}
+                disabled={actionLoading["wakeup"]}
+                onClick={() => handleClientAction("wakeup")}
+                sx={actionBtnStyle}
+              >
+                {actionLoading["wakeup"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+                Væk fra dvale
               </Button>
             </span>
           </Tooltip>
