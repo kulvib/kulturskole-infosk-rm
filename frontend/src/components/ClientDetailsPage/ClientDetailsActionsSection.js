@@ -19,16 +19,7 @@ import TerminalIcon from "@mui/icons-material/Terminal";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import NightlightIcon from "@mui/icons-material/Nightlight";
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
-
-// ACTIONS mapping: frontend key -> backend action
-const ACTION_MAP = {
-  "chrome-start": "start",
-  "chrome-shutdown": "stop",
-  "restart": "restart",
-  "shutdown": "shutdown",
-  "sleep": "sleep",
-  "wakeup": "wakeup"
-};
+import { clientAction } from "../../api"; // <-- Brug din api.js funktion!
 
 export default function ClientDetailsActionsSection({
   clientId,
@@ -54,22 +45,16 @@ export default function ClientDetailsActionsSection({
     justifyContent: "center"
   };
 
-  // Main action handler
+  // Main action handler - bruger api.js (clientAction)
   async function handleClientAction(action) {
     setActionLoading(prev => ({ ...prev, [action]: true }));
 
-    const backendAction = ACTION_MAP[action] || action;
-
     try {
-      await fetch(`/api/clients/${clientId}/chrome-command`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: backendAction })
-      });
-      // Optionally: show feedback or refetch data
+      await clientAction(clientId, action); // Kald til backend via api.js
+      // Optionelt: show feedback eller refetch data her
     } catch (err) {
       console.error("Fejl ved handling:", err);
-      // Optionally: show error feedback
+      // Optionelt: show error feedback
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
