@@ -30,6 +30,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import axios from "axios";
 
+// Brug din backend-URL her!
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
 export default function AdminPage() {
@@ -61,7 +62,7 @@ export default function AdminPage() {
     password2: "",
     role: "bruger",
     is_active: true,
-    school_id: ""
+    school_id: "",
   });
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
@@ -115,8 +116,7 @@ export default function AdminPage() {
       setError("Skolen findes allerede!");
       return;
     }
-    axios.post(`${API_URL}/api/schools/`, null, {
-      params: { name },
+    axios.post(`${API_URL}/api/schools/`, { name }, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
@@ -125,7 +125,7 @@ export default function AdminPage() {
         showSnackbar("Skole oprettet!", "success");
       })
       .catch(e => {
-        setError(e.message || "Fejl ved oprettelse");
+        setError(e.response?.data?.detail || e.message || "Fejl ved oprettelse");
         showSnackbar("Fejl ved oprettelse af skole", "error");
       });
   };
@@ -134,13 +134,12 @@ export default function AdminPage() {
   const handleSaveTimes = async () => {
     if (!selectedSchool) return;
     try {
-      await axios.patch(`${API_URL}/api/schools/${selectedSchool}/times/`, null, {
-        params: {
-          weekday_on: weekdayTimes.onTime,
-          weekday_off: weekdayTimes.offTime,
-          weekend_on: weekendTimes.onTime,
-          weekend_off: weekendTimes.offTime
-        },
+      await axios.patch(`${API_URL}/api/schools/${selectedSchool}/times/`, {
+        weekday_on: weekdayTimes.onTime,
+        weekday_off: weekdayTimes.offTime,
+        weekend_on: weekendTimes.onTime,
+        weekend_off: weekendTimes.offTime
+      }, {
         headers: { Authorization: "Bearer " + localStorage.getItem("token") }
       });
       showSnackbar("Standard tider gemt for skole!", "success");
@@ -204,7 +203,7 @@ export default function AdminPage() {
     setDeleteStep(1);
   };
 
-  // ----------- USER ADMINISTRATION -----------
+  // USER ADMINISTRATION
   useEffect(() => {
     setLoadingUsers(true);
     axios.get(`${API_URL}/api/users/`, {
@@ -238,14 +237,13 @@ export default function AdminPage() {
       showSnackbar("Bruger skal tilknyttes en skole", "error");
       return;
     }
-    axios.post(`${API_URL}/api/users/`, null, {
-      params: {
-        username,
-        password,
-        role: role === "administrator" ? "admin" : "bruger",
-        is_active,
-        school_id: role === "bruger" ? school_id : undefined
-      },
+    axios.post(`${API_URL}/api/users/`, {
+      username,
+      password,
+      role: role === "administrator" ? "admin" : "bruger",
+      is_active,
+      school_id: role === "bruger" ? school_id : undefined
+    }, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
@@ -254,7 +252,7 @@ export default function AdminPage() {
         showSnackbar("Bruger oprettet!", "success");
       })
       .catch(e => {
-        setUserError(e.response?.data?.detail || "Fejl ved oprettelse");
+        setUserError(e.response?.data?.detail || e.message || "Fejl ved oprettelse");
         showSnackbar("Fejl ved oprettelse af bruger", "error");
       });
   };
@@ -307,13 +305,12 @@ export default function AdminPage() {
       showSnackbar("Kodeordene matcher ikke", "error");
       return;
     }
-    axios.patch(`${API_URL}/api/users/${id}`, null, {
-      params: {
-        role: role === "administrator" ? "admin" : "bruger",
-        is_active,
-        password: password ? password : undefined,
-        school_id: role === "bruger" ? school_id : undefined
-      },
+    axios.patch(`${API_URL}/api/users/${id}`, {
+      role: role === "administrator" ? "admin" : "bruger",
+      is_active,
+      password: password ? password : undefined,
+      school_id: role === "bruger" ? school_id : undefined
+    }, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
@@ -323,7 +320,7 @@ export default function AdminPage() {
         showSnackbar("Bruger opdateret!", "success");
       })
       .catch(e => {
-        setUserError(e.response?.data?.detail || "Fejl ved opdatering");
+        setUserError(e.response?.data?.detail || e.message || "Fejl ved opdatering");
         showSnackbar("Fejl ved opdatering af bruger", "error");
       });
   };
