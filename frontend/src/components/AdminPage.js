@@ -80,6 +80,12 @@ export default function AdminPage() {
   const [editUser, setEditUser] = useState(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
+  // SLET BRUGER FLOW
+  const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [deleteUserError, setDeleteUserError] = useState("");
+  const [deleteUserStep, setDeleteUserStep] = useState(1);
+
   // Hent skoler
   useEffect(() => {
     setLoadingSchools(true);
@@ -221,12 +227,38 @@ export default function AdminPage() {
       });
   };
 
-  const handleDeleteUser = (id) => {
-    axios.delete(`${apiUrl}/api/users/${id}`, {
+  // SLET BRUGER: Åben advarselsdialog
+  const handleOpenDeleteUserDialog = (user) => {
+    setUserToDelete(user);
+    setDeleteUserDialogOpen(true);
+    setDeleteUserError("");
+    setDeleteUserStep(1);
+  };
+  // Første bekræftelse
+  const handleFirstDeleteUserConfirm = () => setDeleteUserStep(2);
+
+  // Endelig sletning af bruger
+  const handleFinalDeleteUser = () => {
+    if (!userToDelete) return;
+    axios.delete(`${apiUrl}/api/users/${userToDelete.id}`, {
       headers: { Authorization: "Bearer " + getToken() }
     })
-      .then(() => setUsers(users.filter(u => u.id !== id)))
-      .catch(e => setUserError(e.response?.data?.detail || "Fejl ved sletning"));
+      .then(() => {
+        setUsers(users.filter(u => u.id !== userToDelete.id));
+        setDeleteUserDialogOpen(false);
+        setUserToDelete(null);
+        setDeleteUserStep(1);
+      })
+      .catch(e => {
+        setDeleteUserError("Kunne ikke slette bruger: " + (e.response?.data?.detail || ""));
+      });
+  };
+  // Luk dialog
+  const handleCloseDeleteUserDialog = () => {
+    setDeleteUserDialogOpen(false);
+    setUserToDelete(null);
+    setDeleteUserError("");
+    setDeleteUserStep(1);
   };
 
   const openEditUserDialog = (user) => {
@@ -263,74 +295,84 @@ export default function AdminPage() {
         Her kan du oprette og administrere brugere, godkende skoler og bestemme standardtider.
       </Typography>
 
-      {/* VÆLG SKOLE */}
+      {/* Skolevalg + tænd/sluk tider */}
       <Paper sx={{ mb: 4, p: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-          Vælg skole for standard tænd/sluk tider
-        </Typography>
-        <FormControl sx={{ minWidth: 240 }}>
-          <InputLabel id="skole-select-label">Skole</InputLabel>
-          <Select
-            labelId="skole-select-label"
-            value={selectedSchool}
-            label="Skole"
-            onChange={e => setSelectedSchool(e.target.value)}
-            disabled={loadingSchools}
-          >
-            {schools.map(school => (
-              <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Paper>
-
-      {/* TIDER */}
-      <Paper sx={{ mb: 4, p: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          Standard tænd/sluk tider <span style={{ fontWeight: 400 }}>({selectedSchool ? (schools.find(s => s.id === selectedSchool)?.name || "") : "Vælg skole"})</span>
-        </Typography>
-        <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-start" sx={{ mt: 2 }}>
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>Hverdage (ma-fr):</Typography>
-            <Stack direction="row" gap={2}>
-              <TextField
-                label="Tænd kl."
-                type="time"
-                value={weekdayTimes.onTime}
-                onChange={e => setWeekdayTimes({ ...weekdayTimes, onTime: e.target.value })}
+        <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-start">
+          {/* Vælg skole - venstre side */}
+          <Box sx={{ flex: 1, minWidth: 240 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+              Vælg skole
+            </Typography>
+            <FormControl fullWidth>
+              <InputLabel id="skole-select-label">Skole</InputLabel>
+              <Select
+                labelId="skole-select-label"
+                value={selectedSchool}
+                label="Skole"
+                onChange={e => setSelectedSchool(e.target.value)}
+                disabled={loadingSchools}
+              >
+                {schools.map(school => (
+                  <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+          {/* Tænd/sluk tider - højre side */}
+          <Box sx={{ flex: 2, minWidth: 300 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Standard tænd/sluk tider {selectedSchool ? `- ${schools.find(s => s.id === selectedSchool)?.name || ""}` : ""}
+            </Typography>
+            <Stack direction="row" gap={4} alignItems="center" sx={{ mt: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>Hverdage (ma-fr):</Typography>
+                <Stack direction="row" gap={2}>
+                  <TextField
+                    label="Tænd kl."
+                    type="time"
+                    value={weekdayTimes.onTime}
+                    onChange={e => setWeekdayTimes({ ...weekdayTimes, onTime: e.target.value })}
+                    disabled={!selectedSchool}
+                  />
+                  <TextField
+                    label="Sluk kl."
+                    type="time"
+                    value={weekdayTimes.offTime}
+                    onChange={e => setWeekdayTimes({ ...weekdayTimes, offTime: e.target.value })}
+                    disabled={!selectedSchool}
+                  />
+                </Stack>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>Weekend (lø-sø):</Typography>
+                <Stack direction="row" gap={2}>
+                  <TextField
+                    label="Tænd kl."
+                    type="time"
+                    value={weekendTimes.onTime}
+                    onChange={e => setWeekendTimes({ ...weekendTimes, onTime: e.target.value })}
+                    disabled={!selectedSchool}
+                  />
+                  <TextField
+                    label="Sluk kl."
+                    type="time"
+                    value={weekendTimes.offTime}
+                    onChange={e => setWeekendTimes({ ...weekendTimes, offTime: e.target.value })}
+                    disabled={!selectedSchool}
+                  />
+                </Stack>
+              </Box>
+              <Button
+                variant="contained"
+                size="large"
+                sx={{ minWidth: 140, height: 56 }}
+                onClick={handleSaveTimes}
                 disabled={!selectedSchool}
-              />
-              <TextField
-                label="Sluk kl."
-                type="time"
-                value={weekdayTimes.offTime}
-                onChange={e => setWeekdayTimes({ ...weekdayTimes, offTime: e.target.value })}
-                disabled={!selectedSchool}
-              />
+              >
+                Gem tider
+              </Button>
             </Stack>
           </Box>
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>Weekend (lø-sø):</Typography>
-            <Stack direction="row" gap={2}>
-              <TextField
-                label="Tænd kl."
-                type="time"
-                value={weekendTimes.onTime}
-                onChange={e => setWeekendTimes({ ...weekendTimes, onTime: e.target.value })}
-                disabled={!selectedSchool}
-              />
-              <TextField
-                label="Sluk kl."
-                type="time"
-                value={weekendTimes.offTime}
-                onChange={e => setWeekendTimes({ ...weekendTimes, offTime: e.target.value })}
-                disabled={!selectedSchool}
-              />
-            </Stack>
-          </Box>
-          <Button variant="contained" onClick={handleSaveTimes} disabled={!selectedSchool}>
-            Gem tider
-          </Button>
         </Stack>
       </Paper>
 
@@ -397,7 +439,7 @@ export default function AdminPage() {
         </TableContainer>
       </Paper>
 
-      {/* SLET DIALOG MED DOBBELT BEKRÆFTELSE OG TABEL */}
+      {/* SLET SKOLE DIALOG MED DOBBELT BEKRÆFTELSE OG TABEL */}
       <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog} maxWidth="md" fullWidth>
         <DialogTitle>
           Slet skole: {schoolToDelete?.name}
@@ -560,7 +602,7 @@ export default function AdminPage() {
                       </Tooltip>
                       <Tooltip title="Slet bruger">
                         <span>
-                          <IconButton color="error" onClick={() => handleDeleteUser(user.id)}>
+                          <IconButton color="error" onClick={() => handleOpenDeleteUserDialog(user)}>
                             <DeleteIcon />
                           </IconButton>
                         </span>
@@ -621,6 +663,45 @@ export default function AdminPage() {
           </DialogActions>
         </Dialog>
       </Paper>
+      {/* SLET BRUGER DIALOG MED DOBBELT BEKRÆFTELSE */}
+      <Dialog open={deleteUserDialogOpen} onClose={handleCloseDeleteUserDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Slet bruger: {userToDelete?.username}
+        </DialogTitle>
+        <DialogContent>
+          <Typography color="error" gutterBottom sx={{ mb: 2 }}>
+            Advarsel: Du er ved at slette brugeren <b>{userToDelete?.username}</b>.<br />
+            Denne handling kan <b>ikke fortrydes!</b>
+          </Typography>
+          {deleteUserStep === 1 && (
+            <Typography sx={{ mb: 2 }}>
+              Er du sikker på at du vil slette denne bruger?
+            </Typography>
+          )}
+          {deleteUserStep === 2 && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              Tryk <b>Slet endeligt</b> for at bekræfte.
+            </Typography>
+          )}
+          {deleteUserError && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              {deleteUserError}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteUserDialog}>Annuller</Button>
+          {deleteUserStep === 1 ? (
+            <Button color="warning" variant="contained" onClick={handleFirstDeleteUserConfirm}>
+              Bekræft sletning
+            </Button>
+          ) : (
+            <Button color="error" variant="contained" onClick={handleFinalDeleteUser}>
+              Slet endeligt
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
