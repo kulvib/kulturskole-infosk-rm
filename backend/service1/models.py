@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
 
+# Enum til Chrome kommandoer/handlinger
 class ChromeAction(str, Enum):
     START = "start"
     STOP = "stop"
@@ -10,10 +11,12 @@ class ChromeAction(str, Enum):
     SHUTDOWN = "shutdown"
     NONE = "none"
 
+# Skole-tabellen (reference for client.school_id)
 class School(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, unique=True)
 
+# Bruger-tabellen (admin, m.fl.)
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str
@@ -21,6 +24,7 @@ class User(SQLModel, table=True):
     role: str = "admin"
     is_active: bool = True
 
+# Fælles base for klient (bruges til oprettelse og opdatering)
 class ClientBase(SQLModel):
     name: str
     locality: Optional[str] = None
@@ -29,6 +33,7 @@ class ClientBase(SQLModel):
     lan_ip_address: Optional[str] = None
     lan_mac_address: Optional[str] = None
 
+# Klient-tabellen (hovedmodel)
 class Client(ClientBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     status: Optional[str] = "pending"
@@ -46,8 +51,12 @@ class Client(ClientBase, table=True):
     chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = Field(default=ChromeAction.NONE)
     school_id: Optional[int] = Field(default=None, foreign_key="school.id")
-    state: Optional[str] = Field(default="normal", description="Driftstilstand: normal, sleep, wakeup, shutdown, error")
+    state: Optional[str] = Field(
+        default="normal",
+        description="Driftstilstand: normal, sleep, wakeup, shutdown, error"
+    )
 
+# Til oprettelse af klient
 class ClientCreate(ClientBase):
     sort_order: Optional[int] = None
     kiosk_url: Optional[str] = None
@@ -63,6 +72,7 @@ class ClientCreate(ClientBase):
     school_id: Optional[int] = None
     state: Optional[str] = Field(default="normal")
 
+# Til opdatering af klient
 class ClientUpdate(SQLModel):
     locality: Optional[str] = None
     sort_order: Optional[int] = None
@@ -82,6 +92,7 @@ class ClientUpdate(SQLModel):
     school_id: Optional[int] = None
     state: Optional[str] = None
 
+# Kalendermarkering (fx ferie/vinter/sommer for klienten)
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     season: int = Field(index=True)
