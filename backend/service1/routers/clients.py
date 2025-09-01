@@ -156,55 +156,6 @@ def clear_chrome_command(
     session.refresh(client)
     return {"ok": True}
 
-# Send restart-kommando
-@router.post("/clients/{id}/restart")
-def restart_client(
-    id: int,
-    session=Depends(get_session),
-    user=Depends(get_current_admin_user)
-):
-    client = session.get(Client, id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    client.pending_reboot = True
-    session.add(client)
-    session.commit()
-    session.refresh(client)
-    return {"ok": True, "action": "restart"}
-
-# Send shutdown-kommando
-@router.post("/clients/{id}/shutdown")
-def shutdown_client(
-    id: int,
-    session=Depends(get_session),
-    user=Depends(get_current_admin_user)
-):
-    client = session.get(Client, id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    client.pending_shutdown = True
-    session.add(client)
-    session.commit()
-    session.refresh(client)
-    return {"ok": True, "action": "shutdown"}
-
-# Ryd reboot/shutdown kommando
-@router.post("/clients/{id}/action-clear")
-def clear_client_action(
-    id: int,
-    session=Depends(get_session),
-    user=Depends(get_current_admin_user)
-):
-    client = session.get(Client, id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    client.pending_reboot = False
-    client.pending_shutdown = False
-    session.add(client)
-    session.commit()
-    session.refresh(client)
-    return {"ok": True}
-
 # Opret ny klient
 @router.post("/clients/", response_model=Client)
 async def create_client(
@@ -311,22 +262,6 @@ async def update_kiosk_url(
     session.commit()
     session.refresh(client)
     return client
-
-# Generisk action-endpoint, hvis du vil udvide med custom actions
-@router.post("/clients/{id}/action")
-def client_action(
-    id: int,
-    data: dict = Body(...),
-    session=Depends(get_session),
-    user=Depends(get_current_admin_user)
-):
-    client = session.get(Client, id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    action = data.get("action")
-    if not action:
-        raise HTTPException(status_code=400, detail="Missing action")
-    return {"ok": True, "action": action}
 
 # Godkend klient
 @router.post("/clients/{id}/approve", response_model=Client)
