@@ -158,27 +158,55 @@ export async function pushKioskUrl(id, url) {
   return await res.json();
 }
 
-// KLIENT ACTIONS (OPDATERET TIL KUN AT BRUGE /chrome-command)
+// KLIENT ACTIONS (KORREKT MAPPING TIL ENDPOINTS)
 export async function clientAction(id, action) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
 
-  // Map frontend action to backend action
-  let backendAction;
-  if (action === "chrome-start") backendAction = "start";
-  else if (action === "chrome-shutdown") backendAction = "stop";
-  else backendAction = action; // restart, shutdown, sleep, wakeup, etc.
+  let url, method, payload;
 
-  const url = `${apiUrl}/api/clients/${id}/chrome-command`;
-  const headers = {
-    Authorization: "Bearer " + token,
-    "Content-Type": "application/json",
-  };
+  // Chrome actions via chrome-command endpoint
+  if (action === "chrome-start") {
+    url = `${apiUrl}/api/clients/${id}/chrome-command`;
+    method = "POST";
+    payload = { action: "start" }; // Mappes til "start"
+  } else if (action === "chrome-shutdown") {
+    url = `${apiUrl}/api/clients/${id}/chrome-command`;
+    method = "POST";
+    payload = { action: "stop" }; // Mappes til "stop"
+  }
+  // Sleep/Wakeup via state endpoint
+  else if (action === "sleep") {
+    url = `${apiUrl}/api/clients/${id}/state`;
+    method = "PUT";
+    payload = { state: "sleep" };
+  } else if (action === "wakeup") {
+    url = `${apiUrl}/api/clients/${id}/state`;
+    method = "PUT";
+    payload = { state: "normal" };
+  }
+  // Restart/Shutdown via update endpoint
+  else if (action === "restart") {
+    url = `${apiUrl}/api/clients/${id}/update`;
+    method = "PUT";
+    payload = { pending_reboot: true };
+  } else if (action === "shutdown") {
+    url = `${apiUrl}/api/clients/${id}/update`;
+    method = "PUT";
+    payload = { pending_shutdown: true };
+  }
+  // Fallback error
+  else {
+    throw new Error("Ukendt action: " + action);
+  }
 
   const res = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ action: backendAction }),
+    method,
+    headers: {
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
