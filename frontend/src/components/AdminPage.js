@@ -366,10 +366,10 @@ export default function AdminPage() {
 
       {/* -------- PAPER 1 -------- */}
       <Paper sx={{ mb: 4, p: 3 }}>
-        <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-end">
+        <Stack direction="row" gap={4} alignItems="flex-end" width="100%">
           <Box sx={{ flex: 1, minWidth: 240 }}>
-            {/* "Vælg skole" rykket op og alligned med "Standard tænd/sluk tider:" */}
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 0, mt: 0.5, lineHeight: 1.5 }}>
+            {/* Overskrift i øverste venstre hjørne */}
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Vælg skole
             </Typography>
             <FormControl size="small" fullWidth sx={inputSx}>
@@ -636,6 +636,7 @@ export default function AdminPage() {
                   <MenuItem value="false">Spærret</MenuItem>
                 </Select>
               </FormControl>
+              {/* Opret bruger knappen NU INDENFOR PAPER */}
               <Button variant="contained" sx={{ height: 40, minWidth: 140 }} onClick={handleAddUser}>Opret bruger</Button>
             </Stack>
             {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
