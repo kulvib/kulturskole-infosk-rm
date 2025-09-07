@@ -365,19 +365,22 @@ export default function AdminPage() {
       </Typography>
 
       {/* -------- PAPER 1 -------- */}
-      <Paper sx={{ mb: 4, p: 3, position: "relative" }}>
-        {/* Overskrift i absolut øverste venstre hjørne */}
-        <Typography variant="h6" sx={{
-          fontWeight: 700,
-          position: "absolute",
-          top: 24,
-          left: 24,
-          zIndex: 2
-        }}>
-          Vælg skole
-        </Typography>
-        <Stack direction="row" gap={4} alignItems="flex-end" width="100%" sx={{ mt: 4 }}>
+      <Paper sx={{ mb: 4, p: 3 }}>
+        <Stack direction="row" gap={4} alignItems="flex-start" width="100%" sx={{ mt: 4 }}>
           <Box sx={{ flex: 1, minWidth: 240, pt: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mr: 2, mb: 0 }}>
+                Vælg skole
+              </Typography>
+              <Typography component="span" sx={{ fontWeight: 700 }}>
+                Standard tænd/sluk tider:
+              </Typography>
+              {selectedSchool && (
+                <Typography component="span" sx={{ fontWeight: 400, ml: 1 }}>
+                  {selectedSchoolName}
+                </Typography>
+              )}
+            </Box>
             <FormControl size="small" fullWidth sx={inputSx}>
               <InputLabel id="skole-select-label">Skole</InputLabel>
               <Select
@@ -395,16 +398,6 @@ export default function AdminPage() {
             </FormControl>
           </Box>
           <Box sx={{ flex: 2, minWidth: 300 }}>
-            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-              <Typography component="span" sx={{ fontWeight: 700 }}>
-                Standard tænd/sluk tider:
-              </Typography>
-              {selectedSchool && (
-                <Typography component="span" sx={{ fontWeight: 400, ml: 1 }}>
-                  {selectedSchoolName}
-                </Typography>
-              )}
-            </Box>
             <Stack direction="row" gap={4} alignItems="flex-end" sx={{ mt: 0 }}>
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>Hverdage (ma-fr):</Typography>
@@ -550,7 +543,8 @@ export default function AdminPage() {
             <Typography variant="body2" sx={{ mb: 2 }}>
               Opret, redigér og slet brugere (kræver admin-rettigheder)
             </Typography>
-            <Stack direction="row" gap={2} alignItems="flex-end" sx={{ mb: 2 }}>
+            {/* INPUT-FELTERNE */}
+            <Stack direction="row" gap={2} alignItems="flex-end" sx={{ mb: 0 }}>
               <TextField
                 label="Brugernavn"
                 value={newUser.username}
@@ -642,9 +636,11 @@ export default function AdminPage() {
                   <MenuItem value="false">Spærret</MenuItem>
                 </Select>
               </FormControl>
-              {/* Opret bruger knappen NU INDENFOR PAPER OG STACK */}
-              <Button variant="contained" sx={{ height: 40, minWidth: 140 }} onClick={handleAddUser}>Opret bruger</Button>
             </Stack>
+            {/* "Opret bruger"-knap flyttet herunder */}
+            <Button variant="contained" sx={{ height: 40, minWidth: 140, mt: 2, mb: 2 }} onClick={handleAddUser}>
+              Opret bruger
+            </Button>
             {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
             <TableContainer>
               <Table size="small">
