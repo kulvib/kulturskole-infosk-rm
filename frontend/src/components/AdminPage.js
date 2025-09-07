@@ -363,15 +363,13 @@ export default function AdminPage() {
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
         Administration
       </Typography>
-      <Typography sx={{ mb: 2 }}>
-        Her kan du oprette og administrere brugere, godkende skoler og bestemme standardtider.
-      </Typography>
 
       {/* -------- PAPER 1 -------- */}
       <Paper sx={{ mb: 4, p: 3 }}>
         <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-end">
           <Box sx={{ flex: 1, minWidth: 240 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            {/* "Vælg skole" rykket op og alligned med "Standard tænd/sluk tider:" */}
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 0, mt: 0.5, lineHeight: 1.5 }}>
               Vælg skole
             </Typography>
             <FormControl size="small" fullWidth sx={inputSx}>
