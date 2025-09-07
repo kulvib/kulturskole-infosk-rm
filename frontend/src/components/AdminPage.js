@@ -367,20 +367,11 @@ export default function AdminPage() {
       {/* -------- PAPER 1 -------- */}
       <Paper sx={{ mb: 4, p: 3 }}>
         <Stack direction="row" gap={4} alignItems="flex-start" width="100%" sx={{ mt: 4 }}>
+          {/* Venstre kolonne */}
           <Box sx={{ flex: 1, minWidth: 240, pt: 2 }}>
-            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, mr: 2, mb: 0 }}>
-                Vælg skole
-              </Typography>
-              <Typography component="span" sx={{ fontWeight: 700 }}>
-                Standard tænd/sluk tider:
-              </Typography>
-              {selectedSchool && (
-                <Typography component="span" sx={{ fontWeight: 400, ml: 1 }}>
-                  {selectedSchoolName}
-                </Typography>
-              )}
-            </Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+              Vælg skole
+            </Typography>
             <FormControl size="small" fullWidth sx={inputSx}>
               <InputLabel id="skole-select-label">Skole</InputLabel>
               <Select
@@ -397,7 +388,11 @@ export default function AdminPage() {
               </Select>
             </FormControl>
           </Box>
+          {/* Højre kolonne */}
           <Box sx={{ flex: 2, minWidth: 300 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+              Standard tænd/sluk tider:
+            </Typography>
             <Stack direction="row" gap={4} alignItems="flex-end" sx={{ mt: 0 }}>
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>Hverdage (ma-fr):</Typography>
