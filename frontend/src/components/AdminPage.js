@@ -268,7 +268,7 @@ export default function AdminPage() {
 
   // Endelig sletning af bruger
   const handleFinalDeleteUser = () => {
-    if (!userToDelete) return;
+    if (!userToDelete || userToDelete.role === "admin") return;
     axios.delete(`${API_URL}/api/users/${userToDelete.id}`, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
@@ -299,7 +299,7 @@ export default function AdminPage() {
 
   const handleEditUser = () => {
     if (!editUser) return;
-    const { id, role, is_active, password, password2, school_id } = editUser;
+    const { id, role, is_active, password, password2 } = editUser;
     if (password && password !== password2) {
       setUserError("Kodeordene matcher ikke");
       showSnackbar("Kodeordene matcher ikke", "error");
@@ -309,7 +309,6 @@ export default function AdminPage() {
       role: role === "administrator" ? "admin" : "bruger",
       is_active,
       password: password ? password : undefined,
-      school_id: role === "bruger" ? school_id : undefined
     }, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
@@ -705,9 +704,13 @@ export default function AdminPage() {
                           </IconButton>
                         </span>
                       </Tooltip>
-                      <Tooltip title="Slet bruger">
+                      <Tooltip title={user.role === "admin" ? "Administrator kan ikke slettes" : "Slet bruger"}>
                         <span>
-                          <IconButton color="error" onClick={() => handleOpenDeleteUserDialog(user)}>
+                          <IconButton
+                            color="error"
+                            onClick={() => handleOpenDeleteUserDialog(user)}
+                            disabled={user.role === "admin"}
+                          >
                             <DeleteIcon />
                           </IconButton>
                         </span>
@@ -730,29 +733,15 @@ export default function AdminPage() {
                   <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                   <Select
                     labelId="edit-rolle-label"
-                    value={editUser.role}
+                    value={editUser.role === "admin" ? "administrator" : "bruger"}
                     label="Rolle"
+                    disabled={editUser.role === "admin"}
                     onChange={e => setEditUser({ ...editUser, role: e.target.value })}
                   >
                     <MenuItem value="administrator">Administrator</MenuItem>
                     <MenuItem value="bruger">Bruger</MenuItem>
                   </Select>
                 </FormControl>
-                {editUser.role === "bruger" && (
-                  <FormControl fullWidth>
-                    <InputLabel id="edit-skole-label">Skole</InputLabel>
-                    <Select
-                      labelId="edit-skole-label"
-                      value={editUser.school_id || ""}
-                      label="Skole"
-                      onChange={e => setEditUser({ ...editUser, school_id: e.target.value })}
-                    >
-                      {getSortedSchools().map(school => (
-                        <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                )}
                 <FormControl fullWidth>
                   <InputLabel id="edit-status-label">Status</InputLabel>
                   <Select
@@ -799,12 +788,17 @@ export default function AdminPage() {
             Advarsel: Du er ved at slette brugeren <b>{userToDelete?.username}</b>.<br />
             Denne handling kan <b>ikke fortrydes!</b>
           </Typography>
-          {deleteUserStep === 1 && (
+          {userToDelete?.role === "admin" && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              Administrator-brugere kan ikke slettes.
+            </Typography>
+          )}
+          {deleteUserStep === 1 && userToDelete?.role !== "admin" && (
             <Typography sx={{ mb: 2 }}>
               Er du sikker på at du vil slette denne bruger?
             </Typography>
           )}
-          {deleteUserStep === 2 && (
+          {deleteUserStep === 2 && userToDelete?.role !== "admin" && (
             <Typography color="error" sx={{ mb: 2 }}>
               Tryk <b>Slet endeligt</b> for at bekræfte.
             </Typography>
@@ -817,14 +811,16 @@ export default function AdminPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDeleteUserDialog}>Annuller</Button>
-          {deleteUserStep === 1 ? (
-            <Button color="warning" variant="contained" onClick={handleFirstDeleteUserConfirm}>
-              Bekræft sletning
-            </Button>
-          ) : (
-            <Button color="error" variant="contained" onClick={handleFinalDeleteUser}>
-              Slet endeligt
-            </Button>
+          {userToDelete?.role !== "admin" && (
+            deleteUserStep === 1 ? (
+              <Button color="warning" variant="contained" onClick={handleFirstDeleteUserConfirm}>
+                Bekræft sletning
+              </Button>
+            ) : (
+              <Button color="error" variant="contained" onClick={handleFinalDeleteUser}>
+                Slet endeligt
+              </Button>
+            )
           )}
         </DialogActions>
       </Dialog>
