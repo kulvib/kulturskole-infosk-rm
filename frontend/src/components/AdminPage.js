@@ -325,6 +325,12 @@ export default function AdminPage() {
       });
   };
 
+  // Helper: get sorted schools alphabetically
+  const getSortedSchools = () =>
+    schools
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, minHeight: "60vh", p: 2 }}>
       <Snackbar
@@ -362,7 +368,7 @@ export default function AdminPage() {
                 disabled={loadingSchools}
               >
                 {Array.isArray(schools) &&
-                  schools.map(school => (
+                  getSortedSchools().map(school => (
                     <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
                   ))}
               </Select>
@@ -463,7 +469,7 @@ export default function AdminPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                Array.isArray(schools) && schools.map((school) => (
+                getSortedSchools().map((school) => (
                   <TableRow key={school.id ?? school.name} hover>
                     <TableCell>{school.name}</TableCell>
                     <TableCell align="right">
@@ -609,7 +615,7 @@ export default function AdminPage() {
                 label="Skole"
                 onChange={e => setNewUser({ ...newUser, school_id: e.target.value })}
               >
-                {schools.map(school => (
+                {getSortedSchools().map(school => (
                   <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
                 ))}
               </Select>
@@ -717,7 +723,7 @@ export default function AdminPage() {
                       label="Skole"
                       onChange={e => setEditUser({ ...editUser, school_id: e.target.value })}
                     >
-                      {schools.map(school => (
+                      {getSortedSchools().map(school => (
                         <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
                       ))}
                     </Select>
