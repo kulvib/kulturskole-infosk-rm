@@ -344,6 +344,9 @@ export default function AdminPage() {
     ? (schools.find(s => s.id === selectedSchool)?.name || "")
     : "";
 
+  // Helper for input alignment
+  const inputSx = { minWidth: 180, my: 0 };
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, minHeight: "60vh", p: 2 }}>
       <Snackbar
@@ -364,14 +367,14 @@ export default function AdminPage() {
         Her kan du oprette og administrere brugere, godkende skoler og bestemme standardtider.
       </Typography>
 
-      {/* Skolevalg + tænd/sluk tider - ENS FELTER OG FORMATERET TITEL */}
+      {/* -------- PAPER 1 -------- */}
       <Paper sx={{ mb: 4, p: 3 }}>
-        <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-start">
+        <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-end">
           <Box sx={{ flex: 1, minWidth: 240 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Vælg skole
             </Typography>
-            <FormControl size="small" fullWidth sx={{ minWidth: 180 }}>
+            <FormControl size="small" fullWidth sx={inputSx}>
               <InputLabel id="skole-select-label">Skole</InputLabel>
               <Select
                 labelId="skole-select-label"
@@ -398,7 +401,7 @@ export default function AdminPage() {
                 </Typography>
               )}
             </Box>
-            <Stack direction="row" gap={4} alignItems="center" sx={{ mt: 0 }}>
+            <Stack direction="row" gap={4} alignItems="flex-end" sx={{ mt: 0 }}>
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>Hverdage (ma-fr):</Typography>
                 <Stack direction="row" gap={2}>
@@ -463,381 +466,331 @@ export default function AdminPage() {
         </Stack>
       </Paper>
 
-      {/* SKOLE OPRETTELSE OG LISTE */}
+      {/* -------- PAPER 2 -------- */}
       <Paper sx={{ mb: 4, p: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-          Tilføj og se godkendte skoler
-        </Typography>
-        <Stack direction={{ xs: "column", md: "row" }} gap={2} sx={{ mb: 2 }}>
-          <TextField
-            label="Skole-navn"
-            value={schoolName}
-            onChange={e => setSchoolName(e.target.value)}
-            error={!!error}
-            helperText={error}
-          />
-          <Button variant="contained" onClick={handleAddSchool}>
-            Tilføj skole
-          </Button>
-        </Stack>
-        {deleteError && (
-          <Typography color="error" sx={{ mb: 2 }}>
-            {deleteError}
-          </Typography>
-        )}
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Skole</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {Array.isArray(schools) && schools.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={2} align="center" sx={{ color: "#888" }}>
-                    Ingen skoler oprettet endnu
-                  </TableCell>
-                </TableRow>
-              ) : (
-                getSortedSchools().map((school) => (
-                  <TableRow key={school.id ?? school.name} hover>
-                    <TableCell>{school.name}</TableCell>
-                    <TableCell align="right">
-                      <Tooltip title="Slet skole">
-                        <span>
-                          <IconButton
-                            edge="end"
-                            aria-label="slet"
-                            color="error"
-                            onClick={() => handleOpenDeleteDialog(school)}
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </TableCell>
+        <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-end">
+          <Box sx={{ flex: 2, minWidth: 340 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+              Tilføj og se godkendte skoler
+            </Typography>
+            <Stack direction="row" gap={2} alignItems="flex-end" sx={{ mb: 2 }}>
+              <TextField
+                label="Skole-navn"
+                value={schoolName}
+                onChange={e => setSchoolName(e.target.value)}
+                error={!!error}
+                helperText={error}
+                size="small"
+                sx={inputSx}
+                fullWidth
+              />
+              <Button variant="contained" sx={{ height: 40, minWidth: 140 }} onClick={handleAddSchool}>
+                Tilføj skole
+              </Button>
+            </Stack>
+            {deleteError && (
+              <Typography color="error" sx={{ mb: 2 }}>
+                {deleteError}
+              </Typography>
+            )}
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>Skole</TableCell>
+                    <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                </TableHead>
+                <TableBody>
+                  {Array.isArray(schools) && schools.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={2} align="center" sx={{ color: "#888" }}>
+                        Ingen skoler oprettet endnu
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    getSortedSchools().map((school) => (
+                      <TableRow key={school.id ?? school.name} hover>
+                        <TableCell>{school.name}</TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Slet skole">
+                            <span>
+                              <IconButton
+                                edge="end"
+                                aria-label="slet"
+                                color="error"
+                                onClick={() => handleOpenDeleteDialog(school)}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        </Stack>
       </Paper>
 
-      {/* SLET SKOLE DIALOG MED DOBBELT BEKRÆFTELSE OG TABEL */}
-      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog} maxWidth="md" fullWidth>
-        <DialogTitle>
-          Slet skole: {schoolToDelete?.name}
-        </DialogTitle>
-        <DialogContent>
-          <Typography color="error" gutterBottom sx={{ mb: 2 }}>
-            Advarsel: Du er ved at slette skolen <b>{schoolToDelete?.name}</b>.<br />
-            Alle tilknyttede klienter vil også blive slettet!
-          </Typography>
-          {loadingClients ? (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-              <CircularProgress size={24} />
-              <Typography>Henter tilknyttede klienter...</Typography>
-            </Box>
-          ) : (
-            <>
-              {Array.isArray(clientsToDelete) && clientsToDelete.length > 0 ? (
-                <TableContainer sx={{ mb: 2 }}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell><b>Klient ID</b></TableCell>
-                        <TableCell><b>Lokation</b></TableCell>
-                        <TableCell><b>Skole</b></TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {clientsToDelete.map(client => (
-                        <TableRow key={client.id}>
-                          <TableCell>{client.id}</TableCell>
-                          <TableCell>{client.locality || client.name || "-"}</TableCell>
-                          <TableCell>{schoolToDelete?.name}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              ) : (
-                <Typography sx={{ mb: 2 }}>Ingen klienter er tilknyttet denne skole.</Typography>
-              )}
-            </>
-          )}
-          {deleteStep === 1 && (
-            <Typography sx={{ mb: 2 }}>
-              Er du sikker på at du vil slette denne skole og alle dens klienter?
-            </Typography>
-          )}
-          {deleteStep === 2 && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              Denne handling kan <b>ikke fortrydes!</b><br />
-              Tryk <b>Slet endeligt</b> for at bekræfte.
-            </Typography>
-          )}
-          {deleteError && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              {deleteError}
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDeleteDialog}>Annuller</Button>
-          {deleteStep === 1 ? (
-            <Button color="warning" variant="contained" onClick={handleFirstDeleteConfirm} disabled={loadingClients}>
-              Bekræft sletning
-            </Button>
-          ) : (
-            <Button color="error" variant="contained" onClick={handleFinalDeleteSchool} disabled={loadingClients}>
-              Slet endeligt
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
-
-      {/* ----------- BRUGERADMINISTRATION ----------- */}
+      {/* -------- PAPER 3 -------- */}
       <Paper sx={{ mb: 4, p: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-          Brugeradministration
-        </Typography>
-        <Typography variant="body2" sx={{ mb: 2 }}>
-          Opret, redigér og slet brugere (kræver admin-rettigheder)
-        </Typography>
-        <Stack direction={{ xs: "column", md: "row" }} gap={2} sx={{ mb: 2 }}>
-          <TextField
-            label="Brugernavn"
-            value={newUser.username}
-            onChange={e => setNewUser({ ...newUser, username: e.target.value })}
-          />
-          <TextField
-            label="Kodeord"
-            type={showPassword ? "text" : "password"}
-            value={newUser.password}
-            onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowPassword((show) => !show)}
-                    edge="end"
-                    tabIndex={-1}
+        <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-end">
+          <Box sx={{ flex: 2, minWidth: 340 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+              Brugeradministration
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Opret, redigér og slet brugere (kræver admin-rettigheder)
+            </Typography>
+            <Stack direction="row" gap={2} alignItems="flex-end" sx={{ mb: 2 }}>
+              <TextField
+                label="Brugernavn"
+                value={newUser.username}
+                onChange={e => setNewUser({ ...newUser, username: e.target.value })}
+                size="small"
+                sx={inputSx}
+                fullWidth
+              />
+              <TextField
+                label="Kodeord"
+                type={showPassword ? "text" : "password"}
+                value={newUser.password}
+                onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                size="small"
+                sx={inputSx}
+                fullWidth
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword((show) => !show)}
+                        edge="end"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+              <TextField
+                label="Gentag kodeord"
+                type={showPassword2 ? "text" : "password"}
+                value={newUser.password2}
+                onChange={e => setNewUser({ ...newUser, password2: e.target.value })}
+                size="small"
+                sx={inputSx}
+                fullWidth
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword2((show) => !show)}
+                        edge="end"
+                        tabIndex={-1}
+                      >
+                        {showPassword2 ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+              <FormControl size="small" sx={inputSx} fullWidth>
+                <InputLabel id="rolle-label">Rolle</InputLabel>
+                <Select
+                  labelId="rolle-label"
+                  value={newUser.role}
+                  label="Rolle"
+                  onChange={e => setNewUser({ ...newUser, role: e.target.value })}
+                >
+                  <MenuItem value="administrator">Administrator</MenuItem>
+                  <MenuItem value="bruger">Bruger</MenuItem>
+                </Select>
+              </FormControl>
+              {newUser.role === "bruger" && (
+                <FormControl size="small" sx={inputSx} fullWidth>
+                  <InputLabel id="skole-label">Skole</InputLabel>
+                  <Select
+                    labelId="skole-label"
+                    value={newUser.school_id}
+                    label="Skole"
+                    onChange={e => setNewUser({ ...newUser, school_id: e.target.value })}
                   >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
-          <TextField
-            label="Gentag kodeord"
-            type={showPassword2 ? "text" : "password"}
-            value={newUser.password2}
-            onChange={e => setNewUser({ ...newUser, password2: e.target.value })}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowPassword2((show) => !show)}
-                    edge="end"
-                    tabIndex={-1}
-                  >
-                    {showPassword2 ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
-          <FormControl sx={{ minWidth: 120 }}>
-            <InputLabel id="rolle-label">Rolle</InputLabel>
-            <Select
-              labelId="rolle-label"
-              value={newUser.role}
-              label="Rolle"
-              onChange={e => setNewUser({ ...newUser, role: e.target.value })}
-            >
-              <MenuItem value="administrator">Administrator</MenuItem>
-              <MenuItem value="bruger">Bruger</MenuItem>
-            </Select>
-          </FormControl>
-          {newUser.role === "bruger" && (
-            <FormControl sx={{ minWidth: 120 }}>
-              <InputLabel id="skole-label">Skole</InputLabel>
-              <Select
-                labelId="skole-label"
-                value={newUser.school_id}
-                label="Skole"
-                onChange={e => setNewUser({ ...newUser, school_id: e.target.value })}
-              >
-                {getSortedSchools().map(school => (
-                  <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
-          <FormControl sx={{ minWidth: 120 }}>
-            <InputLabel id="status-label">Status</InputLabel>
-            <Select
-              labelId="status-label"
-              value={newUser.is_active ? "true" : "false"}
-              label="Status"
-              onChange={e => setNewUser({ ...newUser, is_active: e.target.value === "true" })}
-            >
-              <MenuItem value="true">Aktiv</MenuItem>
-              <MenuItem value="false">Spærret</MenuItem>
-            </Select>
-          </FormControl>
-          <Button variant="contained" onClick={handleAddUser}>Opret bruger</Button>
-        </Stack>
-        {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Brugernavn</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Rolle</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Skole</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loadingUsers ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    <CircularProgress size={24} />
-                  </TableCell>
-                </TableRow>
-              ) : Array.isArray(users) && users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ color: "#888" }}>
-                    Ingen brugere oprettet endnu
-                  </TableCell>
-                </TableRow>
-              ) : (
-                users.map(user => (
-                  <TableRow key={user.id} hover>
-                    <TableCell>{user.id}</TableCell>
-                    <TableCell>{user.username}</TableCell>
-                    <TableCell>{user.role === "admin" ? "administrator" : "bruger"}</TableCell>
-                    <TableCell>{user.is_active ? "Aktiv" : "Spærret"}</TableCell>
-                    <TableCell>
-                      {user.school_id
-                        ? (schools.find(s => s.id === user.school_id)?.name ?? user.school_id)
-                        : "-"}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Tooltip title="Rediger bruger">
-                        <span>
-                          <IconButton onClick={() => openEditUserDialog(user)}>
-                            <EditIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      <Tooltip title={user.role === "admin" ? "Administrator kan ikke slettes" : "Slet bruger"}>
-                        <span>
-                          <IconButton
-                            color="error"
-                            onClick={() => handleOpenDeleteUserDialog(user)}
-                            disabled={user.role === "admin"}
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
+                    {getSortedSchools().map(school => (
+                      <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        {/* Dialog til redigering */}
-        <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)}>
-          <DialogTitle>Rediger bruger</DialogTitle>
-          <DialogContent>
-            {editUser && (
-              <Stack gap={2} sx={{ mt: 1 }}>
-                <TextField label="Brugernavn" value={editUser.username} disabled fullWidth />
-                <FormControl fullWidth>
-                  <InputLabel id="edit-rolle-label">Rolle</InputLabel>
-                  <Select
-                    labelId="edit-rolle-label"
-                    value={editUser.role === "admin" ? "administrator" : "bruger"}
-                    label="Rolle"
-                    disabled={editUser.role === "admin"}
-                    onChange={e => setEditUser({ ...editUser, role: e.target.value })}
-                  >
-                    <MenuItem value="administrator">Administrator</MenuItem>
-                    <MenuItem value="bruger">Bruger</MenuItem>
-                  </Select>
-                </FormControl>
-                <FormControl fullWidth>
-                  <InputLabel id="edit-status-label">Status</InputLabel>
-                  <Select
-                    labelId="edit-status-label"
-                    value={editUser.is_active ? "true" : "false"}
-                    label="Status"
-                    onChange={e => setEditUser({ ...editUser, is_active: e.target.value === "true" })}
-                  >
-                    <MenuItem value="true">Aktiv</MenuItem>
-                    <MenuItem value="false">Spærret</MenuItem>
-                  </Select>
-                </FormControl>
-                <TextField
-                  label="Nyt kodeord"
-                  type={showEditPassword ? "text" : "password"}
-                  value={editUser.password || ""}
-                  onChange={e => setEditUser({ ...editUser, password: e.target.value })}
-                  fullWidth
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          onClick={() => setShowEditPassword((show) => !show)}
-                          edge="end"
-                          tabIndex={-1}
-                        >
-                          {showEditPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-                <TextField
-                  label="Gentag nyt kodeord"
-                  type={showEditPassword2 ? "text" : "password"}
-                  value={editUser.password2 || ""}
-                  onChange={e => setEditUser({ ...editUser, password2: e.target.value })}
-                  fullWidth
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          onClick={() => setShowEditPassword2((show) => !show)}
-                          edge="end"
-                          tabIndex={-1}
-                        >
-                          {showEditPassword2 ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              </Stack>
-            )}
-            {userError && <Typography color="error" sx={{ mt: 2 }}>{userError}</Typography>}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setUserDialogOpen(false)}>Annuller</Button>
-            <Button variant="contained" onClick={handleEditUser}>Gem ændringer</Button>
-          </DialogActions>
-        </Dialog>
+              <FormControl size="small" sx={inputSx} fullWidth>
+                <InputLabel id="status-label">Status</InputLabel>
+                <Select
+                  labelId="status-label"
+                  value={newUser.is_active ? "true" : "false"}
+                  label="Status"
+                  onChange={e => setNewUser({ ...newUser, is_active: e.target.value === "true" })}
+                >
+                  <MenuItem value="true">Aktiv</MenuItem>
+                  <MenuItem value="false">Spærret</MenuItem>
+                </Select>
+              </FormControl>
+              <Button variant="contained" sx={{ height: 40, minWidth: 140 }} onClick={handleAddUser}>Opret bruger</Button>
+            </Stack>
+            {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Brugernavn</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Rolle</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Skole</TableCell>
+                    <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loadingUsers ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center">
+                        <CircularProgress size={24} />
+                      </TableCell>
+                    </TableRow>
+                  ) : Array.isArray(users) && users.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ color: "#888" }}>
+                        Ingen brugere oprettet endnu
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    users.map(user => (
+                      <TableRow key={user.id} hover>
+                        <TableCell>{user.id}</TableCell>
+                        <TableCell>{user.username}</TableCell>
+                        <TableCell>{user.role === "admin" ? "administrator" : "bruger"}</TableCell>
+                        <TableCell>{user.is_active ? "Aktiv" : "Spærret"}</TableCell>
+                        <TableCell>
+                          {user.school_id
+                            ? (schools.find(s => s.id === user.school_id)?.name ?? user.school_id)
+                            : "-"}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Rediger bruger">
+                            <span>
+                              <IconButton onClick={() => openEditUserDialog(user)}>
+                                <EditIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title={user.role === "admin" ? "Administrator kan ikke slettes" : "Slet bruger"}>
+                            <span>
+                              <IconButton
+                                color="error"
+                                onClick={() => handleOpenDeleteUserDialog(user)}
+                                disabled={user.role === "admin"}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            {/* Dialog til redigering */}
+            <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)}>
+              <DialogTitle>Rediger bruger</DialogTitle>
+              <DialogContent>
+                {editUser && (
+                  <Stack gap={2} sx={{ mt: 1 }}>
+                    <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" sx={inputSx} />
+                    <FormControl fullWidth size="small" sx={inputSx}>
+                      <InputLabel id="edit-rolle-label">Rolle</InputLabel>
+                      <Select
+                        labelId="edit-rolle-label"
+                        value={editUser.role === "admin" ? "administrator" : "bruger"}
+                        label="Rolle"
+                        disabled={editUser.role === "admin"}
+                        onChange={e => setEditUser({ ...editUser, role: e.target.value })}
+                      >
+                        <MenuItem value="administrator">Administrator</MenuItem>
+                        <MenuItem value="bruger">Bruger</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <FormControl fullWidth size="small" sx={inputSx}>
+                      <InputLabel id="edit-status-label">Status</InputLabel>
+                      <Select
+                        labelId="edit-status-label"
+                        value={editUser.is_active ? "true" : "false"}
+                        label="Status"
+                        onChange={e => setEditUser({ ...editUser, is_active: e.target.value === "true" })}
+                      >
+                        <MenuItem value="true">Aktiv</MenuItem>
+                        <MenuItem value="false">Spærret</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField
+                      label="Nyt kodeord"
+                      type={showEditPassword ? "text" : "password"}
+                      value={editUser.password || ""}
+                      onChange={e => setEditUser({ ...editUser, password: e.target.value })}
+                      fullWidth
+                      size="small"
+                      sx={inputSx}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              onClick={() => setShowEditPassword((show) => !show)}
+                              edge="end"
+                              tabIndex={-1}
+                            >
+                              {showEditPassword ? <VisibilityOff /> : <Visibility />}
+                            </IconButton>
+                          </InputAdornment>
+                        )
+                      }}
+                    />
+                    <TextField
+                      label="Gentag nyt kodeord"
+                      type={showEditPassword2 ? "text" : "password"}
+                      value={editUser.password2 || ""}
+                      onChange={e => setEditUser({ ...editUser, password2: e.target.value })}
+                      fullWidth
+                      size="small"
+                      sx={inputSx}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              onClick={() => setShowEditPassword2((show) => !show)}
+                              edge="end"
+                              tabIndex={-1}
+                            >
+                              {showEditPassword2 ? <VisibilityOff /> : <Visibility />}
+                            </IconButton>
+                          </InputAdornment>
+                        )
+                      }}
+                    />
+                  </Stack>
+                )}
+                {userError && <Typography color="error" sx={{ mt: 2 }}>{userError}</Typography>}
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setUserDialogOpen(false)}>Annuller</Button>
+                <Button variant="contained" onClick={handleEditUser}>Gem ændringer</Button>
+              </DialogActions>
+            </Dialog>
+          </Box>
+        </Stack>
       </Paper>
       {/* SLET BRUGER DIALOG MED DOBBELT BEKRÆFTELSE */}
       <Dialog open={deleteUserDialogOpen} onClose={handleCloseDeleteUserDialog} maxWidth="sm" fullWidth>
