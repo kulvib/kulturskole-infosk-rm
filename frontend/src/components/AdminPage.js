@@ -339,11 +339,6 @@ export default function AdminPage() {
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
 
-  // Helper: get selected school name
-  const selectedSchoolName = Array.isArray(schools)
-    ? (schools.find(s => s.id === selectedSchool)?.name || "")
-    : "";
-
   // Helper for input alignment
   const inputSx = { minWidth: 180, my: 0 };
 
@@ -366,7 +361,12 @@ export default function AdminPage() {
 
       {/* -------- PAPER 1 -------- */}
       <Paper sx={{ mb: 4, p: 3 }}>
-        <Stack direction="row" gap={4} alignItems="flex-start">
+        <Stack
+          direction="row"
+          gap={4}
+          alignItems="flex-end"
+          sx={{ width: "100%", flexWrap: "wrap" }}
+        >
           {/* Venstre kolonne */}
           <Box sx={{ flex: 1, minWidth: 240 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
@@ -393,10 +393,15 @@ export default function AdminPage() {
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
               Standard tænd/sluk tider:
             </Typography>
-            <Stack direction="row" gap={4} alignItems="flex-end">
+            <Stack
+              direction="row"
+              gap={2}
+              alignItems="flex-end"
+              sx={{ mt: 0, flexWrap: "wrap" }}
+            >
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>Hverdage (ma-fr):</Typography>
-                <Stack direction="row" gap={2}>
+                <Stack direction="row" gap={1}>
                   <TextField
                     label="Tænd kl."
                     type="time"
@@ -421,7 +426,7 @@ export default function AdminPage() {
               </Box>
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>Weekend (lø-sø):</Typography>
-                <Stack direction="row" gap={2}>
+                <Stack direction="row" gap={1}>
                   <TextField
                     label="Tænd kl."
                     type="time"
@@ -564,7 +569,7 @@ export default function AdminPage() {
                         edge="end"
                         tabIndex={-1}
                         size="small"
-                        sx={{ fontSize: 18 }} // Gør ikonet mindre
+                        sx={{ fontSize: 18 }}
                       >
                         {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                       </IconButton>
