@@ -366,10 +366,10 @@ export default function AdminPage() {
 
       {/* -------- PAPER 1 -------- */}
       <Paper sx={{ mb: 4, p: 3 }}>
-        <Stack direction="row" gap={4} alignItems="flex-start" width="100%" sx={{ mt: 4 }}>
+        <Stack direction="row" gap={4} alignItems="flex-start">
           {/* Venstre kolonne */}
-          <Box sx={{ flex: 1, minWidth: 240, pt: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+          <Box sx={{ flex: 1, minWidth: 240 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
               Vælg skole
             </Typography>
             <FormControl size="small" fullWidth sx={inputSx}>
@@ -390,10 +390,10 @@ export default function AdminPage() {
           </Box>
           {/* Højre kolonne */}
           <Box sx={{ flex: 2, minWidth: 300 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
               Standard tænd/sluk tider:
             </Typography>
-            <Stack direction="row" gap={4} alignItems="flex-end" sx={{ mt: 0 }}>
+            <Stack direction="row" gap={4} alignItems="flex-end">
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>Hverdage (ma-fr):</Typography>
                 <Stack direction="row" gap={2}>
@@ -563,8 +563,10 @@ export default function AdminPage() {
                         onClick={() => setShowPassword((show) => !show)}
                         edge="end"
                         tabIndex={-1}
+                        size="small"
+                        sx={{ fontSize: 18 }} // Gør ikonet mindre
                       >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                        {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                       </IconButton>
                     </InputAdornment>
                   )
@@ -585,8 +587,10 @@ export default function AdminPage() {
                         onClick={() => setShowPassword2((show) => !show)}
                         edge="end"
                         tabIndex={-1}
+                        size="small"
+                        sx={{ fontSize: 18 }}
                       >
-                        {showPassword2 ? <VisibilityOff /> : <Visibility />}
+                        {showPassword2 ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                       </IconButton>
                     </InputAdornment>
                   )
@@ -747,8 +751,10 @@ export default function AdminPage() {
                               onClick={() => setShowEditPassword((show) => !show)}
                               edge="end"
                               tabIndex={-1}
+                              size="small"
+                              sx={{ fontSize: 18 }}
                             >
-                              {showEditPassword ? <VisibilityOff /> : <Visibility />}
+                              {showEditPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                             </IconButton>
                           </InputAdornment>
                         )
@@ -769,8 +775,10 @@ export default function AdminPage() {
                               onClick={() => setShowEditPassword2((show) => !show)}
                               edge="end"
                               tabIndex={-1}
+                              size="small"
+                              sx={{ fontSize: 18 }}
                             >
-                              {showEditPassword2 ? <VisibilityOff /> : <Visibility />}
+                              {showEditPassword2 ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                             </IconButton>
                           </InputAdornment>
                         )
