@@ -331,6 +331,11 @@ export default function AdminPage() {
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
 
+  // Helper: get selected school name
+  const selectedSchoolName = Array.isArray(schools)
+    ? (schools.find(s => s.id === selectedSchool)?.name || "")
+    : "";
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, minHeight: "60vh", p: 2 }}>
       <Snackbar
@@ -351,14 +356,14 @@ export default function AdminPage() {
         Her kan du oprette og administrere brugere, godkende skoler og bestemme standardtider.
       </Typography>
 
-      {/* Skolevalg + tænd/sluk tider */}
+      {/* Skolevalg + tænd/sluk tider - ENS FELTER OG FORMATERET TITEL */}
       <Paper sx={{ mb: 4, p: 3 }}>
         <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-start">
           <Box sx={{ flex: 1, minWidth: 240 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Vælg skole
             </Typography>
-            <FormControl fullWidth>
+            <FormControl size="small" fullWidth sx={{ minWidth: 180 }}>
               <InputLabel id="skole-select-label">Skole</InputLabel>
               <Select
                 labelId="skole-select-label"
@@ -375,16 +380,26 @@ export default function AdminPage() {
             </FormControl>
           </Box>
           <Box sx={{ flex: 2, minWidth: 300 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Standard tænd/sluk tider {selectedSchool ? `- ${Array.isArray(schools) ? (schools.find(s => s.id === selectedSchool)?.name || "") : ""}` : ""}
-            </Typography>
-            <Stack direction="row" gap={4} alignItems="center" sx={{ mt: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+              <Typography component="span" sx={{ fontWeight: 700 }}>
+                Standard tænd/sluk tider:
+              </Typography>
+              {selectedSchool && (
+                <Typography component="span" sx={{ fontWeight: 400, ml: 1 }}>
+                  {selectedSchoolName}
+                </Typography>
+              )}
+            </Box>
+            <Stack direction="row" gap={4} alignItems="center" sx={{ mt: 0 }}>
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>Hverdage (ma-fr):</Typography>
                 <Stack direction="row" gap={2}>
                   <TextField
                     label="Tænd kl."
                     type="time"
+                    size="small"
+                    fullWidth
+                    sx={{ minWidth: 120 }}
                     value={weekdayTimes.onTime}
                     onChange={e => setWeekdayTimes({ ...weekdayTimes, onTime: e.target.value })}
                     disabled={!selectedSchool}
@@ -392,6 +407,9 @@ export default function AdminPage() {
                   <TextField
                     label="Sluk kl."
                     type="time"
+                    size="small"
+                    fullWidth
+                    sx={{ minWidth: 120 }}
                     value={weekdayTimes.offTime}
                     onChange={e => setWeekdayTimes({ ...weekdayTimes, offTime: e.target.value })}
                     disabled={!selectedSchool}
@@ -404,6 +422,9 @@ export default function AdminPage() {
                   <TextField
                     label="Tænd kl."
                     type="time"
+                    size="small"
+                    fullWidth
+                    sx={{ minWidth: 120 }}
                     value={weekendTimes.onTime}
                     onChange={e => setWeekendTimes({ ...weekendTimes, onTime: e.target.value })}
                     disabled={!selectedSchool}
@@ -411,6 +432,9 @@ export default function AdminPage() {
                   <TextField
                     label="Sluk kl."
                     type="time"
+                    size="small"
+                    fullWidth
+                    sx={{ minWidth: 120 }}
                     value={weekendTimes.offTime}
                     onChange={e => setWeekendTimes({ ...weekendTimes, offTime: e.target.value })}
                     disabled={!selectedSchool}
@@ -420,7 +444,7 @@ export default function AdminPage() {
               <Button
                 variant="contained"
                 size="large"
-                sx={{ minWidth: 140, height: 56 }}
+                sx={{ minWidth: 140, height: 40, alignSelf: "flex-end" }}
                 onClick={handleSaveTimes}
                 disabled={!selectedSchool}
               >
