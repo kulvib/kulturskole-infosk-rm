@@ -25,9 +25,12 @@ import {
   FormControl,
   InputLabel,
   TextField,
+  InputAdornment
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
@@ -72,6 +75,12 @@ export default function AdminPage() {
   const [userToDelete, setUserToDelete] = useState(null);
   const [deleteUserError, setDeleteUserError] = useState("");
   const [deleteUserStep, setDeleteUserStep] = useState(1);
+
+  // VIS/SKJUL PASSWORD
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword2, setShowPassword2] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showEditPassword2, setShowEditPassword2] = useState(false);
 
   // SNACKBAR
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -607,15 +616,41 @@ export default function AdminPage() {
           />
           <TextField
             label="Kodeord"
-            type="password"
+            type={showPassword ? "text" : "password"}
             value={newUser.password}
             onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword((show) => !show)}
+                    edge="end"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
           />
           <TextField
             label="Gentag kodeord"
-            type="password"
+            type={showPassword2 ? "text" : "password"}
             value={newUser.password2}
             onChange={e => setNewUser({ ...newUser, password2: e.target.value })}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword2((show) => !show)}
+                    edge="end"
+                    tabIndex={-1}
+                  >
+                    {showPassword2 ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
           />
           <FormControl sx={{ minWidth: 120 }}>
             <InputLabel id="rolle-label">Rolle</InputLabel>
@@ -756,17 +791,43 @@ export default function AdminPage() {
                 </FormControl>
                 <TextField
                   label="Nyt kodeord"
-                  type="password"
+                  type={showEditPassword ? "text" : "password"}
                   value={editUser.password || ""}
                   onChange={e => setEditUser({ ...editUser, password: e.target.value })}
                   fullWidth
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => setShowEditPassword((show) => !show)}
+                          edge="end"
+                          tabIndex={-1}
+                        >
+                          {showEditPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
                 />
                 <TextField
                   label="Gentag nyt kodeord"
-                  type="password"
+                  type={showEditPassword2 ? "text" : "password"}
                   value={editUser.password2 || ""}
                   onChange={e => setEditUser({ ...editUser, password2: e.target.value })}
                   fullWidth
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => setShowEditPassword2((show) => !show)}
+                          edge="end"
+                          tabIndex={-1}
+                        >
+                          {showEditPassword2 ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
                 />
               </Stack>
             )}
