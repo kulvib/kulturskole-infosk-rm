@@ -25,7 +25,7 @@ import {
   FormControl,
   InputLabel,
   TextField,
-  InputAdornment
+  InputAdornment,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
@@ -365,13 +365,19 @@ export default function AdminPage() {
       </Typography>
 
       {/* -------- PAPER 1 -------- */}
-      <Paper sx={{ mb: 4, p: 3 }}>
-        <Stack direction="row" gap={4} alignItems="flex-end" width="100%">
-          <Box sx={{ flex: 1, minWidth: 240 }}>
-            {/* Overskrift i øverste venstre hjørne */}
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-              Vælg skole
-            </Typography>
+      <Paper sx={{ mb: 4, p: 3, position: "relative" }}>
+        {/* Overskrift i absolut øverste venstre hjørne */}
+        <Typography variant="h6" sx={{
+          fontWeight: 700,
+          position: "absolute",
+          top: 24,
+          left: 24,
+          zIndex: 2
+        }}>
+          Vælg skole
+        </Typography>
+        <Stack direction="row" gap={4} alignItems="flex-end" width="100%" sx={{ mt: 4 }}>
+          <Box sx={{ flex: 1, minWidth: 240, pt: 2 }}>
             <FormControl size="small" fullWidth sx={inputSx}>
               <InputLabel id="skole-select-label">Skole</InputLabel>
               <Select
@@ -636,7 +642,7 @@ export default function AdminPage() {
                   <MenuItem value="false">Spærret</MenuItem>
                 </Select>
               </FormControl>
-              {/* Opret bruger knappen NU INDENFOR PAPER */}
+              {/* Opret bruger knappen NU INDENFOR PAPER OG STACK */}
               <Button variant="contained" sx={{ height: 40, minWidth: 140 }} onClick={handleAddUser}>Opret bruger</Button>
             </Stack>
             {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
