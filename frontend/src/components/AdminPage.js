@@ -31,6 +31,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import SearchIcon from "@mui/icons-material/Search";
 import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
@@ -47,6 +48,9 @@ export default function AdminPage() {
   const [schoolName, setSchoolName] = useState("");
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
+
+  // SØGNING I SKOLELISTE
+  const [schoolSearch, setSchoolSearch] = useState("");
 
   // SLET SKOLE FLOW
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -485,6 +489,17 @@ export default function AdminPage() {
                 Tilføj skole
               </Button>
             </Stack>
+            {/* Søgning */}
+            <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 2 }}>
+              <SearchIcon color="action" />
+              <TextField
+                size="small"
+                placeholder="Søg skole..."
+                value={schoolSearch}
+                onChange={e => setSchoolSearch(e.target.value)}
+                sx={{ maxWidth: 320 }}
+              />
+            </Stack>
             {deleteError && (
               <Typography color="error" sx={{ mb: 2 }}>
                 {deleteError}
@@ -506,25 +521,30 @@ export default function AdminPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    getSortedSchools().map((school) => (
-                      <TableRow key={school.id ?? school.name} hover>
-                        <TableCell>{school.name}</TableCell>
-                        <TableCell align="right">
-                          <Tooltip title="Slet skole">
-                            <span>
-                              <IconButton
-                                edge="end"
-                                aria-label="slet"
-                                color="error"
-                                onClick={() => handleOpenDeleteDialog(school)}
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    getSortedSchools()
+                      .filter(school =>
+                        !schoolSearch ||
+                        school.name.toLowerCase().includes(schoolSearch.toLowerCase())
+                      )
+                      .map((school) => (
+                        <TableRow key={school.id ?? school.name} hover>
+                          <TableCell>{school.name}</TableCell>
+                          <TableCell align="right">
+                            <Tooltip title="Slet skole">
+                              <span>
+                                <IconButton
+                                  edge="end"
+                                  aria-label="slet"
+                                  color="error"
+                                  onClick={() => handleOpenDeleteDialog(school)}
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      ))
                   )}
                 </TableBody>
               </Table>
