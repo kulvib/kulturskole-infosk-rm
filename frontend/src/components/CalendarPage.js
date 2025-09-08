@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
-  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem
+  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays, getSchools } from "../api";
@@ -656,26 +656,62 @@ export default function CalendarPage() {
 
   const isDisabled = !activeClient;
 
+  // Skole-listen skal sorteres alfabetisk, men "Alle skoler" skal være øverst
+  const sortedSchools = useMemo(() =>
+    [...schools].sort((a, b) => a.name.localeCompare(b.name)),
+    [schools]
+  );
+
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* Skolevælger øverst */}
-      <Paper elevation={2} sx={{ p: 2, mb: 3, display: "flex", alignItems: "center", gap: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          Vælg skole:
-        </Typography>
-        <Select
-          size="small"
-          value={selectedSchool}
-          displayEmpty
-          onChange={handleSchoolChange}
-          sx={{ minWidth: 180 }}
-        >
-          <MenuItem value="">Alle skoler</MenuItem>
-          <MenuItem disabled>--------</MenuItem>
-          {schools.map(school => (
-            <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-          ))}
-        </Select>
+      {/* Skolevælger øverst, med overlay-layout for loading */}
+      <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", alignItems: "center", gap: 2 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: "100%" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Vælg skole:
+            </Typography>
+            <Select
+              size="small"
+              value={selectedSchool}
+              displayEmpty
+              onChange={handleSchoolChange}
+              sx={{ minWidth: 180 }}
+            >
+              <MenuItem value="">Alle skoler</MenuItem>
+              <MenuItem disabled>--------</MenuItem>
+              {sortedSchools.map(school => (
+                <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+              ))}
+            </Select>
+          </Box>
+          <Tooltip title="Opdater klienter">
+            <span>
+              <Button
+                startIcon={
+                  loadingClients
+                    ? <CircularProgress size={20} />
+                    : <RefreshIcon />
+                }
+                onClick={fetchClients}
+                disabled={loadingClients}
+                sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
+              >
+                {loadingClients ? "Opdaterer..." : "Opdater"}
+              </Button>
+            </span>
+          </Tooltip>
+        </Stack>
+        {loadingClients && (
+          <Box sx={{
+            position: "absolute",
+            left: 0, top: 0, right: 0, bottom: 0,
+            background: "rgba(255,255,255,0.7)",
+            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10
+          }}>
+            <CircularProgress />
+          </Box>
+        )}
       </Paper>
 
       {/* Godkendte klienter for valgt skole */}
@@ -683,28 +719,6 @@ export default function CalendarPage() {
         Godkendte klienter
       </Typography>
       <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
-        <IconButton
-          aria-label="Opdater klienter"
-          onClick={fetchClients}
-          disabled={loadingClients}
-          sx={{
-            position: "absolute",
-            top: 12,
-            right: 12,
-            zIndex: 2,
-            background: "#fff",
-            border: "1px solid #dbeafe",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)"
-          }}
-        >
-          <RefreshIcon />
-          {loadingClients && (
-            <CircularProgress
-              size={32}
-              sx={{ color: "#1976d2", position: "absolute", left: 4, top: 4, zIndex: 1 }}
-            />
-          )}
-        </IconButton>
         <ClientSelectorInline
           clients={filteredClients}
           selected={selectedClients}
