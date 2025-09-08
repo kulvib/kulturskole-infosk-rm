@@ -469,87 +469,89 @@ export default function AdminPage() {
 
       {/* -------- PAPER 2 -------- */}
       <Paper sx={{ mb: 4, p: 3 }}>
-        <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-end">
-          <Box sx={{ flex: 2, minWidth: 340 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-              Tilføj og se godkendte skoler
+        <Stack direction="column" gap={2}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            Tilføj og se godkendte skoler
+          </Typography>
+          {/* Tilføj & Søg skole på SAMME LINJE */}
+          <Stack direction="row" gap={2} alignItems="flex-end" sx={{ mb: 2, flexWrap: "wrap" }}>
+            <TextField
+              label="Skole-navn"
+              value={schoolName}
+              onChange={e => setSchoolName(e.target.value)}
+              error={!!error}
+              helperText={error}
+              size="small"
+              sx={inputSx}
+              fullWidth
+            />
+            <Button variant="contained" sx={{ height: 40, minWidth: 140 }} onClick={handleAddSchool}>
+              Tilføj skole
+            </Button>
+            <TextField
+              size="small"
+              placeholder="Søg skole..."
+              value={schoolSearch}
+              onChange={e => setSchoolSearch(e.target.value)}
+              sx={{ maxWidth: 260 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Stack>
+          {deleteError && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              {deleteError}
             </Typography>
-            <Stack direction="row" gap={2} alignItems="flex-end" sx={{ mb: 2 }}>
-              <TextField
-                label="Skole-navn"
-                value={schoolName}
-                onChange={e => setSchoolName(e.target.value)}
-                error={!!error}
-                helperText={error}
-                size="small"
-                sx={inputSx}
-                fullWidth
-              />
-              <Button variant="contained" sx={{ height: 40, minWidth: 140 }} onClick={handleAddSchool}>
-                Tilføj skole
-              </Button>
-            </Stack>
-            {/* Søgning */}
-            <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 2 }}>
-              <SearchIcon color="action" />
-              <TextField
-                size="small"
-                placeholder="Søg skole..."
-                value={schoolSearch}
-                onChange={e => setSchoolSearch(e.target.value)}
-                sx={{ maxWidth: 320 }}
-              />
-            </Stack>
-            {deleteError && (
-              <Typography color="error" sx={{ mb: 2 }}>
-                {deleteError}
-              </Typography>
-            )}
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
+          )}
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700 }}>Skole</TableCell>
+                  <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {Array.isArray(schools) && schools.length === 0 ? (
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>Skole</TableCell>
-                    <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
+                    <TableCell colSpan={2} align="center" sx={{ color: "#888" }}>
+                      Ingen skoler oprettet endnu
+                    </TableCell>
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {Array.isArray(schools) && schools.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={2} align="center" sx={{ color: "#888" }}>
-                        Ingen skoler oprettet endnu
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    getSortedSchools()
-                      .filter(school =>
-                        !schoolSearch ||
-                        school.name.toLowerCase().includes(schoolSearch.toLowerCase())
-                      )
-                      .map((school) => (
-                        <TableRow key={school.id ?? school.name} hover>
-                          <TableCell>{school.name}</TableCell>
-                          <TableCell align="right">
-                            <Tooltip title="Slet skole">
-                              <span>
-                                <IconButton
-                                  edge="end"
-                                  aria-label="slet"
-                                  color="error"
-                                  onClick={() => handleOpenDeleteDialog(school)}
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </span>
-                            </Tooltip>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
+                ) : (
+                  getSortedSchools()
+                    .filter(school =>
+                      !schoolSearch ||
+                      school.name.toLowerCase().includes(schoolSearch.toLowerCase())
+                    )
+                    .map((school) => (
+                      <TableRow key={school.id ?? school.name} hover>
+                        <TableCell>{school.name}</TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Slet skole">
+                            <span>
+                              <IconButton
+                                edge="end"
+                                aria-label="slet"
+                                color="error"
+                                onClick={() => handleOpenDeleteDialog(school)}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Stack>
       </Paper>
 
@@ -821,7 +823,30 @@ export default function AdminPage() {
           </Box>
         </Stack>
       </Paper>
-      {/* SLET BRUGER DIALOG MED DOBBELT BEKRÆFTELSE */}
+
+      {/* ---- SLET SKOLE DIALOG ---- */}
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog} maxWidth="xs" fullWidth>
+        <DialogTitle>Slet skole</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Er du sikker på at du vil slette skolen <b>{schoolToDelete?.name}</b>?
+          </Typography>
+          {clientsToDelete && clientsToDelete.length > 0 && (
+            <Typography color="error" sx={{ mt: 1 }}>
+              Bemærk: Skolen har tilknyttede klienter, som også vil blive slettet!
+            </Typography>
+          )}
+          {deleteError && <Typography color="error">{deleteError}</Typography>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog}>Annuller</Button>
+          <Button color="error" variant="contained" onClick={handleFinalDeleteSchool}>
+            Slet endeligt
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ---- SLET BRUGER DIALOG mv. ... */}
       <Dialog open={deleteUserDialogOpen} onClose={handleCloseDeleteUserDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
           Slet bruger: {userToDelete?.username}
