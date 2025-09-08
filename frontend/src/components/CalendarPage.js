@@ -4,7 +4,7 @@ import {
   Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { getClients, saveMarkedDays, getMarkedDays, getSchools } from "../api";
+import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes } from "../api";
 import { useAuth } from "../auth/authcontext";
 import DateTimeEditDialog from "./CalendarPage/DateTimeEditDialog";
 import ClientCalendarDialog from "./CalendarPage/ClientCalendarDialog";
@@ -51,43 +51,6 @@ function formatDate(year, month, day) {
   const mm = String(month + 1).padStart(2, '0');
   const dd = String(day).padStart(2, '0');
   return `${year}-${mm}-${dd}`;
-}
-
-function getDefaultTimes(dateStr, client, clients) {
-  const date = new Date(dateStr);
-  const day = date.getDay();
-
-  let schoolId = null;
-  if (client && clients && clients.length > 0) {
-    const clientObj = clients.find(c => String(c.id) === String(client));
-    schoolId = clientObj && (clientObj.schoolId || clientObj.school_id) ? (clientObj.schoolId || clientObj.school_id) : null;
-  }
-
-  const TIMES_STORAGE_KEY = schoolId
-    ? `standard_times_settings_${schoolId}`
-    : "standard_times_settings";
-
-  let defaultTimes = {
-    weekday: { onTime: "09:00", offTime: "22:30" },
-    weekend: { onTime: "08:00", offTime: "18:00" }
-  };
-
-  const saved = localStorage.getItem(TIMES_STORAGE_KEY);
-  if (saved) {
-    try {
-      const settings = JSON.parse(saved);
-      defaultTimes = {
-        weekday: settings.weekday || defaultTimes.weekday,
-        weekend: settings.weekend || defaultTimes.weekend
-      };
-    } catch {}
-  }
-
-  if (day === 0 || day === 6) {
-    return defaultTimes.weekend;
-  } else {
-    return defaultTimes.weekday;
-  }
 }
 
 function stripTimeFromDateKey(key) {
@@ -313,6 +276,80 @@ function MonthCalendar({
   );
 }
 
+// ---- NYT: Funktion til at hente og holde styr på times for en skole ----
+function useSchoolTimes(selectedSchool) {
+  const [schoolTimes, setSchoolTimes] = useState(null);
+  const [loadingTimes, setLoadingTimes] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let isCurrent = true;
+    if (!selectedSchool) {
+      setSchoolTimes(null);
+      setError(null);
+      setLoadingTimes(false);
+      return;
+    }
+    setLoadingTimes(true);
+    getSchoolTimes(selectedSchool)
+      .then(times => {
+        if (isCurrent) {
+          // fallback hvis backend returnerer null/undefined felter
+          const filled = {
+            weekday: {
+              onTime: times?.weekday?.onTime || "09:00",
+              offTime: times?.weekday?.offTime || "22:30"
+            },
+            weekend: {
+              onTime: times?.weekend?.onTime || "08:00",
+              offTime: times?.weekend?.offTime || "18:00"
+            }
+          };
+          setSchoolTimes(filled);
+          setError(null);
+        }
+      })
+      .catch(err => {
+        setSchoolTimes(null);
+        setError("Kunne ikke hente standardtider");
+      })
+      .finally(() => {
+        if (isCurrent) setLoadingTimes(false);
+      });
+    return () => { isCurrent = false; };
+  }, [selectedSchool]);
+
+  return { schoolTimes, loadingTimes, error };
+}
+
+// ---- NYT: getDefaultTimes bruger nu schoolTimes fra backend ----
+function getDefaultTimes(dateStr, client, clients, schoolTimes) {
+  const date = new Date(dateStr);
+  const day = date.getDay();
+  // Fallback
+  const fallback = {
+    weekday: { onTime: "09:00", offTime: "22:30" },
+    weekend: { onTime: "08:00", offTime: "18:00" }
+  };
+
+  // Find schoolId for denne klient
+  let schoolId = null;
+  if (client && clients && clients.length > 0) {
+    const clientObj = clients.find(c => String(c.id) === String(client));
+    schoolId = clientObj && (clientObj.schoolId || clientObj.school_id) ? (clientObj.schoolId || clientObj.school_id) : null;
+  }
+
+  // Brug schoolTimes (fra backend) hvis tilgængelig
+  const times = schoolTimes || fallback;
+
+  if (day === 0 || day === 6) {
+    return times.weekend;
+  } else {
+    return times.weekday;
+  }
+}
+
+// ---- Her starter hoved-komponenten ----
 export default function CalendarPage() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
@@ -373,6 +410,9 @@ export default function CalendarPage() {
         ),
     [clients, selectedSchool]
   );
+
+  // ---- NYT: Hent aktuelle standardtider fra backend for valgt skole ----
+  const { schoolTimes, loadingTimes, error: schoolTimesError } = useSchoolTimes(selectedSchool);
 
   useEffect(() => {
     if (!activeClient) return;
@@ -439,7 +479,7 @@ export default function CalendarPage() {
     payloadMarkedDays[String(clientId)] = {};
     allDates.forEach(dateStr => {
       const md = markedDays[clientId]?.[dateStr];
-      const defTimes = getDefaultTimes(dateStr, clientId, filteredClients);
+      const defTimes = getDefaultTimes(dateStr, clientId, filteredClients, schoolTimes);
       if (md && md.status === "on") {
         const onTime = md.onTime || defTimes.onTime;
         const offTime = md.offTime || defTimes.offTime;
@@ -575,7 +615,7 @@ export default function CalendarPage() {
         payloadMarkedDays[clientKey] = {};
         allDates.forEach(dateStr => {
           const md = sourceMarkedDays[dateStr];
-          const defTimes = getDefaultTimes(dateStr, cid, filteredClients);
+          const defTimes = getDefaultTimes(dateStr, cid, filteredClients, schoolTimes);
           if (md && md.status === "on") {
             const onTime = md.onTime || defTimes.onTime;
             const offTime = md.offTime || defTimes.offTime;
@@ -627,7 +667,7 @@ export default function CalendarPage() {
       } finally {
         setSavingCalendar(false);
       }
-    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients]
+    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, schoolTimes]
   );
 
   useEffect(() => {
@@ -683,6 +723,8 @@ export default function CalendarPage() {
               <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
             ))}
           </Select>
+          {loadingTimes && <CircularProgress size={20} sx={{ ml: 1 }} />}
+          {schoolTimesError && <Typography sx={{ color: "red", ml: 2 }}>{schoolTimesError}</Typography>}
         </Box>
         <Tooltip title="Opdater klienter">
           <span>
