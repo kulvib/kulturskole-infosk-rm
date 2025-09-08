@@ -5,10 +5,10 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes } from "../api";
-import DateTimeEditDialog from "./DateTimeEditDialog";
-import ClientCalendarDialog from "./ClientCalendarDialog";
+import DateTimeEditDialog from "./CalendarPage/DateTimeEditDialog";
+import ClientCalendarDialog from "./CalendarPage/ClientCalendarDialog";
 
-// ---------- Hjælpe-hook: Hent ALLE skoletider på én gang som opslagstabel ----------
+// --------- Hjælpe-hook: Hent ALLE skoletider for alle skoler ---------
 function useAllSchoolTimes(schools) {
   const [schoolTimesMap, setSchoolTimesMap] = useState({});
   useEffect(() => {
@@ -80,7 +80,7 @@ function deepEqual(obj1, obj2) {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
 
-// -------- Hjælpekomponenter --------
+// -------- Hjælpekomponent: Klientvælger --------
 function ClientSelectorInline({ clients, selected, onChange }) {
   const [search, setSearch] = useState("");
   const sortedClients = useMemo(() => [...clients].sort((a, b) => {
@@ -172,8 +172,7 @@ function ClientSelectorInline({ clients, selected, onChange }) {
 
 // ----------- MAIN COMPONENT START -----------
 export default function CalendarPage() {
-  // Dummy auth - ret evt. til din egen
-  const token = null;
+  const token = null; // Ret evt. til din auth-løsning
   const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
   const [schools, setSchools] = useState([]);
   const [selectedSchool, setSelectedSchool] = useState(""); // "" = alle
@@ -303,7 +302,6 @@ export default function CalendarPage() {
     const times = schoolTimes || fallback;
     return (day === 0 || day === 6) ? times?.weekend || fallback.weekend : times?.weekday || fallback.weekday;
   }
-  // ---------------------------------------------------------------
 
   const handleSaveSingleClient = async (clientId) => {
     if (!clientId) return;
