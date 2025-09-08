@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper,
-  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack, Dialog, DialogContent, DialogTitle, DialogActions
+  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes } from "../api";
+import DateTimeEditDialog from "./DateTimeEditDialog";
+import ClientCalendarDialog from "./ClientCalendarDialog";
 
 // ---------- Hjælpe-hook: Hent ALLE skoletider på én gang som opslagstabel ----------
 function useAllSchoolTimes(schools) {
@@ -165,34 +167,6 @@ function ClientSelectorInline({ clients, selected, onChange }) {
         ))}
       </Box>
     </Box>
-  );
-}
-
-// Dummy dialog-komponenter (udskift evt. med dine egne)
-function DateTimeEditDialog({ open, onClose }) {
-  return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Rediger tider for dag</DialogTitle>
-      <DialogContent>
-        <Typography variant="body2">Her kan du redigere tider for dagen.</Typography>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Luk</Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-function ClientCalendarDialog({ open, onClose }) {
-  return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Kalenderliste</DialogTitle>
-      <DialogContent>
-        <Typography variant="body2">Her kan du vise en oversigt/liste.</Typography>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Luk</Button>
-      </DialogActions>
-    </Dialog>
   );
 }
 
