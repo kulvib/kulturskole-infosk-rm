@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
-  Box, Card, CardContent, Typography, Button, CircularProgress, Paper, IconButton,
+  Box, Card, CardContent, Typography, Button, CircularProgress, Paper,
   Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -664,44 +664,46 @@ export default function CalendarPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* Skolevælger øverst, med overlay-layout for loading */}
-      <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", alignItems: "center", gap: 2 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: "100%" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Vælg skole:
-            </Typography>
-            <Select
-              size="small"
-              value={selectedSchool}
-              displayEmpty
-              onChange={handleSchoolChange}
-              sx={{ minWidth: 180 }}
+      {/* Header: Skolevælger og opdater-knap, UDENFOR Paper */}
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            Vælg skole:
+          </Typography>
+          <Select
+            size="small"
+            value={selectedSchool}
+            displayEmpty
+            onChange={handleSchoolChange}
+            sx={{ minWidth: 180 }}
+          >
+            <MenuItem value="">Alle skoler</MenuItem>
+            <MenuItem disabled>--------</MenuItem>
+            {sortedSchools.map(school => (
+              <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+            ))}
+          </Select>
+        </Box>
+        <Tooltip title="Opdater klienter">
+          <span>
+            <Button
+              startIcon={
+                loadingClients
+                  ? <CircularProgress size={20} />
+                  : <RefreshIcon />
+              }
+              onClick={fetchClients}
+              disabled={loadingClients}
+              sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
             >
-              <MenuItem value="">Alle skoler</MenuItem>
-              <MenuItem disabled>--------</MenuItem>
-              {sortedSchools.map(school => (
-                <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-              ))}
-            </Select>
-          </Box>
-          <Tooltip title="Opdater klienter">
-            <span>
-              <Button
-                startIcon={
-                  loadingClients
-                    ? <CircularProgress size={20} />
-                    : <RefreshIcon />
-                }
-                onClick={fetchClients}
-                disabled={loadingClients}
-                sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
-              >
-                {loadingClients ? "Opdaterer..." : "Opdater"}
-              </Button>
-            </span>
-          </Tooltip>
-        </Stack>
+              {loadingClients ? "Opdaterer..." : "Opdater"}
+            </Button>
+          </span>
+        </Tooltip>
+      </Stack>
+
+      {/* Paper kun indeholdende selve indholdet */}
+      <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
         {loadingClients && (
           <Box sx={{
             position: "absolute",
@@ -712,13 +714,6 @@ export default function CalendarPage() {
             <CircularProgress />
           </Box>
         )}
-      </Paper>
-
-      {/* Godkendte klienter for valgt skole */}
-      <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mb: 1 }}>
-        Godkendte klienter
-      </Typography>
-      <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
         <ClientSelectorInline
           clients={filteredClients}
           selected={selectedClients}
