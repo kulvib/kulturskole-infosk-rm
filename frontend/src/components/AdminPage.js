@@ -706,34 +706,35 @@ export default function AdminPage() {
                 </Select>
               </FormControl>
             </Stack>
-            {/* Søge- og sorteringsfelt for brugertabel */}
-            <Stack direction="row" gap={2} alignItems="flex-end" sx={{ mb: 2, mt: 2 }}>
-              <TextField
-                label="Søg"
-                size="small"
-                value={userSearch}
-                onChange={e => setUserSearch(e.target.value)}
-                sx={{ minWidth: 120 }}
-                placeholder="Søg bruger, rolle, skole..."
-              />
-              <Tooltip title={`Sortér brugernavn ${userSort.direction === "asc" ? "(A-Å)" : "(Å-A)"}`}>
-                <IconButton
-                  onClick={() =>
-                    setUserSort((prev) => ({
-                      ...prev,
-                      direction: prev.direction === "asc" ? "desc" : "asc",
-                    }))
-                  }
-                  sx={{ ml: 1 }}
-                  aria-label="Sortér"
-                >
-                  {userSort.direction === "asc" ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
-                </IconButton>
-              </Tooltip>
+            {/* EN LINJE: Opret bruger (til venstre), søg+sortér (til højre) */}
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, mt: 2 }}>
+              <Button variant="contained" onClick={handleAddUser}>
+                Opret bruger
+              </Button>
+              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                <TextField
+                  label="Søg"
+                  size="small"
+                  value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)}
+                  sx={{ minWidth: 120 }}
+                  placeholder="Søg bruger, rolle, skole..."
+                />
+                <Tooltip title={`Sortér brugernavn ${userSort.direction === "asc" ? "(A-Å)" : "(Å-A)"}`}>
+                  <IconButton
+                    onClick={() =>
+                      setUserSort((prev) => ({
+                        ...prev,
+                        direction: prev.direction === "asc" ? "desc" : "asc",
+                      }))
+                    }
+                    aria-label="Sortér"
+                  >
+                    {userSort.direction === "asc" ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
+                  </IconButton>
+                </Tooltip>
+              </Box>
             </Stack>
-            <Button variant="contained" sx={{ height: 40, minWidth: 140, mt: 0, mb: 2 }} onClick={handleAddUser}>
-              Opret bruger
-            </Button>
             {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
             <TableContainer>
               <Table size="small">
