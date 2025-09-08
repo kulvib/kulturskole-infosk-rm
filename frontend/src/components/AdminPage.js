@@ -88,6 +88,10 @@ export default function AdminPage() {
   const [schoolSort, setSchoolSort] = useState({ direction: "asc" });
   const [schoolSearch, setSchoolSearch] = useState("");
 
+  // SORTERING OG SØGNING FOR BRUGERLISTE
+  const [userSort, setUserSort] = useState({ direction: "asc" });
+  const [userSearch, setUserSearch] = useState("");
+
   // SNACKBAR
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const showSnackbar = (message, severity = "success") => setSnackbar({ open: true, message, severity });
@@ -353,12 +357,34 @@ export default function AdminPage() {
     return arr;
   };
 
-  // Helper for input alignment
-  const inputSx = { minWidth: 180, my: 0 };
-
   // Helper: all dropdowns should be A-Å sorted (no search)
   const getAlphaSchools = () =>
     schools.slice().sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
+
+  // Helper: get sorted and searched users
+  const getSortedUsers = () => {
+    let arr = users.filter(u => {
+      const schoolName = u.school_id
+        ? (getAlphaSchools().find(s => s.id === u.school_id)?.name ?? "")
+        : "";
+      const search = userSearch.trim().toLowerCase();
+      return (
+        search === "" ||
+        u.username.toLowerCase().includes(search) ||
+        (u.role === "admin" ? "administrator" : "bruger").includes(search) ||
+        schoolName.toLowerCase().includes(search)
+      );
+    });
+
+    arr.sort((a, b) => {
+      const cmp = a.username.localeCompare(b.username, 'da', { sensitivity: 'base' });
+      return userSort.direction === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  };
+
+  // Helper for input alignment
+  const inputSx = { minWidth: 180, my: 0 };
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, minHeight: "60vh", p: 2 }}>
@@ -680,8 +706,32 @@ export default function AdminPage() {
                 </Select>
               </FormControl>
             </Stack>
-            {/* "Opret bruger"-knap flyttet herunder */}
-            <Button variant="contained" sx={{ height: 40, minWidth: 140, mt: 2, mb: 2 }} onClick={handleAddUser}>
+            {/* Søge- og sorteringsfelt for brugertabel */}
+            <Stack direction="row" gap={2} alignItems="flex-end" sx={{ mb: 2, mt: 2 }}>
+              <TextField
+                label="Søg"
+                size="small"
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                sx={{ minWidth: 120 }}
+                placeholder="Søg bruger, rolle, skole..."
+              />
+              <Tooltip title={`Sortér brugernavn ${userSort.direction === "asc" ? "(A-Å)" : "(Å-A)"}`}>
+                <IconButton
+                  onClick={() =>
+                    setUserSort((prev) => ({
+                      ...prev,
+                      direction: prev.direction === "asc" ? "desc" : "asc",
+                    }))
+                  }
+                  sx={{ ml: 1 }}
+                  aria-label="Sortér"
+                >
+                  {userSort.direction === "asc" ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
+                </IconButton>
+              </Tooltip>
+            </Stack>
+            <Button variant="contained" sx={{ height: 40, minWidth: 140, mt: 0, mb: 2 }} onClick={handleAddUser}>
               Opret bruger
             </Button>
             {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
@@ -704,14 +754,14 @@ export default function AdminPage() {
                         <CircularProgress size={24} />
                       </TableCell>
                     </TableRow>
-                  ) : Array.isArray(users) && users.length === 0 ? (
+                  ) : getSortedUsers().length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} align="center" sx={{ color: "#888" }}>
                         Ingen brugere oprettet endnu
                       </TableCell>
                     </TableRow>
                   ) : (
-                    users.map(user => (
+                    getSortedUsers().map(user => (
                       <TableRow key={user.id} hover>
                         <TableCell>{user.id}</TableCell>
                         <TableCell>{user.username}</TableCell>
