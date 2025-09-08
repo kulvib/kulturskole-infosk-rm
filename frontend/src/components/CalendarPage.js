@@ -31,7 +31,6 @@ function useAllSchoolTimes(schools) {
   return schoolTimesMap;
 }
 
-// ---------- Diverse hjælpefunktioner ----------
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
@@ -54,7 +53,6 @@ function getSeasons() {
   }
   return seasons;
 }
-
 function getSchoolYearMonths(seasonStart) {
   const months = [];
   for (let i = 0; i < 5; i++) {
@@ -65,7 +63,6 @@ function getSchoolYearMonths(seasonStart) {
   }
   return months;
 }
-
 function getDaysInMonth(month, year) {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -81,7 +78,7 @@ function deepEqual(obj1, obj2) {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
 
-// ---------- Subkomponent: Klientvælger ----------
+// -------- Hjælpekomponenter --------
 function ClientSelectorInline({ clients, selected, onChange }) {
   const [search, setSearch] = useState("");
   const sortedClients = useMemo(() => [...clients].sort((a, b) => {
@@ -171,134 +168,7 @@ function ClientSelectorInline({ clients, selected, onChange }) {
   );
 }
 
-// ---------- Subkomponent: Månedskalender ----------
-function MonthCalendar({
-  name,
-  month,
-  year,
-  clientId,
-  markedDays,
-  markMode,
-  onDayClick,
-  onDateShiftLeftClick,
-  loadingDialogDate,
-  loadingDialogClient
-}) {
-  const [isDragging, setIsDragging] = useState(false);
-  const draggedDates = useRef(new Set());
-
-  const daysInMonth = getDaysInMonth(month, year);
-  const firstDayOfWeek = new Date(year, month, 1).getDay();
-  const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-
-  const cells = [];
-  for (let i = 0; i < offset; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const handleMouseDown = (e, dateString) => {
-    if (e.shiftKey && e.button === 0) {
-      e.preventDefault();
-      if (
-        clientId &&
-        markedDays?.[clientId]?.[dateString]?.status === "on" &&
-        !loadingDialogDate
-      ) {
-        onDateShiftLeftClick(clientId, dateString);
-        return;
-      }
-    }
-    setIsDragging(true);
-    draggedDates.current = new Set([dateString]);
-    if (clientId) {
-      onDayClick([clientId], dateString, markMode, markedDays);
-    }
-  };
-
-  const handleMouseEnter = (e, dateString) => {
-    if (isDragging && clientId && !draggedDates.current.has(dateString)) {
-      draggedDates.current.add(dateString);
-      onDayClick([clientId], dateString, markMode, markedDays);
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    draggedDates.current = new Set();
-  };
-
-  useEffect(() => {
-    if (!isDragging) return;
-    const handleUp = () => handleMouseUp();
-    window.addEventListener("mouseup", handleUp);
-    return () => window.removeEventListener("mouseup", handleUp);
-  }, [isDragging]);
-
-  return (
-    <Card sx={{ borderRadius: "14px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", minWidth: 0, background: "#f9fafc" }}>
-      <CardContent>
-        <Typography variant="h6" sx={{ color: "#0a275c", fontWeight: 700, textAlign: "center", fontSize: "1.08rem", mb: 1 }}>
-          {name} {year}
-        </Typography>
-        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.2, mb: 0.5 }}>
-          {weekdayNames.map(wd => (
-            <Typography key={wd} variant="caption" sx={{ fontWeight: 700, color: "#555", textAlign: "center", fontSize: "0.90rem", letterSpacing: "0.03em" }}>
-              {wd}
-            </Typography>
-          ))}
-        </Box>
-        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.2 }}>
-          {cells.map((day, idx) => {
-            if (!day) return <Box key={idx + "-empty"} />;
-            const dateString = formatDate(year, month, day);
-            const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
-            let bg = "#fff";
-            if (cellStatus === "on") bg = "#b4eeb4";
-            if (cellStatus === "off") bg = "#ffb7b7";
-            const isLoading =
-              loadingDialogDate === dateString && loadingDialogClient === clientId;
-
-            return (
-              <Box key={idx}
-                sx={{
-                  display: "flex", justifyContent: "center", alignItems: "center", p: 0.2, position: "relative"
-                }}>
-                <Box
-                  sx={{
-                    width: 23, height: 23, borderRadius: "50%", background: bg,
-                    border: "1px solid #eee", color: "#0a275c", fontWeight: 500,
-                    fontSize: "0.95rem", textAlign: "center", lineHeight: "23px",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                    cursor: clientId ? "pointer" : "default",
-                    transition: "background 0.2s", opacity: clientId ? 1 : 0.55,
-                    position: "relative"
-                  }}
-                  title={
-                    cellStatus === "on"
-                      ? "Tændt (shift+klik for tid)"
-                      : cellStatus === "off"
-                        ? "Slukket"
-                        : ""
-                  }
-                  onMouseDown={e => handleMouseDown(e, dateString)}
-                  onMouseEnter={e => handleMouseEnter(e, dateString)}
-                >
-                  {isLoading ? (
-                    <CircularProgress size={18} sx={{ position: "absolute", top: 2, left: 2, zIndex: 1201 }} />
-                  ) : (
-                    day
-                  )}
-                </Box>
-              </Box>
-            );
-          })}
-        </Box>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------- Subkomponent: Dummy Dialoger ----------
+// Dummy dialog-komponenter (udskift evt. med dine egne)
 function DateTimeEditDialog({ open, onClose }) {
   return (
     <Dialog open={open} onClose={onClose}>
@@ -326,9 +196,9 @@ function ClientCalendarDialog({ open, onClose }) {
   );
 }
 
-// ------------------- HOVEDKOMPONENTEN -------------------
+// ----------- MAIN COMPONENT START -----------
 export default function CalendarPage() {
-  // Dummy auth:
+  // Dummy auth - ret evt. til din egen
   const token = null;
   const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
   const [schools, setSchools] = useState([]);
@@ -441,7 +311,7 @@ export default function CalendarPage() {
     };
   }, [markedDays[activeClient], activeClient, editDialogOpen]);
 
-  // ---- Standardtider tages nu altid fra klientens skole! ----
+  // ------ NY: Default times hentes altid ud fra klientens skole ------
   function getDefaultTimes(dateStr, clientId) {
     const client = clients.find(c => c.id === clientId);
     if (!client) {
@@ -459,6 +329,7 @@ export default function CalendarPage() {
     const times = schoolTimes || fallback;
     return (day === 0 || day === 6) ? times?.weekend || fallback.weekend : times?.weekday || fallback.weekday;
   }
+  // ---------------------------------------------------------------
 
   const handleSaveSingleClient = async (clientId) => {
     if (!clientId) return;
@@ -508,9 +379,6 @@ export default function CalendarPage() {
     }
   };
 
-  // ... resten af din komponent er uændret, bare brug getDefaultTimes(dateStr, clientId) alle steder
-
-  // UI og rendering (samme som tidligere svar)
   const handleSchoolChange = (e) => {
     setSelectedSchool(e.target.value);
     setSelectedClients([]);
@@ -917,5 +785,132 @@ export default function CalendarPage() {
         clientId={activeClient}
       />
     </Box>
+  );
+}
+
+// MonthCalendar - indlejret for komplethed!
+function MonthCalendar({
+  name,
+  month,
+  year,
+  clientId,
+  markedDays,
+  markMode,
+  onDayClick,
+  onDateShiftLeftClick,
+  loadingDialogDate,
+  loadingDialogClient
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const draggedDates = useRef(new Set());
+
+  const daysInMonth = getDaysInMonth(month, year);
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+  const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+  const cells = [];
+  for (let i = 0; i < offset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const handleMouseDown = (e, dateString) => {
+    if (e.shiftKey && e.button === 0) {
+      e.preventDefault();
+      if (
+        clientId &&
+        markedDays?.[clientId]?.[dateString]?.status === "on" &&
+        !loadingDialogDate
+      ) {
+        onDateShiftLeftClick(clientId, dateString);
+        return;
+      }
+    }
+    setIsDragging(true);
+    draggedDates.current = new Set([dateString]);
+    if (clientId) {
+      onDayClick([clientId], dateString, markMode, markedDays);
+    }
+  };
+
+  const handleMouseEnter = (e, dateString) => {
+    if (isDragging && clientId && !draggedDates.current.has(dateString)) {
+      draggedDates.current.add(dateString);
+      onDayClick([clientId], dateString, markMode, markedDays);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    draggedDates.current = new Set();
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleUp = () => handleMouseUp();
+    window.addEventListener("mouseup", handleUp);
+    return () => window.removeEventListener("mouseup", handleUp);
+  }, [isDragging]);
+
+  return (
+    <Card sx={{ borderRadius: "14px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", minWidth: 0, background: "#f9fafc" }}>
+      <CardContent>
+        <Typography variant="h6" sx={{ color: "#0a275c", fontWeight: 700, textAlign: "center", fontSize: "1.08rem", mb: 1 }}>
+          {name} {year}
+        </Typography>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.2, mb: 0.5 }}>
+          {weekdayNames.map(wd => (
+            <Typography key={wd} variant="caption" sx={{ fontWeight: 700, color: "#555", textAlign: "center", fontSize: "0.90rem", letterSpacing: "0.03em" }}>
+              {wd}
+            </Typography>
+          ))}
+        </Box>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.2 }}>
+          {cells.map((day, idx) => {
+            if (!day) return <Box key={idx + "-empty"} />;
+            const dateString = formatDate(year, month, day);
+            const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
+            let bg = "#fff";
+            if (cellStatus === "on") bg = "#b4eeb4";
+            if (cellStatus === "off") bg = "#ffb7b7";
+            const isLoading =
+              loadingDialogDate === dateString && loadingDialogClient === clientId;
+
+            return (
+              <Box key={idx}
+                sx={{
+                  display: "flex", justifyContent: "center", alignItems: "center", p: 0.2, position: "relative"
+                }}>
+                <Box
+                  sx={{
+                    width: 23, height: 23, borderRadius: "50%", background: bg,
+                    border: "1px solid #eee", color: "#0a275c", fontWeight: 500,
+                    fontSize: "0.95rem", textAlign: "center", lineHeight: "23px",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                    cursor: clientId ? "pointer" : "default",
+                    transition: "background 0.2s", opacity: clientId ? 1 : 0.55,
+                    position: "relative"
+                  }}
+                  title={
+                    cellStatus === "on"
+                      ? "Tændt (shift+klik for tid)"
+                      : cellStatus === "off"
+                        ? "Slukket"
+                        : ""
+                  }
+                  onMouseDown={e => handleMouseDown(e, dateString)}
+                  onMouseEnter={e => handleMouseEnter(e, dateString)}
+                >
+                  {isLoading ? (
+                    <CircularProgress size={18} sx={{ position: "absolute", top: 2, left: 2, zIndex: 1201 }} />
+                  ) : (
+                    day
+                  )}
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+      </CardContent>
+    </Card>
   );
 }
