@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper,
-  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack
+  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack, Dialog, DialogContent, DialogTitle, DialogActions
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes } from "../api";
-import { useAuth } from "../auth/authcontext";
-import DateTimeEditDialog from "./CalendarPage/DateTimeEditDialog";
-import ClientCalendarDialog from "./CalendarPage/ClientCalendarDialog";
+import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes } from "./api";
 
+// Dummy authcontext hvis du ikke bruger din egen
+const useAuth = () => ({ token: null });
+
+// ----------- Hjælpefunktioner -----------
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
@@ -61,6 +62,7 @@ function deepEqual(obj1, obj2) {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
 
+// -------- Hjælpekomponenter --------
 function ClientSelectorInline({ clients, selected, onChange }) {
   const [search, setSearch] = useState("");
   const sortedClients = useMemo(() => [...clients].sort((a, b) => {
@@ -276,7 +278,35 @@ function MonthCalendar({
   );
 }
 
-// ---- NYT: Funktion til at hente og holde styr på times for en skole ----
+// Dummy dialog-komponenter (udskift evt. med dine egne)
+function DateTimeEditDialog({ open, onClose }) {
+  return (
+    <Dialog open={open} onClose={onClose}>
+      <DialogTitle>Rediger tider for dag</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2">Her kan du redigere tider for dagen.</Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Luk</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+function ClientCalendarDialog({ open, onClose }) {
+  return (
+    <Dialog open={open} onClose={onClose}>
+      <DialogTitle>Kalenderliste</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2">Her kan du vise en oversigt/liste.</Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Luk</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// --------- Hook til at hente skoletider ---------
 function useSchoolTimes(selectedSchool) {
   const [schoolTimes, setSchoolTimes] = useState(null);
   const [loadingTimes, setLoadingTimes] = useState(false);
@@ -294,7 +324,6 @@ function useSchoolTimes(selectedSchool) {
     getSchoolTimes(selectedSchool)
       .then(times => {
         if (isCurrent) {
-          // fallback hvis backend returnerer null/undefined felter
           const filled = {
             weekday: {
               onTime: times?.weekday?.onTime || "09:00",
@@ -322,34 +351,20 @@ function useSchoolTimes(selectedSchool) {
   return { schoolTimes, loadingTimes, error };
 }
 
-// ---- NYT: getDefaultTimes bruger nu schoolTimes fra backend ----
+// Hent default tider for dag
 function getDefaultTimes(dateStr, client, clients, schoolTimes) {
   const date = new Date(dateStr);
   const day = date.getDay();
-  // Fallback
   const fallback = {
     weekday: { onTime: "09:00", offTime: "22:30" },
     weekend: { onTime: "08:00", offTime: "18:00" }
   };
-
-  // Find schoolId for denne klient
-  let schoolId = null;
-  if (client && clients && clients.length > 0) {
-    const clientObj = clients.find(c => String(c.id) === String(client));
-    schoolId = clientObj && (clientObj.schoolId || clientObj.school_id) ? (clientObj.schoolId || clientObj.school_id) : null;
-  }
-
-  // Brug schoolTimes (fra backend) hvis tilgængelig
   const times = schoolTimes || fallback;
-
-  if (day === 0 || day === 6) {
-    return times.weekend;
-  } else {
-    return times.weekday;
-  }
+  return (day === 0 || day === 6) ? times.weekend : times.weekday;
 }
 
-// ---- Her starter hoved-komponenten ----
+// ----------- MAIN COMPONENT START -----------
+
 export default function CalendarPage() {
   const { token } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
@@ -411,7 +426,6 @@ export default function CalendarPage() {
     [clients, selectedSchool]
   );
 
-  // ---- NYT: Hent aktuelle standardtider fra backend for valgt skole ----
   const { schoolTimes, loadingTimes, error: schoolTimesError } = useSchoolTimes(selectedSchool);
 
   useEffect(() => {
@@ -696,7 +710,6 @@ export default function CalendarPage() {
 
   const isDisabled = !activeClient;
 
-  // Skole-listen skal sorteres alfabetisk, men "Alle skoler" skal være øverst
   const sortedSchools = useMemo(() =>
     [...schools].sort((a, b) => a.name.localeCompare(b.name)),
     [schools]
@@ -704,7 +717,6 @@ export default function CalendarPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* Header: Skolevælger og opdater-knap, UDENFOR Paper */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -744,7 +756,6 @@ export default function CalendarPage() {
         </Tooltip>
       </Stack>
 
-      {/* Paper kun indeholdende selve indholdet */}
       <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
         {loadingClients && (
           <Box sx={{
@@ -797,7 +808,6 @@ export default function CalendarPage() {
         )}
       </Paper>
 
-      {/* Knaprækken: Markering | Vis liste | Vælg sæson - på samme linje med placeringer */}
       <Box
         sx={{
           display: "flex",
@@ -806,7 +816,6 @@ export default function CalendarPage() {
           width: "100%",
         }}
       >
-        {/* Venstre: Markering */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
           <Typography variant="h6" sx={{ mr: 1, fontWeight: 700 }}>
             Markering:
@@ -832,7 +841,6 @@ export default function CalendarPage() {
             SLUKKET
           </Button>
         </Box>
-        {/* Midten: Vis liste */}
         <Box sx={{ flex: 1, display: "flex", justifyContent: "center" }}>
           <Button
             variant="outlined"
@@ -845,7 +853,6 @@ export default function CalendarPage() {
             Vis liste
           </Button>
         </Box>
-        {/* Højre: Vælg sæson */}
         <Box sx={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
             Vælg sæson:
@@ -866,7 +873,6 @@ export default function CalendarPage() {
         </Box>
       </Box>
 
-      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={2000}
@@ -878,7 +884,6 @@ export default function CalendarPage() {
         </MuiAlert>
       </Snackbar>
 
-      {/* Kalender */}
       <Box
         sx={{
           display: "grid",
