@@ -84,8 +84,9 @@ export default function AdminPage() {
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [showEditPassword2, setShowEditPassword2] = useState(false);
 
-  // SORTERING FOR SKOLELISTE
+  // SORTERING OG SØGNING FOR SKOLELISTE
   const [schoolSort, setSchoolSort] = useState({ direction: "asc" });
+  const [schoolSearch, setSchoolSearch] = useState("");
 
   // SNACKBAR
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -338,9 +339,13 @@ export default function AdminPage() {
       });
   };
 
-  // Helper: get sorted schools
+  // Helper: get sorted and searched schools
   const getSortedSchools = () => {
-    let arr = schools.slice();
+    let arr = schools
+      .filter(s =>
+        schoolSearch.trim() === "" ||
+        s.name.toLowerCase().includes(schoolSearch.trim().toLowerCase())
+      );
     arr.sort((a, b) => {
       const cmp = a.name.localeCompare(b.name, 'da', { sensitivity: 'base' });
       return schoolSort.direction === "asc" ? cmp : -cmp;
@@ -350,6 +355,10 @@ export default function AdminPage() {
 
   // Helper for input alignment
   const inputSx = { minWidth: 180, my: 0 };
+
+  // Helper: all dropdowns should be A-Å sorted (no search)
+  const getAlphaSchools = () =>
+    schools.slice().sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, minHeight: "60vh", p: 2 }}>
@@ -390,7 +399,7 @@ export default function AdminPage() {
                 onChange={e => setSelectedSchool(e.target.value)}
                 disabled={loadingSchools}
               >
-                {getSortedSchools().map(school => (
+                {getAlphaSchools().map(school => (
                   <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
                 ))}
               </Select>
@@ -492,6 +501,14 @@ export default function AdminPage() {
               <Button variant="contained" sx={{ height: 40, minWidth: 140 }} onClick={handleAddSchool}>
                 Tilføj skole
               </Button>
+              <TextField
+                label="Søg"
+                size="small"
+                value={schoolSearch}
+                onChange={e => setSchoolSearch(e.target.value)}
+                sx={{ minWidth: 120 }}
+                placeholder="Søg skole..."
+              />
               <Tooltip title={`Sortér alfabetisk ${schoolSort.direction === "asc" ? "(A-Å)" : "(Å-A)"}`}>
                 <IconButton
                   onClick={() =>
@@ -521,7 +538,7 @@ export default function AdminPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {schools.length === 0 ? (
+                  {getSortedSchools().length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={2} align="center" sx={{ color: "#888" }}>
                         Ingen skoler oprettet endnu
@@ -644,7 +661,7 @@ export default function AdminPage() {
                     label="Skole"
                     onChange={e => setNewUser({ ...newUser, school_id: e.target.value })}
                   >
-                    {getSortedSchools().map(school => (
+                    {getAlphaSchools().map(school => (
                       <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
                     ))}
                   </Select>
@@ -702,7 +719,7 @@ export default function AdminPage() {
                         <TableCell>{user.is_active ? "Aktiv" : "Spærret"}</TableCell>
                         <TableCell>
                           {user.school_id
-                            ? (schools.find(s => s.id === user.school_id)?.name ?? user.school_id)
+                            ? (getAlphaSchools().find(s => s.id === user.school_id)?.name ?? user.school_id)
                             : "-"}
                         </TableCell>
                         <TableCell align="right">
