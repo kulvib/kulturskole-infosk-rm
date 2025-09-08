@@ -426,6 +426,7 @@ export default function CalendarPage() {
 
   const schoolYearMonths = useMemo(() => getSchoolYearMonths(selectedSeason), [selectedSeason]);
 
+  // *** RETTET DEL: Brug altid den aktive klients tider/standardtid ***
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
       if (selectedClients.length < 2) {
@@ -449,14 +450,13 @@ export default function CalendarPage() {
       const payloadMarkedDays = {};
       selectedClients.forEach(cid => {
         const clientKey = String(cid);
-        const sourceMarkedDays = markedDays[activeClient] || {};
         payloadMarkedDays[clientKey] = {};
         allDates.forEach(dateStr => {
-          const md = sourceMarkedDays[dateStr];
-          const defTimes = getDefaultTimes(dateStr, cid);
-          if (md && md.status === "on") {
-            const onTime = md.onTime || defTimes.onTime;
-            const offTime = md.offTime || defTimes.offTime;
+          const sourceMd = markedDays[activeClient]?.[dateStr];
+          const sourceDefTimes = getDefaultTimes(dateStr, activeClient);
+          if (sourceMd && sourceMd.status === "on") {
+            const onTime = sourceMd.onTime || sourceDefTimes.onTime;
+            const offTime = sourceMd.offTime || sourceDefTimes.offTime;
             payloadMarkedDays[clientKey][dateStr] = {
               status: "on",
               onTime,
@@ -507,6 +507,7 @@ export default function CalendarPage() {
       }
     }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]
   );
+  // *** SLUT rettelse ***
 
   useEffect(() => {
     return () => {
