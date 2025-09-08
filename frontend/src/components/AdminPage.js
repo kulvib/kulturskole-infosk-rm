@@ -89,7 +89,7 @@ export default function AdminPage() {
   const [schoolSearch, setSchoolSearch] = useState("");
 
   // SORTERING OG SØGNING FOR BRUGERLISTE
-  const [userSort, setUserSort] = useState({ direction: "asc" });
+  const [userSort, setUserSort] = useState({ key: "username", direction: "asc" });
   const [userSearch, setUserSearch] = useState("");
 
   // SNACKBAR
@@ -377,7 +377,33 @@ export default function AdminPage() {
     });
 
     arr.sort((a, b) => {
-      const cmp = a.username.localeCompare(b.username, 'da', { sensitivity: 'base' });
+      let aVal, bVal;
+      switch (userSort.key) {
+        case "username":
+          aVal = a.username || "";
+          bVal = b.username || "";
+          break;
+        case "role":
+          aVal = a.role === "admin" ? "administrator" : "bruger";
+          bVal = b.role === "admin" ? "administrator" : "bruger";
+          break;
+        case "status":
+          aVal = a.is_active ? "Aktiv" : "Spærret";
+          bVal = b.is_active ? "Aktiv" : "Spærret";
+          break;
+        case "school":
+          aVal = a.school_id
+            ? (getAlphaSchools().find(s => s.id === a.school_id)?.name ?? "")
+            : "";
+          bVal = b.school_id
+            ? (getAlphaSchools().find(s => s.id === b.school_id)?.name ?? "")
+            : "";
+          break;
+        default:
+          aVal = a.username || "";
+          bVal = b.username || "";
+      }
+      const cmp = (aVal || "").localeCompare(bVal || "", 'da', { sensitivity: 'base' });
       return userSort.direction === "asc" ? cmp : -cmp;
     });
     return arr;
@@ -385,6 +411,14 @@ export default function AdminPage() {
 
   // Helper for input alignment
   const inputSx = { minWidth: 180, my: 0 };
+
+  // Handler for click on sort in table head
+  const handleUserTableSort = (key) => {
+    setUserSort(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc"
+    }));
+  };
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, minHeight: "60vh", p: 2 }}>
@@ -720,19 +754,6 @@ export default function AdminPage() {
                   sx={{ minWidth: 120 }}
                   placeholder="Søg bruger, rolle, skole..."
                 />
-                <Tooltip title={`Sortér brugernavn ${userSort.direction === "asc" ? "(A-Å)" : "(Å-A)"}`}>
-                  <IconButton
-                    onClick={() =>
-                      setUserSort((prev) => ({
-                        ...prev,
-                        direction: prev.direction === "asc" ? "desc" : "asc",
-                      }))
-                    }
-                    aria-label="Sortér"
-                  >
-                    {userSort.direction === "asc" ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
-                  </IconButton>
-                </Tooltip>
               </Box>
             </Stack>
             {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
@@ -740,11 +761,42 @@ export default function AdminPage() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Brugernavn</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Rolle</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Skole</TableCell>
+                    <TableCell
+                      sx={{ fontWeight: 700, cursor: "pointer" }}
+                      onClick={() => handleUserTableSort("username")}
+                    >
+                      Brugernavn
+                      {userSort.key === "username" &&
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
+                    <TableCell
+                      sx={{ fontWeight: 700, cursor: "pointer" }}
+                      onClick={() => handleUserTableSort("role")}
+                    >
+                      Rolle
+                      {userSort.key === "role" &&
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
+                    <TableCell
+                      sx={{ fontWeight: 700, cursor: "pointer" }}
+                      onClick={() => handleUserTableSort("status")}
+                    >
+                      Status
+                      {userSort.key === "status" &&
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
+                    <TableCell
+                      sx={{ fontWeight: 700, cursor: "pointer" }}
+                      onClick={() => handleUserTableSort("school")}
+                    >
+                      Skole
+                      {userSort.key === "school" &&
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
                     <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
                   </TableRow>
                 </TableHead>
@@ -764,7 +816,6 @@ export default function AdminPage() {
                   ) : (
                     getSortedUsers().map(user => (
                       <TableRow key={user.id} hover>
-                        <TableCell>{user.id}</TableCell>
                         <TableCell>{user.username}</TableCell>
                         <TableCell>{user.role === "admin" ? "administrator" : "bruger"}</TableCell>
                         <TableCell>{user.is_active ? "Aktiv" : "Spærret"}</TableCell>
