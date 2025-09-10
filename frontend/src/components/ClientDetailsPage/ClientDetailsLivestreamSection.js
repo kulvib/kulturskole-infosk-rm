@@ -31,7 +31,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     ws.current.onmessage = async (event) => {
       const msg = JSON.parse(event.data);
       if (!peerRef.current) {
-        // Inkluder en STUN-server for bedre browserkompatibilitet!
         peerRef.current = new window.RTCPeerConnection({
           iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
         });
