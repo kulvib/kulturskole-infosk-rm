@@ -15,35 +15,26 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const viewerIdRef = useRef(generateViewerId());
 
   useEffect(() => {
-    console.log("useEffect triggered, clientId:", clientId);
     if (!clientId) {
       console.error("Ingen clientId i LivestreamSection!", clientId);
       return;
     }
     viewerIdRef.current = generateViewerId();
-    console.log("Opretter WebSocket til", WEBSOCKET_URL);
     ws.current = new window.WebSocket(WEBSOCKET_URL);
 
     ws.current.onopen = () => {
-      console.log("WebSocket open, sender newViewer", viewerIdRef.current);
-      try {
-        ws.current.send(
-          JSON.stringify({
-            type: "newViewer",
-            viewer_id: viewerIdRef.current,
-          })
-        );
-        console.log("newViewer sendt!");
-      } catch (err) {
-        console.error("Fejl ved send af newViewer:", err);
-      }
+      ws.current.send(
+        JSON.stringify({
+          type: "newViewer",
+          viewer_id: viewerIdRef.current,
+        })
+      );
     };
 
     ws.current.onerror = (e) => {
       console.error("WebSocket error", e);
     };
     ws.current.onclose = (e) => {
-      console.log("WebSocket closed", e);
       if (peerRef.current) {
         peerRef.current.close();
         peerRef.current = null;
@@ -52,13 +43,20 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
     ws.current.onmessage = async (event) => {
       const msg = JSON.parse(event.data);
-      console.log("WS onmessage", msg);
       if (!peerRef.current) {
+        // --- TURN/STUN OPSÆTNING START ---
         peerRef.current = new window.RTCPeerConnection({
-          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            {
+              urls: "turn:openrelay.metered.ca:80",
+              username: "openrelayproject",
+              credential: "openrelayproject"
+            }
+          ]
         });
+        // --- TURN/STUN OPSÆTNING SLUT ---
         peerRef.current.ontrack = (e) => {
-          console.log("ontrack fired", e);
           if (videoRef.current) {
             videoRef.current.srcObject = e.streams[0];
           }
