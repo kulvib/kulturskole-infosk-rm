@@ -1,4 +1,4 @@
-print("### livestream.py REDEPLOY TEST ###")
+print("### TEST: livestream.py LOADED ###")
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import Dict, List
