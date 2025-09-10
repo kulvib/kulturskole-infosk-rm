@@ -169,7 +169,7 @@ export default function ClientDetailsPage({
         </Grid>
         <Grid item xs={12}>
           <ClientDetailsActionsSection
-            clientId={client?.id} // <---- VIGTIG LINJE!
+            clientId={client?.id}
             actionLoading={actionLoading}
             handleClientAction={handleClientAction}
             handleOpenTerminal={handleOpenTerminal}
@@ -179,7 +179,8 @@ export default function ClientDetailsPage({
           />
         </Grid>
         <Grid item xs={12}>
-          <ClientDetailsLivestreamSection />
+          {/* Rettet her: sender clientId med */}
+          <ClientDetailsLivestreamSection clientId={client?.id} />
         </Grid>
       </Grid>
       <ClientCalendarDialog
