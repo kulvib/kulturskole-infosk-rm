@@ -17,9 +17,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   useEffect(() => {
     if (!clientId) return;
     viewerIdRef.current = generateViewerId();
+    console.log("Opretter WebSocket til", WEBSOCKET_URL);
     ws.current = new window.WebSocket(WEBSOCKET_URL);
 
     ws.current.onopen = () => {
+      console.log("WebSocket open, sender newViewer", viewerIdRef.current);
       ws.current.send(
         JSON.stringify({
           type: "newViewer",
@@ -28,13 +30,26 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       );
     };
 
+    ws.current.onerror = (e) => {
+      console.error("WebSocket error", e);
+    };
+    ws.current.onclose = (e) => {
+      console.log("WebSocket closed", e);
+      if (peerRef.current) {
+        peerRef.current.close();
+        peerRef.current = null;
+      }
+    };
+
     ws.current.onmessage = async (event) => {
       const msg = JSON.parse(event.data);
+      console.log("WS onmessage", msg);
       if (!peerRef.current) {
         peerRef.current = new window.RTCPeerConnection({
           iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
         });
         peerRef.current.ontrack = (e) => {
+          console.log("ontrack fired", e);
           if (videoRef.current) {
             videoRef.current.srcObject = e.streams[0];
           }
@@ -76,17 +91,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       }
     };
 
-    ws.current.onclose = () => {
-      if (peerRef.current) {
-        peerRef.current.close();
-        peerRef.current = null;
-      }
-    };
-
     return () => {
       if (ws.current) ws.current.close();
       if (peerRef.current) peerRef.current.close();
     };
+    // eslint-disable-next-line
   }, [clientId]);
 
   return (
