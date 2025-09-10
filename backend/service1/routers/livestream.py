@@ -1,62 +1,63 @@
-from fastapi import APIRouter, HTTPException, Depends
-import subprocess
-from db import get_session
-from models import Client
-from sqlmodel import select
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from typing import List
 
-router = APIRouter(
-    prefix="/livestream",
-    tags=["livestream"],
-)
+router = APIRouter()
 
-# FFmpeg-processer pr. klient
-ffmpeg_processes = {}
+class ConnectionManager:
+    def __init__(self):
+        self.broadcaster: WebSocket = None
+        self.viewers: List[WebSocket] = []
 
-# Hvis du gemmer YouTube-streamkey på klienten (fx client.youtube_stream_key)
-def get_youtube_url(client):
-    # Hvis du har en stream key på klienten, brug den
-    if hasattr(client, "youtube_stream_key") and client.youtube_stream_key:
-        return f"rtmp://a.rtmp.youtube.com/live2/{client.youtube_stream_key}"
-    # Ellers brug en default (ikke anbefalet!)
-    return "rtmp://a.rtmp.youtube.com/live2/YOUR_DEFAULT_STREAM_KEY"
+    async def connect_broadcaster(self, websocket: WebSocket):
+        await websocket.accept()
+        self.broadcaster = websocket
+        await websocket.send_json({"type": "ack", "role": "broadcaster"})
 
-@router.post("/start/{client_id}")
-async def start_livestream(client_id: int, session=Depends(get_session)):
-    client = session.get(Client, client_id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
+    async def connect_viewer(self, websocket: WebSocket):
+        await websocket.accept()
+        self.viewers.append(websocket)
+        await websocket.send_json({"type": "ack", "role": "viewer"})
+        if self.broadcaster:
+            await self.broadcaster.send_json({"type": "newViewer"})
 
-    # Tjek om allerede aktiv
-    if client_id in ffmpeg_processes and ffmpeg_processes[client_id].poll() is None:
-        return {"status": "already_started", "active": True}
+    async def disconnect(self, websocket: WebSocket):
+        if websocket == self.broadcaster:
+            self.broadcaster = None
+        if websocket in self.viewers:
+            self.viewers.remove(websocket)
 
-    # Eksempel: streamer webcam (tilpas efter behov!)
-    youtube_url = get_youtube_url(client)
+    async def relay(self, sender: WebSocket, message: dict):
+        # Routing logic
+        if sender == self.broadcaster:
+            # Broadcaster sender fx 'offer' til viewers
+            for v in self.viewers:
+                await v.send_json(message)
+        elif sender in self.viewers and self.broadcaster:
+            # Viewer sender fx 'answer' eller 'ice-candidate' til broadcaster
+            await self.broadcaster.send_json(message)
+
+manager = ConnectionManager()
+
+@router.websocket("/ws/livestream")
+async def livestream_endpoint(websocket: WebSocket):
     try:
-        proc = subprocess.Popen([
-            "ffmpeg",
-            "-f", "v4l2",              # Linux webcam. Skift evt. til dshow for Windows!
-            "-i", "/dev/video0",       # Tilpas input!
-            "-f", "flv",
-            youtube_url
-        ])
-        ffmpeg_processes[client_id] = proc
-        return {"status": "started", "active": True}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not start FFmpeg: {e}")
+        data = await websocket.receive_json()
+        if data.get("type") == "broadcaster":
+            await manager.connect_broadcaster(websocket)
+        elif data.get("type") == "viewer":
+            await manager.connect_viewer(websocket)
+        else:
+            await websocket.close()
+            return
 
-@router.post("/stop/{client_id}")
-async def stop_livestream(client_id: int):
-    proc = ffmpeg_processes.get(client_id)
-    if proc and proc.poll() is None:
-        proc.terminate()
-        ffmpeg_processes[client_id] = None
-        return {"status": "stopped", "active": False}
-    else:
-        return {"status": "already_stopped", "active": False}
-
-@router.get("/status/{client_id}")
-async def get_livestream_status(client_id: int):
-    proc = ffmpeg_processes.get(client_id)
-    is_active = proc is not None and proc.poll() is None
-    return {"active": is_active}
+        while True:
+            msg = await websocket.receive_json()
+            await manager.relay(websocket, msg)
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket)
+    except Exception:
+        await manager.disconnect(websocket)
+        try:
+            await websocket.close()
+        except:
+            pass
