@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Grid, Card, Typography } from "@mui/material";
+import { Box, Grid, Card, Typography, Button } from "@mui/material";
 import ClientDetailsHeaderSection from "./ClientDetailsHeaderSection";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
 import ClientDetailsActionsSection from "./ClientDetailsActionsSection";
@@ -20,6 +20,8 @@ export default function ClientDetailsPage({
   handleRefresh,
   markedDays,
   calendarLoading,
+  streamKey,            // <-- ny prop
+  onRestartStream       // <-- ny prop
 }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -179,8 +181,16 @@ export default function ClientDetailsPage({
           />
         </Grid>
         <Grid item xs={12}>
-          {/* Rettet her: sender clientId med */}
-          <ClientDetailsLivestreamSection clientId={client?.id} />
+          {/* Genstart Stream knap og streamKey! */}
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={onRestartStream}
+            sx={{ mb: 1 }}
+          >
+            Genstart Stream
+          </Button>
+          <ClientDetailsLivestreamSection key={streamKey} clientId={client?.id} />
         </Grid>
       </Grid>
       <ClientCalendarDialog
