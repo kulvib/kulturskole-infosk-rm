@@ -1,3 +1,5 @@
+print("### livestream.py LOADED ###")
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import Dict, List
 
@@ -12,6 +14,7 @@ rooms: Dict[str, Room] = {}
 
 @router.websocket("/ws/livestream/{client_id}")
 async def livestream_endpoint(websocket: WebSocket, client_id: str):
+    print(f"WebSocket-forbindelse forsøgt for client_id={client_id}")
     await websocket.accept()
     if client_id not in rooms:
         rooms[client_id] = Room()
