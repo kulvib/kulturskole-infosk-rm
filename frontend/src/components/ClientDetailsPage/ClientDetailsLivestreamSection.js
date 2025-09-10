@@ -2,18 +2,30 @@ import React, { useEffect, useRef } from "react";
 import { Card, CardContent, Box, Typography } from "@mui/material";
 import VideocamIcon from "@mui/icons-material/Videocam";
 
+// Helper to generate a unique viewer_id per session
+function generateViewerId() {
+  return String(Date.now()) + "_" + Math.floor(Math.random() * 100000);
+}
+
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const WEBSOCKET_URL = `wss://kulturskole-infosk-rm.onrender.com/ws/livestream/${clientId}`;
   const videoRef = useRef(null);
   const ws = useRef(null);
   const peerRef = useRef(null);
+  const viewerIdRef = useRef(generateViewerId());
 
   useEffect(() => {
     if (!clientId) return;
+    viewerIdRef.current = generateViewerId();
     ws.current = new window.WebSocket(WEBSOCKET_URL);
 
     ws.current.onopen = () => {
-      ws.current.send(JSON.stringify({ type: "viewer" }));
+      ws.current.send(
+        JSON.stringify({
+          type: "newViewer",
+          viewer_id: viewerIdRef.current,
+        })
+      );
     };
 
     ws.current.onmessage = async (event) => {
@@ -30,7 +42,13 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         };
         peerRef.current.onicecandidate = (e) => {
           if (e.candidate) {
-            ws.current.send(JSON.stringify({ type: "ice-candidate", candidate: e.candidate }));
+            ws.current.send(
+              JSON.stringify({
+                type: "ice-candidate",
+                candidate: e.candidate,
+                viewer_id: viewerIdRef.current,
+              })
+            );
           }
         };
       }
@@ -44,6 +62,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           JSON.stringify({
             type: "answer",
             answer: { sdp: answer.sdp, type: answer.type },
+            viewer_id: viewerIdRef.current,
           })
         );
       }
