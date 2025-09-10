@@ -9,6 +9,7 @@ export default function ClientDetailsPageWrapper() {
   const [refreshing, setRefreshing] = useState(false);
   const [markedDays, setMarkedDays] = useState({});
   const [calendarLoading, setCalendarLoading] = useState(false);
+  const [streamKey, setStreamKey] = useState(0); // Ny state til at remounte livestream
 
   const fetchAllData = async (forceUpdate = false) => {
     if (!clientId) return;
@@ -27,8 +28,7 @@ export default function ClientDetailsPageWrapper() {
         return prev;
       });
 
-      // PATCH: Sæt altid ny reference, så kalender-paper re-renderer!
-      setMarkedDays({ ...calendarData?.markedDays }); // <-- PATCH
+      setMarkedDays({ ...calendarData?.markedDays });
 
     } catch (err) {
       setMarkedDays({});
@@ -48,6 +48,11 @@ export default function ClientDetailsPageWrapper() {
     setRefreshing(false);
   };
 
+  // Ny funktion: Genstart stream
+  const handleRestartStream = () => {
+    setStreamKey(k => k + 1);
+  };
+
   return (
     <ClientDetailsPage
       client={client}
@@ -55,6 +60,8 @@ export default function ClientDetailsPageWrapper() {
       handleRefresh={handleRefresh}
       markedDays={markedDays}
       calendarLoading={calendarLoading}
+      streamKey={streamKey} // sendes videre
+      onRestartStream={handleRestartStream} // sendes videre
     />
   );
 }
