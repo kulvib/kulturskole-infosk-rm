@@ -19,7 +19,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     ws.current.onmessage = async (event) => {
       const msg = JSON.parse(event.data);
       if (!peerRef.current) {
-        peerRef.current = new window.RTCPeerConnection();
+        // Inkluder en STUN-server for bedre browserkompatibilitet!
+        peerRef.current = new window.RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
         peerRef.current.ontrack = (e) => {
           if (videoRef.current) {
             videoRef.current.srcObject = e.streams[0];
@@ -32,15 +35,26 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         };
       }
       if (msg.type === "offer") {
-        await peerRef.current.setRemoteDescription(new window.RTCSessionDescription({type: "offer", sdp: msg.offer}));
+        await peerRef.current.setRemoteDescription(
+          new window.RTCSessionDescription({ type: "offer", sdp: msg.offer })
+        );
         const answer = await peerRef.current.createAnswer();
         await peerRef.current.setLocalDescription(answer);
-        ws.current.send(JSON.stringify({ type: "answer", answer: { sdp: answer.sdp, type: answer.type } }));
+        ws.current.send(
+          JSON.stringify({
+            type: "answer",
+            answer: { sdp: answer.sdp, type: answer.type },
+          })
+        );
       }
       if (msg.type === "ice-candidate" && msg.candidate) {
         try {
-          await peerRef.current.addIceCandidate(new window.RTCIceCandidate(msg.candidate));
-        } catch (err) {}
+          await peerRef.current.addIceCandidate(
+            new window.RTCIceCandidate(msg.candidate)
+          );
+        } catch (err) {
+          // Silent fail
+        }
       }
     };
 
@@ -66,14 +80,16 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             Livestream for klient {clientId}
           </Typography>
         </Box>
-        <Box sx={{
-          p: 2,
-          border: "1px solid #eee",
-          borderRadius: 2,
-          background: "#fafafa",
-          textAlign: "center",
-          minHeight: "160px",
-        }}>
+        <Box
+          sx={{
+            p: 2,
+            border: "1px solid #eee",
+            borderRadius: 2,
+            background: "#fafafa",
+            textAlign: "center",
+            minHeight: "160px",
+          }}
+        >
           <video
             ref={videoRef}
             autoPlay
