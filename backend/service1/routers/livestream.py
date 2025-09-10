@@ -6,7 +6,7 @@ router = APIRouter()
 class Room:
     def __init__(self):
         self.broadcaster: WebSocket = None
-        self.viewers: Dict[str, WebSocket] = {}  # key: viewer_id
+        self.viewers: Dict[str, WebSocket] = {}
 
 rooms: Dict[str, Room] = {}
 
@@ -19,14 +19,17 @@ async def livestream_endpoint(websocket: WebSocket, client_id: str):
     room = rooms[client_id]
     try:
         data = await websocket.receive_json()
+        print(f"Første besked modtaget fra {client_id}: {data}")
         # Broadcaster tilmelder sig
         if data.get("type") == "broadcaster":
             room.broadcaster = websocket
+            print(f"Broadcaster tilsluttet for client_id={client_id}")
             await websocket.send_json({"type": "ack", "role": "broadcaster"})
         # Viewer tilmelder sig
         elif data.get("type") == "newViewer":
             viewer_id = str(data.get("viewer_id"))
             room.viewers[viewer_id] = websocket
+            print(f"Viewer {viewer_id} tilsluttet for client_id={client_id}")
             await websocket.send_json({"type": "ack", "role": "viewer", "viewer_id": viewer_id})
             # Giv broadcaster besked om ny viewer
             if room.broadcaster:
@@ -34,16 +37,21 @@ async def livestream_endpoint(websocket: WebSocket, client_id: str):
                     "type": "newViewer",
                     "viewer_id": viewer_id
                 })
+            else:
+                print(f"Ingen broadcaster tilsluttet for client_id={client_id} (viewer {viewer_id})")
         else:
+            print(f"Ukendt type i første besked: {data}")
             await websocket.close()
             return
 
         while True:
             msg = await websocket.receive_json()
+            print(f"Besked modtaget på ws for client_id={client_id}: {msg}")
             # Broadcaster sender: videresend til korrekt viewer
             if websocket == room.broadcaster:
                 viewer_id = msg.get("viewer_id")
                 if viewer_id and viewer_id in room.viewers:
+                    print(f"Videresender besked fra broadcaster til viewer_id={viewer_id}")
                     await room.viewers[viewer_id].send_json(msg)
             # Viewer sender: videresend til broadcaster
             else:
@@ -54,15 +62,19 @@ async def livestream_endpoint(websocket: WebSocket, client_id: str):
                         break
                 if room.broadcaster and viewer_id:
                     msg["viewer_id"] = viewer_id
+                    print(f"Videresender besked fra viewer {viewer_id} til broadcaster")
                     await room.broadcaster.send_json(msg)
     except WebSocketDisconnect:
-        # Fjern viewer eller broadcaster ved disconnect
+        print(f"WebSocketDisconnect for client_id={client_id}")
         if websocket == room.broadcaster:
+            print(f"Broadcaster frakoblet for client_id={client_id}")
             room.broadcaster = None
         for vid, ws in list(room.viewers.items()):
             if ws == websocket:
+                print(f"Viewer {vid} frakoblet for client_id={client_id}")
                 del room.viewers[vid]
-    except Exception:
+    except Exception as e:
+        print(f"Exception i ws for client_id={client_id}: {e}")
         if websocket == room.broadcaster:
             room.broadcaster = None
         for vid, ws in list(room.viewers.items()):
