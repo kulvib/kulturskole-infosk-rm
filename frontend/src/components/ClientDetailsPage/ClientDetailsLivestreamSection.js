@@ -15,19 +15,28 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const viewerIdRef = useRef(generateViewerId());
 
   useEffect(() => {
-    if (!clientId) return;
+    console.log("useEffect triggered, clientId:", clientId);
+    if (!clientId) {
+      console.error("Ingen clientId i LivestreamSection!", clientId);
+      return;
+    }
     viewerIdRef.current = generateViewerId();
     console.log("Opretter WebSocket til", WEBSOCKET_URL);
     ws.current = new window.WebSocket(WEBSOCKET_URL);
 
     ws.current.onopen = () => {
       console.log("WebSocket open, sender newViewer", viewerIdRef.current);
-      ws.current.send(
-        JSON.stringify({
-          type: "newViewer",
-          viewer_id: viewerIdRef.current,
-        })
-      );
+      try {
+        ws.current.send(
+          JSON.stringify({
+            type: "newViewer",
+            viewer_id: viewerIdRef.current,
+          })
+        );
+        console.log("newViewer sendt!");
+      } catch (err) {
+        console.error("Fejl ved send af newViewer:", err);
+      }
     };
 
     ws.current.onerror = (e) => {
