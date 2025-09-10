@@ -44,18 +44,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     ws.current.onmessage = async (event) => {
       const msg = JSON.parse(event.data);
       if (!peerRef.current) {
-        // --- TURN/STUN OPSÆTNING START ---
+        // --- KUN TURN OPSÆTNING OG tvunget relay ---
         peerRef.current = new window.RTCPeerConnection({
           iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
             {
               urls: "turn:openrelay.metered.ca:80",
               username: "openrelayproject",
               credential: "openrelayproject"
             }
-          ]
+          ],
+          iceTransportPolicy: "relay"
         });
-        // --- TURN/STUN OPSÆTNING SLUT ---
         peerRef.current.ontrack = (e) => {
           if (videoRef.current) {
             videoRef.current.srcObject = e.streams[0];
