@@ -1,13 +1,22 @@
+print("### main.py starter ###")
+
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 
+print("### main.py: Pre-router-import ###")
+
 from routers import clients, calendar, meta, schools, users, livestream  # Importer livestream!
+
+print("### main.py: livestream importeret ###")
+
 from auth import router as auth_router, get_password_hash
 from db import create_db_and_tables, engine
 from models import User
+
+print("### main.py: Efter alle imports ###")
 
 load_dotenv()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "meget_sikkert_fallback_kodeord")
