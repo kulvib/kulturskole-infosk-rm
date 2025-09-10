@@ -2,14 +2,14 @@ import React, { useEffect, useRef } from "react";
 import { Card, CardContent, Box, Typography } from "@mui/material";
 import VideocamIcon from "@mui/icons-material/Videocam";
 
-const WEBSOCKET_URL = "wss://kulturskole-infosk-rm.onrender.com/ws/livestream";
-
-export default function ClientDetailsLivestreamSection() {
+export default function ClientDetailsLivestreamSection({ clientId }) {
+  const WEBSOCKET_URL = `wss://kulturskole-infosk-rm.onrender.com/ws/livestream/${clientId}`;
   const videoRef = useRef(null);
   const ws = useRef(null);
   const peerRef = useRef(null);
 
   useEffect(() => {
+    if (!clientId) return;
     ws.current = new window.WebSocket(WEBSOCKET_URL);
 
     ws.current.onopen = () => {
@@ -32,10 +32,10 @@ export default function ClientDetailsLivestreamSection() {
         };
       }
       if (msg.type === "offer") {
-        await peerRef.current.setRemoteDescription(new window.RTCSessionDescription(msg.offer));
+        await peerRef.current.setRemoteDescription(new window.RTCSessionDescription({type: "offer", sdp: msg.offer}));
         const answer = await peerRef.current.createAnswer();
         await peerRef.current.setLocalDescription(answer);
-        ws.current.send(JSON.stringify({ type: "answer", answer }));
+        ws.current.send(JSON.stringify({ type: "answer", answer: { sdp: answer.sdp, type: answer.type } }));
       }
       if (msg.type === "ice-candidate" && msg.candidate) {
         try {
@@ -55,7 +55,7 @@ export default function ClientDetailsLivestreamSection() {
       if (ws.current) ws.current.close();
       if (peerRef.current) peerRef.current.close();
     };
-  }, []);
+  }, [clientId]);
 
   return (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
@@ -63,7 +63,7 @@ export default function ClientDetailsLivestreamSection() {
         <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2 }}>
           <VideocamIcon color="action" fontSize="large" />
           <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
-            Livestream fra klient
+            Livestream for klient {clientId}
           </Typography>
         </Box>
         <Box sx={{
