@@ -20,8 +20,8 @@ export default function ClientDetailsPage({
   handleRefresh,
   markedDays,
   calendarLoading,
-  streamKey,            // <-- ny prop
-  onRestartStream       // <-- ny prop
+  streamKey,
+  onRestartStream
 }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -181,7 +181,6 @@ export default function ClientDetailsPage({
           />
         </Grid>
         <Grid item xs={12}>
-          {/* Genstart Stream knap og streamKey! */}
           <Button
             variant="outlined"
             color="primary"
