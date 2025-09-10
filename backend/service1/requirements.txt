@@ -13,3 +13,6 @@ alembic
 fastapi[all]
 requests
 websockets==12.0
+aiortc
+opencv-python
+numpy
