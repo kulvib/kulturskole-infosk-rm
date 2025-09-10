@@ -1,27 +1,59 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { Card, CardContent, Box, Typography } from "@mui/material";
 import VideocamIcon from "@mui/icons-material/Videocam";
 
-const WEBSOCKET_URL = "wss://kulturskole-infosk-rm.onrender.com/ws"; // Din backend WebSocket-URL
+const WEBSOCKET_URL = "wss://kulturskole-infosk-rm.onrender.com/ws/livestream";
 
 export default function ClientDetailsLivestreamSection() {
-  const [image, setImage] = useState(null);
+  const videoRef = useRef(null);
   const ws = useRef(null);
+  const peerRef = useRef(null);
 
   useEffect(() => {
     ws.current = new window.WebSocket(WEBSOCKET_URL);
 
-    ws.current.onmessage = (event) => {
-      // Forvent at event.data er base64 billede-data (f.eks. JPEG eller PNG)
-      setImage(event.data);
+    ws.current.onopen = () => {
+      ws.current.send(JSON.stringify({ type: "viewer" }));
+    };
+
+    ws.current.onmessage = async (event) => {
+      const msg = JSON.parse(event.data);
+      if (!peerRef.current) {
+        peerRef.current = new window.RTCPeerConnection();
+        peerRef.current.ontrack = (e) => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = e.streams[0];
+          }
+        };
+        peerRef.current.onicecandidate = (e) => {
+          if (e.candidate) {
+            ws.current.send(JSON.stringify({ type: "ice-candidate", candidate: e.candidate }));
+          }
+        };
+      }
+      if (msg.type === "offer") {
+        await peerRef.current.setRemoteDescription(new window.RTCSessionDescription(msg.offer));
+        const answer = await peerRef.current.createAnswer();
+        await peerRef.current.setLocalDescription(answer);
+        ws.current.send(JSON.stringify({ type: "answer", answer }));
+      }
+      if (msg.type === "ice-candidate" && msg.candidate) {
+        try {
+          await peerRef.current.addIceCandidate(new window.RTCIceCandidate(msg.candidate));
+        } catch (err) {}
+      }
     };
 
     ws.current.onclose = () => {
-      console.warn("WebSocket lukket");
+      if (peerRef.current) {
+        peerRef.current.close();
+        peerRef.current = null;
+      }
     };
 
     return () => {
-      ws.current.close();
+      if (ws.current) ws.current.close();
+      if (peerRef.current) peerRef.current.close();
     };
   }, []);
 
@@ -42,17 +74,12 @@ export default function ClientDetailsLivestreamSection() {
           textAlign: "center",
           minHeight: "160px",
         }}>
-          {image ? (
-            <img
-              src={`data:image/jpeg;base64,${image}`}
-              alt="Livestream"
-              style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
-            />
-          ) : (
-            <Typography color="text.secondary" fontStyle="italic">
-              Ingen livestream billede endnu...
-            </Typography>
-          )}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
+          />
         </Box>
       </CardContent>
     </Card>
