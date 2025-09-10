@@ -61,6 +61,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 type: "ice-candidate",
                 candidate: e.candidate,
                 viewer_id: viewerIdRef.current,
+                sdpMid: e.candidate.sdpMid,
+                sdpMLineIndex: e.candidate.sdpMLineIndex,
               })
             );
           }
