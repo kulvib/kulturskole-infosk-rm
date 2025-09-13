@@ -1,22 +1,16 @@
 {
-  "name": "kulturskole-infosk-rm-frontend",
+  "name": "kulturskole-sfu-server",
   "version": "1.0.0",
   "private": true,
-  "description": "Frontend for kulturskole-infosk-rm med mediasoup livestream viewer",
+  "description": "Mediasoup SFU server for kulturskole-infosk-rm",
+  "main": "server.js",
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "node server.js"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "mediasoup-client": "^3.6.97",
-    "@mui/material": "^5.13.7",
-    "@mui/icons-material": "^5.13.7"
-  },
-  "devDependencies": {
-    "react-scripts": "^5.0.1"
+    "mediasoup": "^3.11.7",
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+    // tilføj evt. andre server-afhængigheder her
   }
 }
