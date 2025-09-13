@@ -1,5 +1,4 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, WebSocket, WebSocketDisconnect
 from typing import Dict
 import os
 
@@ -16,14 +15,15 @@ async def upload_hls_file(
 ):
     """
     Modtag segment fra en producer og opdater manifest for korrekt client_id.
-    Sletter automatisk gamle segmenter, så kun de 5 nyeste beholdes.
+    Logger filsti og størrelse. Sletter gamle segmenter, så kun de 5 nyeste beholdes.
     """
     client_dir = os.path.join(HLS_DIR, client_id)
     os.makedirs(client_dir, exist_ok=True)
     seg_path = os.path.join(client_dir, file.filename)
+    content = await file.read()
     with open(seg_path, "wb") as f:
-        content = await file.read()
         f.write(content)
+    print(f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes")  # LOGNING
     update_manifest(client_dir, keep_last_n=5)
     return {"filename": file.filename, "client_id": client_id}
 
@@ -44,13 +44,7 @@ def update_manifest(client_dir, keep_last_n=5):
         for seg in segments:
             m3u.write("#EXTINF:5.0,\n")
             m3u.write(f"{seg}\n")
-
-@router.get("/hls/{client_id}/{filename}")
-async def get_hls_file(client_id: str, filename: str):
-    file_path = os.path.join(HLS_DIR, client_id, filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(file_path)
+    print(f"[MANIFEST] Manifest opdateret: {manifest_path} ({len(segments)} segmenter)")  # LOGNING
 
 # --- WebRTC signalering ---
 class Room:
