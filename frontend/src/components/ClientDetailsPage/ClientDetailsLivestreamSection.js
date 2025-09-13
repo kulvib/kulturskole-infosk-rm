@@ -10,14 +10,13 @@ export default function LivestreamMediasoupViewer() {
   const transportRef = useRef(null);
   const consumerRef = useRef(null);
 
-  // Sæt din WebSocket-URL til SFU her:
+  // Udskift evt. URL til din egen SFU-server
   const WEBSOCKET_URL = 'wss://kulturskole-infosk-rm-sfu-server.onrender.com';
 
   useEffect(() => {
     let running = true;
 
     async function runMediasoup() {
-      // 1. Forbind til SFU
       wsRef.current = new window.WebSocket(WEBSOCKET_URL);
 
       wsRef.current.onclose = () => {
@@ -27,7 +26,7 @@ export default function LivestreamMediasoupViewer() {
         if (consumerRef.current) consumerRef.current = null;
       };
 
-      // Helper til at sende/vente på svar
+      // Helper til request/response-protokol
       function request(action, data = {}) {
         return new Promise((resolve, reject) => {
           const msg = { action, data };
@@ -42,15 +41,15 @@ export default function LivestreamMediasoupViewer() {
 
       wsRef.current.onopen = async () => {
         try {
-          // 2. Hent router RTP capabilities
+          // 1. Hent router RTP capabilities
           const routerCaps = await request("getRouterRtpCapabilities");
 
-          // 3. Lav device (mediasoup-client)
+          // 2. Lav device
           const device = new mediasoupClient.Device();
           await device.load({ routerRtpCapabilities: routerCaps.data });
           deviceRef.current = device;
 
-          // 4. Opret transport
+          // 3. Opret recv transport
           const { data: transportOptions } = await request("createWebRtcTransport");
           const recvTransport = device.createRecvTransport({
             id: transportOptions.id,
@@ -60,7 +59,7 @@ export default function LivestreamMediasoupViewer() {
           });
           transportRef.current = recvTransport;
 
-          // 5. Forbind transport (DTLS handshake)
+          // 4. Forbind transport (DTLS handshake)
           recvTransport.on("connect", async ({ dtlsParameters }, callback, errback) => {
             try {
               await request("connectWebRtcTransport", {
@@ -73,38 +72,38 @@ export default function LivestreamMediasoupViewer() {
             }
           });
 
-          // 6. Hent producerId (her skal du evt. tilpasse: måske får du den fra serveren, eller hardcoder til test)
-          // For demo: serveren skal have mindst én producer aktiv! Du kan få ID via WebSocket, eller lave en "getProducers" action på din SFU.
-          // Her: bed om alle producers fra serveren (du skal evt. udvide din server til at kunne det)
-          // For nu: Spørg om det, eller få backend til at sende dig første producerId.
-
-          // --- DU SKAL TILPASSE DETTE ----
-          // Fx:
-          // const { data: { producerId } } = await request("getFirstProducerId");
-
-          // For test: hardcode et producerId du ved eksisterer:
+          // 5. Hent producerId (du kan også hardcode det her)
+          // Hvis din backend ikke understøtter denne action, så hardcode producerId, fx:
           // const producerId = "din-producer-id-her";
-          // Hvis ikke, så stop her og lav det backend-endpoint først!
+          // Ellers:
+          const { data: { producerId } } = await request("getFirstProducerId");
+          if (!producerId) {
+            throw new Error("Ingen producer aktiv på SFU!");
+          }
 
-          // 7. Consumer (modtag stream)
-          // const { data: consumerOptions } = await request("consume", {
-          //   transportId: recvTransport.id,
-          //   producerId,
-          //   rtpCapabilities: device.rtpCapabilities,
-          // });
+          // 6. Opret consumer (modtag stream fra producer)
+          const { data: consumerOptions } = await request("consume", {
+            transportId: recvTransport.id,
+            producerId,
+            rtpCapabilities: device.rtpCapabilities,
+          });
 
-          // const consumer = await recvTransport.consume({
-          //   id: consumerOptions.id,
-          //   producerId: consumerOptions.producerId,
-          //   kind: consumerOptions.kind,
-          //   rtpParameters: consumerOptions.rtpParameters,
-          // });
-          // consumerRef.current = consumer;
+          const consumer = await recvTransport.consume({
+            id: consumerOptions.id,
+            producerId: consumerOptions.producerId,
+            kind: consumerOptions.kind,
+            rtpParameters: consumerOptions.rtpParameters,
+          });
+          consumerRef.current = consumer;
 
-          // 8. Sæt stream på video-tag
-          // const stream = new window.MediaStream();
-          // stream.addTrack(consumer.track);
-          // if (videoRef.current) videoRef.current.srcObject = stream;
+          // 7. Sæt stream på video-tag
+          const stream = new window.MediaStream();
+          stream.addTrack(consumer.track);
+          if (videoRef.current) videoRef.current.srcObject = stream;
+
+          // 8. Resume consumer hvis nødvendig
+          await request("resume", { consumerId: consumer.id });
+
         } catch (err) {
           console.error("Mediasoup FEJL:", err);
         }
