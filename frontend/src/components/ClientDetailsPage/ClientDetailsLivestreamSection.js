@@ -48,16 +48,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       console.log("Modtog WebSocket-besked:", msg);
 
       if (!peerRef.current) {
-        // --- KUN TURN OPSÆTNING OG tvunget relay ---
+        // Brug både STUN og TURN, samt tillad direkte forbindelser
         peerRef.current = new window.RTCPeerConnection({
           iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
             {
               urls: "turn:openrelay.metered.ca:80",
               username: "openrelayproject",
               credential: "openrelayproject"
             }
           ],
-          iceTransportPolicy: "relay"
+          iceTransportPolicy: "all"
         });
         peerRef.current.ontrack = (e) => {
           console.log("Har modtaget stream!", e.streams[0]);
@@ -70,8 +71,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           }
         };
         peerRef.current.onicecandidate = (e) => {
+          console.log("ICE-candidate fra browser:", e.candidate);
           if (e.candidate) {
-            console.log("Sender ice-candidate til backend", e.candidate);
             ws.current.send(
               JSON.stringify({
                 type: "ice-candidate",
