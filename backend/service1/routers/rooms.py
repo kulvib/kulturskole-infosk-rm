@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-# Dummy data – udskift med databaseopslag hvis nødvendigt
 DUMMY_ROOMS = [
     {"room_id": "musik1", "name": "Musiklokale 1"},
     {"room_id": "dans2", "name": "Dansesal 2"},
