@@ -1,8 +1,30 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
 from typing import Dict
+import os
 
 router = APIRouter()
 
+# --- HLS setup ---
+HLS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hls"))
+os.makedirs(HLS_DIR, exist_ok=True)
+
+@router.post("/hls/upload")
+async def upload_hls_file(file: UploadFile = File(...)):
+    file_location = os.path.join(HLS_DIR, file.filename)
+    with open(file_location, "wb") as f:
+        content = await file.read()
+        f.write(content)
+    return {"filename": file.filename}
+
+@router.get("/hls/{filename}")
+async def get_hls_file(filename: str):
+    file_path = os.path.join(HLS_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path)
+
+# --- WebRTC signalering ---
 class Room:
     def __init__(self):
         self.broadcaster: WebSocket = None
