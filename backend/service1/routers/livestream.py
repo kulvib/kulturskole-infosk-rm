@@ -37,14 +37,26 @@ def update_manifest(client_dir, keep_last_n=5):
             os.remove(os.path.join(client_dir, seg))
         segments = segments[-keep_last_n:]  # behold kun de nyeste
 
+    # Udtræk første segmentnummer til EXT-X-MEDIA-SEQUENCE
+    def extract_num(filename):
+        # Forvent format: segment_00083.mp4
+        num = filename.replace("segment_", "").replace(".mp4", "")
+        return int(num)
+
+    if segments:
+        media_seq = extract_num(segments[0])
+    else:
+        media_seq = 0
+
     # Skriv manifest for de nuværende segmenter
     manifest_path = os.path.join(client_dir, "index.m3u8")
     with open(manifest_path, "w") as m3u:
-        m3u.write("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n#EXT-X-MEDIA-SEQUENCE:0\n")
+        m3u.write("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n")
+        m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
         for seg in segments:
             m3u.write("#EXTINF:5.0,\n")
             m3u.write(f"{seg}\n")
-    print(f"[MANIFEST] Manifest opdateret: {manifest_path} ({len(segments)} segmenter)")
+    print(f"[MANIFEST] Manifest opdateret: {manifest_path} (start={media_seq}, {len(segments)} segmenter)")
 
 # --- WebRTC signalering (kan beholdes, men ikke relevant for HLS upload) ---
 class Room:
