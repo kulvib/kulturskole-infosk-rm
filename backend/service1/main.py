@@ -8,9 +8,9 @@ from sqlmodel import Session, select
 
 print("### main.py: Pre-router-import ###")
 
-from routers import clients, calendar, meta, schools, users, livestream  # Importer livestream!
+from routers import clients, calendar, meta, schools, users, livestream, rooms  # <- rooms med!
 
-print("### main.py: livestream importeret ###")
+print("### main.py: livestream og rooms importeret ###")
 
 from auth import router as auth_router, get_password_hash
 from db import create_db_and_tables, engine
@@ -65,6 +65,7 @@ app.include_router(calendar.router, prefix="/api")
 app.include_router(meta.router, prefix="/api")
 app.include_router(users.router, prefix="/api")  # users-router
 app.include_router(livestream.router)  # Tilføj livestream-routeren
+app.include_router(rooms.router)       # <- Tilføj rooms-routeren
 
 # Root route to avoid 404
 @app.get("/")
