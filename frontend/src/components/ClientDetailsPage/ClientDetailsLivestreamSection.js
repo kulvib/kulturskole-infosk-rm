@@ -53,7 +53,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           iceServers: [
             { urls: "stun:stun.l.google.com:19302" },
             {
-              urls: "turn:openrelay.metered.ca:80",
+              urls: "turn:openrelay.metered.ca:80?transport=udp",
+              username: "openrelayproject",
+              credential: "openrelayproject"
+            },
+            {
+              urls: "turn:openrelay.metered.ca:443?transport=tcp",
+              username: "openrelayproject",
+              credential: "openrelayproject"
+            },
+            {
+              urls: "turn:openrelay.metered.ca:443",
               username: "openrelayproject",
               credential: "openrelayproject"
             }
@@ -64,7 +74,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           console.log("Har modtaget stream!", e.streams[0]);
           if (videoRef.current) {
             videoRef.current.srcObject = e.streams[0];
-            // Ekstra log:
             setTimeout(() => {
               console.log("video.srcObject er nu sat til:", videoRef.current.srcObject);
             }, 1000);
