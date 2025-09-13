@@ -1,4 +1,4 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form
 from fastapi.responses import FileResponse
 from typing import Dict
 import os
@@ -10,16 +10,44 @@ HLS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hls"))
 os.makedirs(HLS_DIR, exist_ok=True)
 
 @router.post("/hls/upload")
-async def upload_hls_file(file: UploadFile = File(...)):
-    file_location = os.path.join(HLS_DIR, file.filename)
-    with open(file_location, "wb") as f:
+async def upload_hls_file(
+    file: UploadFile = File(...),
+    client_id: str = Form(...)
+):
+    """
+    Modtag segment fra en producer og opdater manifest for korrekt client_id.
+    Sletter automatisk gamle segmenter, så kun de 5 nyeste beholdes.
+    """
+    client_dir = os.path.join(HLS_DIR, client_id)
+    os.makedirs(client_dir, exist_ok=True)
+    seg_path = os.path.join(client_dir, file.filename)
+    with open(seg_path, "wb") as f:
         content = await file.read()
         f.write(content)
-    return {"filename": file.filename}
+    update_manifest(client_dir, keep_last_n=5)
+    return {"filename": file.filename, "client_id": client_id}
 
-@router.get("/hls/{filename}")
-async def get_hls_file(filename: str):
-    file_path = os.path.join(HLS_DIR, filename)
+def update_manifest(client_dir, keep_last_n=5):
+    # Find og sorter alle segmenter (fx .mp4)
+    segments = sorted([f for f in os.listdir(client_dir) if f.endswith(".mp4")])
+    # Slet gamle segmenter, hvis der er for mange
+    if len(segments) > keep_last_n:
+        to_delete = segments[:-keep_last_n]
+        for seg in to_delete:
+            os.remove(os.path.join(client_dir, seg))
+        segments = segments[-keep_last_n:]  # behold kun de nyeste
+
+    # Skriv manifest for de nuværende segmenter
+    manifest_path = os.path.join(client_dir, "index.m3u8")
+    with open(manifest_path, "w") as m3u:
+        m3u.write("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n#EXT-X-MEDIA-SEQUENCE:0\n")
+        for seg in segments:
+            m3u.write("#EXTINF:5.0,\n")
+            m3u.write(f"{seg}\n")
+
+@router.get("/hls/{client_id}/{filename}")
+async def get_hls_file(client_id: str, filename: str):
+    file_path = os.path.join(HLS_DIR, client_id, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path)
