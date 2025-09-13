@@ -47,13 +47,6 @@ def update_manifest(client_dir, keep_last_n=5):
             m3u.write(f"{seg}\n")
     print(f"[MANIFEST] Manifest opdateret: {manifest_path} ({len(segments)} segmenter)")
 
-@router.get("/hls/{client_id}/{filename}")
-async def get_hls_file(client_id: str, filename: str):
-    file_path = os.path.join(HLS_DIR, client_id, filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(file_path)
-
 # --- WebRTC signalering ---
 class Room:
     def __init__(self):
