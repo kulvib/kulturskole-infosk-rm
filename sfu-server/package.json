@@ -15,7 +15,6 @@
     "mediasoup-client": "^3.6.97",
     "@mui/material": "^5.13.7",
     "@mui/icons-material": "^5.13.7"
-    // Tilføj evt. andre dependencies fra dit projekt her.
   },
   "devDependencies": {
     "react-scripts": "^5.0.1"
