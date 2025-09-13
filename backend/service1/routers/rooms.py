@@ -1,13 +1,13 @@
-from flask import Blueprint, jsonify
+from fastapi import APIRouter
 
-rooms_bp = Blueprint('rooms', __name__)
+router = APIRouter()
 
-# Dummy data - kan evt. komme fra database på sigt
+# Dummy data – udskift med databaseopslag hvis nødvendigt
 DUMMY_ROOMS = [
     {"room_id": "musik1", "name": "Musiklokale 1"},
     {"room_id": "dans2", "name": "Dansesal 2"},
 ]
 
-@rooms_bp.route("/api/rooms", methods=["GET"])
-def get_rooms():
-    return jsonify(DUMMY_ROOMS)
+@router.get("/api/rooms")
+async def get_rooms():
+    return DUMMY_ROOMS
