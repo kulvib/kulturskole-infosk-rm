@@ -23,6 +23,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     ws.current = new window.WebSocket(WEBSOCKET_URL);
 
     ws.current.onopen = () => {
+      console.log("WebSocket åbnet, sender newViewer", viewerIdRef.current);
       ws.current.send(
         JSON.stringify({
           type: "newViewer",
@@ -35,6 +36,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       console.error("WebSocket error", e);
     };
     ws.current.onclose = (e) => {
+      console.log("WebSocket lukket", e);
       if (peerRef.current) {
         peerRef.current.close();
         peerRef.current = null;
@@ -43,6 +45,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
     ws.current.onmessage = async (event) => {
       const msg = JSON.parse(event.data);
+      console.log("Modtog WebSocket-besked:", msg);
+
       if (!peerRef.current) {
         // --- KUN TURN OPSÆTNING OG tvunget relay ---
         peerRef.current = new window.RTCPeerConnection({
@@ -56,12 +60,18 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           iceTransportPolicy: "relay"
         });
         peerRef.current.ontrack = (e) => {
+          console.log("Har modtaget stream!", e.streams[0]);
           if (videoRef.current) {
             videoRef.current.srcObject = e.streams[0];
+            // Ekstra log:
+            setTimeout(() => {
+              console.log("video.srcObject er nu sat til:", videoRef.current.srcObject);
+            }, 1000);
           }
         };
         peerRef.current.onicecandidate = (e) => {
           if (e.candidate) {
+            console.log("Sender ice-candidate til backend", e.candidate);
             ws.current.send(
               JSON.stringify({
                 type: "ice-candidate",
@@ -73,8 +83,15 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             );
           }
         };
+        peerRef.current.oniceconnectionstatechange = () => {
+          console.log("ICE state:", peerRef.current.iceConnectionState);
+        };
+        peerRef.current.onconnectionstatechange = () => {
+          console.log("Peer connection state:", peerRef.current.connectionState);
+        };
       }
       if (msg.type === "offer") {
+        console.log("Modtog offer:", msg.offer);
         await peerRef.current.setRemoteDescription(
           new window.RTCSessionDescription({ type: "offer", sdp: msg.offer })
         );
@@ -87,14 +104,16 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             viewer_id: viewerIdRef.current,
           })
         );
+        console.log("Sendte answer til backend");
       }
       if (msg.type === "ice-candidate" && msg.candidate) {
         try {
+          console.log("Tilføjer ice-candidate fra backend", msg.candidate);
           await peerRef.current.addIceCandidate(
             new window.RTCIceCandidate(msg.candidate)
           );
         } catch (err) {
-          // Silent fail
+          console.error("Fejl ved addIceCandidate", err);
         }
       }
     };
@@ -129,6 +148,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             ref={videoRef}
             autoPlay
             playsInline
+            controls
             style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
           />
         </Box>
