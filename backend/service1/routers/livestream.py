@@ -1,5 +1,4 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form
-from fastapi.responses import FileResponse
 from typing import Dict
 import os
 
@@ -47,7 +46,7 @@ def update_manifest(client_dir, keep_last_n=5):
             m3u.write(f"{seg}\n")
     print(f"[MANIFEST] Manifest opdateret: {manifest_path} ({len(segments)} segmenter)")
 
-# --- WebRTC signalering ---
+# --- WebRTC signalering (ubrugret, men beholdt for fuldstændighed) ---
 class Room:
     def __init__(self):
         self.broadcaster: WebSocket = None
