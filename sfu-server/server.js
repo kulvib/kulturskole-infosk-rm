@@ -7,29 +7,27 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Simple in-memory store for rooms/peers (for demo)
-const rooms = new Map();
-
 let worker;
+
 (async () => {
   worker = await mediasoup.createWorker();
   console.log('Mediasoup worker started');
 })();
 
-// --- WebSocket signaling ---
+// Simple in-memory store for rooms/peers (for demo)
+const rooms = new Map();
+
 wss.on('connection', (ws) => {
   ws.on('message', async (message) => {
-    // Expect JSON messages: {action, roomId, peerId, ...}
     try {
       const msg = JSON.parse(message);
-      // Her skal du håndtere "join room", "create transport", "produce", "consume" osv.
-      // Dette er kun stub for at vise strukturen
+      // Eksempel på handling: ping-pong test
       if (msg.action === 'ping') {
-        ws.send(JSON.stringify({action: 'pong'}));
+        ws.send(JSON.stringify({ action: 'pong' }));
       }
-      // ... implementér flere signaler her
+      // Her kan du udvide med: join room, create transport, produce, consume, etc.
     } catch (err) {
-      ws.send(JSON.stringify({error: err.toString()}));
+      ws.send(JSON.stringify({ error: err.toString() }));
     }
   });
 });
