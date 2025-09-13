@@ -1,4 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form
+from fastapi.responses import FileResponse
 from typing import Dict
 import os
 
@@ -23,7 +24,7 @@ async def upload_hls_file(
     content = await file.read()
     with open(seg_path, "wb") as f:
         f.write(content)
-    print(f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes")  # LOGNING
+    print(f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes")
     update_manifest(client_dir, keep_last_n=5)
     return {"filename": file.filename, "client_id": client_id}
 
@@ -44,7 +45,14 @@ def update_manifest(client_dir, keep_last_n=5):
         for seg in segments:
             m3u.write("#EXTINF:5.0,\n")
             m3u.write(f"{seg}\n")
-    print(f"[MANIFEST] Manifest opdateret: {manifest_path} ({len(segments)} segmenter)")  # LOGNING
+    print(f"[MANIFEST] Manifest opdateret: {manifest_path} ({len(segments)} segmenter)")
+
+@router.get("/hls/{client_id}/{filename}")
+async def get_hls_file(client_id: str, filename: str):
+    file_path = os.path.join(HLS_DIR, client_id, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path)
 
 # --- WebRTC signalering ---
 class Room:
