@@ -3,6 +3,7 @@ print("### main.py starter ###")
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 
@@ -56,6 +57,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- STATIC MOUNT TIL HLS ---
+HLS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "hls"))
+os.makedirs(HLS_DIR, exist_ok=True)
+app.mount("/hls", StaticFiles(directory=HLS_DIR), name="hls")
+print(f"### main.py: Static mount for HLS på {HLS_DIR} ###")
 
 # Routers
 app.include_router(clients.router, prefix="/api")
