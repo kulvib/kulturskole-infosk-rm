@@ -8,24 +8,119 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 let worker;
+let router;
+let transports = new Map(); // id -> transport
+let producers = new Map();  // id -> producer
+let consumers = new Map();  // id -> consumer
 
 (async () => {
   worker = await mediasoup.createWorker();
-  console.log('Mediasoup worker started');
+  router = await worker.createRouter({ mediaCodecs: [
+    {
+      kind: "audio",
+      mimeType: "audio/opus",
+      clockRate: 48000,
+      channels: 2,
+    },
+    {
+      kind: "video",
+      mimeType: "video/VP8",
+      clockRate: 90000,
+      parameters: {},
+    },
+  ]});
+  console.log('Mediasoup worker & router started');
 })();
-
-// Simple in-memory store for rooms/peers (for demo)
-const rooms = new Map();
 
 wss.on('connection', (ws) => {
   ws.on('message', async (message) => {
+    let msg;
     try {
-      const msg = JSON.parse(message);
-      // Eksempel på handling: ping-pong test
-      if (msg.action === 'ping') {
-        ws.send(JSON.stringify({ action: 'pong' }));
+      msg = JSON.parse(message);
+    } catch (err) {
+      ws.send(JSON.stringify({ error: "Invalid JSON" }));
+      return;
+    }
+    try {
+      switch(msg.action) {
+        case 'ping':
+          ws.send(JSON.stringify({ action: 'pong' }));
+          break;
+        case 'getRouterRtpCapabilities':
+          ws.send(JSON.stringify({
+            action: 'routerRtpCapabilities',
+            data: router.rtpCapabilities
+          }));
+          break;
+        case 'createWebRtcTransport':
+          {
+            const transport = await router.createWebRtcTransport({
+              listenIps: [{ ip: '0.0.0.0', announcedIp: null }],
+              enableUdp: true,
+              enableTcp: true,
+              preferUdp: true,
+            });
+            transports.set(transport.id, transport);
+            ws.send(JSON.stringify({
+              action: 'webRtcTransportCreated',
+              data: {
+                id: transport.id,
+                iceParameters: transport.iceParameters,
+                iceCandidates: transport.iceCandidates,
+                dtlsParameters: transport.dtlsParameters,
+              }
+            }));
+          }
+          break;
+        case 'connectWebRtcTransport':
+          {
+            const { transportId, dtlsParameters } = msg.data;
+            const transport = transports.get(transportId);
+            await transport.connect({ dtlsParameters });
+            ws.send(JSON.stringify({ action: 'webRtcTransportConnected', data: { transportId } }));
+          }
+          break;
+        case 'produce':
+          {
+            const { transportId, kind, rtpParameters } = msg.data;
+            const transport = transports.get(transportId);
+            const producer = await transport.produce({ kind, rtpParameters });
+            producers.set(producer.id, producer);
+            ws.send(JSON.stringify({
+              action: 'produced',
+              data: { id: producer.id }
+            }));
+          }
+          break;
+        case 'consume':
+          {
+            const { transportId, producerId, rtpCapabilities } = msg.data;
+            const transport = transports.get(transportId);
+            if (!router.canConsume({ producerId, rtpCapabilities })) {
+              ws.send(JSON.stringify({ error: 'Cannot consume' }));
+              return;
+            }
+            const consumer = await transport.consume({
+              producerId,
+              rtpCapabilities,
+              paused: false,
+            });
+            consumers.set(consumer.id, consumer);
+            ws.send(JSON.stringify({
+              action: 'consumed',
+              data: {
+                id: consumer.id,
+                producerId,
+                kind: consumer.kind,
+                rtpParameters: consumer.rtpParameters,
+                type: consumer.type,
+              }
+            }));
+          }
+          break;
+        default:
+          ws.send(JSON.stringify({ error: 'Unknown action' }));
       }
-      // Her kan du udvide med: join room, create transport, produce, consume, etc.
     } catch (err) {
       ws.send(JSON.stringify({ error: err.toString() }));
     }
