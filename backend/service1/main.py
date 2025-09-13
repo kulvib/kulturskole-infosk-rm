@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 
 print("### main.py: Pre-router-import ###")
 
-from routers import clients, calendar, meta, schools, users, livestream  # rooms fjernet
+from routers import clients, calendar, meta, schools, users, livestream
 
 print("### main.py: livestream importeret ###")
 
@@ -71,7 +71,8 @@ app.include_router(auth_router, prefix="/auth")
 app.include_router(calendar.router, prefix="/api")
 app.include_router(meta.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
-app.include_router(livestream.router)  # rooms.router er fjernet
+# VIGTIGT: livestream-router får prefix /api for at UNDGÅ konflikt med static mount på /hls
+app.include_router(livestream.router, prefix="/api")
 
 # Root route to avoid 404
 @app.get("/")
