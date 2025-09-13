@@ -1,139 +1,126 @@
 import React, { useEffect, useRef } from "react";
+import * as mediasoupClient from "mediasoup-client";
 import { Card, CardContent, Box, Typography } from "@mui/material";
 import VideocamIcon from "@mui/icons-material/Videocam";
 
-// Helper to generate a unique viewer_id per session
-function generateViewerId() {
-  return String(Date.now()) + "_" + Math.floor(Math.random() * 100000);
-}
-
-export default function ClientDetailsLivestreamSection({ clientId }) {
-  const WEBSOCKET_URL = `wss://kulturskole-infosk-rm.onrender.com/ws/livestream/${clientId}`;
+export default function LivestreamMediasoupViewer() {
   const videoRef = useRef(null);
-  const ws = useRef(null);
-  const peerRef = useRef(null);
-  const viewerIdRef = useRef(generateViewerId());
+  const wsRef = useRef(null);
+  const deviceRef = useRef(null);
+  const transportRef = useRef(null);
+  const consumerRef = useRef(null);
+
+  // Sæt din WebSocket-URL til SFU her:
+  const WEBSOCKET_URL = 'wss://kulturskole-infosk-rm-sfu-server.onrender.com';
 
   useEffect(() => {
-    if (!clientId) {
-      console.error("Ingen clientId i LivestreamSection!", clientId);
-      return;
-    }
-    viewerIdRef.current = generateViewerId();
-    ws.current = new window.WebSocket(WEBSOCKET_URL);
+    let running = true;
 
-    ws.current.onopen = () => {
-      console.log("WebSocket åbnet, sender newViewer", viewerIdRef.current);
-      ws.current.send(
-        JSON.stringify({
-          type: "newViewer",
-          viewer_id: viewerIdRef.current,
-        })
-      );
-    };
+    async function runMediasoup() {
+      // 1. Forbind til SFU
+      wsRef.current = new window.WebSocket(WEBSOCKET_URL);
 
-    ws.current.onerror = (e) => {
-      console.error("WebSocket error", e);
-    };
-    ws.current.onclose = (e) => {
-      console.log("WebSocket lukket", e);
-      if (peerRef.current) {
-        peerRef.current.close();
-        peerRef.current = null;
-      }
-    };
+      wsRef.current.onclose = () => {
+        running = false;
+        if (transportRef.current) transportRef.current.close();
+        if (deviceRef.current) deviceRef.current = null;
+        if (consumerRef.current) consumerRef.current = null;
+      };
 
-    ws.current.onmessage = async (event) => {
-      const msg = JSON.parse(event.data);
-      console.log("Modtog WebSocket-besked:", msg);
-
-      if (!peerRef.current) {
-        // Brug både STUN og TURN, samt tillad direkte forbindelser
-        peerRef.current = new window.RTCPeerConnection({
-          iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            {
-              urls: "turn:openrelay.metered.ca:80?transport=udp",
-              username: "openrelayproject",
-              credential: "openrelayproject"
-            },
-            {
-              urls: "turn:openrelay.metered.ca:443?transport=tcp",
-              username: "openrelayproject",
-              credential: "openrelayproject"
-            },
-            {
-              urls: "turn:openrelay.metered.ca:443",
-              username: "openrelayproject",
-              credential: "openrelayproject"
-            }
-          ],
-          iceTransportPolicy: "all"
+      // Helper til at sende/vente på svar
+      function request(action, data = {}) {
+        return new Promise((resolve, reject) => {
+          const msg = { action, data };
+          wsRef.current.send(JSON.stringify(msg));
+          wsRef.current.onmessage = (event) => {
+            const res = JSON.parse(event.data);
+            if (res.error) return reject(res.error);
+            resolve(res);
+          };
         });
-        peerRef.current.ontrack = (e) => {
-          console.log("Har modtaget stream!", e.streams[0]);
-          if (videoRef.current) {
-            videoRef.current.srcObject = e.streams[0];
-            setTimeout(() => {
-              console.log("video.srcObject er nu sat til:", videoRef.current.srcObject);
-            }, 1000);
-          }
-        };
-        peerRef.current.onicecandidate = (e) => {
-          console.log("ICE-candidate fra browser:", e.candidate);
-          if (e.candidate) {
-            ws.current.send(
-              JSON.stringify({
-                type: "ice-candidate",
-                candidate: e.candidate,
-                viewer_id: viewerIdRef.current,
-                sdpMid: e.candidate.sdpMid,
-                sdpMLineIndex: e.candidate.sdpMLineIndex,
-              })
-            );
-          }
-        };
-        peerRef.current.oniceconnectionstatechange = () => {
-          console.log("ICE state:", peerRef.current.iceConnectionState);
-        };
-        peerRef.current.onconnectionstatechange = () => {
-          console.log("Peer connection state:", peerRef.current.connectionState);
-        };
       }
-      if (msg.type === "offer") {
-        console.log("Modtog offer:", msg.offer);
-        await peerRef.current.setRemoteDescription(
-          new window.RTCSessionDescription({ type: "offer", sdp: msg.offer })
-        );
-        const answer = await peerRef.current.createAnswer();
-        await peerRef.current.setLocalDescription(answer);
-        ws.current.send(
-          JSON.stringify({
-            type: "answer",
-            answer: { sdp: answer.sdp, type: answer.type },
-            viewer_id: viewerIdRef.current,
-          })
-        );
-        console.log("Sendte answer til backend");
-      }
-      if (msg.type === "ice-candidate" && msg.candidate) {
+
+      wsRef.current.onopen = async () => {
         try {
-          console.log("Tilføjer ice-candidate fra backend", msg.candidate);
-          await peerRef.current.addIceCandidate(
-            new window.RTCIceCandidate(msg.candidate)
-          );
+          // 2. Hent router RTP capabilities
+          const routerCaps = await request("getRouterRtpCapabilities");
+
+          // 3. Lav device (mediasoup-client)
+          const device = new mediasoupClient.Device();
+          await device.load({ routerRtpCapabilities: routerCaps.data });
+          deviceRef.current = device;
+
+          // 4. Opret transport
+          const { data: transportOptions } = await request("createWebRtcTransport");
+          const recvTransport = device.createRecvTransport({
+            id: transportOptions.id,
+            iceParameters: transportOptions.iceParameters,
+            iceCandidates: transportOptions.iceCandidates,
+            dtlsParameters: transportOptions.dtlsParameters,
+          });
+          transportRef.current = recvTransport;
+
+          // 5. Forbind transport (DTLS handshake)
+          recvTransport.on("connect", async ({ dtlsParameters }, callback, errback) => {
+            try {
+              await request("connectWebRtcTransport", {
+                transportId: recvTransport.id,
+                dtlsParameters,
+              });
+              callback();
+            } catch (err) {
+              errback(err);
+            }
+          });
+
+          // 6. Hent producerId (her skal du evt. tilpasse: måske får du den fra serveren, eller hardcoder til test)
+          // For demo: serveren skal have mindst én producer aktiv! Du kan få ID via WebSocket, eller lave en "getProducers" action på din SFU.
+          // Her: bed om alle producers fra serveren (du skal evt. udvide din server til at kunne det)
+          // For nu: Spørg om det, eller få backend til at sende dig første producerId.
+
+          // --- DU SKAL TILPASSE DETTE ----
+          // Fx:
+          // const { data: { producerId } } = await request("getFirstProducerId");
+
+          // For test: hardcode et producerId du ved eksisterer:
+          // const producerId = "din-producer-id-her";
+          // Hvis ikke, så stop her og lav det backend-endpoint først!
+
+          // 7. Consumer (modtag stream)
+          // const { data: consumerOptions } = await request("consume", {
+          //   transportId: recvTransport.id,
+          //   producerId,
+          //   rtpCapabilities: device.rtpCapabilities,
+          // });
+
+          // const consumer = await recvTransport.consume({
+          //   id: consumerOptions.id,
+          //   producerId: consumerOptions.producerId,
+          //   kind: consumerOptions.kind,
+          //   rtpParameters: consumerOptions.rtpParameters,
+          // });
+          // consumerRef.current = consumer;
+
+          // 8. Sæt stream på video-tag
+          // const stream = new window.MediaStream();
+          // stream.addTrack(consumer.track);
+          // if (videoRef.current) videoRef.current.srcObject = stream;
         } catch (err) {
-          console.error("Fejl ved addIceCandidate", err);
+          console.error("Mediasoup FEJL:", err);
         }
-      }
-    };
+      };
+    }
+
+    runMediasoup();
 
     return () => {
-      if (ws.current) ws.current.close();
-      if (peerRef.current) peerRef.current.close();
+      running = false;
+      if (wsRef.current) wsRef.current.close();
+      if (transportRef.current) transportRef.current.close();
+      if (deviceRef.current) deviceRef.current = null;
+      if (consumerRef.current) consumerRef.current = null;
     };
-    // eslint-disable-next-line
-  }, [clientId]);
+  }, []);
 
   return (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
@@ -141,7 +128,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2 }}>
           <VideocamIcon color="action" fontSize="large" />
           <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
-            Livestream for klient {clientId}
+            Livestream (mediasoup)
           </Typography>
         </Box>
         <Box
