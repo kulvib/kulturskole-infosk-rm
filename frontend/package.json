@@ -16,7 +16,8 @@
     "react-router-dom": "^6.23.1",
     "react-scripts": "^5.0.1",
     "react-beautiful-dnd": "^13.1.1",
-    "react-calendar": "^4.0.0"
+    "react-calendar": "^4.0.0",
+    "mediasoup-client": "^3.6.97"
   },
   "scripts": {
     "start": "react-scripts start",
