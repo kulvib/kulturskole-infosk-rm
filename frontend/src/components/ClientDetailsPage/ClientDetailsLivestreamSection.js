@@ -7,11 +7,10 @@ import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
-  const hlsRef = useRef(null); // To retain Hls instance
+  const hlsRef = useRef(null);
   const [manifestExists, setManifestExists] = useState(null);
   const [isLive, setIsLive] = useState(true);
 
-  // Check if manifest exists
   useEffect(() => {
     if (!clientId) {
       setManifestExists(false);
@@ -23,7 +22,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       .catch(() => setManifestExists(false));
   }, [clientId]);
 
-  // Setup HLS and video
   useEffect(() => {
     if (!manifestExists) return;
     let hls;
@@ -41,7 +39,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     } else if (video && video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
     }
-    // Autoplay and muted
     if (video) {
       video.muted = true;
       video.autoplay = true;
@@ -53,7 +50,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     };
   }, [manifestExists, clientId]);
 
-  // LIVE edge detection - now uses <5 seconds as "LIVE"
   useEffect(() => {
     if (!manifestExists) return;
     let interval;
@@ -61,16 +57,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       const video = videoRef.current;
       const hls = hlsRef.current;
       if (hls && video && hls.liveSyncPosition) {
-        // Difference between live edge and current time
         const diff = Math.abs(hls.liveSyncPosition - video.currentTime);
-        setIsLive(diff < 5); // Show LIVE if within 5 seconds of live edge
+        setIsLive(diff < 5);
       } else if (video && video.seekable && video.seekable.length > 0) {
-        // Fallback for native HLS (iOS/Safari)
         const liveEdge = video.seekable.end(video.seekable.length - 1);
         const diff = Math.abs(liveEdge - video.currentTime);
         setIsLive(diff < 5);
       } else {
-        setIsLive(true); // Default to LIVE if uncertain
+        setIsLive(true);
       }
     };
     interval = setInterval(checkLive, 1000);
@@ -111,21 +105,23 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   return (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
       <CardContent>
-        <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2 }}>
-          <VideocamIcon color="action" fontSize="large" />
-          <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
-            Livestream
-          </Typography>
-        </Box>
-        {/* LIVE-badge only if at live edge */}
-        {isLive && (
-          <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-            <FiberManualRecordIcon sx={{ color: "red", fontSize: 16, mr: 0.5 }} />
-            <Typography variant="caption" sx={{ color: "red", fontWeight: "bold", letterSpacing: 1 }}>
-              LIVE
+        {/* Header med “Livestream” til venstre og “LIVE” badge til højre */}
+        <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2, justifyContent: "space-between" }}>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <VideocamIcon color="action" fontSize="large" />
+            <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
+              Livestream
             </Typography>
           </Box>
-        )}
+          {isLive && (
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <FiberManualRecordIcon sx={{ color: "red", fontSize: 16, mr: 0.5 }} />
+              <Typography variant="caption" sx={{ color: "red", fontWeight: "bold", letterSpacing: 1 }}>
+                LIVE
+              </Typography>
+            </Box>
+          )}
+        </Box>
         <Box
           sx={{
             p: 2,
