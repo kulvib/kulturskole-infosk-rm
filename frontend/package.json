@@ -17,6 +17,7 @@
     "react-scripts": "^5.0.1",
     "react-beautiful-dnd": "^13.1.1",
     "react-calendar": "^4.0.0",
+    "hls.js": "^1.5.7",
     "mediasoup-client": "^3.6.97"
   },
   "scripts": {
