@@ -20,7 +20,7 @@ def extract_num(filename, prefix="segment_"):
     m = re.match(rf"{re.escape(prefix)}(\d+)\.(mp4|ts)$", filename)
     return int(m.group(1)) if m else -1
 
-def update_manifest(client_dir, keep_n=5, segment_duration=3):
+def update_manifest(client_dir, keep_n=10, segment_duration=6):
     """
     Skriver manifest, så den kun peger på de nyeste keep_n segmenter,
     som eksisterer fysisk i client_dir. Finder automatisk om .ts eller .mp4 bruges.
@@ -56,10 +56,6 @@ async def upload_hls_file(
     file: UploadFile = File(...),
     client_id: str = Form(...)
 ):
-    """
-    Modtag segment fra en producer. Segmentet gemmes og intet slettes endnu.
-    Tillader både .ts (anbefalet) og .mp4
-    """
     try:
         allowed_exts = [".ts", ".mp4"]
         if not any(file.filename.endswith(ext) for ext in allowed_exts):
@@ -81,21 +77,15 @@ async def upload_hls_file(
 async def cleanup_hls_files(
     client_id: str = Body(...),
     keep_files: List[str] = Body(...),
-    keep_n: int = 5,
-    segment_duration: int = 3,
+    keep_n: int = 10,
+    segment_duration: int = 6,
 ):
-    """
-    Slet alle segmenter for client_id undtagen dem i keep_files.
-    Skriv manifestet så den kun peger på de nyeste keep_n segmenter, der faktisk eksisterer.
-    Understøtter både .ts og .mp4 segmenter.
-    """
     try:
         print(f"[SERVER][CLEANUP] Modtog keep_files: {keep_files}")
         client_dir = os.path.join(HLS_DIR, client_id)
         if not os.path.exists(client_dir):
             return {"deleted": [], "kept": []}
         all_files = [f for f in os.listdir(client_dir) if f.startswith("segment_") and (f.endswith(".ts") or f.endswith(".mp4"))]
-        # Slet alle segmenter som ikke er blandt keep_files
         to_delete = [f for f in all_files if f not in keep_files]
         for seg in to_delete:
             try:
@@ -104,10 +94,7 @@ async def cleanup_hls_files(
             except Exception as e:
                 print(f"[CLEANUP] Kunne ikke slette {seg}: {e}")
 
-        # Efter cleanup: skriv manifestet, der kun peger på de nyeste keep_n segmenter
         update_manifest(client_dir, keep_n=keep_n, segment_duration=segment_duration)
-
-        # Returnér status
         kept = sorted(
             [f for f in os.listdir(client_dir) if f.startswith("segment_") and (f.endswith(".ts") or f.endswith(".mp4"))],
             key=lambda f: extract_num(f, "segment_")
@@ -118,7 +105,7 @@ async def cleanup_hls_files(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Fejl i cleanup: {e}")
 
-# --- WebRTC signalering ---
+# --- WebRTC signalering (samme som før) ---
 class Room:
     def __init__(self):
         self.broadcaster: WebSocket = None
@@ -136,18 +123,15 @@ async def livestream_endpoint(websocket: WebSocket, client_id: str):
     try:
         data = await websocket.receive_json()
         print(f"Første besked modtaget fra {client_id}: {data}")
-        # Broadcaster tilmelder sig
         if data.get("type") == "broadcaster":
             room.broadcaster = websocket
             print(f"Broadcaster tilsluttet for client_id={client_id}")
             await websocket.send_json({"type": "ack", "role": "broadcaster"})
-        # Viewer tilmelder sig
         elif data.get("type") == "newViewer":
             viewer_id = str(data.get("viewer_id"))
             room.viewers[viewer_id] = websocket
             print(f"Viewer {viewer_id} tilsluttet for client_id={client_id}")
             await websocket.send_json({"type": "ack", "role": "viewer", "viewer_id": viewer_id})
-            # Giv broadcaster besked om ny viewer
             if room.broadcaster:
                 await room.broadcaster.send_json({
                     "type": "newViewer",
@@ -163,13 +147,11 @@ async def livestream_endpoint(websocket: WebSocket, client_id: str):
         while True:
             msg = await websocket.receive_json()
             print(f"Besked modtaget på ws for client_id={client_id}: {msg}")
-            # Broadcaster sender: videresend til korrekt viewer
             if websocket == room.broadcaster:
                 viewer_id = msg.get("viewer_id")
                 if viewer_id and viewer_id in room.viewers:
                     print(f"Videresender besked fra broadcaster til viewer_id={viewer_id}")
                     await room.viewers[viewer_id].send_json(msg)
-            # Viewer sender: videresend til broadcaster
             else:
                 viewer_id = None
                 for vid, ws in room.viewers.items():
