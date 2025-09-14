@@ -1,5 +1,5 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form
-from typing import Dict
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form, Body
+from typing import Dict, List
 import os
 import traceback
 
@@ -36,6 +36,31 @@ async def upload_hls_file(
         print("[FEJL VED UPLOAD]", e)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Fejl i upload: {e}")
+
+@router.post("/hls/cleanup")
+async def cleanup_hls_files(
+    client_id: str = Body(...),
+    keep_files: List[str] = Body(...)
+):
+    """
+    Slet alle segmenter for client_id undtagen dem i keep_files.
+    """
+    try:
+        client_dir = os.path.join(HLS_DIR, client_id)
+        if not os.path.exists(client_dir):
+            return {"deleted": [], "kept": []}
+        all_files = [f for f in os.listdir(client_dir) if f.endswith(".mp4")]
+        to_delete = [f for f in all_files if f not in keep_files]
+        for seg in to_delete:
+            os.remove(os.path.join(client_dir, seg))
+            print(f"[CLEANUP] Slettede gammelt segment: {seg}")
+        # Opdatér manifest så det kun indeholder de ønskede segmenter
+        update_manifest(client_dir, keep_last_n=len(keep_files))
+        return {"deleted": to_delete, "kept": keep_files}
+    except Exception as e:
+        print("[FEJL VED CLEANUP]", e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Fejl i cleanup: {e}")
 
 def update_manifest(client_dir, keep_last_n=5):
     # Find og sorter alle segmenter (.mp4)
