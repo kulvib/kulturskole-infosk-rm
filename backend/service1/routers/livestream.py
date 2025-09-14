@@ -10,41 +10,52 @@ router = APIRouter()
 HLS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hls"))
 os.makedirs(HLS_DIR, exist_ok=True)
 
-def extract_num(filename):
-    m = re.search(r'(\d+)', filename)
-    if m:
-        return int(m.group(1))
-    print(f"[MANIFEST] Kunne ikke udtrække nummer fra: {filename}")
+def extract_num(filename, prefix="fixed_segment_"):
+    # Only extract number if filename matches expected prefix, else 0
+    if filename.startswith(prefix):
+        m = re.search(r'(\d+)', filename)
+        if m:
+            return int(m.group(1))
     return 0
 
-def update_manifest(client_dir, keep_last_n=5):
-    # Find og sorter alle segmenter (.mp4) numerisk
+def update_manifest(client_dir, client_id, keep_last_n=5, segment_duration=3):
+    """
+    Update manifest file with the newest keep_last_n segments.
+    Uses absolute URLs for segments for compatibility with players like VLC.
+    Ignores segments smaller than 1000 bytes (likely broken).
+    """
+    segment_prefix = "fixed_segment_"
+    segment_suffix = ".mp4"
+    # Only include valid segments
     segments = sorted(
-        [f for f in os.listdir(client_dir) if f.endswith(".mp4")],
-        key=extract_num
+        [f for f in os.listdir(client_dir)
+         if f.startswith(segment_prefix) and f.endswith(segment_suffix)
+         and os.path.getsize(os.path.join(client_dir, f)) > 1000],
+        key=lambda fname: extract_num(fname, prefix=segment_prefix)
     )
-    print(f"[MANIFEST] Fundne segmenter: {segments}")
-
-    # Slet gamle segmenter, hvis der er for mange
+    # Remove old segments if too many
     if len(segments) > keep_last_n:
         to_delete = segments[:-keep_last_n]
         for seg in to_delete:
-            os.remove(os.path.join(client_dir, seg))
-            print(f"[CLEANUP] Slettede gammelt segment: {seg}")
-        segments = segments[-keep_last_n:]  # behold kun de nyeste
+            try:
+                os.remove(os.path.join(client_dir, seg))
+                print(f"[CLEANUP] Slettede gammelt segment: {seg}")
+            except Exception as e:
+                print(f"[CLEANUP] Kunne ikke slette {seg}: {e}")
+        segments = segments[-keep_last_n:]
 
-    if segments:
-        media_seq = extract_num(segments[0])
-    else:
-        media_seq = 0
-
+    media_seq = extract_num(segments[0], prefix=segment_prefix) if segments else 0
     manifest_path = os.path.join(client_dir, "index.m3u8")
+    # Absolute URL for segments (recommended for VLC/browser)
+    base_url = f"https://kulturskole-infosk-rm.onrender.com/hls/{client_id}/"
     with open(manifest_path, "w") as m3u:
-        m3u.write("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n")
+        m3u.write("#EXTM3U\n")
+        m3u.write("#EXT-X-VERSION:3\n")
+        m3u.write(f"#EXT-X-TARGETDURATION:{segment_duration}\n")
         m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
         for seg in segments:
-            m3u.write("#EXTINF:5.0,\n")
-            m3u.write(f"{seg}\n")
+            m3u.write(f"#EXTINF:{segment_duration}.0,\n")
+            m3u.write(f"{base_url}{seg}\n")
     print(f"[MANIFEST] Manifest opdateret: {manifest_path} (start={media_seq}, {len(segments)} segmenter)")
 
 @router.post("/hls/upload")
@@ -65,7 +76,7 @@ async def upload_hls_file(
             f.write(content)
         print(f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes")
         try:
-            update_manifest(client_dir, keep_last_n=5)
+            update_manifest(client_dir, client_id, keep_last_n=5, segment_duration=3)
         except Exception as em:
             print("[FEJL VED MANIFEST]", em)
             traceback.print_exc()
@@ -90,10 +101,12 @@ async def cleanup_hls_files(
         all_files = [f for f in os.listdir(client_dir) if f.endswith(".mp4")]
         to_delete = [f for f in all_files if f not in keep_files]
         for seg in to_delete:
-            os.remove(os.path.join(client_dir, seg))
-            print(f"[CLEANUP] Slettede gammelt segment: {seg}")
-        # Opdatér manifest så det kun indeholder de ønskede segmenter
-        update_manifest(client_dir, keep_last_n=5)
+            try:
+                os.remove(os.path.join(client_dir, seg))
+                print(f"[CLEANUP] Slettede gammelt segment: {seg}")
+            except Exception as e:
+                print(f"[CLEANUP] Kunne ikke slette {seg}: {e}")
+        update_manifest(client_dir, client_id, keep_last_n=5, segment_duration=3)
         return {"deleted": to_delete, "kept": keep_files}
     except Exception as e:
         print("[FEJL VED CLEANUP]", e)
