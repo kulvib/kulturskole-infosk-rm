@@ -17,50 +17,36 @@ else:
 os.makedirs(HLS_DIR, exist_ok=True)
 
 def extract_num(filename, prefix="fixed_segment_"):
-    if filename.startswith(prefix):
-        m = re.search(r'(\d+)', filename)
-        if m:
-            return int(m.group(1))
-    return 0
+    m = re.match(rf"{re.escape(prefix)}(\d+)\.mp4$", filename)
+    return int(m.group(1)) if m else -1
 
-def update_manifest(client_dir, client_id, keep_last_n=5, segment_duration=3):
+def update_manifest(client_dir, keep_n=5, segment_duration=3):
     """
-    Update manifest file with the newest keep_last_n segments.
-    Keeps (keep_last_n+1) segments physically to avoid race conditions.
+    Skriver manifest, så den kun peger på de nyeste keep_n segmenter,
+    som eksisterer fysisk i client_dir.
     """
-    segment_prefix = "fixed_segment_"
-    segment_suffix = ".mp4"
-    # Only include valid segments
-    segments = sorted(
+    prefix = "fixed_segment_"
+    suffix = ".mp4"
+    segs = sorted(
         [f for f in os.listdir(client_dir)
-         if f.startswith(segment_prefix) and f.endswith(segment_suffix)
+         if f.startswith(prefix) and f.endswith(suffix)
          and os.path.getsize(os.path.join(client_dir, f)) > 1000],
-        key=lambda fname: extract_num(fname, prefix=segment_prefix)
+        key=lambda f: extract_num(f, prefix)
     )
-    # Remove old segments if too many (keep one extra for robustness)
-    if len(segments) > keep_last_n + 1:
-        to_delete = segments[:-(keep_last_n + 1)]
-        for seg in to_delete:
-            try:
-                os.remove(os.path.join(client_dir, seg))
-                print(f"[CLEANUP] Slettede gammelt segment: {seg}")
-            except Exception as e:
-                print(f"[CLEANUP] Kunne ikke slette {seg}: {e}")
-        segments = segments[-(keep_last_n + 1):]
-
-    # Manifest peger kun på de nyeste keep_last_n segmenter
-    manifest_segments = segments[-keep_last_n:]
-    media_seq = extract_num(manifest_segments[0], prefix=segment_prefix) if manifest_segments else 0
+    manifest_segs = segs[-keep_n:]
+    if not manifest_segs:
+        return
+    media_seq = extract_num(manifest_segs[0], prefix)
     manifest_path = os.path.join(client_dir, "index.m3u8")
     with open(manifest_path, "w") as m3u:
         m3u.write("#EXTM3U\n")
         m3u.write("#EXT-X-VERSION:3\n")
         m3u.write(f"#EXT-X-TARGETDURATION:{segment_duration}\n")
         m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
-        for seg in manifest_segments:
+        for seg in manifest_segs:
             m3u.write(f"#EXTINF:{segment_duration}.0,\n")
             m3u.write(f"{seg}\n")
-    print(f"[MANIFEST] Manifest opdateret: {manifest_path} (start={media_seq}, {len(manifest_segments)} segmenter)")
+    print(f"[MANIFEST] Opdateret manifest for {client_dir}: {manifest_path} ({media_seq}..{extract_num(manifest_segs[-1], prefix)})")
 
 @router.post("/hls/upload")
 async def upload_hls_file(
@@ -68,8 +54,7 @@ async def upload_hls_file(
     client_id: str = Form(...)
 ):
     """
-    Modtag segment fra en producer og opdater manifest for korrekt client_id.
-    Logger filsti og størrelse. Sletter gamle segmenter, så kun de nyeste beholdes (fysisk +1 ekstra).
+    Modtag segment fra en producer. Segmentet gemmes og intet slettes endnu.
     """
     try:
         client_dir = os.path.join(HLS_DIR, client_id)
@@ -79,11 +64,6 @@ async def upload_hls_file(
         with open(seg_path, "wb") as f:
             f.write(content)
         print(f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes")
-        try:
-            update_manifest(client_dir, client_id, keep_last_n=5, segment_duration=3)
-        except Exception as em:
-            print("[FEJL VED MANIFEST]", em)
-            traceback.print_exc()
         return {"filename": file.filename, "client_id": client_id}
     except Exception as e:
         print("[FEJL VED UPLOAD]", e)
@@ -93,12 +73,13 @@ async def upload_hls_file(
 @router.post("/hls/cleanup")
 async def cleanup_hls_files(
     client_id: str = Body(...),
-    keep_files: List[str] = Body(...)
+    keep_files: List[str] = Body(...),
+    keep_n: int = 5,
+    segment_duration: int = 3,
 ):
     """
     Slet alle segmenter for client_id undtagen dem i keep_files.
-    Skriv manifestet så det kun peger på keep_files (de 5 nyeste).
-    Beholder fysisk 1 ekstra segment hvis muligt.
+    Skriv manifestet så det kun peger på de nyeste keep_n segmenter, der faktisk eksisterer.
     """
     try:
         print(f"[SERVER][CLEANUP] Modtog keep_files: {keep_files}")
@@ -106,14 +87,8 @@ async def cleanup_hls_files(
         if not os.path.exists(client_dir):
             return {"deleted": [], "kept": []}
         all_files = [f for f in os.listdir(client_dir) if f.endswith(".mp4")]
-        # Behold 1 ekstra fysisk hvis muligt
-        keep_files_sorted = sorted(
-            [f for f in keep_files],
-            key=lambda fname: extract_num(fname)
-        )
-        extra_keep = keep_files_sorted[:-5] if len(keep_files_sorted) > 5 else []
-        keep_physical = keep_files + extra_keep
-        to_delete = [f for f in all_files if f not in keep_physical]
+        # Slet alle segmenter som ikke er blandt keep_files
+        to_delete = [f for f in all_files if f not in keep_files]
         for seg in to_delete:
             try:
                 os.remove(os.path.join(client_dir, seg))
@@ -121,27 +96,15 @@ async def cleanup_hls_files(
             except Exception as e:
                 print(f"[CLEANUP] Kunne ikke slette {seg}: {e}")
 
-        # Skriv manifestet baseret på de 5 nyeste
-        fixed_prefix = "fixed_segment_"
-        fixed_suffix = ".mp4"
-        files_sorted = sorted(
-            [f for f in keep_files if f.startswith(fixed_prefix) and f.endswith(fixed_suffix)],
-            key=lambda fname: extract_num(fname, prefix=fixed_prefix)
-        )[-5:]
-        if files_sorted:
-            manifest_path = os.path.join(client_dir, "index.m3u8")
-            media_seq = extract_num(files_sorted[0], prefix=fixed_prefix)
-            with open(manifest_path, "w") as m3u:
-                m3u.write("#EXTM3U\n")
-                m3u.write("#EXT-X-VERSION:3\n")
-                m3u.write("#EXT-X-TARGETDURATION:3\n")
-                m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
-                for seg in files_sorted:
-                    m3u.write(f"#EXTINF:3.0,\n")
-                    m3u.write(f"{seg}\n")
-            print(f"[MANIFEST][CLEANUP] Manifest opdateret: {manifest_path} med {len(files_sorted)} segmenter.")
+        # Efter cleanup: skriv manifestet, der kun peger på de nyeste keep_n segmenter
+        update_manifest(client_dir, keep_n=keep_n, segment_duration=segment_duration)
 
-        return {"deleted": to_delete, "kept": files_sorted}
+        # Returnér status
+        kept = sorted(
+            [f for f in os.listdir(client_dir) if f.endswith(".mp4")],
+            key=lambda f: extract_num(f)
+        )
+        return {"deleted": to_delete, "kept": kept}
     except Exception as e:
         print("[FEJL VED CLEANUP]", e)
         traceback.print_exc()
