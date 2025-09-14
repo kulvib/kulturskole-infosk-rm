@@ -55,7 +55,7 @@ async def cleanup_hls_files(
             os.remove(os.path.join(client_dir, seg))
             print(f"[CLEANUP] Slettede gammelt segment: {seg}")
         # Opdatér manifest så det kun indeholder de ønskede segmenter
-        update_manifest(client_dir, keep_last_n=len(keep_files))
+        update_manifest(client_dir, keep_last_n=5)
         return {"deleted": to_delete, "kept": keep_files}
     except Exception as e:
         print("[FEJL VED CLEANUP]", e)
@@ -75,7 +75,6 @@ def update_manifest(client_dir, keep_last_n=5):
 
     # Udtræk første segmentnummer til EXT-X-MEDIA-SEQUENCE
     def extract_num(filename):
-        # Prøv at udtrække tal fra format: segment_00083.mp4 eller fixed_segment_00042.mp4
         import re
         m = re.search(r'(\d+)', filename)
         if m:
