@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from sqlmodel import Session, select
+from starlette.middleware.base import BaseHTTPMiddleware
 
 print("### main.py: Pre-router-import ###")
 
@@ -59,22 +60,31 @@ app.add_middleware(
 )
 
 # --- STATIC MOUNT TIL HLS ---
-# Find den rigtige HLS-dir uanset hvor main.py ligger
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Hvis du kører main.py fra backend/, men segmenter lander i service1/hls:
 SERVICE1_HLS_DIR = os.path.join(BASE_DIR, "service1", "hls")
 ROOT_HLS_DIR = os.path.join(BASE_DIR, "hls")
-
 if os.path.isdir(SERVICE1_HLS_DIR):
     HLS_DIR = SERVICE1_HLS_DIR
 else:
-    # fallback for ældre setup
     HLS_DIR = ROOT_HLS_DIR
 
 os.makedirs(HLS_DIR, exist_ok=True)
 app.mount("/hls", StaticFiles(directory=HLS_DIR), name="hls")
 print(f"### main.py: Static mount for HLS på {HLS_DIR} ###")
+
+# --- CORS FOR HLS STATIC (meget vigtig for browserafspilning af HLS) ---
+from starlette.responses import Response
+
+class HLSCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/hls/"):
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+
+app.add_middleware(HLSCORSMiddleware)
 
 # Routers
 app.include_router(clients.router, prefix="/api")
@@ -83,7 +93,6 @@ app.include_router(auth_router, prefix="/auth")
 app.include_router(calendar.router, prefix="/api")
 app.include_router(meta.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
-# VIGTIGT: livestream-router får prefix /api for at undgå konflikt med static mount på /hls
 app.include_router(livestream.router, prefix="/api")
 
 # Root route to avoid 404
