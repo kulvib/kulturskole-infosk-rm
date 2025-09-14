@@ -49,6 +49,7 @@ def on_startup():
     create_db_and_tables()
     ensure_admin_user()
 
+# Global CORS (API)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -72,7 +73,7 @@ os.makedirs(HLS_DIR, exist_ok=True)
 app.mount("/hls", StaticFiles(directory=HLS_DIR), name="hls")
 print(f"### main.py: Static mount for HLS på {HLS_DIR} ###")
 
-# --- CORS FOR HLS STATIC (meget vigtig for browserafspilning af HLS) ---
+# --- EKSTRA CORS FOR HLS STATIC FILES (gør HLS tilgængeligt for alle domæner) ---
 from starlette.responses import Response
 
 class HLSCORSMiddleware(BaseHTTPMiddleware):
