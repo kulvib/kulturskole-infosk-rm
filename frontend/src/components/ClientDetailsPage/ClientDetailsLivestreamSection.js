@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { Card, CardContent, Box, Typography } from "@mui/material";
+import { Card, CardContent, Box, Typography, Button } from "@mui/material";
 import VideocamIcon from "@mui/icons-material/Videocam";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
-  const [manifestExists, setManifestExists] = useState(null); // null=ukendt, false=nej, true=ja
+  const [manifestExists, setManifestExists] = useState(null);
 
   useEffect(() => {
     if (!clientId) {
@@ -34,8 +35,25 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     } else if (video && video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
     }
+    // Autoplay og muted
+    if (video) {
+      video.muted = true;
+      video.autoplay = true;
+      video.play().catch(() => {});
+    }
     return () => { if (hls) hls.destroy(); };
   }, [manifestExists, clientId]);
+
+  const handleFullscreen = () => {
+    const video = videoRef.current;
+    if (video.requestFullscreen) {
+      video.requestFullscreen();
+    } else if (video.webkitRequestFullscreen) {
+      video.webkitRequestFullscreen();
+    } else if (video.msRequestFullscreen) {
+      video.msRequestFullscreen();
+    }
+  };
 
   if (manifestExists === null) {
     return <Typography variant="body2">Tjekker om livestream findes…</Typography>;
@@ -80,9 +98,21 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             ref={videoRef}
             autoPlay
             playsInline
-            controls
+            muted
+            controls={false}
             style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
+            tabIndex={-1}
           />
+          <Box sx={{ mt: 1, display: "flex", justifyContent: "center" }}>
+            <Button
+              onClick={handleFullscreen}
+              variant="outlined"
+              startIcon={<FullscreenIcon />}
+              sx={{ borderRadius: 2 }}
+            >
+              Fuld skærm
+            </Button>
+          </Box>
         </Box>
       </CardContent>
     </Card>
