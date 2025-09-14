@@ -28,7 +28,7 @@ def extract_num(filename, prefix="fixed_segment_"):
 def update_manifest(client_dir, client_id, keep_last_n=5, segment_duration=3):
     """
     Update manifest file with the newest keep_last_n segments.
-    Uses absolute URLs for segments for compatibility with players like VLC.
+    Uses RELATIVE segment paths (kun filnavn), så HLS virker i VLC/browser.
     Ignores segments smaller end 1000 bytes (likely broken).
     """
     segment_prefix = "fixed_segment_"
@@ -53,8 +53,7 @@ def update_manifest(client_dir, client_id, keep_last_n=5, segment_duration=3):
 
     media_seq = extract_num(segments[0], prefix=segment_prefix) if segments else 0
     manifest_path = os.path.join(client_dir, "index.m3u8")
-    # Absolut URL for segmenter (matcher static mount på /hls i main.py)
-    base_url = f"/hls/{client_id}/"
+    # RELATIV path (kun filnavn)
     with open(manifest_path, "w") as m3u:
         m3u.write("#EXTM3U\n")
         m3u.write("#EXT-X-VERSION:3\n")
@@ -62,7 +61,7 @@ def update_manifest(client_dir, client_id, keep_last_n=5, segment_duration=3):
         m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
         for seg in segments:
             m3u.write(f"#EXTINF:{segment_duration}.0,\n")
-            m3u.write(f"{base_url}{seg}\n")
+            m3u.write(f"{seg}\n")
     print(f"[MANIFEST] Manifest opdateret: {manifest_path} (start={media_seq}, {len(segments)} segmenter)")
 
 @router.post("/hls/upload")
