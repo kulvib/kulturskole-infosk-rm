@@ -2,12 +2,50 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File,
 from typing import Dict, List
 import os
 import traceback
+import re
 
 router = APIRouter()
 
 # --- HLS setup ---
 HLS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hls"))
 os.makedirs(HLS_DIR, exist_ok=True)
+
+def extract_num(filename):
+    m = re.search(r'(\d+)', filename)
+    if m:
+        return int(m.group(1))
+    print(f"[MANIFEST] Kunne ikke udtrække nummer fra: {filename}")
+    return 0
+
+def update_manifest(client_dir, keep_last_n=5):
+    # Find og sorter alle segmenter (.mp4) numerisk
+    segments = sorted(
+        [f for f in os.listdir(client_dir) if f.endswith(".mp4")],
+        key=extract_num
+    )
+    print(f"[MANIFEST] Fundne segmenter: {segments}")
+
+    # Slet gamle segmenter, hvis der er for mange
+    if len(segments) > keep_last_n:
+        to_delete = segments[:-keep_last_n]
+        for seg in to_delete:
+            os.remove(os.path.join(client_dir, seg))
+            print(f"[CLEANUP] Slettede gammelt segment: {seg}")
+        segments = segments[-keep_last_n:]  # behold kun de nyeste
+
+    if segments:
+        media_seq = extract_num(segments[0])
+    else:
+        media_seq = 0
+
+    manifest_path = os.path.join(client_dir, "index.m3u8")
+    with open(manifest_path, "w") as m3u:
+        m3u.write("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n")
+        m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
+        for seg in segments:
+            m3u.write("#EXTINF:5.0,\n")
+            m3u.write(f"{seg}\n")
+    print(f"[MANIFEST] Manifest opdateret: {manifest_path} (start={media_seq}, {len(segments)} segmenter)")
 
 @router.post("/hls/upload")
 async def upload_hls_file(
@@ -61,41 +99,6 @@ async def cleanup_hls_files(
         print("[FEJL VED CLEANUP]", e)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Fejl i cleanup: {e}")
-
-def update_manifest(client_dir, keep_last_n=5):
-    # Find og sorter alle segmenter (.mp4)
-    segments = sorted([f for f in os.listdir(client_dir) if f.endswith(".mp4")])
-    print(f"[MANIFEST] Fundne segmenter: {segments}")
-    # Slet gamle segmenter, hvis der er for mange
-    if len(segments) > keep_last_n:
-        to_delete = segments[:-keep_last_n]
-        for seg in to_delete:
-            os.remove(os.path.join(client_dir, seg))
-        segments = segments[-keep_last_n:]  # behold kun de nyeste
-
-    # Udtræk første segmentnummer til EXT-X-MEDIA-SEQUENCE
-    def extract_num(filename):
-        import re
-        m = re.search(r'(\d+)', filename)
-        if m:
-            return int(m.group(1))
-        print(f"[MANIFEST] Kunne ikke udtrække nummer fra: {filename}")
-        return 0
-
-    if segments:
-        media_seq = extract_num(segments[0])
-    else:
-        media_seq = 0
-
-    # Skriv manifest for de nuværende segmenter
-    manifest_path = os.path.join(client_dir, "index.m3u8")
-    with open(manifest_path, "w") as m3u:
-        m3u.write("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n")
-        m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
-        for seg in segments:
-            m3u.write("#EXTINF:5.0,\n")
-            m3u.write(f"{seg}\n")
-    print(f"[MANIFEST] Manifest opdateret: {manifest_path} (start={media_seq}, {len(segments)} segmenter)")
 
 # --- WebRTC signalering ---
 class Room:
