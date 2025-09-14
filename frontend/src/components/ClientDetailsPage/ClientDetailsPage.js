@@ -187,7 +187,7 @@ export default function ClientDetailsPage({
             onClick={onRestartStream}
             sx={{ mb: 1 }}
           >
-            Genstart Stream
+            Opdatér stream
           </Button>
           <ClientDetailsLivestreamSection key={streamKey} clientId={client?.id} />
         </Grid>
