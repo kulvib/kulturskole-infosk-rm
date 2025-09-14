@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
 import { Card, CardContent, Box, Typography, Button } from "@mui/material";
 import VideocamIcon from "@mui/icons-material/Videocam";
@@ -50,26 +50,37 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     };
   }, [manifestExists, clientId]);
 
+  // checkLive i useCallback, så den kan bruges i flere hooks
+  const checkLive = useCallback(() => {
+    const video = videoRef.current;
+    const hls = hlsRef.current;
+    if (hls && video && hls.liveSyncPosition) {
+      const diff = Math.abs(hls.liveSyncPosition - video.currentTime);
+      setIsLive(diff < 15);
+    } else if (video && video.seekable && video.seekable.length > 0) {
+      const liveEdge = video.seekable.end(video.seekable.length - 1);
+      const diff = Math.abs(liveEdge - video.currentTime);
+      setIsLive(diff < 15);
+    } else {
+      setIsLive(true);
+    }
+  }, []);
+
   useEffect(() => {
     if (!manifestExists) return;
-    let interval;
-    const checkLive = () => {
-      const video = videoRef.current;
-      const hls = hlsRef.current;
-      if (hls && video && hls.liveSyncPosition) {
-        const diff = Math.abs(hls.liveSyncPosition - video.currentTime);
-        setIsLive(diff < 15); // Nu 15 sekunder i stedet for 20/30
-      } else if (video && video.seekable && video.seekable.length > 0) {
-        const liveEdge = video.seekable.end(video.seekable.length - 1);
-        const diff = Math.abs(liveEdge - video.currentTime);
-        setIsLive(diff < 15); // Nu 15 sekunder i stedet for 20/30
-      } else {
-        setIsLive(true);
-      }
-    };
-    interval = setInterval(checkLive, 1000);
+    const interval = setInterval(checkLive, 1000);
     return () => clearInterval(interval);
-  }, [manifestExists]);
+  }, [manifestExists, checkLive]);
+
+  // Tving checkLive ved fullscreenchange
+  useEffect(() => {
+    if (!manifestExists) return;
+    const handler = () => {
+      setTimeout(checkLive, 100);
+    };
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, [manifestExists, checkLive]);
 
   const handleFullscreen = () => {
     const video = videoRef.current;
