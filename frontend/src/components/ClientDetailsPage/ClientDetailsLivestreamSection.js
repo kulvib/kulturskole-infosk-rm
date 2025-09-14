@@ -3,6 +3,7 @@ import Hls from "hls.js";
 import { Card, CardContent, Box, Typography, Button } from "@mui/material";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import VideocamIcon from "@mui/icons-material/Videocam";
 
 export default function ClientDetailsLivestreamSection({ clientId, onRestartStream }) {
   const videoRef = useRef(null);
@@ -49,7 +50,6 @@ export default function ClientDetailsLivestreamSection({ clientId, onRestartStre
     };
   }, [manifestExists, clientId]);
 
-  // checkLive i useCallback, så den kan bruges i flere hooks
   const checkLive = useCallback(() => {
     const video = videoRef.current;
     const hls = hlsRef.current;
@@ -71,7 +71,6 @@ export default function ClientDetailsLivestreamSection({ clientId, onRestartStre
     return () => clearInterval(interval);
   }, [manifestExists, checkLive]);
 
-  // Tving checkLive ved fullscreenchange
   useEffect(() => {
     if (!manifestExists) return;
     const handler = () => {
@@ -100,6 +99,7 @@ export default function ClientDetailsLivestreamSection({ clientId, onRestartStre
       <Card elevation={2} sx={{ borderRadius: 2 }}>
         <CardContent>
           <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2 }}>
+            <VideocamIcon color="action" fontSize="large" />
             <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
               Ingen stream tilgængelig.
             </Typography>
