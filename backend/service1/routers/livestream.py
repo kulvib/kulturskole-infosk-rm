@@ -16,39 +16,41 @@ else:
     HLS_DIR = os.path.abspath(ROOT_HLS_DIR)
 os.makedirs(HLS_DIR, exist_ok=True)
 
-def extract_num(filename, prefix="fixed_segment_"):
-    m = re.match(rf"{re.escape(prefix)}(\d+)\.mp4$", filename)
+def extract_num(filename, prefix="segment_"):
+    m = re.match(rf"{re.escape(prefix)}(\d+)\.(mp4|ts)$", filename)
     return int(m.group(1)) if m else -1
 
 def update_manifest(client_dir, keep_n=5, segment_duration=3):
     """
     Skriver manifest, så den kun peger på de nyeste keep_n segmenter,
-    som eksisterer fysisk i client_dir.
+    som eksisterer fysisk i client_dir. Finder automatisk om .ts eller .mp4 bruges.
     Tilføjer #EXT-X-ENDLIST til sidst, så manifestet er kompatibelt med HLS-afspillere.
     """
-    prefix = "fixed_segment_"
-    suffix = ".mp4"
-    segs = sorted(
-        [f for f in os.listdir(client_dir)
-         if f.startswith(prefix) and f.endswith(suffix)
-         and os.path.getsize(os.path.join(client_dir, f)) > 1000],
-        key=lambda f: extract_num(f, prefix)
-    )
-    manifest_segs = segs[-keep_n:]
-    if not manifest_segs:
-        return
-    media_seq = extract_num(manifest_segs[0], prefix)
-    manifest_path = os.path.join(client_dir, "index.m3u8")
-    with open(manifest_path, "w", encoding="utf-8", newline="\n") as m3u:
-        m3u.write("#EXTM3U\n")
-        m3u.write("#EXT-X-VERSION:3\n")
-        m3u.write(f"#EXT-X-TARGETDURATION:{segment_duration}\n")
-        m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
-        for seg in manifest_segs:
-            m3u.write(f"#EXTINF:{segment_duration}.0,\n")
-            m3u.write(f"{seg}\n")
-        m3u.write("#EXT-X-ENDLIST\n")
-    print(f"[MANIFEST] Opdateret manifest for {client_dir}: {manifest_path} ({media_seq}..{extract_num(manifest_segs[-1], prefix)})")
+    # Find eksisterende segment-typer
+    seg_types = [".ts", ".mp4"]
+    for ext in seg_types:
+        segs = sorted(
+            [f for f in os.listdir(client_dir)
+             if f.startswith("segment_") and f.endswith(ext)
+             and os.path.getsize(os.path.join(client_dir, f)) > 1000],
+            key=lambda f: extract_num(f, "segment_")
+        )
+        if segs:
+            manifest_segs = segs[-keep_n:]
+            media_seq = extract_num(manifest_segs[0], "segment_")
+            manifest_path = os.path.join(client_dir, "index.m3u8")
+            with open(manifest_path, "w", encoding="utf-8", newline="\n") as m3u:
+                m3u.write("#EXTM3U\n")
+                m3u.write("#EXT-X-VERSION:3\n")
+                m3u.write(f"#EXT-X-TARGETDURATION:{segment_duration}\n")
+                m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
+                for seg in manifest_segs:
+                    m3u.write(f"#EXTINF:{segment_duration}.0,\n")
+                    m3u.write(f"{seg}\n")
+                m3u.write("#EXT-X-ENDLIST\n")
+            print(f"[MANIFEST] Opdateret manifest for {client_dir}: {manifest_path} ({media_seq}..{extract_num(manifest_segs[-1], 'segment_')})")
+            return
+    print(f"[MANIFEST] Ingen segmenter fundet til manifest i {client_dir}")
 
 @router.post("/hls/upload")
 async def upload_hls_file(
@@ -57,8 +59,12 @@ async def upload_hls_file(
 ):
     """
     Modtag segment fra en producer. Segmentet gemmes og intet slettes endnu.
+    Tillader både .ts (anbefalet) og .mp4
     """
     try:
+        allowed_exts = [".ts", ".mp4"]
+        if not any(file.filename.endswith(ext) for ext in allowed_exts):
+            raise HTTPException(status_code=400, detail="Kun .ts eller .mp4 segmenter understøttes")
         client_dir = os.path.join(HLS_DIR, client_id)
         os.makedirs(client_dir, exist_ok=True)
         seg_path = os.path.join(client_dir, file.filename)
@@ -81,14 +87,15 @@ async def cleanup_hls_files(
 ):
     """
     Slet alle segmenter for client_id undtagen dem i keep_files.
-    Skriv manifestet så det kun peger på de nyeste keep_n segmenter, der faktisk eksisterer.
+    Skriv manifestet så den kun peger på de nyeste keep_n segmenter, der faktisk eksisterer.
+    Understøtter både .ts og .mp4 segmenter.
     """
     try:
         print(f"[SERVER][CLEANUP] Modtog keep_files: {keep_files}")
         client_dir = os.path.join(HLS_DIR, client_id)
         if not os.path.exists(client_dir):
             return {"deleted": [], "kept": []}
-        all_files = [f for f in os.listdir(client_dir) if f.endswith(".mp4")]
+        all_files = [f for f in os.listdir(client_dir) if f.startswith("segment_") and (f.endswith(".ts") or f.endswith(".mp4"))]
         # Slet alle segmenter som ikke er blandt keep_files
         to_delete = [f for f in all_files if f not in keep_files]
         for seg in to_delete:
@@ -103,8 +110,8 @@ async def cleanup_hls_files(
 
         # Returnér status
         kept = sorted(
-            [f for f in os.listdir(client_dir) if f.endswith(".mp4")],
-            key=lambda f: extract_num(f)
+            [f for f in os.listdir(client_dir) if f.startswith("segment_") and (f.endswith(".ts") or f.endswith(".mp4"))],
+            key=lambda f: extract_num(f, "segment_")
         )
         return {"deleted": to_delete, "kept": kept}
     except Exception as e:
