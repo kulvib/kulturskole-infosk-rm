@@ -7,7 +7,14 @@ import re
 router = APIRouter()
 
 # --- HLS setup ---
-HLS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hls"))
+# Find HLS dir fra main.py-logik:
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SERVICE1_HLS_DIR = os.path.join(BASE_DIR, "..", "service1", "hls")
+ROOT_HLS_DIR = os.path.join(BASE_DIR, "..", "hls")
+if os.path.isdir(SERVICE1_HLS_DIR):
+    HLS_DIR = os.path.abspath(SERVICE1_HLS_DIR)
+else:
+    HLS_DIR = os.path.abspath(ROOT_HLS_DIR)
 os.makedirs(HLS_DIR, exist_ok=True)
 
 def extract_num(filename, prefix="fixed_segment_"):
@@ -22,7 +29,7 @@ def update_manifest(client_dir, client_id, keep_last_n=5, segment_duration=3):
     """
     Update manifest file with the newest keep_last_n segments.
     Uses absolute URLs for segments for compatibility with players like VLC.
-    Ignores segments smaller than 1000 bytes (likely broken).
+    Ignores segments smaller end 1000 bytes (likely broken).
     """
     segment_prefix = "fixed_segment_"
     segment_suffix = ".mp4"
@@ -46,8 +53,8 @@ def update_manifest(client_dir, client_id, keep_last_n=5, segment_duration=3):
 
     media_seq = extract_num(segments[0], prefix=segment_prefix) if segments else 0
     manifest_path = os.path.join(client_dir, "index.m3u8")
-    # Absolute URL for segments (recommended for VLC/browser)
-    base_url = f"https://kulturskole-infosk-rm.onrender.com/hls/{client_id}/"
+    # Absolut URL for segmenter (matcher static mount på /hls i main.py)
+    base_url = f"/hls/{client_id}/"
     with open(manifest_path, "w") as m3u:
         m3u.write("#EXTM3U\n")
         m3u.write("#EXT-X-VERSION:3\n")
