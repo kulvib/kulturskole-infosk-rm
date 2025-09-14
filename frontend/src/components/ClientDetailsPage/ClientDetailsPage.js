@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Grid, Card, Typography, Button } from "@mui/material";
+import { Box, Grid, Card, Typography } from "@mui/material";
 import ClientDetailsHeaderSection from "./ClientDetailsHeaderSection";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
 import ClientDetailsActionsSection from "./ClientDetailsActionsSection";
@@ -181,15 +181,11 @@ export default function ClientDetailsPage({
           />
         </Grid>
         <Grid item xs={12}>
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={onRestartStream}
-            sx={{ mb: 1 }}
-          >
-            Opdatér stream
-          </Button>
-          <ClientDetailsLivestreamSection key={streamKey} clientId={client?.id} />
+          <ClientDetailsLivestreamSection
+            key={streamKey}
+            clientId={client?.id}
+            onRestartStream={onRestartStream}
+          />
         </Grid>
       </Grid>
       <ClientCalendarDialog
