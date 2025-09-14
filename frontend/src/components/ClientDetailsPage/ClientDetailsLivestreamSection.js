@@ -81,7 +81,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2 }}>
           <VideocamIcon color="action" fontSize="large" />
           <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
-            Livestream (HLS)
+            Livestream
           </Typography>
         </Box>
         <Box
