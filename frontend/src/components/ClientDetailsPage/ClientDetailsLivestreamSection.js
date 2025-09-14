@@ -3,11 +3,15 @@ import Hls from "hls.js";
 import { Card, CardContent, Box, Typography, Button } from "@mui/material";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
+  const hlsRef = useRef(null); // To retain Hls instance
   const [manifestExists, setManifestExists] = useState(null);
+  const [isLive, setIsLive] = useState(true);
 
+  // Check if manifest exists
   useEffect(() => {
     if (!clientId) {
       setManifestExists(false);
@@ -19,6 +23,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       .catch(() => setManifestExists(false));
   }, [clientId]);
 
+  // Setup HLS and video
   useEffect(() => {
     if (!manifestExists) return;
     let hls;
@@ -32,17 +37,45 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       });
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
+      hlsRef.current = hls;
     } else if (video && video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
     }
-    // Autoplay og muted
+    // Autoplay and muted
     if (video) {
       video.muted = true;
       video.autoplay = true;
       video.play().catch(() => {});
     }
-    return () => { if (hls) hls.destroy(); };
+    return () => {
+      if (hls) hls.destroy();
+      hlsRef.current = null;
+    };
   }, [manifestExists, clientId]);
+
+  // LIVE edge detection - now uses <5 seconds as "LIVE"
+  useEffect(() => {
+    if (!manifestExists) return;
+    let interval;
+    const checkLive = () => {
+      const video = videoRef.current;
+      const hls = hlsRef.current;
+      if (hls && video && hls.liveSyncPosition) {
+        // Difference between live edge and current time
+        const diff = Math.abs(hls.liveSyncPosition - video.currentTime);
+        setIsLive(diff < 5); // Show LIVE if within 5 seconds of live edge
+      } else if (video && video.seekable && video.seekable.length > 0) {
+        // Fallback for native HLS (iOS/Safari)
+        const liveEdge = video.seekable.end(video.seekable.length - 1);
+        const diff = Math.abs(liveEdge - video.currentTime);
+        setIsLive(diff < 5);
+      } else {
+        setIsLive(true); // Default to LIVE if uncertain
+      }
+    };
+    interval = setInterval(checkLive, 1000);
+    return () => clearInterval(interval);
+  }, [manifestExists]);
 
   const handleFullscreen = () => {
     const video = videoRef.current;
@@ -84,6 +117,15 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             Livestream
           </Typography>
         </Box>
+        {/* LIVE-badge only if at live edge */}
+        {isLive && (
+          <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+            <FiberManualRecordIcon sx={{ color: "red", fontSize: 16, mr: 0.5 }} />
+            <Typography variant="caption" sx={{ color: "red", fontWeight: "bold", letterSpacing: 1 }}>
+              LIVE
+            </Typography>
+          </Box>
+        )}
         <Box
           sx={{
             p: 2,
