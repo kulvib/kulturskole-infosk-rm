@@ -58,11 +58,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       const hls = hlsRef.current;
       if (hls && video && hls.liveSyncPosition) {
         const diff = Math.abs(hls.liveSyncPosition - video.currentTime);
-        setIsLive(diff < 30); // Nu 30 sekunder i stedet for 5
+        setIsLive(diff < 15); // Nu 15 sekunder i stedet for 20/30
       } else if (video && video.seekable && video.seekable.length > 0) {
         const liveEdge = video.seekable.end(video.seekable.length - 1);
         const diff = Math.abs(liveEdge - video.currentTime);
-        setIsLive(diff < 30); // Nu 30 sekunder i stedet for 5
+        setIsLive(diff < 15); // Nu 15 sekunder i stedet for 20/30
       } else {
         setIsLive(true);
       }
