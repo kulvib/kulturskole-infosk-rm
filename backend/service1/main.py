@@ -59,7 +59,19 @@ app.add_middleware(
 )
 
 # --- STATIC MOUNT TIL HLS ---
-HLS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "hls"))
+# Find den rigtige HLS-dir uanset hvor main.py ligger
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Hvis du kører main.py fra backend/, men segmenter lander i service1/hls:
+SERVICE1_HLS_DIR = os.path.join(BASE_DIR, "service1", "hls")
+ROOT_HLS_DIR = os.path.join(BASE_DIR, "hls")
+
+if os.path.isdir(SERVICE1_HLS_DIR):
+    HLS_DIR = SERVICE1_HLS_DIR
+else:
+    # fallback for ældre setup
+    HLS_DIR = ROOT_HLS_DIR
+
 os.makedirs(HLS_DIR, exist_ok=True)
 app.mount("/hls", StaticFiles(directory=HLS_DIR), name="hls")
 print(f"### main.py: Static mount for HLS på {HLS_DIR} ###")
