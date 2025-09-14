@@ -1,38 +1,62 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Card, CardContent, Box, Typography } from "@mui/material";
 import VideocamIcon from "@mui/icons-material/Videocam";
 
-/**
- * Props:
- *   clientId: string (kræves)
- */
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
+  const [manifestExists, setManifestExists] = useState(null); // null=ukendt, false=nej, true=ja
 
   useEffect(() => {
-    if (!clientId) return;
+    if (!clientId) {
+      setManifestExists(false);
+      return;
+    }
+    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
+    fetch(hlsUrl, { method: "HEAD" })
+      .then(resp => setManifestExists(resp.ok))
+      .catch(() => setManifestExists(false));
+  }, [clientId]);
+
+  useEffect(() => {
+    if (!manifestExists) return;
+    let hls;
     const video = videoRef.current;
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
-
-    let hls;
     if (Hls.isSupported()) {
       hls = new Hls({
-        liveSyncDurationCount: 6, // Hold spilleren 6 segmenter bagud for robusthed
-        maxLiveSyncPlaybackRate: 1, // Afspil aldrig hurtigere end realtime
+        liveSyncDurationCount: 6,
+        maxLiveSyncPlaybackRate: 1,
         lowLatencyMode: false
       });
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    } else if (video && video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
     }
+    return () => { if (hls) hls.destroy(); };
+  }, [manifestExists, clientId]);
 
-    return () => {
-      if (hls) hls.destroy();
-    };
-  }, [clientId]);
-
+  if (manifestExists === null) {
+    return <Typography variant="body2">Tjekker om livestream findes…</Typography>;
+  }
+  if (!manifestExists) {
+    return (
+      <Card elevation={2} sx={{ borderRadius: 2 }}>
+        <CardContent>
+          <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2 }}>
+            <VideocamIcon color="action" fontSize="large" />
+            <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
+              Livestream
+            </Typography>
+          </Box>
+          <Typography variant="body2" color="text.secondary">
+            Ingen live stream tilgængelig.
+          </Typography>
+        </CardContent>
+      </Card>
+    );
+  }
   return (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
       <CardContent>
