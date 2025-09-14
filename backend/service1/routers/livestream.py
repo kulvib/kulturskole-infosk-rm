@@ -99,6 +99,7 @@ async def cleanup_hls_files(
     Skriv manifestet så det kun peger på keep_files (de 5 nyeste).
     """
     try:
+        print(f"[SERVER][CLEANUP] Modtog keep_files: {keep_files}")
         client_dir = os.path.join(HLS_DIR, client_id)
         if not os.path.exists(client_dir):
             return {"deleted": [], "kept": []}
