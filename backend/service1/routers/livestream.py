@@ -1,6 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form
 from typing import Dict
 import os
+import traceback
 
 router = APIRouter()
 
@@ -17,19 +18,29 @@ async def upload_hls_file(
     Modtag segment fra en producer og opdater manifest for korrekt client_id.
     Logger filsti og størrelse. Sletter gamle segmenter, så kun de 5 nyeste beholdes.
     """
-    client_dir = os.path.join(HLS_DIR, client_id)
-    os.makedirs(client_dir, exist_ok=True)
-    seg_path = os.path.join(client_dir, file.filename)
-    content = await file.read()
-    with open(seg_path, "wb") as f:
-        f.write(content)
-    print(f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes")
-    update_manifest(client_dir, keep_last_n=5)
-    return {"filename": file.filename, "client_id": client_id}
+    try:
+        client_dir = os.path.join(HLS_DIR, client_id)
+        os.makedirs(client_dir, exist_ok=True)
+        seg_path = os.path.join(client_dir, file.filename)
+        content = await file.read()
+        with open(seg_path, "wb") as f:
+            f.write(content)
+        print(f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes")
+        try:
+            update_manifest(client_dir, keep_last_n=5)
+        except Exception as em:
+            print("[FEJL VED MANIFEST]", em)
+            traceback.print_exc()
+        return {"filename": file.filename, "client_id": client_id}
+    except Exception as e:
+        print("[FEJL VED UPLOAD]", e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Fejl i upload: {e}")
 
 def update_manifest(client_dir, keep_last_n=5):
-    # Find og sorter alle segmenter (fx .mp4)
+    # Find og sorter alle segmenter (.mp4)
     segments = sorted([f for f in os.listdir(client_dir) if f.endswith(".mp4")])
+    print(f"[MANIFEST] Fundne segmenter: {segments}")
     # Slet gamle segmenter, hvis der er for mange
     if len(segments) > keep_last_n:
         to_delete = segments[:-keep_last_n]
@@ -39,9 +50,13 @@ def update_manifest(client_dir, keep_last_n=5):
 
     # Udtræk første segmentnummer til EXT-X-MEDIA-SEQUENCE
     def extract_num(filename):
-        # Forvent format: segment_00083.mp4
-        num = filename.replace("segment_", "").replace(".mp4", "")
-        return int(num)
+        # Prøv at udtrække tal fra format: segment_00083.mp4 eller fixed_segment_00042.mp4
+        import re
+        m = re.search(r'(\d+)', filename)
+        if m:
+            return int(m.group(1))
+        print(f"[MANIFEST] Kunne ikke udtrække nummer fra: {filename}")
+        return 0
 
     if segments:
         media_seq = extract_num(segments[0])
@@ -58,7 +73,7 @@ def update_manifest(client_dir, keep_last_n=5):
             m3u.write(f"{seg}\n")
     print(f"[MANIFEST] Manifest opdateret: {manifest_path} (start={media_seq}, {len(segments)} segmenter)")
 
-# --- WebRTC signalering (kan beholdes, men ikke relevant for HLS upload) ---
+# --- WebRTC signalering ---
 class Room:
     def __init__(self):
         self.broadcaster: WebSocket = None
@@ -131,6 +146,7 @@ async def livestream_endpoint(websocket: WebSocket, client_id: str):
                 del room.viewers[vid]
     except Exception as e:
         print(f"Exception i ws for client_id={client_id}: {e}")
+        traceback.print_exc()
         if websocket == room.broadcaster:
             room.broadcaster = None
         for vid, ws in list(room.viewers.items()):
