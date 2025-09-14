@@ -24,6 +24,7 @@ def update_manifest(client_dir, keep_n=5, segment_duration=3):
     """
     Skriver manifest, så den kun peger på de nyeste keep_n segmenter,
     som eksisterer fysisk i client_dir.
+    Tilføjer #EXT-X-ENDLIST til sidst, så manifestet er kompatibelt med HLS-afspillere.
     """
     prefix = "fixed_segment_"
     suffix = ".mp4"
@@ -38,7 +39,7 @@ def update_manifest(client_dir, keep_n=5, segment_duration=3):
         return
     media_seq = extract_num(manifest_segs[0], prefix)
     manifest_path = os.path.join(client_dir, "index.m3u8")
-    with open(manifest_path, "w") as m3u:
+    with open(manifest_path, "w", encoding="utf-8", newline="\n") as m3u:
         m3u.write("#EXTM3U\n")
         m3u.write("#EXT-X-VERSION:3\n")
         m3u.write(f"#EXT-X-TARGETDURATION:{segment_duration}\n")
@@ -46,6 +47,7 @@ def update_manifest(client_dir, keep_n=5, segment_duration=3):
         for seg in manifest_segs:
             m3u.write(f"#EXTINF:{segment_duration}.0,\n")
             m3u.write(f"{seg}\n")
+        m3u.write("#EXT-X-ENDLIST\n")
     print(f"[MANIFEST] Opdateret manifest for {client_dir}: {manifest_path} ({media_seq}..{extract_num(manifest_segs[-1], prefix)})")
 
 @router.post("/hls/upload")
