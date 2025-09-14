@@ -83,7 +83,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   };
 
   if (manifestExists === null) {
-    return <Typography variant="body2">Tjekker om livestream findes…</Typography>;
+    return <Typography variant="body2">Tjekker om stream findes…</Typography>;
   }
   if (!manifestExists) {
     return (
@@ -92,11 +92,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2 }}>
             <VideocamIcon color="action" fontSize="large" />
             <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
-              Livestream
+              Stream
             </Typography>
           </Box>
           <Typography variant="body2" color="text.secondary">
-            Ingen live stream tilgængelig.
+            Ingen stream tilgængelig.
           </Typography>
         </CardContent>
       </Card>
@@ -105,12 +105,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   return (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
       <CardContent>
-        {/* Header med “Livestream” til venstre og “LIVE” badge til højre */}
+        {/* Header med “Stream” til venstre og “LIVE” badge til højre */}
         <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2, justifyContent: "space-between" }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <VideocamIcon color="action" fontSize="large" />
             <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
-              Livestream
+              Stream
             </Typography>
           </Box>
           {isLive && (
