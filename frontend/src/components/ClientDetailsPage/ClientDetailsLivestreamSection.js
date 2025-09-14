@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
 import { Card, CardContent, Box, Typography, Button } from "@mui/material";
-import VideocamIcon from "@mui/icons-material/Videocam";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 
-export default function ClientDetailsLivestreamSection({ clientId }) {
+export default function ClientDetailsLivestreamSection({ clientId, onRestartStream }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const [manifestExists, setManifestExists] = useState(null);
@@ -101,14 +100,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       <Card elevation={2} sx={{ borderRadius: 2 }}>
         <CardContent>
           <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2 }}>
-            <VideocamIcon color="action" fontSize="large" />
             <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
-              Stream
+              Ingen stream tilgængelig.
             </Typography>
           </Box>
-          <Typography variant="body2" color="text.secondary">
-            Ingen stream tilgængelig.
-          </Typography>
         </CardContent>
       </Card>
     );
@@ -116,13 +111,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   return (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
       <CardContent>
-        {/* Header med “Stream” til venstre og “LIVE” badge til højre */}
+        {/* Header med "Opdatér stream" til venstre og “LIVE” badge til højre */}
         <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2, justifyContent: "space-between" }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
-            <VideocamIcon color="action" fontSize="large" />
-            <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
-              Stream
-            </Typography>
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={onRestartStream}
+              sx={{ borderRadius: 2 }}
+            >
+              Opdatér stream
+            </Button>
           </Box>
           {isLive && (
             <Box sx={{ display: "flex", alignItems: "center" }}>
