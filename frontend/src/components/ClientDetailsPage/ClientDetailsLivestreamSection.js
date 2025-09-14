@@ -5,6 +5,8 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import VideocamIcon from "@mui/icons-material/Videocam";
 
+const LIVE_DELAY_THRESHOLD = 23; // sekunder
+
 export default function ClientDetailsLivestreamSection({ clientId, onRestartStream }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -55,11 +57,11 @@ export default function ClientDetailsLivestreamSection({ clientId, onRestartStre
     const hls = hlsRef.current;
     if (hls && video && hls.liveSyncPosition) {
       const diff = Math.abs(hls.liveSyncPosition - video.currentTime);
-      setIsLive(diff < 15);
+      setIsLive(diff < LIVE_DELAY_THRESHOLD);
     } else if (video && video.seekable && video.seekable.length > 0) {
       const liveEdge = video.seekable.end(video.seekable.length - 1);
       const diff = Math.abs(liveEdge - video.currentTime);
-      setIsLive(diff < 15);
+      setIsLive(diff < LIVE_DELAY_THRESHOLD);
     } else {
       setIsLive(true);
     }
@@ -111,7 +113,7 @@ export default function ClientDetailsLivestreamSection({ clientId, onRestartStre
   return (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
       <CardContent>
-        {/* Header med "Opdatér stream" til venstre og “LIVE” badge til højre */}
+        {/* Header med "Opdatér stream" til venstre og LIVE/FORSINKET badge til højre */}
         <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2, justifyContent: "space-between" }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <Button
@@ -123,11 +125,18 @@ export default function ClientDetailsLivestreamSection({ clientId, onRestartStre
               Opdatér stream
             </Button>
           </Box>
-          {isLive && (
+          {isLive ? (
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <FiberManualRecordIcon sx={{ color: "green", fontSize: 16, mr: 0.5 }} />
+              <Typography variant="caption" sx={{ color: "green", fontWeight: "bold", letterSpacing: 1 }}>
+                LIVE
+              </Typography>
+            </Box>
+          ) : (
             <Box sx={{ display: "flex", alignItems: "center" }}>
               <FiberManualRecordIcon sx={{ color: "red", fontSize: 16, mr: 0.5 }} />
               <Typography variant="caption" sx={{ color: "red", fontWeight: "bold", letterSpacing: 1 }}>
-                LIVE
+                FORSINKET
               </Typography>
             </Box>
           )}
