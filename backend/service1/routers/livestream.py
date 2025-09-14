@@ -24,9 +24,8 @@ def update_manifest(client_dir, keep_n=5, segment_duration=3):
     """
     Skriver manifest, så den kun peger på de nyeste keep_n segmenter,
     som eksisterer fysisk i client_dir. Finder automatisk om .ts eller .mp4 bruges.
-    Tilføjer #EXT-X-ENDLIST til sidst, så manifestet er kompatibelt med HLS-afspillere.
+    Skriver IKKE #EXT-X-ENDLIST, så manifestet bliver ved med at opdatere for live streaming.
     """
-    # Find eksisterende segment-typer
     seg_types = [".ts", ".mp4"]
     for ext in seg_types:
         segs = sorted(
@@ -47,7 +46,7 @@ def update_manifest(client_dir, keep_n=5, segment_duration=3):
                 for seg in manifest_segs:
                     m3u.write(f"#EXTINF:{segment_duration}.0,\n")
                     m3u.write(f"{seg}\n")
-                m3u.write("#EXT-X-ENDLIST\n")
+                # LIVE: IKKE skriv #EXT-X-ENDLIST!
             print(f"[MANIFEST] Opdateret manifest for {client_dir}: {manifest_path} ({media_seq}..{extract_num(manifest_segs[-1], 'segment_')})")
             return
     print(f"[MANIFEST] Ingen segmenter fundet til manifest i {client_dir}")
