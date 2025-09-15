@@ -169,17 +169,19 @@ export async function clientAction(id, action) {
   if (action === "chrome-start") {
     url = `${apiUrl}/api/clients/${id}/chrome-command`;
     method = "POST";
-    payload = { action: "start" }; // Mappes til "start"
+    payload = { action: "start" };
   } else if (action === "chrome-shutdown") {
     url = `${apiUrl}/api/clients/${id}/chrome-command`;
     method = "POST";
-    payload = { action: "stop" }; // Mappes til "stop"
-  }
-  // LIVESTREAM_START via chrome-command endpoint
-  else if (action === "livestream_start") {
+    payload = { action: "stop" };
+  } else if (action === "livestream_start") {
     url = `${apiUrl}/api/clients/${id}/chrome-command`;
     method = "POST";
     payload = { action: "livestream_start" };
+  } else if (action === "livestream_stop") {
+    url = `${apiUrl}/api/clients/${id}/chrome-command`;
+    method = "POST";
+    payload = { action: "livestream_stop" };
   }
   // Sleep/Wakeup via state endpoint
   else if (action === "sleep") {
@@ -454,7 +456,8 @@ export async function updateSchoolTimes(schoolId, updates) {
   return await res.json();
 }
 
-// LIVESTREAM API FUNKTIONER PR. KLIENT
+// ----- LEGACY (GAMLE) LIVESTREAM API ENDPOINTS (BRUGES KUN HVIS AGENT/BACKEND ER SAT OP TIL DET) -----
+
 export async function getLivestreamStatus(clientId) {
   const token = getToken();
   const res = await fetch(`${apiUrl}/api/livestream/status/${clientId}`, {
