@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
-import { Card, CardContent, Box, Typography, Button, Stack } from "@mui/material";
+import { Card, CardContent, Box, Typography, Button, Stack, Snackbar, Alert } from "@mui/material";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import VideocamIcon from "@mui/icons-material/Videocam";
@@ -11,12 +11,14 @@ export default function ClientDetailsLivestreamSection({
   clientId,
   onRestartStream,
   onStartLivestream,
-  loadingStart
+  loadingStart,
+  pendingLivestream // <-- NY prop, boolean
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const [manifestExists, setManifestExists] = useState(null);
   const [isLive, setIsLive] = useState(true);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   useEffect(() => {
     if (!clientId) {
@@ -98,6 +100,28 @@ export default function ClientDetailsLivestreamSection({
     }
   };
 
+  // --- NYT: Snackbar-håndtering ---
+  const handleStartLivestream = async () => {
+    try {
+      await onStartLivestream();
+    } catch (err) {
+      // Backend-fejl fanges her (fx "Livestream already requested")
+      setSnackbar({
+        open: true,
+        message:
+          (err?.response?.data?.detail) ||
+          err?.message ||
+          "Fejl: Kunne ikke starte livestream",
+        severity: "error"
+      });
+    }
+  };
+
+  const handleCloseSnackbar = (_, reason) => {
+    if (reason === "clickaway") return;
+    setSnackbar({ ...snackbar, open: false });
+  };
+
   if (manifestExists === null) {
     return <Typography variant="body2">Tjekker om stream findes…</Typography>;
   }
@@ -115,12 +139,26 @@ export default function ClientDetailsLivestreamSection({
             <Button
               variant="contained"
               color="primary"
-              onClick={onStartLivestream}
-              disabled={loadingStart}
+              onClick={handleStartLivestream}
+              disabled={loadingStart || pendingLivestream}
             >
-              Start livestream
+              {pendingLivestream
+                ? "Livestream igang/afventer..."
+                : loadingStart
+                ? "Starter…"
+                : "Start livestream"}
             </Button>
           </Stack>
+          <Snackbar
+            open={snackbar.open}
+            autoHideDuration={3500}
+            onClose={handleCloseSnackbar}
+            anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          >
+            <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
+              {snackbar.message}
+            </Alert>
+          </Snackbar>
         </CardContent>
       </Card>
     );
@@ -186,6 +224,16 @@ export default function ClientDetailsLivestreamSection({
             </Button>
           </Box>
         </Box>
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={3500}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </CardContent>
     </Card>
   );
