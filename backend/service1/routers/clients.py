@@ -144,20 +144,7 @@ def get_chrome_command(
         raise HTTPException(status_code=404, detail="Client not found")
     return {"action": client.pending_chrome_action.value if client.pending_chrome_action else None}
 
-# Klienten kan rydde kommando efter udført handling
-@router.post("/clients/{id}/chrome-command-clear")
-def clear_chrome_command(
-    id: int,
-    session=Depends(get_session)
-):
-    client = session.get(Client, id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    client.pending_chrome_action = ChromeAction.NONE
-    session.add(client)
-    session.commit()
-    session.refresh(client)
-    return {"ok": True}
+# (Fjernet: /clients/{id}/chrome-command-clear - klienten rydder selv flaget via update)
 
 # Opret ny klient
 @router.post("/clients/", response_model=Client)
