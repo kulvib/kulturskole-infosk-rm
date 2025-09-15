@@ -44,6 +44,31 @@ export default function ClientDetailsPage({
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
 
   const [loadingStartLivestream, setLoadingStartLivestream] = useState(false);
+  const [loadingStopLivestream, setLoadingStopLivestream] = useState(false);
+  const [pendingLivestream, setPendingLivestream] = useState(false);
+
+  // Poll for pending_chrome_action og opdater pendingLivestream state
+  useEffect(() => {
+    let interval;
+    if (client?.id) {
+      const poll = async () => {
+        try {
+          const updated = await getClient(client.id);
+          const pca = updated.pending_chrome_action;
+          setPendingLivestream(
+            pca === "livestream_start" || pca === "livestream_stop"
+          );
+          setLiveChromeStatus(updated.chrome_status || "unknown");
+          setLiveChromeColor(updated.chrome_color || null);
+          setLastSeen(updated.last_seen || null);
+          setUptime(updated.uptime || null);
+        } catch {}
+      };
+      poll();
+      interval = setInterval(poll, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [client?.id]);
 
   useEffect(() => {
     if (client) {
@@ -55,20 +80,6 @@ export default function ClientDetailsPage({
       setUptime(client.uptime || null);
     }
   }, [client]);
-
-  useEffect(() => {
-    if (!client?.id) return;
-    const pollerStatus = setInterval(async () => {
-      try {
-        const updated = await getClient(client.id);
-        setLiveChromeStatus(updated.chrome_status || "unknown");
-        setLiveChromeColor(updated.chrome_color || null);
-        setLastSeen(updated.last_seen || null);
-        setUptime(updated.uptime || null);
-      } catch {}
-    }, 1000);
-    return () => clearInterval(pollerStatus);
-  }, [client?.id]);
 
   const showSnackbar = (message, severity = "success") => {
     setSnackbar({ open: true, message, severity });
@@ -115,11 +126,7 @@ export default function ClientDetailsPage({
     try {
       await clientAction(client.id, action);
       showSnackbar("Handlingen blev udført!", "success");
-      const updated = await getClient(client.id);
-      setLiveChromeStatus(updated.chrome_status || "unknown");
-      setLiveChromeColor(updated.chrome_color || null);
-      setLastSeen(updated.last_seen || null);
-      setUptime(updated.uptime || null);
+      // status opdateres i polleren
     } catch (err) {
       showSnackbar("Fejl: " + err.message, "error");
     }
@@ -129,13 +136,23 @@ export default function ClientDetailsPage({
   const handleOpenTerminal = () => openTerminal(client.id);
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
-  // --- NYT: Knap-funktion til at starte livestream
+  // Start-stream
   const handleStartLivestream = async () => {
     setLoadingStartLivestream(true);
     try {
       await handleClientAction("livestream_start");
     } finally {
       setLoadingStartLivestream(false);
+    }
+  };
+
+  // Stop-stream
+  const handleStopLivestream = async () => {
+    setLoadingStopLivestream(true);
+    try {
+      await handleClientAction("livestream_stop");
+    } finally {
+      setLoadingStopLivestream(false);
     }
   };
 
@@ -198,7 +215,10 @@ export default function ClientDetailsPage({
             clientId={client?.id}
             onRestartStream={onRestartStream}
             onStartLivestream={handleStartLivestream}
+            onStopLivestream={handleStopLivestream}
             loadingStart={loadingStartLivestream}
+            loadingStop={loadingStopLivestream}
+            pendingLivestream={pendingLivestream}
           />
         </Grid>
       </Grid>
