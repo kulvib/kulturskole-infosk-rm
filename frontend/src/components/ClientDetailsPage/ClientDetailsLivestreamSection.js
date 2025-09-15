@@ -1,13 +1,18 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
-import { Card, CardContent, Box, Typography, Button } from "@mui/material";
+import { Card, CardContent, Box, Typography, Button, Stack } from "@mui/material";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import VideocamIcon from "@mui/icons-material/Videocam";
 
 const LIVE_DELAY_THRESHOLD = 23; // sekunder
 
-export default function ClientDetailsLivestreamSection({ clientId, onRestartStream }) {
+export default function ClientDetailsLivestreamSection({
+  clientId,
+  onRestartStream,
+  onStartLivestream,
+  loadingStart
+}) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const [manifestExists, setManifestExists] = useState(null);
@@ -106,6 +111,16 @@ export default function ClientDetailsLivestreamSection({ clientId, onRestartStre
               Ingen stream tilgængelig.
             </Typography>
           </Box>
+          <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={onStartLivestream}
+              disabled={loadingStart}
+            >
+              Start livestream
+            </Button>
+          </Stack>
         </CardContent>
       </Card>
     );
