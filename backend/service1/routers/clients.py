@@ -229,11 +229,16 @@ async def update_client(
         client.chrome_last_updated = datetime.utcnow()
     if getattr(client_update, "chrome_color", None) is not None:
         client.chrome_color = client_update.chrome_color
-    if getattr(client_update, "pending_chrome_action", None) is not None:
-        try:
-            client.pending_chrome_action = ChromeAction(getattr(client_update, "pending_chrome_action"))
-        except (ValueError, TypeError):
+    # --- Rettelse: Opdater pending_chrome_action også når den ønskes sat til None (ryddes af agent) ---
+    if "pending_chrome_action" in client_update.__fields_set__:
+        val = getattr(client_update, "pending_chrome_action")
+        if val is None:
             client.pending_chrome_action = ChromeAction.NONE
+        else:
+            try:
+                client.pending_chrome_action = ChromeAction(val)
+            except (ValueError, TypeError):
+                client.pending_chrome_action = ChromeAction.NONE
     if getattr(client_update, "school_id", None) is not None:
         client.school_id = client_update.school_id
     if getattr(client_update, "state", None) is not None:
