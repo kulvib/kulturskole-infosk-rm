@@ -120,6 +120,9 @@ def set_chrome_command(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     action = data.get("action")
+    # --- BESKYTTELSE MOD DOBBELT-LIVESTREAM ---
+    if action == "livestream_start" and client.pending_chrome_action == "livestream_start":
+        raise HTTPException(status_code=400, detail="Livestream already requested")
     try:
         chrome_action = ChromeAction(action)
     except ValueError:
@@ -229,7 +232,7 @@ async def update_client(
         client.chrome_last_updated = datetime.utcnow()
     if getattr(client_update, "chrome_color", None) is not None:
         client.chrome_color = client_update.chrome_color
-    # --- Rettelse: Opdater pending_chrome_action også når den ønskes sat til None (ryddes af agent) ---
+    # --- Rettelse: pending_chrome_action ---
     if "pending_chrome_action" in client_update.__fields_set__:
         val = getattr(client_update, "pending_chrome_action")
         if val is None:
