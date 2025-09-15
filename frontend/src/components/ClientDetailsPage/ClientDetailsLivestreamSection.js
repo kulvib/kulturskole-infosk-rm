@@ -1,26 +1,23 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
-import { Card, CardContent, Box, Typography, Button, CircularProgress } from "@mui/material";
+import { Card, CardContent, Box, Typography, Button } from "@mui/material";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import VideocamIcon from "@mui/icons-material/Videocam";
 
-const LIVE_DELAY_THRESHOLD = 15;      // sekunder for "live"
-const MIN_BUFFER_SECONDS = 5;         // sekunder der skal bufferes før visning
+const LIVE_DELAY_THRESHOLD = 23; // sekunder
 
 export default function ClientDetailsLivestreamSection({ clientId, onRestartStream }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const [manifestExists, setManifestExists] = useState(null);
   const [isLive, setIsLive] = useState(true);
-  const [showVideo, setShowVideo] = useState(false);
 
   useEffect(() => {
     if (!clientId) {
       setManifestExists(false);
       return;
     }
-    setShowVideo(false); // skjul video hvis clientId skifter
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
     fetch(hlsUrl, { method: "HEAD" })
       .then(resp => setManifestExists(resp.ok))
@@ -29,7 +26,6 @@ export default function ClientDetailsLivestreamSection({ clientId, onRestartStre
 
   useEffect(() => {
     if (!manifestExists) return;
-    setShowVideo(false); // skjul video, start forfra
     let hls;
     const video = videoRef.current;
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
@@ -50,25 +46,9 @@ export default function ClientDetailsLivestreamSection({ clientId, onRestartStre
       video.autoplay = true;
       video.play().catch(() => {});
     }
-    // Buffer progress event
-    const bufferCheck = () => {
-      if (video && video.buffered.length > 0) {
-        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
-        const buffer = bufferedEnd - video.currentTime;
-        if (buffer >= MIN_BUFFER_SECONDS) {
-          setShowVideo(true);
-        }
-      }
-    };
-    video && video.addEventListener("progress", bufferCheck);
-    // For nogle streams "progress" ikke kaldes, så poll også:
-    const interval = setInterval(bufferCheck, 500);
-    // Clean up
     return () => {
       if (hls) hls.destroy();
       hlsRef.current = null;
-      video && video.removeEventListener("progress", bufferCheck);
-      clearInterval(interval);
     };
   }, [manifestExists, clientId]);
 
@@ -171,35 +151,25 @@ export default function ClientDetailsLivestreamSection({ clientId, onRestartStre
             minHeight: "160px",
           }}
         >
-          {/* Buffer-vent logik */}
-          {!showVideo ? (
-            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 160 }}>
-              <CircularProgress size={32} sx={{ mb: 2 }} />
-              <Typography variant="body2">Bufferer stream...</Typography>
-            </Box>
-          ) : (
-            <>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                controls={false}
-                style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
-                tabIndex={-1}
-              />
-              <Box sx={{ mt: 1, display: "flex", justifyContent: "center" }}>
-                <Button
-                  onClick={handleFullscreen}
-                  variant="outlined"
-                  startIcon={<FullscreenIcon />}
-                  sx={{ borderRadius: 2 }}
-                >
-                  Fuld skærm
-                </Button>
-              </Box>
-            </>
-          )}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            controls={false}
+            style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
+            tabIndex={-1}
+          />
+          <Box sx={{ mt: 1, display: "flex", justifyContent: "center" }}>
+            <Button
+              onClick={handleFullscreen}
+              variant="outlined"
+              startIcon={<FullscreenIcon />}
+              sx={{ borderRadius: 2 }}
+            >
+              Fuld skærm
+            </Button>
+          </Box>
         </Box>
       </CardContent>
     </Card>
