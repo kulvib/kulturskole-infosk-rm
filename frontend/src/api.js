@@ -175,6 +175,12 @@ export async function clientAction(id, action) {
     method = "POST";
     payload = { action: "stop" }; // Mappes til "stop"
   }
+  // LIVESTREAM_START via chrome-command endpoint
+  else if (action === "livestream_start") {
+    url = `${apiUrl}/api/clients/${id}/chrome-command`;
+    method = "POST";
+    payload = { action: "livestream_start" };
+  }
   // Sleep/Wakeup via state endpoint
   else if (action === "sleep") {
     url = `${apiUrl}/api/clients/${id}/state`;
