@@ -3,7 +3,6 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
 
-# Enum til Chrome kommandoer/handlinger
 class ChromeAction(str, Enum):
     START = "start"
     STOP = "stop"
@@ -12,11 +11,13 @@ class ChromeAction(str, Enum):
     SLEEP = "sleep"
     WAKEUP = "wakeup"
     NONE = "none"
+    LIVESTREAM_START = "livestream_start"  # <-- tilføjet
+    LIVESTREAM_STOP = "livestream_stop"    # (valgfrit)
 
 class School(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, unique=True)
-    weekday_on: Optional[str] = Field(default="09:00")   # fx "09:00"
+    weekday_on: Optional[str] = Field(default="09:00")
     weekday_off: Optional[str] = Field(default="22:30")
     weekend_on: Optional[str] = Field(default="08:00")
     weekend_off: Optional[str] = Field(default="18:00")
@@ -27,7 +28,7 @@ class User(SQLModel, table=True):
     hashed_password: str
     role: str = "admin"
     is_active: bool = True
-    school_id: Optional[int] = Field(default=None, foreign_key="school.id")  # <-- TILFØJET
+    school_id: Optional[int] = Field(default=None, foreign_key="school.id")
 
 class ClientBase(SQLModel):
     name: str
