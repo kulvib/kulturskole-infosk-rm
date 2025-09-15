@@ -219,16 +219,21 @@ async def update_client(
         client.chrome_last_updated = datetime.utcnow()
     if getattr(client_update, "chrome_color", None) is not None:
         client.chrome_color = client_update.chrome_color
-    # --- Rettelse: pending_chrome_action ---
+
+    # --- PATCH: pending_chrome_action ---
     if "pending_chrome_action" in client_update.__fields_set__:
         val = getattr(client_update, "pending_chrome_action")
         if val is None:
+            # Kun nulstil hvis eksplicit sat til None
             client.pending_chrome_action = ChromeAction.NONE
         else:
             try:
                 client.pending_chrome_action = ChromeAction(val)
             except (ValueError, TypeError):
-                client.pending_chrome_action = ChromeAction.NONE
+                # Hvis ugyldig værdi, behold nuværende!
+                pass
+    # Hvis feltet ikke er med i request, behold nuværende værdi!
+
     if getattr(client_update, "school_id", None) is not None:
         client.school_id = client_update.school_id
     if getattr(client_update, "state", None) is not None:
