@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
-import { Card, CardContent, Box, Typography, Button, Stack, Snackbar, Alert } from "@mui/material";
+import { Card, CardContent, Box, Typography, Button, Snackbar, Alert } from "@mui/material";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import VideocamIcon from "@mui/icons-material/Videocam";
@@ -11,8 +11,10 @@ export default function ClientDetailsLivestreamSection({
   clientId,
   onRestartStream,
   onStartLivestream,
+  onStopLivestream,
   loadingStart,
-  pendingLivestream // <-- NY prop, boolean
+  loadingStop,
+  pendingLivestream // boolean
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -29,7 +31,7 @@ export default function ClientDetailsLivestreamSection({
     fetch(hlsUrl, { method: "HEAD" })
       .then(resp => setManifestExists(resp.ok))
       .catch(() => setManifestExists(false));
-  }, [clientId]);
+  }, [clientId, pendingLivestream]); // opdater når pendingLivestream ændrer sig
 
   useEffect(() => {
     if (!manifestExists) return;
@@ -100,75 +102,65 @@ export default function ClientDetailsLivestreamSection({
     }
   };
 
-  // --- NYT: Snackbar-håndtering ---
-  const handleStartLivestream = async () => {
-    try {
-      await onStartLivestream();
-    } catch (err) {
-      // Backend-fejl fanges her (fx "Livestream already requested")
-      setSnackbar({
-        open: true,
-        message:
-          (err?.response?.data?.detail) ||
-          err?.message ||
-          "Fejl: Kunne ikke starte livestream",
-        severity: "error"
-      });
-    }
-  };
-
+  // Snackbar-håndtering
+  const openError = (msg) =>
+    setSnackbar({ open: true, message: msg, severity: "error" });
   const handleCloseSnackbar = (_, reason) => {
     if (reason === "clickaway") return;
     setSnackbar({ ...snackbar, open: false });
   };
 
+  // Knapper til Start/Stop stream: fejl vises som snackbar
+  const handleStartLivestream = async () => {
+    try {
+      await onStartLivestream();
+    } catch (err) {
+      openError(
+        (err?.response?.data?.detail) ||
+        err?.message ||
+        "Fejl: Kunne ikke starte livestream"
+      );
+    }
+  };
+  const handleStopLivestream = async () => {
+    try {
+      await onStopLivestream();
+    } catch (err) {
+      openError(
+        (err?.response?.data?.detail) ||
+        err?.message ||
+        "Fejl: Kunne ikke stoppe livestream"
+      );
+    }
+  };
+
+  // Hvis vi stadig checker for manifest
   if (manifestExists === null) {
     return <Typography variant="body2">Tjekker om stream findes…</Typography>;
   }
-  if (!manifestExists) {
-    return (
-      <Card elevation={2} sx={{ borderRadius: 2 }}>
-        <CardContent>
-          <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2 }}>
-            <VideocamIcon color="action" fontSize="large" />
-            <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
-              Ingen stream tilgængelig.
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+
+  return (
+    <Card elevation={2} sx={{ borderRadius: 2 }}>
+      <CardContent>
+        {/* Knappanel med Start, Stop og Opdatér */}
+        <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2, justifyContent: "space-between" }}>
+          <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
             <Button
               variant="contained"
               color="primary"
               onClick={handleStartLivestream}
               disabled={loadingStart || pendingLivestream}
             >
-              {pendingLivestream
-                ? "Livestream igang/afventer..."
-                : loadingStart
-                ? "Starter…"
-                : "Start livestream"}
+              {manifestExists ? "Genstart livestream" : "Start livestream"}
             </Button>
-          </Stack>
-          <Snackbar
-            open={snackbar.open}
-            autoHideDuration={3500}
-            onClose={handleCloseSnackbar}
-            anchorOrigin={{ vertical: "top", horizontal: "center" }}
-          >
-            <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
-              {snackbar.message}
-            </Alert>
-          </Snackbar>
-        </CardContent>
-      </Card>
-    );
-  }
-  return (
-    <Card elevation={2} sx={{ borderRadius: 2 }}>
-      <CardContent>
-        {/* Header med "Opdatér stream" til venstre og LIVE/FORSINKET badge til højre */}
-        <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2, justifyContent: "space-between" }}>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={handleStopLivestream}
+              disabled={loadingStop || !manifestExists || pendingLivestream}
+            >
+              Stop livestream
+            </Button>
             <Button
               variant="outlined"
               color="primary"
@@ -178,7 +170,7 @@ export default function ClientDetailsLivestreamSection({
               Opdatér stream
             </Button>
           </Box>
-          {isLive ? (
+          {manifestExists && (isLive ? (
             <Box sx={{ display: "flex", alignItems: "center" }}>
               <FiberManualRecordIcon sx={{ color: "green", fontSize: 16, mr: 0.5 }} />
               <Typography variant="caption" sx={{ color: "green", fontWeight: "bold", letterSpacing: 1 }}>
@@ -192,38 +184,53 @@ export default function ClientDetailsLivestreamSection({
                 FORSINKET
               </Typography>
             </Box>
-          )}
+          ))}
         </Box>
-        <Box
-          sx={{
-            p: 2,
-            border: "1px solid #eee",
-            borderRadius: 2,
-            background: "#fafafa",
-            textAlign: "center",
-            minHeight: "160px",
-          }}
-        >
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            controls={false}
-            style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
-            tabIndex={-1}
-          />
-          <Box sx={{ mt: 1, display: "flex", justifyContent: "center" }}>
-            <Button
-              onClick={handleFullscreen}
-              variant="outlined"
-              startIcon={<FullscreenIcon />}
-              sx={{ borderRadius: 2 }}
-            >
-              Fuld skærm
-            </Button>
+        {manifestExists ? (
+          <Box
+            sx={{
+              p: 2,
+              border: "1px solid #eee",
+              borderRadius: 2,
+              background: "#fafafa",
+              textAlign: "center",
+              minHeight: "160px",
+            }}
+          >
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              controls={false}
+              style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
+              tabIndex={-1}
+            />
+            <Box sx={{ mt: 1, display: "flex", justifyContent: "center" }}>
+              <Button
+                onClick={handleFullscreen}
+                variant="outlined"
+                startIcon={<FullscreenIcon />}
+                sx={{ borderRadius: 2 }}
+              >
+                Fuld skærm
+              </Button>
+            </Box>
           </Box>
-        </Box>
+        ) : (
+          <Box sx={{ p: 2, textAlign: "center" }}>
+            <VideocamIcon color="action" fontSize="large" />
+            <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
+              Ingen stream tilgængelig.
+            </Typography>
+          </Box>
+        )}
+        {/* Pending-besked */}
+        {pendingLivestream && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Livestream-kommando er sendt, afventer agent...
+          </Alert>
+        )}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={3500}
