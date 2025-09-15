@@ -43,6 +43,8 @@ export default function ClientDetailsPage({
 
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
 
+  const [loadingStartLivestream, setLoadingStartLivestream] = useState(false);
+
   useEffect(() => {
     if (client) {
       if (!localityDirty) setLocality(client.locality || "");
@@ -127,6 +129,16 @@ export default function ClientDetailsPage({
   const handleOpenTerminal = () => openTerminal(client.id);
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
+  // --- NYT: Knap-funktion til at starte livestream
+  const handleStartLivestream = async () => {
+    setLoadingStartLivestream(true);
+    try {
+      await handleClientAction("livestream_start");
+    } finally {
+      setLoadingStartLivestream(false);
+    }
+  };
+
   if (!client) {
     return (
       <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4 }}>
@@ -185,6 +197,8 @@ export default function ClientDetailsPage({
             key={streamKey}
             clientId={client?.id}
             onRestartStream={onRestartStream}
+            onStartLivestream={handleStartLivestream}
+            loadingStart={loadingStartLivestream}
           />
         </Grid>
       </Grid>
