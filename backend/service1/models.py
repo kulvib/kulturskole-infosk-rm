@@ -11,8 +11,8 @@ class ChromeAction(str, Enum):
     SLEEP = "sleep"
     WAKEUP = "wakeup"
     NONE = "none"
-    LIVESTREAM_START = "livestream_start"  # <-- tilføjet
-    LIVESTREAM_STOP = "livestream_stop"    # (valgfrit)
+    LIVESTREAM_START = "livestream_start"
+    LIVESTREAM_STOP = "livestream_stop"
 
 class School(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -59,6 +59,9 @@ class Client(ClientBase, table=True):
         default="normal",
         description="Driftstilstand: normal, sleep, wakeup, shutdown, error"
     )
+    livestream_status: Optional[str] = "idle"
+    livestream_last_segment: Optional[datetime] = None
+    livestream_last_error: Optional[str] = None
 
 class ClientCreate(ClientBase):
     sort_order: Optional[int] = None
@@ -93,6 +96,9 @@ class ClientUpdate(SQLModel):
     pending_chrome_action: Optional[ChromeAction] = None
     school_id: Optional[int] = None
     state: Optional[str] = None
+    livestream_status: Optional[str] = None
+    livestream_last_segment: Optional[datetime] = None
+    livestream_last_error: Optional[str] = None
 
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
