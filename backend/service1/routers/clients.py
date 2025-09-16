@@ -120,7 +120,6 @@ def set_chrome_command(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     action = data.get("action")
-    # --- BESKYTTELSE MOD DOBBELT-LIVESTREAM ---
     if action == "livestream_start" and client.pending_chrome_action == "livestream_start":
         raise HTTPException(status_code=400, detail="Livestream already requested")
     try:
@@ -143,8 +142,6 @@ def get_chrome_command(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     return {"action": client.pending_chrome_action.value if client.pending_chrome_action else None}
-
-# (Fjernet: /clients/{id}/chrome-command-clear - klienten rydder selv flaget via update)
 
 # Opret ny klient
 @router.post("/clients/", response_model=Client)
@@ -175,6 +172,9 @@ async def create_client(
         pending_chrome_action=getattr(client_in, "pending_chrome_action", ChromeAction.NONE),
         school_id=getattr(client_in, "school_id", None),
         state=getattr(client_in, "state", "normal"),
+        livestream_status="idle",
+        livestream_last_segment=None,
+        livestream_last_error=None
     )
     session.add(client)
     session.commit()
@@ -219,25 +219,25 @@ async def update_client(
         client.chrome_last_updated = datetime.utcnow()
     if getattr(client_update, "chrome_color", None) is not None:
         client.chrome_color = client_update.chrome_color
-
-    # --- PATCH: pending_chrome_action ---
     if "pending_chrome_action" in client_update.__fields_set__:
         val = getattr(client_update, "pending_chrome_action")
         if val is None:
-            # Kun nulstil hvis eksplicit sat til None
             client.pending_chrome_action = ChromeAction.NONE
         else:
             try:
                 client.pending_chrome_action = ChromeAction(val)
             except (ValueError, TypeError):
-                # Hvis ugyldig værdi, behold nuværende!
                 pass
-    # Hvis feltet ikke er med i request, behold nuværende værdi!
-
     if getattr(client_update, "school_id", None) is not None:
         client.school_id = client_update.school_id
     if getattr(client_update, "state", None) is not None:
         client.state = client_update.state
+    if getattr(client_update, "livestream_status", None) is not None:
+        client.livestream_status = client_update.livestream_status
+    if getattr(client_update, "livestream_last_segment", None) is not None:
+        client.livestream_last_segment = client_update.livestream_last_segment
+    if getattr(client_update, "livestream_last_error", None) is not None:
+        client.livestream_last_error = client_update.livestream_last_error
     session.add(client)
     session.commit()
     session.refresh(client)
