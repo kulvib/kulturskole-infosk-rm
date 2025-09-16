@@ -33,7 +33,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [pendingLivestream, setPendingLivestream] = useState(false);
 
-  // HLS player refs
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
 
@@ -61,7 +60,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, [fetchClient]);
 
-  // Manifest check (GET, ikke HEAD)
+  // Manifest check
   useEffect(() => {
     if (!clientId) {
       setManifestExists(false);
@@ -73,13 +72,13 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       .catch(() => setManifestExists(false));
   }, [clientId, client?.livestream_status]);
 
-  // Robust HLS.js attach/detach, kun 1 instance, ingen remount, ingen play() race!
+  // Robust HLS.js attach/detach
   useEffect(() => {
     if (!manifestExists) return;
     const video = videoRef.current;
     if (!video) return;
 
-    // Ryd op hvis gammel HLS
+    // Clean up any old hls instance
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
