@@ -210,15 +210,9 @@ export default function ClientDetailsPage({
           />
         </Grid>
         <Grid item xs={12}>
+          {/* Fjern key={streamKey} for at undgå video-ref race condition */}
           <ClientDetailsLivestreamSection
-            key={streamKey}
             clientId={client?.id}
-            onRestartStream={onRestartStream}
-            onStartLivestream={handleStartLivestream}
-            onStopLivestream={handleStopLivestream}
-            loadingStart={loadingStartLivestream}
-            loadingStop={loadingStopLivestream}
-            pendingLivestream={pendingLivestream}
           />
         </Grid>
       </Grid>
