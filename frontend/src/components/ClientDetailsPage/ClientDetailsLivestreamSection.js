@@ -59,18 +59,19 @@ export default function ClientDetailsLivestreamPage({ clientId }) {
     return () => clearInterval(interval);
   }, [fetchClient]);
 
+  // Ændring: Brug GET i stedet for HEAD for at undgå NS_BINDING_ABORTED
   useEffect(() => {
     if (!clientId) {
       setManifestExists(false);
       return;
     }
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
-    fetch(hlsUrl, { method: "HEAD" })
+    fetch(hlsUrl)
       .then(resp => setManifestExists(resp.ok))
       .catch(() => setManifestExists(false));
   }, [clientId, client?.livestream_status]);
 
-  // Video afspilning med HLS.js
+  // Video afspilning med HLS.js + error logging
   useEffect(() => {
     if (!manifestExists) return;
     let hls;
@@ -78,6 +79,9 @@ export default function ClientDetailsLivestreamPage({ clientId }) {
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
     if (Hls.isSupported()) {
       hls = new Hls();
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.error("HLS.js error:", data);
+      });
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
       hlsRef.current = hls;
@@ -87,7 +91,9 @@ export default function ClientDetailsLivestreamPage({ clientId }) {
     if (video) {
       video.muted = true;
       video.autoplay = true;
-      video.play().catch(() => {});
+      video.play().catch((err) => {
+        console.error("Video play() error:", err);
+      });
     }
     return () => {
       if (hls) hls.destroy();
