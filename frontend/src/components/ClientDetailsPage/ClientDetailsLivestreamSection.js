@@ -27,7 +27,7 @@ function ClientDetailsLivestreamStatus({ isOnline, lastSeenAgo, livestreamStatus
   );
 }
 
-export default function ClientDetailsLivestreamPage({ clientId }) {
+export default function ClientDetailsLivestreamSection({ clientId }) {
   const [client, setClient] = useState(null);
   const [manifestExists, setManifestExists] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -59,7 +59,7 @@ export default function ClientDetailsLivestreamPage({ clientId }) {
     return () => clearInterval(interval);
   }, [fetchClient]);
 
-  // Ændring: Brug GET i stedet for HEAD for at undgå NS_BINDING_ABORTED
+  // Manifest check (GET, ikke HEAD)
   useEffect(() => {
     if (!clientId) {
       setManifestExists(false);
@@ -71,11 +71,16 @@ export default function ClientDetailsLivestreamPage({ clientId }) {
       .catch(() => setManifestExists(false));
   }, [clientId, client?.livestream_status]);
 
-  // Video afspilning med HLS.js + error logging
+  // HLS.js video afspilning med robust attach og logging
   useEffect(() => {
     if (!manifestExists) return;
-    let hls;
     const video = videoRef.current;
+    console.log("videoRef.current før attachMedia:", video);
+    if (!video) {
+      console.error("Video-elementet findes ikke på attach-tidspunktet!");
+      return;
+    }
+    let hls;
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
     if (Hls.isSupported()) {
       hls = new Hls();
@@ -85,16 +90,14 @@ export default function ClientDetailsLivestreamPage({ clientId }) {
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
       hlsRef.current = hls;
-    } else if (video && video.canPlayType("application/vnd.apple.mpegurl")) {
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
     }
-    if (video) {
-      video.muted = true;
-      video.autoplay = true;
-      video.play().catch((err) => {
-        console.error("Video play() error:", err);
-      });
-    }
+    video.muted = true;
+    video.autoplay = true;
+    video.play().catch((err) => {
+      console.error("Video play() error:", err);
+    });
     return () => {
       if (hls) hls.destroy();
       hlsRef.current = null;
@@ -223,7 +226,7 @@ export default function ClientDetailsLivestreamPage({ clientId }) {
                 autoPlay
                 playsInline
                 muted
-                controls={false}
+                controls={true} // Sæt til true for nem fejlsøgning
                 style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
                 tabIndex={-1}
               />
