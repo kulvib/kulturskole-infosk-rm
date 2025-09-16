@@ -35,8 +35,19 @@ export default function ClientDetailsLivestreamPage({ clientId }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
 
+  // Helper to get the token from localStorage (adjust if stored elsewhere)
+  const getToken = () => localStorage.getItem("token");
+
   const fetchClient = useCallback(async () => {
-    const resp = await fetch(`https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/`);
+    const token = getToken();
+    const resp = await fetch(
+      `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/`,
+      {
+        headers: {
+          "Authorization": "Bearer " + token
+        }
+      }
+    );
     if (!resp.ok) throw new Error("Kunne ikke hente klient");
     const data = await resp.json();
     setClient(data);
@@ -93,11 +104,18 @@ export default function ClientDetailsLivestreamPage({ clientId }) {
   const handleStartLivestream = async () => {
     setPendingLivestream(true);
     try {
-      const resp = await fetch(`https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/chrome-command`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "livestream_start" })
-      });
+      const token = getToken();
+      const resp = await fetch(
+        `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/chrome-command`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+          },
+          body: JSON.stringify({ action: "livestream_start" })
+        }
+      );
       if (!resp.ok) throw new Error((await resp.json()).detail || "Fejl: Kunne ikke starte livestream");
       setSnackbar({ open: true, message: "Livestream start-kommando sendt!", severity: "success" });
       setTimeout(fetchClient, 2000);
@@ -110,11 +128,18 @@ export default function ClientDetailsLivestreamPage({ clientId }) {
   const handleStopLivestream = async () => {
     setPendingLivestream(true);
     try {
-      const resp = await fetch(`https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/chrome-command`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "livestream_stop" })
-      });
+      const token = getToken();
+      const resp = await fetch(
+        `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/chrome-command`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+          },
+          body: JSON.stringify({ action: "livestream_stop" })
+        }
+      );
       if (!resp.ok) throw new Error((await resp.json()).detail || "Fejl: Kunne ikke stoppe livestream");
       setSnackbar({ open: true, message: "Livestream stop-kommando sendt!", severity: "success" });
       setTimeout(fetchClient, 2000);
