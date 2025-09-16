@@ -69,24 +69,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
     fetch(hlsUrl)
       .then(resp => {
-        console.log("[Manifest check] Status:", resp.status, "OK?", resp.ok);
         setManifestExists(resp.ok);
       })
-      .catch((err) => {
-        console.log("[Manifest check] Catch error", err);
-        setManifestExists(false);
-      });
+      .catch(() => setManifestExists(false));
   }, [clientId, client?.livestream_status]);
 
-  // Robust HLS.js attach/detach
+  // HLS.js setup: ensure videoRef.current is present before initializing HLS
   useEffect(() => {
-    console.log("[HLS useEffect] manifestExists:", manifestExists, "clientId:", clientId);
     if (!manifestExists) return;
+    if (!videoRef.current) return; // Wait for video element to be mounted
+
     const video = videoRef.current;
-    if (!video) {
-      console.warn("[HLS useEffect] No video element");
-      return;
-    }
 
     // Clean up any old hls instance
     if (hlsRef.current) {
@@ -95,25 +88,19 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
 
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
-    let hls;
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      console.log("[HLS useEffect] Native HLS support - setting src");
       video.src = hlsUrl;
     } else if (Hls.isSupported()) {
-      console.log("[HLS useEffect] Using HLS.js for", hlsUrl);
-      hls = new Hls({ enableWorker: true, debug: true });
+      const hls = new Hls({ enableWorker: true, debug: false });
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (event, data) => {
         console.error("HLS.js error:", data);
       });
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log("HLS.js: Manifest parsed, calling video.play()");
         video.play().catch(e => console.error("video.play error", e));
       });
       hlsRef.current = hls;
-    } else {
-      console.error("[HLS useEffect] HLS not supported in this browser");
     }
     video.muted = true;
     video.autoplay = true;
@@ -124,7 +111,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         hlsRef.current = null;
       }
     };
-  }, [manifestExists, clientId]);
+  }, [manifestExists, clientId, videoRef.current]); // videoRef.current as dependency
 
   const openError = (msg) => setSnackbar({ open: true, message: msg, severity: "error" });
   const handleCloseSnackbar = (_, reason) => {
@@ -242,7 +229,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 minHeight: "160px",
               }}
             >
-              {console.log("[RENDER] Rendering video, manifestExists:", manifestExists)}
               <video
                 ref={videoRef}
                 id="livestream-video"
