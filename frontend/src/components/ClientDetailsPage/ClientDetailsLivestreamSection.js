@@ -32,10 +32,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [manifestExists, setManifestExists] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [pendingLivestream, setPendingLivestream] = useState(false);
+
+  // HLS player refs
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
 
-  // Helper to get the token from localStorage (adjust if stored elsewhere)
+  // Helper to get the token from localStorage
   const getToken = () => localStorage.getItem("token");
 
   const fetchClient = useCallback(async () => {
@@ -71,13 +73,13 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       .catch(() => setManifestExists(false));
   }, [clientId, client?.livestream_status]);
 
-  // HLS.js video afspilning med robust attach og cleanup
+  // Robust HLS.js attach/detach, kun 1 instance, ingen remount, ingen play() race!
   useEffect(() => {
     if (!manifestExists) return;
     const video = videoRef.current;
     if (!video) return;
 
-    // Destroy any old HLS instance
+    // Ryd op hvis gammel HLS
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
@@ -85,20 +87,22 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
     let hls;
-    if (Hls.isSupported()) {
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = hlsUrl;
+    } else if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, debug: false });
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (event, data) => {
         console.error("HLS.js error:", data);
       });
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(e => console.error("video.play error", e));
+      });
       hlsRef.current = hls;
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = hlsUrl;
     }
     video.muted = true;
     video.autoplay = true;
-    // Do not force video.play() here, let browser handle it
 
     return () => {
       if (hlsRef.current) {
@@ -227,10 +231,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               <video
                 ref={videoRef}
                 id="livestream-video"
+                controls
                 autoPlay
                 playsInline
                 muted
-                controls={true}
                 style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
                 tabIndex={-1}
               />
