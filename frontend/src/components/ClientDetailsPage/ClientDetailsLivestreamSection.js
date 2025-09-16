@@ -71,36 +71,40 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       .catch(() => setManifestExists(false));
   }, [clientId, client?.livestream_status]);
 
-  // HLS.js video afspilning med robust attach og logging
+  // HLS.js video afspilning med robust attach og cleanup
   useEffect(() => {
     if (!manifestExists) return;
     const video = videoRef.current;
-    console.log("videoRef.current før attachMedia:", video);
-    if (!video) {
-      console.error("Video-elementet findes ikke på attach-tidspunktet!");
-      return;
+    if (!video) return;
+
+    // Destroy any old HLS instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
     }
-    let hls;
+
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
+    let hls;
     if (Hls.isSupported()) {
-      hls = new Hls();
+      hls = new Hls({ enableWorker: true, debug: false });
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (event, data) => {
         console.error("HLS.js error:", data);
       });
-      hls.loadSource(hlsUrl);
-      hls.attachMedia(video);
       hlsRef.current = hls;
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
     }
     video.muted = true;
     video.autoplay = true;
-    video.play().catch((err) => {
-      console.error("Video play() error:", err);
-    });
+    // Do not force video.play() here, let browser handle it
+
     return () => {
-      if (hls) hls.destroy();
-      hlsRef.current = null;
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
     };
   }, [manifestExists, clientId]);
 
@@ -226,7 +230,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 autoPlay
                 playsInline
                 muted
-                controls={true} // Sæt til true for nem fejlsøgning
+                controls={true}
                 style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
                 tabIndex={-1}
               />
