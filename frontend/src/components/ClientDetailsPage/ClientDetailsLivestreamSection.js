@@ -102,9 +102,16 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     // eslint-disable-next-line
   }, [clientId]);
 
-  // Sæt sidst set live når streamen bliver klar igen
+  // Opdater Sidst set live hvert 10. sekund så længe streamen er live
   useEffect(() => {
-    if (manifestReady) setLastLive(new Date());
+    let interval;
+    if (manifestReady) {
+      setLastLive(new Date());
+      interval = setInterval(() => {
+        setLastLive(new Date());
+      }, 10000); // Opdater hvert 10. sekund
+    }
+    return () => clearInterval(interval);
   }, [manifestReady]);
 
   return (
