@@ -882,54 +882,59 @@ export default function AdminPage() {
                         <MenuItem value="false">Spærret</MenuItem>
                       </Select>
                     </FormControl>
-                    <TextField
-                      label="Nyt kodeord"
-                      type={showEditPassword ? "text" : "password"}
-                      value={editUser.password || ""}
-                      onChange={e => setEditUser({ ...editUser, password: e.target.value })}
-                      fullWidth
-                      size="small"
-                      sx={inputSx}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              onClick={() => setShowEditPassword((show) => !show)}
-                              edge="end"
-                              tabIndex={-1}
-                              size="small"
-                              sx={{ fontSize: 18 }}
-                            >
-                              {showEditPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                            </IconButton>
-                          </InputAdornment>
-                        )
-                      }}
-                    />
-                    <TextField
-                      label="Gentag nyt kodeord"
-                      type={showEditPassword2 ? "text" : "password"}
-                      value={editUser.password2 || ""}
-                      onChange={e => setEditUser({ ...editUser, password2: e.target.value })}
-                      fullWidth
-                      size="small"
-                      sx={inputSx}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              onClick={() => setShowEditPassword2((show) => !show)}
-                              edge="end"
-                              tabIndex={-1}
-                              size="small"
-                              sx={{ fontSize: 18 }}
-                            >
-                              {showEditPassword2 ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                            </IconButton>
-                          </InputAdornment>
-                        )
-                      }}
-                    />
+                    {/* Vis kun kodeordsfelter hvis ikke admin */}
+                    {editUser.role !== "admin" && (
+                      <>
+                        <TextField
+                          label="Nyt kodeord"
+                          type={showEditPassword ? "text" : "password"}
+                          value={editUser.password || ""}
+                          onChange={e => setEditUser({ ...editUser, password: e.target.value })}
+                          fullWidth
+                          size="small"
+                          sx={inputSx}
+                          InputProps={{
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  onClick={() => setShowEditPassword((show) => !show)}
+                                  edge="end"
+                                  tabIndex={-1}
+                                  size="small"
+                                  sx={{ fontSize: 18 }}
+                                >
+                                  {showEditPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                                </IconButton>
+                              </InputAdornment>
+                            )
+                          }}
+                        />
+                        <TextField
+                          label="Gentag nyt kodeord"
+                          type={showEditPassword2 ? "text" : "password"}
+                          value={editUser.password2 || ""}
+                          onChange={e => setEditUser({ ...editUser, password2: e.target.value })}
+                          fullWidth
+                          size="small"
+                          sx={inputSx}
+                          InputProps={{
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  onClick={() => setShowEditPassword2((show) => !show)}
+                                  edge="end"
+                                  tabIndex={-1}
+                                  size="small"
+                                  sx={{ fontSize: 18 }}
+                                >
+                                  {showEditPassword2 ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                                </IconButton>
+                              </InputAdornment>
+                            )
+                          }}
+                        />
+                      </>
+                    )}
                   </Stack>
                 )}
                 {userError && <Typography color="error" sx={{ mt: 2 }}>{userError}</Typography>}
