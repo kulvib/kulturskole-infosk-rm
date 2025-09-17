@@ -20,7 +20,7 @@ const menuItems = [
   { text: "Klienter", path: "/clients", match: "/clients" },
   { text: "Kalender", path: "/calendar", match: "/calendar" },
   { text: "Administration", path: "/administration", match: "/administration" },
-  { text: "Livestream test", path: "/livestream-test", match: "/livestream-test" }, // TILFØJET
+  // { text: "Livestream test", path: "/livestream-test", match: "/livestream-test" }, // FJERNET
 ];
 
 export default function Dashboard() {
