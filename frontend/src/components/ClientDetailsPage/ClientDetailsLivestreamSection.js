@@ -15,7 +15,7 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-// Pulsating badge (samme grønne basisfarve pulserer)
+// Pulsating badge (samme grønne basisfarve pulserer, ikonet tættere på teksten)
 function LiveStatusBadge({ isLive, clientId }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", ml: 2 }}>
@@ -27,7 +27,7 @@ function LiveStatusBadge({ isLive, clientId }) {
           bgcolor: isLive ? "#43a047" : "#e53935",
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
-          mr: 1,
+          mr: 0.5, // Justeret fra 1 til 0.5 for mindre afstand til teksten
           animation: isLive ? "pulsate 2s infinite" : "none"
         }} />
         <Typography
