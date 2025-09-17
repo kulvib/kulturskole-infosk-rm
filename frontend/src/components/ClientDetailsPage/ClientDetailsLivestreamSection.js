@@ -7,7 +7,7 @@ import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 
 /**
  * Polls for manifest existence, returns true once manifest is found (HEAD request ok), false otherwise.
- * Polls every 500ms up to 7 seconds.
+ * Polls every 500ms up to 20 seconds (40 tries).
  */
 function useManifestPolling(clientId, resetKey) {
   const [manifestExists, setManifestExists] = useState(false);
@@ -18,7 +18,7 @@ function useManifestPolling(clientId, resetKey) {
 
     const poll = async () => {
       const url = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8?t=${resetKey}`;
-      for (let i = 0; i < 14; ++i) {
+      for (let i = 0; i < 40; ++i) { // 40*500ms = 20 sekunder
         try {
           const resp = await fetch(url, { method: "HEAD" });
           if (resp.ok) {
@@ -104,7 +104,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   };
 
-  // -- HER ER DELAYET MELLEM RESET OG START --
+  // -- HER ER DET LÆNGERE DELAY MELLEM RESET OG START --
   const handleStart = async () => {
     setPending(true);
     try {
@@ -113,8 +113,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/reset-hls`,
         { method: "POST", headers: { "Authorization": "Bearer " + getToken() } }
       );
-      // 2. Vent 400 ms (beskyt mod race condition)
-      await new Promise(res => setTimeout(res, 400));
+      // 2. Vent 1200 ms for at være sikker på reset er færdig
+      await new Promise(res => setTimeout(res, 1200));
 
       // 3. Start agent livestream
       await fetch(
