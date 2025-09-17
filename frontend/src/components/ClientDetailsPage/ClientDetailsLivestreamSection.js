@@ -2,6 +2,26 @@ import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Box, Card, CardContent, Typography, CircularProgress, Alert } from "@mui/material";
 
+function LiveIndicator() {
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 1 }}>
+      <Box
+        sx={{
+          width: 12,
+          height: 12,
+          borderRadius: "50%",
+          bgcolor: "#2ecc40",
+          boxShadow: "0 0 6px 2px #2ecc40",
+          mr: 1,
+        }}
+      />
+      <Typography variant="caption" sx={{ fontWeight: "bold", color: "#2ecc40" }}>
+        LIVE
+      </Typography>
+    </Box>
+  );
+}
+
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -102,14 +122,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     // eslint-disable-next-line
   }, [clientId]);
 
-  // Opdater Sidst set live hvert 10. sekund så længe streamen er live
+  // Opdater Sidst set live hvert 5. sekund så længe streamen er live
   useEffect(() => {
     let interval;
     if (manifestReady) {
       setLastLive(new Date());
       interval = setInterval(() => {
         setLastLive(new Date());
-      }, 10000); // Opdater hvert 10. sekund
+      }, 5000); // Opdater hvert 5. sekund
     }
     return () => clearInterval(interval);
   }, [manifestReady]);
@@ -118,9 +138,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     <Box maxWidth={600} mx="auto" mt={3}>
       <Card elevation={2} sx={{ borderRadius: 2 }}>
         <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Livestream
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+            <Typography variant="h6">
+              Livestream
+            </Typography>
+            {manifestReady && <LiveIndicator />}
+          </Box>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
