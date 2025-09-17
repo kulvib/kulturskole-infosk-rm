@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from db import get_session
 from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction
 from auth import get_current_admin_user
+import os
+import glob
 
 router = APIRouter()
 
@@ -329,3 +331,27 @@ def client_terminal(id: int, session=Depends(get_session), user=Depends(get_curr
 @router.get("/clients/{id}/remote-desktop")
 def client_remote_desktop(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
     return {"remote_desktop_url": f"/remote-desktop/{id}"}
+
+# --- RESET HLS FOR EN KLIENT ---
+@router.post("/clients/{client_id}/reset-hls")
+def reset_hls(client_id: int):
+    """
+    Sletter alle HLS-segmenter (.ts) og manifest (index.m3u8) for den specifikke klient.
+    """
+    hls_dir = f"/opt/render/project/src/backend/service1/hls/{client_id}/"
+    if not os.path.exists(hls_dir):
+        raise HTTPException(status_code=404, detail="HLS directory not found for client")
+    files = glob.glob(os.path.join(hls_dir, "*"))
+    deleted = []
+    errors = []
+    for f in files:
+        try:
+            os.remove(f)
+            deleted.append(os.path.basename(f))
+        except Exception as e:
+            errors.append({"file": os.path.basename(f), "error": str(e)})
+    return {
+        "status": "ok",
+        "deleted_files": deleted,
+        "errors": errors
+    }
