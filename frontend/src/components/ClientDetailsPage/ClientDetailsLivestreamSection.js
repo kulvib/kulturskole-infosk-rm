@@ -12,30 +12,48 @@ import {
   Grid
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import LiveTvIcon from "@mui/icons-material/LiveTv";
 
-function LiveIndicator() {
+// Pulsating grøn badge som matcher dine øvrige badges visuelt
+function LiveStatusBadge({ isLive }) {
+  const color = isLive ? "#43a047" : "#e53935";
+  const text = isLive ? "live" : "offline";
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 1 }}>
-      <Box
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
+      <Box sx={{
+        width: 10,
+        height: 10,
+        borderRadius: "50%",
+        bgcolor: color,
+        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+        border: "1px solid #ddd",
+        mr: 1,
+        animation: isLive ? "pulsate 1.2s infinite" : "none"
+      }} />
+      <Typography
+        variant="body2"
         sx={{
-          width: 12,
-          height: 12,
-          borderRadius: "50%",
-          bgcolor: "#2ecc40",
-          boxShadow: "0 0 6px 2px #2ecc40",
-          mr: 1,
-          animation: "live-blink 1s infinite alternate"
+          fontWeight: 400,
+          textTransform: "lowercase",
+          color: color
         }}
-      />
-      <Typography variant="caption" sx={{ fontWeight: "bold", color: "#2ecc40" }}>
-        LIVE
+      >
+        {text}
       </Typography>
       <style>
         {`
-          @keyframes live-blink {
-            0% { opacity: 1; }
-            100% { opacity: 0.4; }
+          @keyframes pulsate {
+            0% {
+              transform: scale(1);
+              opacity: 1;
+            }
+            50% {
+              transform: scale(1.5);
+              opacity: 0.5;
+            }
+            100% {
+              transform: scale(1);
+              opacity: 1;
+            }
           }
         `}
       </style>
@@ -138,7 +156,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           setManifestReady(false);
           cleanup();
         } else {
-          setError("Kan ikke finde livestream endnu.");
+          setError("Kan ikke finde klientstream endnu.");
         }
         manifestChecked = false;
       }
@@ -185,11 +203,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         <Card elevation={2} sx={{ borderRadius: 2 }}>
           <CardContent sx={{ pb: 1.5 }}>
             <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 1 }}>
-              <LiveTvIcon sx={{ color: "#1976d2", mr: 1 }} />
               <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1 }}>
-                Livestream
+                Klientstream
               </Typography>
-              {manifestReady && <LiveIndicator />}
+              <LiveStatusBadge isLive={manifestReady} />
               <Tooltip title="Genindlæs stream">
                 <span>
                   <IconButton
@@ -224,7 +241,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160 }}>
                   <CircularProgress size={32} />
                   <Typography variant="body2" sx={{ ml: 2 }}>
-                    {error ? "Prøver igen ..." : "Venter på livestream ..."}
+                    {error ? "Prøver igen ..." : "Venter på klientstream ..."}
                   </Typography>
                 </Box>
               )}
