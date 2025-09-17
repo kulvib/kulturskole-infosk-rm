@@ -21,6 +21,47 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useNavigate } from "react-router-dom";
 
+// StatusBadge med 2s puls animation hvis animate=true
+function StatusBadge({ color, text, animate = false }) {
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
+      <Box sx={{
+        width: 10,
+        height: 10,
+        borderRadius: "50%",
+        bgcolor: color,
+        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+        border: "1px solid #ddd",
+        mr: 1,
+        animation: animate ? "pulsate 2s infinite" : "none"
+      }} />
+      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none" }}>
+        {text}
+      </Typography>
+      {animate && (
+        <style>
+          {`
+            @keyframes pulsate {
+              0% {
+                transform: scale(1);
+                opacity: 1;
+              }
+              50% {
+                transform: scale(1.25);
+                opacity: 0.5;
+              }
+              100% {
+                transform: scale(1);
+                opacity: 1;
+              }
+            }
+          `}
+        </style>
+      )}
+    </Box>
+  );
+}
+
 function CopyIconButton({ value, disabled, iconSize = 16 }) {
   const [copied, setCopied] = React.useState(false);
 
@@ -59,46 +100,39 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
   );
 }
 
-// Ændret dot til 10x10 i ChromeStatusIcon
+// ChromeStatusIcon med badge og 2s puls (animeret hvis browser kører)
 function ChromeStatusIcon({ status, color }) {
   let fallbackColor = "grey.400";
   let text = status || "Ukendt";
   let dotColor = color || fallbackColor;
+  let animate = false;
 
   if (!color && typeof status === "string") {
     const s = status.toLowerCase();
     if (s === "running") {
       dotColor = "#43a047";
       text = "Åben";
+      animate = true;
     } else if (s === "stopped" || s === "closed") {
       dotColor = "#e53935";
       text = "Lukket";
+      animate = false;
     } else if (s === "unknown") {
       dotColor = "grey.400";
       text = "Ukendt";
+      animate = false;
     } else if (s.includes("kører")) {
       dotColor = "#43a047";
       text = status;
+      animate = true;
     } else if (s.includes("lukket")) {
       dotColor = "#e53935";
       text = status;
+      animate = false;
     }
   }
 
-  return (
-    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
-      <Box sx={{
-        width: 10,
-        height: 10,
-        borderRadius: "50%",
-        bgcolor: dotColor,
-        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-        border: "1px solid #ddd",
-        mr: 1,
-      }} />
-      <Typography variant="body2" sx={{ fontWeight: 400 }}>{text}</Typography>
-    </Box>
-  );
+  return <StatusBadge color={dotColor} text={text} animate={animate} />;
 }
 
 export default function ClientDetailsHeaderSection({
@@ -135,10 +169,9 @@ export default function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": { height: "32px" },
   };
 
-  // Endnu mindre padding-left på value-celler for at rykke værdierne endnu længere mod venstre
   const valueCellStyle = {
     border: 0,
-    pl: 0, // ingen padding-left!
+    pl: 0,
     py: 0,
     verticalAlign: "middle",
     height: 40,
@@ -186,7 +219,6 @@ export default function ClientDetailsHeaderSection({
       </Box>
       <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
         <CardContent>
-          {/* TOP: Kun Klientnavn i én række */}
           <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
             <Typography
               variant="h6"
@@ -263,7 +295,6 @@ export default function ClientDetailsHeaderSection({
                       </Box>
                     </TableCell>
                   </TableRow>
-                  {/* Byttet om: Kiosk browser status først, derefter Kiosk URL */}
                   <TableRow sx={{ height: 40 }}>
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
                       Kiosk browser status:
@@ -306,7 +337,6 @@ export default function ClientDetailsHeaderSection({
                       </Box>
                     </TableCell>
                   </TableRow>
-                  {/* --- */}
                 </TableBody>
               </Table>
             </TableContainer>
