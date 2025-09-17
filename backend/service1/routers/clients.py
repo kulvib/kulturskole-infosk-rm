@@ -355,29 +355,3 @@ def reset_hls(client_id: int):
         "deleted_files": deleted,
         "errors": errors
     }
-
-# --- STOP HLS STREAM & RYD OP (frontend kalder denne ved "forlad side") ---
-@router.post("/clients/{client_id}/stop-hls")
-def stop_hls(client_id: int):
-    """
-    Stopper evt. streamingproces og sletter alle HLS-segmenter (.ts) og manifest (index.m3u8) for klienten.
-    """
-    # TODO: Indsæt evt. logik til at stoppe Chrome-agent/stream her
-
-    hls_dir = f"/opt/render/project/src/backend/service1/hls/{client_id}/"
-    if not os.path.exists(hls_dir):
-        return {"status": "ok", "deleted_files": [], "errors": ["HLS directory not found for client"]}
-    files = glob.glob(os.path.join(hls_dir, "*"))
-    deleted = []
-    errors = []
-    for f in files:
-        try:
-            os.remove(f)
-            deleted.append(os.path.basename(f))
-        except Exception as e:
-            errors.append({"file": os.path.basename(f), "error": str(e)})
-    return {
-        "status": "ok",
-        "deleted_files": deleted,
-        "errors": errors
-    }
