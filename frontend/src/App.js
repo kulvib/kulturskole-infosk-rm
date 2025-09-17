@@ -10,7 +10,7 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import CalendarPage from "./components/CalendarPage";
 import AdminPage from "./components/AdminPage";
 import RemoteDesktop from "./components/RemoteDesktop";
-import LivestreamTest from "./components/LivestreamTest"; // <-- TILFØJET
+// import LivestreamTest from "./components/LivestreamTest"; // FJERNET
 
 export default function App() {
   return (
@@ -30,7 +30,7 @@ export default function App() {
           <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="administration" element={<AdminPage />} />
-          <Route path="livestream-test" element={<LivestreamTest />} /> {/* <-- TILFØJET */}
+          {/* <Route path="livestream-test" element={<LivestreamTest />} /> FJERNET */}
         </Route>
         <Route path="/remote-desktop/:clientId" element={<RemoteDesktop />} />
         <Route path="*" element={<NotFound />} />
