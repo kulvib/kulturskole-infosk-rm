@@ -1,12 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { Box, Card, CardContent, Typography, CircularProgress } from "@mui/material";
+import { Box, Card, CardContent, Typography, CircularProgress, Alert } from "@mui/material";
 
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const [manifestReady, setManifestReady] = useState(false);
+  const [error, setError] = useState("");
+  const [lastLive, setLastLive] = useState(null);
 
+  // Polls for manifest, and handles auto-reconnect
   useEffect(() => {
     if (!clientId) return;
     const video = videoRef.current;
@@ -14,44 +17,40 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
     let hls;
     let manifestChecked = false;
-    let interval;
+    let stopPolling = false;
+    let pollInterval;
 
-    const checkManifestAndStart = async () => {
-      try {
-        const resp = await fetch(hlsUrl, { method: "HEAD" });
-        if (resp.ok) {
-          manifestChecked = true;
-          setManifestReady(true);
-          if (video.canPlayType("application/vnd.apple.mpegurl")) {
-            video.src = hlsUrl;
-          } else if (Hls.isSupported()) {
-            hls = new Hls();
-            hlsRef.current = hls;
-            hls.loadSource(hlsUrl);
-            hls.attachMedia(video);
-            hls.on(Hls.Events.ERROR, (event, data) => {
-              console.error("HLS.js error:", data);
-            });
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-              video.play().catch(() => {});
-            });
+    // Helper: start HLS playback
+    const startPlayback = () => {
+      setError("");
+      setManifestReady(true);
+      setLastLive(new Date());
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = hlsUrl;
+      } else if (Hls.isSupported()) {
+        hls = new Hls();
+        hlsRef.current = hls;
+        hls.loadSource(hlsUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            setError("Streamen blev afbrudt. Prøver igen ...");
+            setManifestReady(false);
+            cleanup();
+            // Poll igen fra næste tick
           }
-          video.muted = true;
-          video.autoplay = true;
-          video.playsInline = true;
-          clearInterval(interval);
-        }
-      } catch (e) {
-        // ignore
+        });
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => {});
+        });
       }
+      video.muted = true;
+      video.autoplay = true;
+      video.playsInline = true;
     };
 
-    interval = setInterval(() => {
-      if (!manifestChecked) checkManifestAndStart();
-    }, 1000);
-
-    return () => {
-      clearInterval(interval);
+    // Helper: cleanup HLS/video
+    const cleanup = () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
@@ -61,7 +60,52 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         videoRef.current.load();
       }
     };
+
+    // Poll for manifest
+    const poll = async () => {
+      try {
+        const resp = await fetch(hlsUrl, { method: "HEAD" });
+        if (resp.ok) {
+          if (!manifestChecked) {
+            manifestChecked = true;
+            setError("");
+            setManifestReady(true);
+            startPlayback();
+          }
+        } else {
+          throw new Error("404");
+        }
+      } catch (e) {
+        if (manifestChecked) {
+          setError("Streamen blev afbrudt eller forsvandt. Prøver igen ...");
+          setManifestReady(false);
+          cleanup();
+        } else {
+          setError("Kan ikke finde livestream endnu.");
+        }
+        manifestChecked = false;
+      }
+    };
+
+    // Første kald for hurtigt respons
+    poll();
+    pollInterval = setInterval(() => {
+      if (stopPolling) return;
+      poll();
+    }, manifestReady ? 5000 : 1000); // Poll hurtigt indtil stream er klar, derefter hvert 5. sek
+
+    return () => {
+      stopPolling = true;
+      clearInterval(pollInterval);
+      cleanup();
+    };
+    // eslint-disable-next-line
   }, [clientId]);
+
+  // Sæt sidst set live når streamen bliver klar igen
+  useEffect(() => {
+    if (manifestReady) setLastLive(new Date());
+  }, [manifestReady]);
 
   return (
     <Box maxWidth={600} mx="auto" mt={3}>
@@ -70,11 +114,16 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           <Typography variant="h6" sx={{ mb: 2 }}>
             Livestream
           </Typography>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
           {!manifestReady && (
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160 }}>
               <CircularProgress size={32} />
               <Typography variant="body2" sx={{ ml: 2 }}>
-                Venter på livestream ...
+                {error ? "Prøver igen ..." : "Venter på livestream ..."}
               </Typography>
             </Box>
           )}
@@ -88,6 +137,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8, display: manifestReady ? "block" : "none" }}
             tabIndex={-1}
           />
+          {lastLive && (
+            <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 2 }}>
+              Sidst set live: {lastLive.toLocaleTimeString()}
+            </Typography>
+          )}
         </CardContent>
       </Card>
     </Box>
