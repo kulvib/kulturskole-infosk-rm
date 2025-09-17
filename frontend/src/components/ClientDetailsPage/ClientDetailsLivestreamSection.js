@@ -1,16 +1,11 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { Box, Card, CardContent, Typography, CircularProgress, Button } from "@mui/material";
-import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import { Box, Card, CardContent, Typography, CircularProgress } from "@mui/material";
 
-/**
- * Viser en HLS-stream automatisk når komponenten loades.
- * Starter video-afspilning så snart manifestet findes.
- * Ingen knapper, ingen polling, ingen start/stop.
- */
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
+  const [manifestReady, setManifestReady] = useState(false);
 
   useEffect(() => {
     if (!clientId) return;
@@ -21,12 +16,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     let manifestChecked = false;
     let interval;
 
-    // Simpel polling indtil manifest findes, derefter start afspilning
     const checkManifestAndStart = async () => {
       try {
         const resp = await fetch(hlsUrl, { method: "HEAD" });
         if (resp.ok) {
           manifestChecked = true;
+          setManifestReady(true);
           if (video.canPlayType("application/vnd.apple.mpegurl")) {
             video.src = hlsUrl;
           } else if (Hls.isSupported()) {
@@ -75,6 +70,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           <Typography variant="h6" sx={{ mb: 2 }}>
             Livestream
           </Typography>
+          {!manifestReady && (
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160 }}>
+              <CircularProgress size={32} />
+              <Typography variant="body2" sx={{ ml: 2 }}>
+                Venter på livestream ...
+              </Typography>
+            </Box>
+          )}
           <video
             ref={videoRef}
             id="livestream-video"
@@ -82,23 +85,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             autoPlay
             playsInline
             muted
-            style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
+            style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8, display: manifestReady ? "block" : "none" }}
             tabIndex={-1}
           />
-          <Box sx={{ mt: 1, display: "flex", justifyContent: "center" }}>
-            <Button
-              onClick={() => {
-                const vid = videoRef.current;
-                if (!vid) return;
-                if (vid.requestFullscreen) vid.requestFullscreen();
-              }}
-              variant="outlined"
-              startIcon={<FullscreenIcon />}
-              sx={{ borderRadius: 2 }}
-            >
-              Fuld skærm
-            </Button>
-          </Box>
         </CardContent>
       </Card>
     </Box>
