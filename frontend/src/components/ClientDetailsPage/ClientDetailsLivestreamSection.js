@@ -18,8 +18,8 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 // Pulsating badge (mindre og rolig puls)
 function LiveStatusBadge({ isLive, clientId }) {
   return (
-    <Box sx={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-start", ml: 2 }}>
-      <Box sx={{ display: "flex", alignItems: "center" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", ml: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "flex-end" }}>
         <Box sx={{
           width: 8,
           height: 8,
@@ -35,7 +35,9 @@ function LiveStatusBadge({ isLive, clientId }) {
           sx={{
             fontWeight: 400,
             textTransform: "none",
-            color: "#222"
+            color: "#222",
+            textAlign: "right",
+            minWidth: 150 // kan justeres efter behov
           }}
         >
           {isLive
@@ -44,11 +46,11 @@ function LiveStatusBadge({ isLive, clientId }) {
         </Typography>
       </Box>
       {/* Ny tekst under ID */}
-      {isLive &&
-        <Typography variant="caption" sx={{ color: "#888", ml: 3 }}>
-          stream kan være forsinket op til et minut
+      {isLive && (
+        <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "right", width: "100%" }}>
+          stream kan være op til et minut forsinket
         </Typography>
-      }
+      )}
       <style>
         {`
           @keyframes pulsate {
