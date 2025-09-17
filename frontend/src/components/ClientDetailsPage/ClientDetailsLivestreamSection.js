@@ -29,11 +29,28 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [error, setError] = useState("");
   const [lastLive, setLastLive] = useState(null);
 
+  // STOP STREAM & RYD OP VED UNLOAD
+  useEffect(() => {
+    if (!clientId) return;
+
+    function cleanupStream() {
+      navigator.sendBeacon(
+        `/api/clients/${clientId}/stop-hls`
+      );
+    }
+
+    window.addEventListener("beforeunload", cleanupStream);
+    return () => {
+      window.removeEventListener("beforeunload", cleanupStream);
+      cleanupStream(); // også ved unmount
+    };
+  }, [clientId]);
+
   // Polls for manifest, and handles auto-reconnect
   useEffect(() => {
     if (!clientId) return;
     const video = videoRef.current;
-    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
+    const hlsUrl = `/hls/${clientId}/index.m3u8`;
 
     let hls;
     let manifestChecked = false;
@@ -57,7 +74,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             setError("Streamen blev afbrudt. Prøver igen ...");
             setManifestReady(false);
             cleanup();
-            // Poll igen fra næste tick
           }
         });
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -107,19 +123,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       }
     };
 
-    // Første kald for hurtigt respons
     poll();
     pollInterval = setInterval(() => {
       if (stopPolling) return;
       poll();
-    }, manifestReady ? 5000 : 1000); // Poll hurtigt indtil stream er klar, derefter hvert 5. sek
+    }, manifestReady ? 5000 : 1000);
 
     return () => {
       stopPolling = true;
       clearInterval(pollInterval);
       cleanup();
     };
-    // eslint-disable-next-line
   }, [clientId]);
 
   // Opdater Sidst set live hvert 5. sekund så længe streamen er live
@@ -129,7 +143,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       setLastLive(new Date());
       interval = setInterval(() => {
         setLastLive(new Date());
-      }, 5000); // Opdater hvert 5. sekund
+      }, 5000);
     }
     return () => clearInterval(interval);
   }, [manifestReady]);
