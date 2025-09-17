@@ -431,6 +431,27 @@ export default function CalendarPage() {
 
   const schoolYearMonths = useMemo(() => getSchoolYearMonths(selectedSeason), [selectedSeason]);
 
+  // ----------- VIGTIGT: Klientnavne + skole med i listen -----------
+  const otherClientNames = selectedClients.length > 1
+    ? filteredClients
+        .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
+        .map(c => {
+          const schoolName = schools.find(s => String(s.id) === String(c.schoolId || c.school_id))?.name || "Ukendt skole";
+          return `${c.locality || c.name} – ${schoolName}`;
+        })
+        .filter(Boolean)
+        .join("; ")
+    : "";
+
+  const activeClientName = activeClient
+    ? (() => {
+        const c = filteredClients.find(c => c.id === activeClient);
+        const schoolName = schools.find(s => String(s.id) === String(c?.schoolId || c?.school_id))?.name;
+        return c ? `${c.locality || c.name}${schoolName ? " – " + schoolName : ""}` : "Automatisk";
+      })()
+    : "Automatisk";
+  // ---------------------------------------------------------------
+
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
       if (selectedClients.length < 2) {
@@ -521,17 +542,6 @@ export default function CalendarPage() {
   const clientMarkedDays = markedDays[activeClient];
   const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
 
-  const activeClientName = activeClient
-    ? filteredClients.find(c => c.id === activeClient)?.locality || filteredClients.find(c => c.id === activeClient)?.name || "Automatisk"
-    : "Automatisk";
-  const otherClientNames = selectedClients.length > 1
-    ? filteredClients
-        .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
-        .map(c => c.locality || c.name)
-        .filter(Boolean)
-        .join(", ")
-    : "";
-
   const handleCloseSnackbar = () => {
     setSnackbar({ open: false, message: "", severity: "success" });
   };
@@ -608,7 +618,7 @@ export default function CalendarPage() {
           }}>
             <Box>
               <Typography variant="body2" sx={{ fontSize: "1rem", fontWeight: 700 }}>
-                Viser kalender for: {activeClientName} -
+                Viser kalender for: {activeClientName}
               </Typography>
               <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "#555", fontWeight: 400 }}>
                 ændringerne slår også igennem på klienterne: {otherClientNames}
