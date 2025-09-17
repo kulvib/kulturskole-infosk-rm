@@ -15,7 +15,7 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-// Pulsating grøn badge (mindre og rolig puls)
+// Pulsating badge (mindre og rolig puls)
 function LiveStatusBadge({ isLive }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
@@ -61,7 +61,7 @@ function LiveStatusBadge({ isLive }) {
   );
 }
 
-// Hjælpefunktion til dansk dato-format med ugedag
+// Dansk dato med ugedag
 function formatDateTimeWithDay(date) {
   if (!date) return "";
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
@@ -218,9 +218,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     if (!video) return;
     if (video.requestFullscreen) {
       video.requestFullscreen();
-    } else if (video.webkitRequestFullscreen) { // Safari
+    } else if (video.webkitRequestFullscreen) {
       video.webkitRequestFullscreen();
-    } else if (video.msRequestFullscreen) { // IE11
+    } else if (video.msRequestFullscreen) {
       video.msRequestFullscreen();
     }
   };
@@ -230,13 +230,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       <Grid item xs={12}>
         <Card elevation={2} sx={{ borderRadius: 2 }}>
           <CardContent sx={{ pb: 1.5 }}>
-            {/* Header linje med alt status */}
+            {/* Header med titel, opdater, live indikator (yderst højre) */}
             <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-              {/* Venstre: Titel */}
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Klientstream
               </Typography>
-              {/* Opdater ikon */}
               <Tooltip title="Genindlæs stream">
                 <span>
                   <IconButton
@@ -250,36 +248,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   </IconButton>
                 </span>
               </Tooltip>
-              {/* Spacer */}
               <Box sx={{ flexGrow: 1 }} />
-              {/* Sidst set live + live indikator */}
-              {manifestReady && (
-                <>
-                  <Typography
-                    variant="body2"
-                    color="textSecondary"
-                    sx={{
-                      pr: 1,
-                      fontWeight: 400,
-                      fontSize: "0.96em",
-                      whiteSpace: "nowrap"
-                    }}
-                  >
-                    Sidst set: {formatDateTimeWithDay(lastLive)}
-                  </Typography>
-                  <LiveStatusBadge isLive={manifestReady} />
-                </>
-              )}
-              {!manifestReady && (
-                <LiveStatusBadge isLive={manifestReady} />
-              )}
+              <LiveStatusBadge isLive={manifestReady} />
             </Box>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
               </Alert>
             )}
-            {/* Centrer video og loader */}
             <Box
               sx={{
                 display: "flex",
@@ -305,7 +281,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   autoPlay
                   playsInline
                   muted
-                  // Ingen controls!
                   style={{
                     maxWidth: 420,
                     maxHeight: 320,
@@ -328,6 +303,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 >
                   Fuld skærm
                 </Button>
+              )}
+              {/* Sidst set info UNDER knappen */}
+              {lastLive && manifestReady && (
+                <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 1 }}>
+                  Sidst set: {formatDateTimeWithDay(lastLive)}
+                </Typography>
               )}
             </Box>
           </CardContent>
