@@ -18,10 +18,8 @@ import {
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
-// Online/offline badge
-function OnlineStatusBadge({ isOnline }) {
-  const color = isOnline ? "#43a047" : "#e53935";
-  const text = isOnline ? "online" : "offline"; // always lowercase
+// Fælles StatusBadge med 2 sekunders puls animation
+function StatusBadge({ color, text, animate = false }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box sx={{
@@ -32,57 +30,75 @@ function OnlineStatusBadge({ isOnline }) {
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
         border: "1px solid #ddd",
         mr: 1,
+        animation: animate ? "pulsate 2s infinite" : "none"
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "lowercase" }}>
+      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none" }}>
         {text}
       </Typography>
+      {animate && (
+        <style>
+          {`
+            @keyframes pulsate {
+              0% {
+                transform: scale(1);
+                opacity: 1;
+              }
+              50% {
+                transform: scale(1.25);
+                opacity: 0.5;
+              }
+              100% {
+                transform: scale(1);
+                opacity: 1;
+              }
+            }
+          `}
+        </style>
+      )}
     </Box>
   );
 }
 
-// State badge
+// Online/offline badge med 2s puls, grøn/rød
+function OnlineStatusBadge({ isOnline }) {
+  const color = isOnline ? "#43a047" : "#e53935";
+  const text = isOnline ? "online" : "offline";
+  return <StatusBadge color={color} text={text} animate={true} />;
+}
+
+// State badge med 2s puls på farvede states, ikke på "ukendt"
 function StateBadge({ state }) {
-  let dotColor = "grey.400";
+  let color = "grey.400";
   let text = state || "ukendt";
+  let animate = false;
   if (state) {
     switch (state.toLowerCase()) {
       case "normal":
-        dotColor = "#43a047";
+        color = "#43a047";
+        animate = true;
         break;
       case "sleep":
-        dotColor = "#1976d2";
+        color = "#1976d2";
+        animate = true;
         break;
       case "maintenance":
-        dotColor = "#ffa000";
+        color = "#ffa000";
+        animate = true;
         break;
       case "error":
-        dotColor = "#e53935";
+        color = "#e53935";
+        animate = true;
         break;
       case "offline":
-        dotColor = "#757575";
+        color = "#757575";
+        animate = false;
         break;
       default:
-        dotColor = "grey.400";
+        color = "grey.400";
+        animate = false;
     }
   }
-  return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
-      <Box
-        sx={{
-          width: 10,
-          height: 10,
-          borderRadius: "50%",
-          bgcolor: dotColor,
-          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-          border: "1px solid #ddd",
-          mr: 1,
-        }}
-      />
-      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "lowercase" }}>
-        {text.toLowerCase()}
-      </Typography>
-    </Box>
-  );
+  return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} />;
 }
 
 function formatDateShort(dt) {
@@ -299,9 +315,9 @@ function CopyField({ value }) {
             aria-label="kopier"
             onClick={handleCopy}
             size="small"
-            sx={{ ml: 0.5, p: 0, height: "1em", width: "1em" }}  // mindre ikonknap
+            sx={{ ml: 0.5, p: 0, height: "1em", width: "1em" }}
           >
-            <ContentCopyIcon sx={{ fontSize: "0.8em", verticalAlign: "middle" }} /> {/* mindre kopiikon */}
+            <ContentCopyIcon sx={{ fontSize: "0.8em", verticalAlign: "middle" }} />
           </IconButton>
         </Tooltip>
       )}
