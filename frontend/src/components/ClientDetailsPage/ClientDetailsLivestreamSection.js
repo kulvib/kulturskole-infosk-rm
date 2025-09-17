@@ -38,7 +38,7 @@ function LiveStatusBadge({ isLive, clientId }) {
         }}
       >
         {isLive
-          ? `livestream klientID: ${clientId}`
+          ? `livestream klient ID: ${clientId}`
           : "offline"}
       </Typography>
       <style>
