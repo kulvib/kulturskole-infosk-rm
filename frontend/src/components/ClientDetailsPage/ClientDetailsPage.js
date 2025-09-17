@@ -136,6 +136,15 @@ export default function ClientDetailsPage({
   const handleOpenTerminal = () => openTerminal(client.id);
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
+  // --- HER STARTER STREAMET AUTOMATISK ---
+  useEffect(() => {
+    if (client?.id) {
+      clientAction(client.id, "livestream_start").catch(() => {});
+    }
+    // eslint-disable-next-line
+  }, [client?.id]);
+  // --- SLUT AUTOMATISK START ---
+
   if (!client) {
     return (
       <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4 }}>
