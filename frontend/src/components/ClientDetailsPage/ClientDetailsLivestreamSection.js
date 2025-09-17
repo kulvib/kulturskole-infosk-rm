@@ -9,18 +9,19 @@ import {
   Alert,
   IconButton,
   Tooltip,
-  Grid
+  Grid,
+  Button
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-// Pulsating grøn badge
+// Pulsating grøn badge (nu mindre og mindre puls)
 function LiveStatusBadge({ isLive }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box sx={{
-        width: 10,
-        height: 10,
+        width: 8,
+        height: 8,
         borderRadius: "50%",
         bgcolor: isLive ? "#43a047" : "#e53935",
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
@@ -46,7 +47,7 @@ function LiveStatusBadge({ isLive }) {
               opacity: 1;
             }
             50% {
-              transform: scale(1.5);
+              transform: scale(1.25);
               opacity: 0.5;
             }
             100% {
@@ -215,10 +216,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         <Card elevation={2} sx={{ borderRadius: 2 }}>
           <CardContent sx={{ pb: 1.5 }}>
             <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Klientstream
               </Typography>
-              <LiveStatusBadge isLive={manifestReady} />
               <Tooltip title="Genindlæs stream">
                 <span>
                   <IconButton
@@ -232,6 +232,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   </IconButton>
                 </span>
               </Tooltip>
+              <LiveStatusBadge isLive={manifestReady} />
             </Box>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -264,7 +265,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   autoPlay
                   playsInline
                   muted
-                  // Fjern controls!
+                  // Ingen controls!
                   style={{
                     maxWidth: 420,
                     maxHeight: 320,
@@ -275,21 +276,21 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   }}
                   tabIndex={-1}
                 />
-                <Tooltip title="Fuld skærm">
-                  <span>
-                    <IconButton
-                      aria-label="fullscreen"
-                      onClick={handleFullscreen}
-                      sx={{ ml: 1 }}
-                      size="small"
-                    >
-                      <FullscreenIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
               </Box>
+              {/* Fuld skærm-knap under videoen */}
+              {manifestReady && (
+                <Button
+                  startIcon={<FullscreenIcon />}
+                  variant="outlined"
+                  size="small"
+                  sx={{ mt: 2, mb: 1, borderRadius: 2 }}
+                  onClick={handleFullscreen}
+                >
+                  Fuld skærm
+                </Button>
+              )}
               {lastLive && manifestReady && (
-                <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 2 }}>
+                <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 1 }}>
                   Sidst set live: {lastLive.toLocaleTimeString()}
                 </Typography>
               )}
