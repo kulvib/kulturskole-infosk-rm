@@ -14,7 +14,6 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import LiveTvIcon from "@mui/icons-material/LiveTv";
 
-// Grøn blinkende prik
 function LiveIndicator() {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 1 }}>
@@ -51,6 +50,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [error, setError] = useState("");
   const [lastLive, setLastLive] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // STOP STREAM & RYD OP VED UNLOAD
   useEffect(() => {
@@ -73,7 +73,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   useEffect(() => {
     if (!clientId) return;
     const video = videoRef.current;
-    // Absolut URL til backend
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
 
     let hls;
@@ -156,7 +155,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       clearInterval(pollInterval);
       cleanup();
     };
-  }, [clientId]);
+  }, [clientId, refreshKey]);
 
   // Opdater Sidst set live hvert 5. sekund så længe streamen er live
   useEffect(() => {
@@ -170,13 +169,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, [manifestReady]);
 
-  // Manuelt refresh (fx via knap)
+  // Manuelt refresh (nu med refreshKey)
   const handleRefresh = () => {
     setRefreshing(true);
     setManifestReady(false);
     setTimeout(() => {
       setRefreshing(false);
-    }, 500); // vent lidt så poll-loop fanger evt. ændringer
+      setRefreshKey(prev => prev + 1);
+    }, 500);
   };
 
   return (
@@ -209,35 +209,48 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 {error}
               </Alert>
             )}
-            {!manifestReady && (
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160 }}>
-                <CircularProgress size={32} />
-                <Typography variant="body2" sx={{ ml: 2 }}>
-                  {error ? "Prøver igen ..." : "Venter på livestream ..."}
-                </Typography>
-              </Box>
-            )}
-            <video
-              ref={videoRef}
-              id="livestream-video"
-              controls
-              autoPlay
-              playsInline
-              muted
-              style={{
-                maxWidth: "100%",
-                maxHeight: 320,
-                borderRadius: 8,
-                display: manifestReady ? "block" : "none",
-                background: "#000"
+            {/* Centrer video og loader */}
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 200,
+                width: "100%",
               }}
-              tabIndex={-1}
-            />
-            {lastLive && (
-              <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 2 }}>
-                Sidst set live: {lastLive.toLocaleTimeString()}
-              </Typography>
-            )}
+            >
+              {!manifestReady && (
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160 }}>
+                  <CircularProgress size={32} />
+                  <Typography variant="body2" sx={{ ml: 2 }}>
+                    {error ? "Prøver igen ..." : "Venter på livestream ..."}
+                  </Typography>
+                </Box>
+              )}
+              <video
+                ref={videoRef}
+                id="livestream-video"
+                controls
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: 320,
+                  borderRadius: 8,
+                  display: manifestReady ? "block" : "none",
+                  background: "#000",
+                  margin: "0 auto"
+                }}
+                tabIndex={-1}
+              />
+              {lastLive && manifestReady && (
+                <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 2 }}>
+                  Sidst set live: {lastLive.toLocaleTimeString()}
+                </Typography>
+              )}
+            </Box>
           </CardContent>
         </Card>
       </Grid>
