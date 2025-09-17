@@ -1,108 +1,62 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Hls from "hls.js";
-import { Card, CardContent, Box, Typography, Button, Snackbar, Alert } from "@mui/material";
+import { Card, CardContent, Box, Typography, Button, Snackbar, Alert, CircularProgress, Stack } from "@mui/material";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
-import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import VideocamIcon from "@mui/icons-material/Videocam";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 
-function ClientDetailsLivestreamStatus({ isOnline, lastSeenAgo, livestreamStatus, livestreamLastSegment, livestreamLastError }) {
-  return (
-    <Box sx={{ mb: 2, display: "flex", flexDirection: "column", gap: 1 }}>
-      <Typography variant="caption">
-        Agent: <span style={{
-          display: "inline-block", width: 10, height: 10, borderRadius: "50%",
-          background: isOnline ? "green" : "red", marginRight: 4
-        }} /> {isOnline ? "Online" : `Offline (${lastSeenAgo})`}
-      </Typography>
-      <Typography variant="caption">
-        Livestream: <b>{livestreamStatus}</b>
-      </Typography>
-      <Typography variant="caption">
-        Sidste segment: {livestreamLastSegment
-          ? new Date(livestreamLastSegment).toLocaleTimeString()
-          : "ukendt"}
-      </Typography>
-      {livestreamLastError && <Alert severity="error">{livestreamLastError}</Alert>}
-    </Box>
-  );
-}
-
-export default function ClientDetailsLivestreamSection({ clientId, resetKey, onResetLivestream }) {
-  const [client, setClient] = useState(null);
-  const [manifestExists, setManifestExists] = useState(null);
+export default function ClientDetailsLivestreamSection({ clientId }) {
+  const [pending, setPending] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const [pendingLivestream, setPendingLivestream] = useState(false);
+  const [resetKey, setResetKey] = useState(Date.now());
+  const [manifestExists, setManifestExists] = useState(false);
+  const [streamRunning, setStreamRunning] = useState(false);
 
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
 
-  // Helper to get the token from localStorage
   const getToken = () => localStorage.getItem("token");
 
-  const fetchClient = useCallback(async () => {
-    const token = getToken();
-    const resp = await fetch(
-      `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/`,
-      {
-        headers: {
-          "Authorization": "Bearer " + token
-        }
-      }
-    );
-    if (!resp.ok) throw new Error("Kunne ikke hente klient");
-    const data = await resp.json();
-    setClient(data);
-  }, [clientId]);
-
   useEffect(() => {
-    fetchClient();
-    const interval = setInterval(fetchClient, 4000);
-    return () => clearInterval(interval);
-  }, [fetchClient]);
-
-  // Manifest check
-  useEffect(() => {
-    if (!clientId) {
-      setManifestExists(false);
-      return;
-    }
-    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
-    fetch(hlsUrl)
+    if (!clientId) return;
+    const url = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8?t=${resetKey}`;
+    fetch(url)
       .then(resp => {
         setManifestExists(resp.ok);
+        setStreamRunning(resp.ok);
       })
-      .catch(() => setManifestExists(false));
-  }, [clientId, client?.livestream_status, resetKey]);
+      .catch(() => {
+        setManifestExists(false);
+        setStreamRunning(false);
+      });
+  }, [clientId, resetKey]);
 
-  // HLS.js setup: ensure videoRef.current is present before initializing HLS
   useEffect(() => {
-    if (!manifestExists) return;
-    if (!videoRef.current) return; // Wait for video element to be mounted
+    if (!manifestExists || !videoRef.current) return;
 
-    const video = videoRef.current;
-
-    // Clean up any old hls instance
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
 
-    // Tilføj cache-busting på manifest-URL
+    const video = videoRef.current;
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8?t=${resetKey}`;
+
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
     } else if (Hls.isSupported()) {
-      const hls = new Hls({ enableWorker: true, debug: false });
+      const hls = new Hls();
+      hlsRef.current = hls;
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (event, data) => {
         console.error("HLS.js error:", data);
       });
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(e => console.error("video.play error", e));
+        video.play().catch(() => {});
       });
-      hlsRef.current = hls;
     }
+
     video.muted = true;
     video.autoplay = true;
 
@@ -112,171 +66,157 @@ export default function ClientDetailsLivestreamSection({ clientId, resetKey, onR
         hlsRef.current = null;
       }
     };
-  }, [manifestExists, clientId, resetKey, videoRef.current]); // resetKey dependency!
+  }, [manifestExists, clientId, resetKey]);
 
-  const openError = (msg) => setSnackbar({ open: true, message: msg, severity: "error" });
+  const cleanupVideo = () => {
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.removeAttribute("src");
+      videoRef.current.load();
+    }
+  };
+
+  const handleStart = async () => {
+    setPending(true);
+    try {
+      await fetch(
+        `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/reset-hls`,
+        { method: "POST", headers: { "Authorization": "Bearer " + getToken() } }
+      );
+      await fetch(
+        `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/chrome-command`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + getToken(),
+          },
+          body: JSON.stringify({ action: "livestream_start" }),
+        }
+      );
+      cleanupVideo();
+      setResetKey(Date.now());
+      setSnackbar({ open: true, message: "Stream startet!", severity: "success" });
+      setTimeout(() => {
+        setPending(false);
+      }, 1500);
+    } catch (err) {
+      setSnackbar({ open: true, message: "Fejl ved start: " + err.message, severity: "error" });
+      setPending(false);
+    }
+  };
+
+  const handleStop = async () => {
+    setPending(true);
+    try {
+      await fetch(
+        `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/chrome-command`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + getToken(),
+          },
+          body: JSON.stringify({ action: "livestream_stop" }),
+        }
+      );
+      await fetch(
+        `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/reset-hls`,
+        { method: "POST", headers: { "Authorization": "Bearer " + getToken() } }
+      );
+      cleanupVideo();
+      setResetKey(Date.now());
+      setSnackbar({ open: true, message: "Stream stoppet og filer slettet!", severity: "success" });
+      setPending(false);
+    } catch (err) {
+      setSnackbar({ open: true, message: "Fejl ved stop: " + err.message, severity: "error" });
+      setPending(false);
+    }
+  };
+
   const handleCloseSnackbar = (_, reason) => {
     if (reason === "clickaway") return;
     setSnackbar({ ...snackbar, open: false });
   };
 
-  const handleStartLivestream = async () => {
-    setPendingLivestream(true);
-    try {
-      const token = getToken();
-      const resp = await fetch(
-        `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/chrome-command`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + token
-          },
-          body: JSON.stringify({ action: "livestream_start" })
-        }
-      );
-      if (!resp.ok) throw new Error((await resp.json()).detail || "Fejl: Kunne ikke starte livestream");
-      setSnackbar({ open: true, message: "Livestream start-kommando sendt!", severity: "success" });
-      setTimeout(fetchClient, 2000);
-    } catch (err) {
-      openError(err.message);
-    }
-    setTimeout(() => setPendingLivestream(false), 3000);
-  };
-
-  const handleStopLivestream = async () => {
-    setPendingLivestream(true);
-    try {
-      const token = getToken();
-      const resp = await fetch(
-        `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/chrome-command`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + token
-          },
-          body: JSON.stringify({ action: "livestream_stop" })
-        }
-      );
-      if (!resp.ok) throw new Error((await resp.json()).detail || "Fejl: Kunne ikke stoppe livestream");
-      setSnackbar({ open: true, message: "Livestream stop-kommando sendt!", severity: "success" });
-      setTimeout(fetchClient, 2000);
-    } catch (err) {
-      openError(err.message);
-    }
-    setTimeout(() => setPendingLivestream(false), 3000);
-  };
-
-  if (!client) return <Typography>Indlæser klient...</Typography>;
-
-  const isOnline = client.isOnline;
-  const lastSeenAgo = client.last_seen ? Math.floor((Date.now() - new Date(client.last_seen).getTime()) / 1000) + " sek siden" : "ukendt";
-
   return (
     <Box maxWidth={600} mx="auto" mt={3}>
-      <ClientDetailsLivestreamStatus
-        isOnline={isOnline}
-        lastSeenAgo={lastSeenAgo}
-        livestreamStatus={client.livestream_status}
-        livestreamLastSegment={client.livestream_last_segment}
-        livestreamLastError={client.livestream_last_error}
-      />
       <Card elevation={2} sx={{ borderRadius: 2 }}>
         <CardContent>
-          <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", mb: 2, justifyContent: "space-between" }}>
-            <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleStartLivestream}
-                disabled={pendingLivestream}
-              >
-                {manifestExists ? "Genstart livestream" : "Start livestream"}
-              </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={handleStopLivestream}
-                disabled={pendingLivestream || !manifestExists}
-              >
-                Stop livestream
-              </Button>
-              <Button
-                variant="outlined"
-                color="secondary"
-                onClick={onResetLivestream}
-                disabled={pendingLivestream}
-              >
-                Nulstil stream
-              </Button>
-            </Box>
-            {manifestExists ? (
-              <Box sx={{ display: "flex", alignItems: "center" }}>
-                <FiberManualRecordIcon sx={{ color: "green", fontSize: 16, mr: 0.5 }} />
-                <Typography variant="caption" sx={{ color: "green", fontWeight: "bold", letterSpacing: 1 }}>
-                  LIVE
-                </Typography>
-              </Box>
+          <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleStart}
+              disabled={pending}
+              startIcon={<FiberManualRecordIcon />}
+            >
+              Start stream
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={handleStop}
+              disabled={pending || !streamRunning}
+              startIcon={<VideocamIcon />}
+            >
+              Stop stream
+            </Button>
+            {pending && <CircularProgress size={24} />}
+            <Typography variant="caption" sx={{ ml: 2, color: streamRunning ? "green" : "red", fontWeight: "bold" }}>
+              {streamRunning ? "LIVE" : "IKKE AKTIV"}
+            </Typography>
+          </Stack>
+          <Box
+            sx={{
+              p: 2,
+              border: "1px solid #eee",
+              borderRadius: 2,
+              background: "#fafafa",
+              textAlign: "center",
+              minHeight: "160px",
+            }}
+          >
+            {streamRunning ? (
+              <>
+                <video
+                  ref={videoRef}
+                  id="livestream-video"
+                  controls
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
+                  tabIndex={-1}
+                  key={resetKey}
+                />
+                <Box sx={{ mt: 1, display: "flex", justifyContent: "center" }}>
+                  <Button
+                    onClick={() => {
+                      const vid = videoRef.current;
+                      if (!vid) return;
+                      if (vid.requestFullscreen) vid.requestFullscreen();
+                    }}
+                    variant="outlined"
+                    startIcon={<FullscreenIcon />}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    Fuld skærm
+                  </Button>
+                </Box>
+              </>
             ) : (
-              <Box sx={{ display: "flex", alignItems: "center" }}>
-                <FiberManualRecordIcon sx={{ color: "red", fontSize: 16, mr: 0.5 }} />
-                <Typography variant="caption" sx={{ color: "red", fontWeight: "bold", letterSpacing: 1 }}>
-                  INGEN STREAM
+              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", p: 2 }}>
+                <VideocamIcon color="action" fontSize="large" />
+                <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
+                  Ingen aktiv stream.
                 </Typography>
               </Box>
             )}
           </Box>
-          {manifestExists ? (
-            <Box
-              sx={{
-                p: 2,
-                border: "1px solid #eee",
-                borderRadius: 2,
-                background: "#fafafa",
-                textAlign: "center",
-                minHeight: "160px",
-              }}
-            >
-              <video
-                ref={videoRef}
-                id="livestream-video"
-                controls
-                autoPlay
-                playsInline
-                muted
-                style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
-                tabIndex={-1}
-                key={resetKey}
-              />
-              <Box sx={{ mt: 1, display: "flex", justifyContent: "center" }}>
-                <Button
-                  onClick={() => {
-                    const vid = videoRef.current;
-                    if (!vid) return;
-                    if (vid.requestFullscreen) vid.requestFullscreen();
-                  }}
-                  variant="outlined"
-                  startIcon={<FullscreenIcon />}
-                  sx={{ borderRadius: 2 }}
-                >
-                  Fuld skærm
-                </Button>
-              </Box>
-            </Box>
-          ) : (
-            <Box sx={{ p: 2, textAlign: "center" }}>
-              <VideocamIcon color="action" fontSize="large" />
-              <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
-                Ingen stream tilgængelig.
-              </Typography>
-            </Box>
-          )}
-          {pendingLivestream && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              Livestream-kommando er sendt, afventer agent...
-            </Alert>
-          )}
           <Snackbar
             open={snackbar.open}
             autoHideDuration={3500}
