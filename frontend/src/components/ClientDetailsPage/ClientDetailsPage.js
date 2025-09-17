@@ -47,6 +47,9 @@ export default function ClientDetailsPage({
   const [loadingStopLivestream, setLoadingStopLivestream] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
 
+  // NYT: resetKey til livestream
+  const [resetKey, setResetKey] = useState(Date.now());
+
   // Poll for pending_chrome_action og opdater pendingLivestream state
   useEffect(() => {
     let interval;
@@ -156,6 +159,20 @@ export default function ClientDetailsPage({
     }
   };
 
+  // NY: Nulstil stream
+  const handleResetLivestream = async () => {
+    try {
+      await fetch(
+        `https://kulturskole-infosk-rm.onrender.com/api/clients/${client.id}/reset-hls`,
+        { method: "POST", headers: { "Authorization": "Bearer " + localStorage.getItem("token") } }
+      );
+      setResetKey(Date.now());
+      showSnackbar("Stream nulstillet! Genstart livestream om nødvendigt.", "success");
+    } catch (err) {
+      showSnackbar("Kunne ikke nulstille livestream: " + err.message, "error");
+    }
+  };
+
   if (!client) {
     return (
       <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4 }}>
@@ -210,9 +227,11 @@ export default function ClientDetailsPage({
           />
         </Grid>
         <Grid item xs={12}>
-          {/* Fjern key={streamKey} for at undgå video-ref race condition */}
+          {/* Nu med resetKey og onResetLivestream */}
           <ClientDetailsLivestreamSection
             clientId={client?.id}
+            resetKey={resetKey}
+            onResetLivestream={handleResetLivestream}
           />
         </Grid>
       </Grid>
