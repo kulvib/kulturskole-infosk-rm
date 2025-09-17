@@ -81,8 +81,16 @@ function deepEqual(obj1, obj2) {
 }
 
 // -------- Hjælpekomponent: Klientvælger --------
-function ClientSelectorInline({ clients, selected, onChange }) {
+function ClientSelectorInline({ clients, selected, onChange, schools }) {
   const [search, setSearch] = useState("");
+
+  // Hjælpefunktion til at finde skolens navn fra client
+  function getSchoolNameForClient(client) {
+    const schoolId = client.schoolId || client.school_id;
+    const school = schools.find(s => String(s.id) === String(schoolId));
+    return school ? school.name : "Ukendt skole";
+  }
+
   const sortedClients = useMemo(() => [...clients].sort((a, b) => {
     const aName = (a.locality || a.name || "").toLowerCase();
     const bName = (b.locality || b.name || "").toLowerCase();
@@ -161,7 +169,7 @@ function ClientSelectorInline({ clients, selected, onChange }) {
               inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
             />
             <Typography variant="body2" noWrap>
-              {client.locality || client.name || "Ingen lokalitet"}
+              {(client.locality || client.name || "Ingen lokalitet") + " – " + getSchoolNameForClient(client)}
             </Typography>
           </Box>
         ))}
@@ -594,6 +602,7 @@ export default function CalendarPage() {
           clients={filteredClients}
           selected={selectedClients}
           onChange={handleClientSelectorChange}
+          schools={schools}
         />
         {selectedClients.length > 1 && (
           <Box sx={{
