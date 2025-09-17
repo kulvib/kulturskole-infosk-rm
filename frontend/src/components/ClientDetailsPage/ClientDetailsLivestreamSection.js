@@ -104,15 +104,19 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   };
 
+  // -- HER ER DELAYET MELLEM RESET OG START --
   const handleStart = async () => {
     setPending(true);
     try {
-      // 1. Reset HLS (delete old manifest/segments)
+      // 1. Reset HLS (slet gamle filer)
       await fetch(
         `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/reset-hls`,
         { method: "POST", headers: { "Authorization": "Bearer " + getToken() } }
       );
-      // 2. Start agent livestream
+      // 2. Vent 400 ms (beskyt mod race condition)
+      await new Promise(res => setTimeout(res, 400));
+
+      // 3. Start agent livestream
       await fetch(
         `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/chrome-command`,
         {
