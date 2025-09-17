@@ -27,7 +27,7 @@ function LiveStatusBadge({ isLive, clientId }) {
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
         border: "1px solid #ddd",
         mr: 1,
-        animation: isLive ? "pulsate 3s infinite" : "none"
+        animation: isLive ? "pulsate 2s infinite" : "none" // 2 sekunders puls
       }} />
       <Typography
         variant="body2"
