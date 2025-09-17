@@ -27,7 +27,7 @@ function ClientDetailsLivestreamStatus({ isOnline, lastSeenAgo, livestreamStatus
   );
 }
 
-export default function ClientDetailsLivestreamSection({ clientId }) {
+export default function ClientDetailsLivestreamSection({ clientId, resetKey, onResetLivestream }) {
   const [client, setClient] = useState(null);
   const [manifestExists, setManifestExists] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
@@ -72,7 +72,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         setManifestExists(resp.ok);
       })
       .catch(() => setManifestExists(false));
-  }, [clientId, client?.livestream_status]);
+  }, [clientId, client?.livestream_status, resetKey]);
 
   // HLS.js setup: ensure videoRef.current is present before initializing HLS
   useEffect(() => {
@@ -87,7 +87,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       hlsRef.current = null;
     }
 
-    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
+    // Tilføj cache-busting på manifest-URL
+    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8?t=${resetKey}`;
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
     } else if (Hls.isSupported()) {
@@ -111,7 +112,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         hlsRef.current = null;
       }
     };
-  }, [manifestExists, clientId, videoRef.current]); // videoRef.current as dependency
+  }, [manifestExists, clientId, resetKey, videoRef.current]); // resetKey dependency!
 
   const openError = (msg) => setSnackbar({ open: true, message: msg, severity: "error" });
   const handleCloseSnackbar = (_, reason) => {
@@ -201,6 +202,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               >
                 Stop livestream
               </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={onResetLivestream}
+                disabled={pendingLivestream}
+              >
+                Nulstil stream
+              </Button>
             </Box>
             {manifestExists ? (
               <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -238,6 +247,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 muted
                 style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8 }}
                 tabIndex={-1}
+                key={resetKey}
               />
               <Box sx={{ mt: 1, display: "flex", justifyContent: "center" }}>
                 <Button
