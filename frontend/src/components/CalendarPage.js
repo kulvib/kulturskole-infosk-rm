@@ -84,7 +84,6 @@ function deepEqual(obj1, obj2) {
 function ClientSelectorInline({ clients, selected, onChange, schools }) {
   const [search, setSearch] = useState("");
 
-  // Hjælpefunktion til at finde skolens navn fra client
   function getSchoolNameForClient(client) {
     const schoolId = client.schoolId || client.school_id;
     const school = schools.find(s => String(s.id) === String(schoolId));
@@ -135,7 +134,7 @@ function ClientSelectorInline({ clients, selected, onChange, schools }) {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr", md: "repeat(5, 1fr)" },
+          gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr", md: "repeat(4, 1fr)" },
           gap: 1,
         }}
       >
@@ -292,11 +291,9 @@ export default function CalendarPage() {
     };
   }, [markedDays[activeClient], activeClient, editDialogOpen]);
 
-  // ------ NY: Default times hentes altid ud fra klientens skole ------
   function getDefaultTimes(dateStr, clientId) {
     const client = clients.find(c => c.id === clientId);
     if (!client) {
-      // fallback
       return { onTime: "09:00", offTime: "22:30" };
     }
     const schoolId = client.schoolId || client.school_id;
@@ -434,7 +431,6 @@ export default function CalendarPage() {
 
   const schoolYearMonths = useMemo(() => getSchoolYearMonths(selectedSeason), [selectedSeason]);
 
-  // *** RETTET DEL: Brug altid den aktive klients tider/standardtid ***
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
       if (selectedClients.length < 2) {
@@ -515,7 +511,6 @@ export default function CalendarPage() {
       }
     }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]
   );
-  // *** SLUT rettelse ***
 
   useEffect(() => {
     return () => {
