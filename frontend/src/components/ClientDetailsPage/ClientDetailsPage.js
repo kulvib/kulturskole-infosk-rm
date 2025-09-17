@@ -47,9 +47,6 @@ export default function ClientDetailsPage({
   const [loadingStopLivestream, setLoadingStopLivestream] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
 
-  // NYT: resetKey til livestream
-  const [resetKey, setResetKey] = useState(Date.now());
-
   // Poll for pending_chrome_action og opdater pendingLivestream state
   useEffect(() => {
     let interval;
@@ -139,40 +136,6 @@ export default function ClientDetailsPage({
   const handleOpenTerminal = () => openTerminal(client.id);
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
-  // Start-stream
-  const handleStartLivestream = async () => {
-    setLoadingStartLivestream(true);
-    try {
-      await handleClientAction("livestream_start");
-    } finally {
-      setLoadingStartLivestream(false);
-    }
-  };
-
-  // Stop-stream
-  const handleStopLivestream = async () => {
-    setLoadingStopLivestream(true);
-    try {
-      await handleClientAction("livestream_stop");
-    } finally {
-      setLoadingStopLivestream(false);
-    }
-  };
-
-  // NY: Nulstil stream
-  const handleResetLivestream = async () => {
-    try {
-      await fetch(
-        `https://kulturskole-infosk-rm.onrender.com/api/clients/${client.id}/reset-hls`,
-        { method: "POST", headers: { "Authorization": "Bearer " + localStorage.getItem("token") } }
-      );
-      setResetKey(Date.now());
-      showSnackbar("Stream nulstillet! Genstart livestream om nødvendigt.", "success");
-    } catch (err) {
-      showSnackbar("Kunne ikke nulstille livestream: " + err.message, "error");
-    }
-  };
-
   if (!client) {
     return (
       <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4 }}>
@@ -227,12 +190,7 @@ export default function ClientDetailsPage({
           />
         </Grid>
         <Grid item xs={12}>
-          {/* Nu med resetKey og onResetLivestream */}
-          <ClientDetailsLivestreamSection
-            clientId={client?.id}
-            resetKey={resetKey}
-            onResetLivestream={handleResetLivestream}
-          />
+          <ClientDetailsLivestreamSection clientId={client?.id} />
         </Grid>
       </Grid>
       <ClientCalendarDialog
