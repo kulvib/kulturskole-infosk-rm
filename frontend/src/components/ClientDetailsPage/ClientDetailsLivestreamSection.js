@@ -15,7 +15,7 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-// Pulsating grøn badge (nu mindre og mindre puls)
+// Pulsating grøn badge (mindre og rolig puls)
 function LiveStatusBadge({ isLive }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
@@ -61,6 +61,21 @@ function LiveStatusBadge({ isLive }) {
   );
 }
 
+// Hjælpefunktion til dansk dato-format med ugedag
+function formatDateTimeWithDay(date) {
+  if (!date) return "";
+  const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
+  const d = new Date(date);
+  const dayName = ukedage[d.getDay()];
+  const day = d.getDate().toString().padStart(2, "0");
+  const month = (d.getMonth() + 1).toString().padStart(2, "0");
+  const year = d.getFullYear();
+  const hour = d.getHours().toString().padStart(2, "0");
+  const min = d.getMinutes().toString().padStart(2, "0");
+  const sec = d.getSeconds().toString().padStart(2, "0");
+  return `${dayName} ${day}.${month} ${year}, kl. ${hour}:${min}:${sec}`;
+}
+
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -83,7 +98,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     window.addEventListener("beforeunload", cleanupStream);
     return () => {
       window.removeEventListener("beforeunload", cleanupStream);
-      cleanupStream(); // også ved unmount
+      cleanupStream();
     };
   }, [clientId]);
 
@@ -215,10 +230,13 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       <Grid item xs={12}>
         <Card elevation={2} sx={{ borderRadius: 2 }}>
           <CardContent sx={{ pb: 1.5 }}>
-            <Box sx={{ display: "flex", alignItems: "center", mb: 2, gap: 1 }}>
+            {/* Header linje med alt status */}
+            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+              {/* Venstre: Titel */}
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Klientstream
               </Typography>
+              {/* Opdater ikon */}
               <Tooltip title="Genindlæs stream">
                 <span>
                   <IconButton
@@ -232,7 +250,29 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   </IconButton>
                 </span>
               </Tooltip>
-              <LiveStatusBadge isLive={manifestReady} />
+              {/* Spacer */}
+              <Box sx={{ flexGrow: 1 }} />
+              {/* Sidst set live + live indikator */}
+              {manifestReady && (
+                <>
+                  <Typography
+                    variant="body2"
+                    color="textSecondary"
+                    sx={{
+                      pr: 1,
+                      fontWeight: 400,
+                      fontSize: "0.96em",
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    Sidst set: {formatDateTimeWithDay(lastLive)}
+                  </Typography>
+                  <LiveStatusBadge isLive={manifestReady} />
+                </>
+              )}
+              {!manifestReady && (
+                <LiveStatusBadge isLive={manifestReady} />
+              )}
             </Box>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -288,11 +328,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 >
                   Fuld skærm
                 </Button>
-              )}
-              {lastLive && manifestReady && (
-                <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 1 }}>
-                  Sidst set live: {lastLive.toLocaleTimeString()}
-                </Typography>
               )}
             </Box>
           </CardContent>
