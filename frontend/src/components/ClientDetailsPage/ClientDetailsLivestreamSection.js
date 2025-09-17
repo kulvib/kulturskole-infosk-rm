@@ -18,29 +18,37 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 // Pulsating badge (mindre og rolig puls)
 function LiveStatusBadge({ isLive, clientId }) {
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
-      <Box sx={{
-        width: 8,
-        height: 8,
-        borderRadius: "50%",
-        bgcolor: isLive ? "#43a047" : "#e53935",
-        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-        border: "1px solid #ddd",
-        mr: 1,
-        animation: isLive ? "pulsate 2s infinite" : "none" // 2 sekunders puls
-      }} />
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 400,
-          textTransform: "none",
-          color: "#222"
-        }}
-      >
-        {isLive
-          ? `livestream klient ID: ${clientId}`
-          : "offline"}
-      </Typography>
+    <Box sx={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-start", ml: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center" }}>
+        <Box sx={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          bgcolor: isLive ? "#43a047" : "#e53935",
+          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+          border: "1px solid #ddd",
+          mr: 1,
+          animation: isLive ? "pulsate 2s infinite" : "none" // 2 sekunders puls
+        }} />
+        <Typography
+          variant="body2"
+          sx={{
+            fontWeight: 400,
+            textTransform: "none",
+            color: "#222"
+          }}
+        >
+          {isLive
+            ? `stream klient ID: ${clientId}`
+            : "offline"}
+        </Typography>
+      </Box>
+      {/* Ny tekst under ID */}
+      {isLive &&
+        <Typography variant="caption" sx={{ color: "#888", ml: 3 }}>
+          stream kan være forsinket op til et minut
+        </Typography>
+      }
       <style>
         {`
           @keyframes pulsate {
