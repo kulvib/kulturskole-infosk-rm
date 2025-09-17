@@ -12,32 +12,31 @@ import {
   Grid
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-// Pulsating grøn badge som matcher dine øvrige badges visuelt
+// Pulsating grøn badge
 function LiveStatusBadge({ isLive }) {
-  const color = isLive ? "#43a047" : "#e53935";
-  const text = isLive ? "live" : "offline";
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box sx={{
         width: 10,
         height: 10,
         borderRadius: "50%",
-        bgcolor: color,
+        bgcolor: isLive ? "#43a047" : "#e53935",
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
         border: "1px solid #ddd",
         mr: 1,
-        animation: isLive ? "pulsate 1.2s infinite" : "none"
+        animation: isLive ? "pulsate 3s infinite" : "none"
       }} />
       <Typography
         variant="body2"
         sx={{
           fontWeight: 400,
           textTransform: "lowercase",
-          color: color
+          color: "#222"
         }}
       >
-        {text}
+        {isLive ? "live" : "offline"}
       </Typography>
       <style>
         {`
@@ -197,6 +196,19 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }, 500);
   };
 
+  // Fullscreen handler
+  const handleFullscreen = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.requestFullscreen) {
+      video.requestFullscreen();
+    } else if (video.webkitRequestFullscreen) { // Safari
+      video.webkitRequestFullscreen();
+    } else if (video.msRequestFullscreen) { // IE11
+      video.msRequestFullscreen();
+    }
+  };
+
   return (
     <Grid container spacing={0}>
       <Grid item xs={12}>
@@ -245,23 +257,37 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   </Typography>
                 </Box>
               )}
-              <video
-                ref={videoRef}
-                id="livestream-video"
-                controls
-                autoPlay
-                playsInline
-                muted
-                style={{
-                  maxWidth: "100%",
-                  maxHeight: 320,
-                  borderRadius: 8,
-                  display: manifestReady ? "block" : "none",
-                  background: "#000",
-                  margin: "0 auto"
-                }}
-                tabIndex={-1}
-              />
+              <Box sx={{ display: manifestReady ? "flex" : "none", alignItems: "center", justifyContent: "center", width: "100%" }}>
+                <video
+                  ref={videoRef}
+                  id="livestream-video"
+                  autoPlay
+                  playsInline
+                  muted
+                  // Fjern controls!
+                  style={{
+                    maxWidth: 420,
+                    maxHeight: 320,
+                    borderRadius: 8,
+                    border: "2px solid #ddd",
+                    background: "#000",
+                    margin: "0 auto",
+                  }}
+                  tabIndex={-1}
+                />
+                <Tooltip title="Fuld skærm">
+                  <span>
+                    <IconButton
+                      aria-label="fullscreen"
+                      onClick={handleFullscreen}
+                      sx={{ ml: 1 }}
+                      size="small"
+                    >
+                      <FullscreenIcon />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Box>
               {lastLive && manifestReady && (
                 <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 2 }}>
                   Sidst set live: {lastLive.toLocaleTimeString()}
