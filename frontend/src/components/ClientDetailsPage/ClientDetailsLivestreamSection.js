@@ -16,7 +16,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
 // Pulsating badge (mindre og rolig puls)
-function LiveStatusBadge({ isLive }) {
+function LiveStatusBadge({ isLive, clientId }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
       <Box sx={{
@@ -33,11 +33,13 @@ function LiveStatusBadge({ isLive }) {
         variant="body2"
         sx={{
           fontWeight: 400,
-          textTransform: "lowercase",
+          textTransform: "none",
           color: "#222"
         }}
       >
-        {isLive ? "live" : "offline"}
+        {isLive
+          ? `livestream fra klient no. ${clientId}`
+          : "offline"}
       </Typography>
       <style>
         {`
@@ -93,6 +95,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       navigator.sendBeacon(
         `/api/clients/${clientId}/stop-hls`
       );
+      // Hvis du også vil informere AGENT/klient direkte, kan du sende en besked via fx WebSocket eller et andet endpoint her.
+      // Denne cleanup sender kun til din backend (server), som er ansvarlig for at fortælle agenten/klienten at stoppe streamen.
     }
 
     window.addEventListener("beforeunload", cleanupStream);
@@ -249,7 +253,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 </span>
               </Tooltip>
               <Box sx={{ flexGrow: 1 }} />
-              <LiveStatusBadge isLive={manifestReady} />
+              <LiveStatusBadge isLive={manifestReady} clientId={clientId} />
             </Box>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -285,7 +289,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                     maxWidth: 420,
                     maxHeight: 320,
                     borderRadius: 8,
-                    border: "2px solid #ddd",
+                    border: "2px solid #444",
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
                     background: "#000",
                     margin: "0 auto",
                   }}
