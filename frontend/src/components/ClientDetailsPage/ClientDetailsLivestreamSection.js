@@ -15,7 +15,7 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-// Pulsating badge (mindre og rolig puls)
+// Pulsating badge (samme grønne basisfarve pulserer)
 function LiveStatusBadge({ isLive, clientId }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", ml: 2 }}>
@@ -28,7 +28,7 @@ function LiveStatusBadge({ isLive, clientId }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
-          animation: isLive ? "pulsate 2s infinite" : "none" // 2 sekunders puls
+          animation: isLive ? "pulsate 2s infinite" : "none"
         }} />
         <Typography
           variant="body2"
@@ -37,7 +37,7 @@ function LiveStatusBadge({ isLive, clientId }) {
             textTransform: "none",
             color: "#222",
             textAlign: "right",
-            minWidth: 150 // kan justeres efter behov
+            minWidth: 150
           }}
         >
           {isLive
@@ -45,26 +45,23 @@ function LiveStatusBadge({ isLive, clientId }) {
             : "offline"}
         </Typography>
       </Box>
-      {/* Ny tekst under ID */}
-      {isLive && (
-        <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "right", width: "100%" }}>
-          stream kan være op til et minut forsinket
-        </Typography>
-      )}
       <style>
         {`
           @keyframes pulsate {
             0% {
               transform: scale(1);
               opacity: 1;
+              background: #43a047;
             }
             50% {
               transform: scale(1.25);
               opacity: 0.5;
+              background: #43a047;
             }
             100% {
               transform: scale(1);
               opacity: 1;
+              background: #43a047;
             }
           }
         `}
@@ -319,11 +316,16 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   Fuld skærm
                 </Button>
               )}
-              {/* Sidst set info UNDER knappen */}
+              {/* Sidst set info og forsinkelsesinfo UNDER knappen */}
               {lastLive && manifestReady && (
-                <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 1 }}>
-                  Sidst set: {formatDateTimeWithDay(lastLive)}
-                </Typography>
+                <>
+                  <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 1 }}>
+                    Sidst set: {formatDateTimeWithDay(lastLive)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
+                    stream kan være op til et minut forsinket
+                  </Typography>
+                </>
               )}
             </Box>
           </CardContent>
