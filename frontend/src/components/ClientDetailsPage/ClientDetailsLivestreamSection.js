@@ -5,11 +5,45 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 
+/**
+ * Polls for manifest existence, returns true once manifest is found (HEAD request ok), false otherwise.
+ * Polls every 500ms up to 7 seconds.
+ */
+function useManifestPolling(clientId, resetKey) {
+  const [manifestExists, setManifestExists] = useState(false);
+
+  useEffect(() => {
+    if (!clientId) return;
+    let cancelled = false;
+
+    const poll = async () => {
+      const url = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8?t=${resetKey}`;
+      for (let i = 0; i < 14; ++i) {
+        try {
+          const resp = await fetch(url, { method: "HEAD" });
+          if (resp.ok) {
+            setManifestExists(true);
+            return;
+          }
+        } catch {}
+        await new Promise(res => setTimeout(res, 500));
+        if (cancelled) return;
+      }
+      setManifestExists(false);
+    };
+    setManifestExists(false); // reset while polling
+    poll();
+    return () => { cancelled = true; };
+  }, [clientId, resetKey]);
+
+  return manifestExists;
+}
+
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const [pending, setPending] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [resetKey, setResetKey] = useState(Date.now());
-  const [manifestExists, setManifestExists] = useState(false);
+  const manifestExists = useManifestPolling(clientId, resetKey);
   const [streamRunning, setStreamRunning] = useState(false);
 
   const videoRef = useRef(null);
@@ -18,19 +52,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const getToken = () => localStorage.getItem("token");
 
   useEffect(() => {
-    if (!clientId) return;
-    const url = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8?t=${resetKey}`;
-    fetch(url)
-      .then(resp => {
-        setManifestExists(resp.ok);
-        setStreamRunning(resp.ok);
-      })
-      .catch(() => {
-        setManifestExists(false);
-        setStreamRunning(false);
-      });
-  }, [clientId, resetKey]);
+    setStreamRunning(manifestExists);
+  }, [manifestExists]);
 
+  // video/HLS.js setup when manifest is found and streamRunning
   useEffect(() => {
     if (!manifestExists || !videoRef.current) return;
 
@@ -82,10 +107,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const handleStart = async () => {
     setPending(true);
     try {
+      // 1. Reset HLS (delete old manifest/segments)
       await fetch(
         `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/reset-hls`,
         { method: "POST", headers: { "Authorization": "Bearer " + getToken() } }
       );
+      // 2. Start agent livestream
       await fetch(
         `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/chrome-command`,
         {
@@ -100,9 +127,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       cleanupVideo();
       setResetKey(Date.now());
       setSnackbar({ open: true, message: "Stream startet!", severity: "success" });
-      setTimeout(() => {
-        setPending(false);
-      }, 1500);
+      setTimeout(() => setPending(false), 1500);
     } catch (err) {
       setSnackbar({ open: true, message: "Fejl ved start: " + err.message, severity: "error" });
       setPending(false);
@@ -112,6 +137,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const handleStop = async () => {
     setPending(true);
     try {
+      // 1. Stop agent
       await fetch(
         `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/chrome-command`,
         {
@@ -123,6 +149,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           body: JSON.stringify({ action: "livestream_stop" }),
         }
       );
+      // 2. Reset HLS (delete manifest/segments)
       await fetch(
         `https://kulturskole-infosk-rm.onrender.com/api/clients/${clientId}/reset-hls`,
         { method: "POST", headers: { "Authorization": "Bearer " + getToken() } }
@@ -211,9 +238,18 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             ) : (
               <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", p: 2 }}>
                 <VideocamIcon color="action" fontSize="large" />
-                <Typography variant="body2" sx={{ fontWeight: 700, ml: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, ml: 1, mb: 1 }}>
                   Ingen aktiv stream.
                 </Typography>
+                {pending ? (
+                  <CircularProgress size={24} sx={{ mt: 2 }} />
+                ) : (
+                  <Typography variant="body2" color="textSecondary">
+                    {manifestExists
+                      ? "Stream klar til start."
+                      : "Venter på at stream starter ..."}
+                  </Typography>
+                )}
               </Box>
             )}
           </Box>
