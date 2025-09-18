@@ -15,7 +15,7 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-// LiveStatusBadge komponent
+// LiveStatusBadge komponent med nye formuleringer
 function LiveStatusBadge({ isLive, clientId, lagText }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", ml: 2 }}>
@@ -37,16 +37,16 @@ function LiveStatusBadge({ isLive, clientId, lagText }) {
             textTransform: "none",
             color: "#222",
             textAlign: "right",
-            minWidth: 150
+            minWidth: 200
           }}
         >
           {isLive
-            ? `stream klient ID: ${clientId}`
+            ? `Streamforbindelse til klient ID: ${clientId}`
             : "offline"}
         </Typography>
       </Box>
       {lagText && (
-        <Typography variant="caption" sx={{ color: lagText === "Du ser helt live!" ? "#43a047" : "#f90", textAlign: "right", mt: 0.5 }}>
+        <Typography variant="caption" sx={{ color: lagText === "Stream er live" ? "#43a047" : "#f90", textAlign: "right", mt: 0.5 }}>
           {lagText}
         </Typography>
       )}
@@ -79,10 +79,9 @@ function formatDateTimeWithDay(date) {
 }
 
 function formatLag(lagSeconds) {
-  if (lagSeconds < 1.5) return "ingen nævneværdig forsinkelse";
-  if (lagSeconds < 10) return `${Math.round(lagSeconds)} sekunder`;
+  if (lagSeconds < 1.5) return ""; // ingen tekst, bruges kun i badge
   if (lagSeconds < 60) return `${Math.round(lagSeconds)} sekunder`;
-  return `${Math.round(lagSeconds/60)} minut${lagSeconds < 120 ? "" : "ter"}`;
+  return `${Math.round(lagSeconds/60)} minutter`;
 }
 
 export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
@@ -320,13 +319,16 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
     }
   };
 
-  // Udregn lagText til status-badge
+  // Udregn lagText til status-badge med brugerens ønskede formuleringer
   let lagText = "";
   if (playerLag !== null) {
-    lagText =
-      playerLag < 1.5
-        ? "Du ser helt live!"
-        : `Du ser streamen med ${formatLag(playerLag)} forsinkelse fra live`;
+    if (playerLag < 1.5) {
+      lagText = "Stream er live";
+    } else if (playerLag < 60) {
+      lagText = `Stream er ${formatLag(playerLag)} forsinket`;
+    } else {
+      lagText = `Stream er ${formatLag(playerLag)} forsinket`;
+    }
   }
 
   return (
@@ -426,7 +428,7 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
               {/* SERVER-LAG: hvor gammelt er serverens seneste segment */}
               {lastSegmentTimestamp && lastSegmentLag !== null && (
                 <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
-                  Seneste segment modtaget for {formatLag(lastSegmentLag)} siden
+                  Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
                   {lastSegmentTimestamp && (
                     <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
                   )}
