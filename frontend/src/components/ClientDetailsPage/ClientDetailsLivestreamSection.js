@@ -14,8 +14,8 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import LiveTvIcon from "@mui/icons-material/LiveTv";
 
-// LiveStatusBadge komponent med nye formuleringer og lastFetched-support (uden admin-prop)
 function LiveStatusBadge({ isLive, clientId, lagText, lastFetched }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", ml: 2 }}>
@@ -68,7 +68,6 @@ function LiveStatusBadge({ isLive, clientId, lagText, lastFetched }) {
   );
 }
 
-// Dansk dato med ugedag
 function formatDateTimeWithDay(date) {
   if (!date) return "";
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
@@ -84,7 +83,7 @@ function formatDateTimeWithDay(date) {
 }
 
 function formatLag(lagSeconds) {
-  if (lagSeconds < 1.5) return ""; // ingen tekst, bruges kun i badge
+  if (lagSeconds < 1.5) return "";
   if (lagSeconds < 60) return `${Math.round(lagSeconds)} sekunder`;
   return `${Math.round(lagSeconds/60)} minutter`;
 }
@@ -98,17 +97,13 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Server-lag state (fra backend: tid siden sidste segment blev skrevet)
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
   const [lastSegmentLag, setLastSegmentLag] = useState(null);
 
-  // Player-lag state (forsinkelse fra Hls.js live edge)
   const [playerLag, setPlayerLag] = useState(null);
 
-  // For alle: tidspunkt for sidste succesfulde manifest hentning
   const [lastFetched, setLastFetched] = useState(null);
 
-  // Intelligent reset: kun hvis sidste segment er >5 minutter gammelt eller ingen manifest
   useEffect(() => {
     if (!clientId) return;
     let ignore = false;
@@ -118,14 +113,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         const resp = await fetch(`/api/hls/${clientId}/last-segment-info`);
         let doReset = false;
         if (!resp.ok) {
-          doReset = true; // ingen manifest, reset
+          doReset = true;
         } else {
           const data = await resp.json();
           if (!data.timestamp || data.error) {
             doReset = true;
           } else {
             const segTime = new Date(data.timestamp).getTime();
-            if (Date.now() - segTime > 5 * 60 * 1000) { // 5 minutter
+            if (Date.now() - segTime > 5 * 60 * 1000) {
               doReset = true;
             }
           }
@@ -133,19 +128,15 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         if (!ignore && doReset) {
           await fetch(`/api/hls/${clientId}/reset`, { method: "POST" });
         }
-      } catch (e) {
-        // fejl ignoreres
-      }
+      } catch (e) {}
     }
     maybeResetSegments();
     return () => { ignore = true; };
   }, [clientId, refreshKey]);
 
-  // Polls for manifest, and handles auto-reconnect
   useEffect(() => {
     if (!clientId) return;
     const video = videoRef.current;
-    // VIGTIG RETTELSE: Brug FULD backend-URL herunder!
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
 
     let hls;
@@ -191,7 +182,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       }
     };
 
-    // Poll for manifest
     const poll = async () => {
       try {
         const resp = await fetch(hlsUrl, { method: "HEAD" });
@@ -231,7 +221,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     };
   }, [clientId, refreshKey]);
 
-  // Poll server-side lag (tid siden server modtog sidste segment)
   useEffect(() => {
     if (!clientId || !manifestReady) return;
     let stop = false;
@@ -262,7 +251,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => { stop = true; };
   }, [clientId, manifestReady]);
 
-  // Poll player-lag via Hls.js liveSyncPosition vs video.currentTime
   useEffect(() => {
     if (!manifestReady) return;
     let interval;
@@ -277,7 +265,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, [manifestReady]);
 
-  // Opdater Sidst set live hvert 5. sekund så længe streamen er live
   useEffect(() => {
     let interval;
     if (manifestReady) {
@@ -289,7 +276,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, [manifestReady]);
 
-  // Manuelt refresh (nu med refreshKey)
   const handleRefresh = () => {
     setRefreshing(true);
     setManifestReady(false);
@@ -299,7 +285,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }, 500);
   };
 
-  // Fullscreen handler
   const handleFullscreen = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -312,7 +297,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   };
 
-  // Udregn lagText til status-badge med brugerens ønskede formuleringer
   let lagText = "";
   if (playerLag !== null) {
     if (playerLag < 1.5) {
@@ -327,11 +311,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       <Grid item xs={12}>
         <Card elevation={2} sx={{ borderRadius: 2 }}>
           <CardContent sx={{ pb: 1.5 }}>
-            {/* Header med titel, opdater, live indikator (yderst højre) */}
+            {/* Header med streamikon, titel, opdater, live indikator (yderst højre) */}
             <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Klientstream
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center" }}>
+                <LiveTvIcon sx={{ mr: 1, fontSize: 28 }} />
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Stream – klient ID: {clientId}
+                </Typography>
+              </Box>
               <Tooltip title="Genindlæs stream">
                 <span>
                   <IconButton
@@ -395,7 +382,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   tabIndex={-1}
                 />
               </Box>
-              {/* Fuld skærm-knap under videoen */}
               {manifestReady && (
                 <Button
                   startIcon={<FullscreenIcon />}
@@ -407,7 +393,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   Fuld skærm
                 </Button>
               )}
-              {/* SERVER-LAG: hvor gammelt er serverens seneste segment */}
               {lastSegmentTimestamp && lastSegmentLag !== null && (
                 <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
                   Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
