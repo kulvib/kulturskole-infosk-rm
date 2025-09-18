@@ -21,7 +21,7 @@ def extract_num(filename, prefix="segment_"):
     m = re.match(rf"{re.escape(prefix)}(\d+)\.(mp4|ts)$", filename)
     return int(m.group(1)) if m else -1
 
-def update_manifest(client_dir, keep_n=10, segment_duration=6):
+def update_manifest(client_dir, keep_n=4, segment_duration=6):
     """
     Skriver manifest, så den kun peger på de nyeste keep_n segmenter,
     som eksisterer fysisk i client_dir. Finder automatisk om .ts eller .mp4 bruges.
@@ -79,7 +79,7 @@ async def upload_hls_file(
 async def cleanup_hls_files(
     client_id: str = Body(...),
     keep_files: List[str] = Body(...),
-    keep_n: int = 10,
+    keep_n: int = 4,
     segment_duration: int = 6,
 ):
     try:
@@ -107,7 +107,6 @@ async def cleanup_hls_files(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Fejl i cleanup: {e}")
 
-# --- NYT: Endpoint til at hente timestamp for sidste segment ---
 @router.get("/hls/{client_id}/last-segment-info")
 def get_last_segment_info(client_id: str):
     client_dir = os.path.join(HLS_DIR, client_id)
@@ -129,6 +128,18 @@ def get_last_segment_info(client_id: str):
         "segment": last_segment,
         "timestamp": datetime.utcfromtimestamp(mtime).isoformat() + "Z"
     }
+
+@router.post("/hls/{client_id}/reset")
+def reset_hls(client_id: str):
+    client_dir = os.path.join(HLS_DIR, client_id)
+    if not os.path.exists(client_dir):
+        return {"message": "already cleaned"}
+    for f in os.listdir(client_dir):
+        try:
+            os.remove(os.path.join(client_dir, f))
+        except Exception as e:
+            print(f"Could not delete {f}: {e}")
+    return {"message": "reset done"}
 
 # --- WebRTC signalering (samme som før) ---
 class Room:
