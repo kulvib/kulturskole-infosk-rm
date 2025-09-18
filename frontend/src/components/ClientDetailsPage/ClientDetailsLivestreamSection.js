@@ -133,7 +133,8 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
   useEffect(() => {
     if (!clientId) return;
     const video = videoRef.current;
-    const hlsUrl = `/hls/${clientId}/index.m3u8`;
+    // VIGTIG RETTELSE: Brug FULD backend-URL herunder!
+    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
 
     let hls;
     let manifestChecked = false;
