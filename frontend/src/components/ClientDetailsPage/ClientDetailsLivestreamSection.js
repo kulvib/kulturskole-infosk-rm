@@ -284,45 +284,46 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       <Grid item xs={12}>
         <Card elevation={2} sx={{ borderRadius: 2 }}>
           <CardContent sx={{ pb: 1.5 }}>
-            {/* Header med Stream, status-ikon, klient-ID (lille), refresh */}
-            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
-                Stream
-              </Typography>
-              <Box sx={{
-                width: 12,
-                height: 12,
-                borderRadius: "50%",
-                bgcolor: manifestReady ? "#43a047" : "#e53935",
-                boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-                border: "1px solid #ddd",
-                mr: 1,
-                animation: manifestReady ? "pulsate 2s infinite" : "none"
-              }} />
+            {/* Header med Stream, status-ikon, refresh på linje 1, klient-ID på linje 2 */}
+            <Box sx={{ mb: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center" }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
+                  Stream
+                </Typography>
+                <Box sx={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: "50%",
+                  bgcolor: manifestReady ? "#43a047" : "#e53935",
+                  boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+                  border: "1px solid #ddd",
+                  mr: 1,
+                  animation: manifestReady ? "pulsate 2s infinite" : "none"
+                }} />
+                <Tooltip title="Genindlæs stream">
+                  <span>
+                    <IconButton
+                      aria-label="refresh"
+                      onClick={handleRefresh}
+                      size="small"
+                      disabled={refreshing}
+                    >
+                      {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Box>
               <Typography
                 variant="body2"
                 sx={{
                   color: "#888",
                   fontSize: "0.9rem",
-                  mr: 1,
-                  lineHeight: 1.2,
+                  mt: 0.2,
+                  ml: 0.5,
                   fontWeight: 400
                 }}>
                 klient ID: {clientId}
               </Typography>
-              <Tooltip title="Genindlæs stream">
-                <span>
-                  <IconButton
-                    aria-label="refresh"
-                    onClick={handleRefresh}
-                    size="small"
-                    disabled={refreshing}
-                  >
-                    {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Box sx={{ flexGrow: 1 }} />
               <style>
                 {`
                   @keyframes pulsate {
