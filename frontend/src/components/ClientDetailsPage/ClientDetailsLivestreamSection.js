@@ -366,8 +366,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   </Typography>
                   {lastSegmentTimestamp && lastSegmentLag !== null && (
                     <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
-                      Live (forsinkelse: {formatLag(lastSegmentLag)}){lastSegmentLag > 6 && (
-                        <> – sidste billede modtaget: {formatDateTimeWithDay(new Date(lastSegmentTimestamp))}</>
+                      {lastSegmentLag < 2
+                        ? "Live (ingen nævneværdig forsinkelse)"
+                        : <>Live (forsinkelse: {formatLag(lastSegmentLag)})</>
+                      }
+                      {lastSegmentTimestamp && (
+                        <> – billede modtaget: {formatDateTimeWithDay(new Date(lastSegmentTimestamp))}</>
                       )}
                     </Typography>
                   )}
