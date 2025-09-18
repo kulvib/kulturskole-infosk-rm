@@ -40,15 +40,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const hlsRef = useRef(null);
   const [manifestReady, setManifestReady] = useState(false);
   const [error, setError] = useState("");
-  const [lastLive, setLastLive] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
   const [lastSegmentLag, setLastSegmentLag] = useState(null);
-
   const [playerLag, setPlayerLag] = useState(null);
-
   const [lastFetched, setLastFetched] = useState(null);
 
   useEffect(() => {
@@ -94,7 +91,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     const startPlayback = () => {
       setError("");
       setManifestReady(true);
-      setLastLive(new Date());
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = hlsUrl;
       } else if (Hls.isSupported()) {
@@ -212,17 +208,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, [manifestReady]);
 
-  useEffect(() => {
-    let interval;
-    if (manifestReady) {
-      setLastLive(new Date());
-      interval = setInterval(() => {
-        setLastLive(new Date());
-      }, 5000);
-    }
-    return () => clearInterval(interval);
-  }, [manifestReady]);
-
   const handleRefresh = () => {
     setRefreshing(true);
     setManifestReady(false);
@@ -303,7 +288,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 </Box>
               </Box>
 
-              {/* Center: Video - altid centerstillet i sin flexbox og flugter med top */}
+              {/* Center: Video - ALTID centerstillet og altid synlig */}
               <Box
                 sx={{
                   flex: 1,
@@ -311,34 +296,43 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   justifyContent: "center",
                   alignItems: "flex-start",
                   minHeight: 34,
+                  position: "relative",
                 }}
               >
-                {manifestReady ? (
-                  <video
-                    ref={videoRef}
-                    id="livestream-video"
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{
-                      maxWidth: 420,
-                      maxHeight: 320,
-                      borderRadius: 8,
-                      border: "2px solid #444",
-                      boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
-                      background: "#000",
-                      margin: 0,
-                    }}
-                    tabIndex={-1}
-                  />
-                ) : (
-                  <Box sx={{ display: "flex", alignItems: "center", minHeight: 160 }}>
-                    <CircularProgress size={32} />
-                    <Typography variant="body2" sx={{ ml: 2 }}>
-                      {error ? "Prøver igen ..." : "Venter på klientstream ..."}
-                    </Typography>
-                  </Box>
-                )}
+                <Box sx={{
+                  width: "100%",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "flex-start",
+                  minHeight: 160,
+                }}>
+                  {manifestReady ? (
+                    <video
+                      ref={videoRef}
+                      id="livestream-video"
+                      autoPlay
+                      playsInline
+                      muted
+                      style={{
+                        maxWidth: 420,
+                        maxHeight: 320,
+                        borderRadius: 8,
+                        border: "2px solid #444",
+                        boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
+                        background: "#000",
+                        margin: 0,
+                      }}
+                      tabIndex={-1}
+                    />
+                  ) : (
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: 160 }}>
+                      <CircularProgress size={32} />
+                      <Typography variant="body2" sx={{ ml: 2 }}>
+                        {error ? "Prøver igen ..." : "Venter på klientstream ..."}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
               </Box>
 
               {/* Højre side: statusinfo */}
