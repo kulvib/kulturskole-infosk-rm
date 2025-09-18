@@ -16,7 +16,10 @@ from routers import calendar
 from routers import meta
 from routers import schools
 from routers import users
-from routers import livestream
+from routers import livestream  # Importerer også HLS_DIR
+
+# --- HLS_DIR bruges her ---
+from routers.livestream import HLS_DIR
 
 print("### main.py: livestream importeret ###")
 
@@ -67,15 +70,6 @@ app.add_middleware(
 )
 
 # --- STATIC MOUNT TIL HLS ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SERVICE1_HLS_DIR = os.path.join(BASE_DIR, "service1", "hls")
-ROOT_HLS_DIR = os.path.join(BASE_DIR, "hls")
-if os.path.isdir(SERVICE1_HLS_DIR):
-    HLS_DIR = SERVICE1_HLS_DIR
-else:
-    HLS_DIR = ROOT_HLS_DIR
-
-os.makedirs(HLS_DIR, exist_ok=True)
 app.mount("/hls", StaticFiles(directory=HLS_DIR), name="hls")
 print(f"### main.py: Static mount for HLS på {HLS_DIR} ###")
 
@@ -89,7 +83,7 @@ class HLSCORSMiddleware(BaseHTTPMiddleware):
             response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "*"
-            response.headers["Cache-Control"] = "no-store"  # <- VIGTIGT: Undgå caching for HLS!
+            response.headers["Cache-Control"] = "no-store"
         return response
 
 app.add_middleware(HLSCORSMiddleware)
