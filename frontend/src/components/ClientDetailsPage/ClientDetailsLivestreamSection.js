@@ -192,7 +192,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     pollInterval = setInterval(() => {
       if (stopPolling) return;
       poll();
-    }, manifestReady ? 5000 : 1000);
+    }, manifestReady ? 5000 : 250); // OPTIMERING: 250ms mens vi venter på manifest!
 
     return () => {
       stopPolling = true;
