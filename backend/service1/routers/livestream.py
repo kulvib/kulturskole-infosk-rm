@@ -67,6 +67,7 @@ async def upload_hls_file(
         with open(seg_path, "wb") as f:
             f.write(content)
         print(f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes")
+        update_manifest(client_dir)  # <-- Opdater manifest straks efter upload!
         return {"filename": file.filename, "client_id": client_id}
     except Exception as e:
         print("[FEJL VED UPLOAD]", e)
