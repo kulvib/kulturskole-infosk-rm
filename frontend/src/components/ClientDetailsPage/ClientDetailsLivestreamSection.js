@@ -16,7 +16,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
 // LiveStatusBadge komponent
-function LiveStatusBadge({ isLive, clientId }) {
+function LiveStatusBadge({ isLive, clientId, lagText }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", ml: 2 }}>
       <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "flex-end" }}>
@@ -45,6 +45,11 @@ function LiveStatusBadge({ isLive, clientId }) {
             : "offline"}
         </Typography>
       </Box>
+      {lagText && (
+        <Typography variant="caption" sx={{ color: lagText === "Du ser helt live!" ? "#43a047" : "#f90", textAlign: "right", mt: 0.5 }}>
+          {lagText}
+        </Typography>
+      )}
       <style>
         {`
           @keyframes pulsate {
@@ -315,6 +320,15 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
     }
   };
 
+  // Udregn lagText til status-badge
+  let lagText = "";
+  if (playerLag !== null) {
+    lagText =
+      playerLag < 1.5
+        ? "Du ser helt live!"
+        : `Du ser streamen med ${formatLag(playerLag)} forsinkelse fra live`;
+  }
+
   return (
     <Grid container spacing={0}>
       <Grid item xs={12}>
@@ -353,7 +367,7 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
                 </Tooltip>
               )}
               <Box sx={{ flexGrow: 1 }} />
-              <LiveStatusBadge isLive={manifestReady} clientId={clientId} />
+              <LiveStatusBadge isLive={manifestReady} clientId={clientId} lagText={lagText} />
             </Box>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -409,30 +423,14 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
                   Fuld skærm
                 </Button>
               )}
-              {/* Sidst set info og lag-info */}
-              {lastLive && manifestReady && (
-                <>
-                  <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 1 }}>
-                    Sidst set: {formatDateTimeWithDay(lastLive)}
-                  </Typography>
-                  {/* PLAYER-LAG: hvor langt bagud er brugeren ift. live edge */}
-                  {playerLag !== null && (
-                    <Typography variant="caption" sx={{ color: playerLag < 2 ? "#43a047" : "#f90", mt: 0.5, textAlign: "center", width: "100%" }}>
-                      {playerLag < 1.5
-                        ? "Du ser helt live!"
-                        : `Du ser streamen med ${formatLag(playerLag)} forsinkelse fra live`}
-                    </Typography>
+              {/* SERVER-LAG: hvor gammelt er serverens seneste segment */}
+              {lastSegmentTimestamp && lastSegmentLag !== null && (
+                <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
+                  Seneste segment modtaget for {formatLag(lastSegmentLag)} siden
+                  {lastSegmentTimestamp && (
+                    <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
                   )}
-                  {/* SERVER-LAG: hvor gammelt er serverens seneste segment */}
-                  {lastSegmentTimestamp && lastSegmentLag !== null && (
-                    <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
-                      Seneste segment modtaget for {formatLag(lastSegmentLag)} siden
-                      {lastSegmentTimestamp && (
-                        <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
-                      )}
-                    </Typography>
-                  )}
-                </>
+                </Typography>
               )}
             </Box>
           </CardContent>
