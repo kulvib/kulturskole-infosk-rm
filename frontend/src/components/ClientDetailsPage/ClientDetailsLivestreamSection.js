@@ -15,32 +15,6 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-function LiveStatusBadge({ lagText, lastFetched }) {
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", ml: 2 }}>
-      {lagText && (
-        <Typography variant="caption" sx={{ color: lagText === "Stream er live" ? "#43a047" : "#f90", textAlign: "right", mt: 0.5 }}>
-          {lagText}
-        </Typography>
-      )}
-      {lastFetched && (
-        <Typography variant="caption" sx={{ color: "#888", textAlign: "right", mt: 0.5 }}>
-          Sidste stream hentet: {formatDateTimeWithDay(lastFetched)}
-        </Typography>
-      )}
-      <style>
-        {`
-          @keyframes pulsate {
-            0% { transform: scale(1); opacity: 1; background: #43a047; }
-            50% { transform: scale(1.25); opacity: 0.5; background: #43a047; }
-            100% { transform: scale(1); opacity: 1; background: #43a047; }
-          }
-        `}
-      </style>
-    </Box>
-  );
-}
-
 function formatDateTimeWithDay(date) {
   if (!date) return "";
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
@@ -58,7 +32,7 @@ function formatDateTimeWithDay(date) {
 function formatLag(lagSeconds) {
   if (lagSeconds < 1.5) return "";
   if (lagSeconds < 60) return `${Math.round(lagSeconds)} sekunder`;
-  return `${Math.round(lagSeconds/60)} minutter`;
+  return `${Math.round(lagSeconds / 60)} minutter`;
 }
 
 export default function ClientDetailsLivestreamSection({ clientId }) {
@@ -284,9 +258,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       <Grid item xs={12}>
         <Card elevation={2} sx={{ borderRadius: 2 }}>
           <CardContent sx={{ pb: 1.5 }}>
-            {/* Header med Stream, status-ikon, refresh på linje 1, klient-ID på linje 2 */}
-            <Box sx={{ mb: 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center" }}>
+            {/* Header med venstre og højre side */}
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                mb: 0.5
+              }}
+            >
+              {/* Venstre: Stream + status */}
+              <Box sx={{ display: "flex", alignItems: "center", minHeight: 34 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
                   Stream
                 </Typography>
@@ -297,33 +279,24 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   bgcolor: manifestReady ? "#43a047" : "#e53935",
                   boxShadow: "0 0 2px rgba(0,0,0,0.12)",
                   border: "1px solid #ddd",
-                  mr: 1,
+                  mr: 0.5,
                   animation: manifestReady ? "pulsate 2s infinite" : "none"
                 }} />
-                <Tooltip title="Genindlæs stream">
-                  <span>
-                    <IconButton
-                      aria-label="refresh"
-                      onClick={handleRefresh}
-                      size="small"
-                      disabled={refreshing}
-                    >
-                      {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
-                    </IconButton>
-                  </span>
-                </Tooltip>
               </Box>
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "#888",
-                  fontSize: "0.9rem",
-                  mt: 0.2,
-                  ml: 0.5,
-                  fontWeight: 400
-                }}>
-                klient ID: {clientId}
-              </Typography>
+              {/* Højre: Statusinfo, live, sidste hentet, klientID */}
+              <Box sx={{ textAlign: "right", minWidth: 180 }}>
+                <Typography variant="body2" sx={{ color: lagText === "Stream er live" ? "#43a047" : "#f90", fontWeight: 500 }}>
+                  {lagText}
+                </Typography>
+                {lastFetched && (
+                  <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
+                    Sidste stream hentet: {formatDateTimeWithDay(lastFetched)}
+                  </Typography>
+                )}
+                <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
+                  Klient ID: {clientId}
+                </Typography>
+              </Box>
               <style>
                 {`
                   @keyframes pulsate {
@@ -334,30 +307,46 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 `}
               </style>
             </Box>
+            {/* Refresh-knap under headeren til venstre */}
+            <Box sx={{ display: "flex", alignItems: "center", mt: 0, mb: 1 }}>
+              <Tooltip title="Genindlæs stream">
+                <span>
+                  <IconButton
+                    aria-label="refresh"
+                    onClick={handleRefresh}
+                    size="small"
+                    disabled={refreshing}
+                  >
+                    {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Box>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
               </Alert>
             )}
+            {/* Video og controls */}
             <Box
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
+                alignItems: "flex-start",
+                justifyContent: "flex-start",
                 minHeight: 200,
                 width: "100%",
+                mt: 0, // Ryk video op
               }}
             >
-              {!manifestReady && (
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160 }}>
-                  <CircularProgress size={32} />
-                  <Typography variant="body2" sx={{ ml: 2 }}>
-                    {error ? "Prøver igen ..." : "Venter på klientstream ..."}
-                  </Typography>
-                </Box>
-              )}
-              <Box sx={{ display: manifestReady ? "flex" : "none", alignItems: "center", justifyContent: "center", width: "100%" }}>
+              <Box
+                sx={{
+                  display: manifestReady ? "flex" : "none",
+                  alignItems: "flex-start", // så toppen flugter
+                  justifyContent: "flex-start",
+                  width: "100%",
+                }}
+              >
                 <video
                   ref={videoRef}
                   id="livestream-video"
@@ -371,11 +360,19 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                     border: "2px solid #444",
                     boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
                     background: "#000",
-                    margin: "0 auto",
+                    margin: "0 0 0 0",
                   }}
                   tabIndex={-1}
                 />
               </Box>
+              {!manifestReady && (
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: "100%" }}>
+                  <CircularProgress size={32} />
+                  <Typography variant="body2" sx={{ ml: 2 }}>
+                    {error ? "Prøver igen ..." : "Venter på klientstream ..."}
+                  </Typography>
+                </Box>
+              )}
               {manifestReady && (
                 <Button
                   startIcon={<FullscreenIcon />}
@@ -395,11 +392,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   )}
                 </Typography>
               )}
-              {/* Statusbadge med lag og sidste hentet */}
-              <LiveStatusBadge
-                lagText={lagText}
-                lastFetched={lastFetched}
-              />
             </Box>
           </CardContent>
         </Card>
