@@ -27,7 +27,7 @@ function LiveStatusBadge({ isLive, clientId }) {
           bgcolor: isLive ? "#43a047" : "#e53935",
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
-          mr: 0.5, // Justeret fra 1 til 0.5 for mindre afstand til teksten
+          mr: 0.5,
           animation: isLive ? "pulsate 2s infinite" : "none"
         }} />
         <Typography
@@ -85,6 +85,13 @@ function formatDateTimeWithDay(date) {
   return `${dayName} ${day}.${month} ${year}, kl. ${hour}:${min}:${sec}`;
 }
 
+function formatLag(lagSeconds) {
+  if (lagSeconds < 1.5) return "ingen nævneværdig forsinkelse";
+  if (lagSeconds < 10) return `${Math.round(lagSeconds)} sekunder`;
+  if (lagSeconds < 60) return `${Math.round(lagSeconds)} sekunder`;
+  return `${Math.round(lagSeconds/60)} minut${lagSeconds < 120 ? "" : "ter"}`;
+}
+
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -94,6 +101,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // NYT: Statet til segment-timestamp/forsinkelse
+  const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
+  const [lastSegmentLag, setLastSegmentLag] = useState(null);
+
   // STOP STREAM & RYD OP VED UNLOAD
   useEffect(() => {
     if (!clientId) return;
@@ -102,8 +113,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       navigator.sendBeacon(
         `/api/clients/${clientId}/stop-hls`
       );
-      // Hvis du også vil informere AGENT/klient direkte, kan du sende en besked via fx WebSocket eller et andet endpoint her.
-      // Denne cleanup sender kun til din backend (server), som er ansvarlig for at fortælle agenten/klienten at stoppe streamen.
     }
 
     window.addEventListener("beforeunload", cleanupStream);
@@ -192,7 +201,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     pollInterval = setInterval(() => {
       if (stopPolling) return;
       poll();
-    }, manifestReady ? 5000 : 250); // OPTIMERING: 250ms mens vi venter på manifest!
+    }, manifestReady ? 5000 : 250);
 
     return () => {
       stopPolling = true;
@@ -200,6 +209,39 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       cleanup();
     };
   }, [clientId, refreshKey]);
+
+  // NYT: Poll timestamp for sidste segment når manifestReady
+  useEffect(() => {
+    if (!clientId || !manifestReady) return;
+    let stop = false;
+
+    async function pollSegmentLag() {
+      while (!stop) {
+        try {
+          const resp = await fetch(`/api/hls/${clientId}/last-segment-info`);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.timestamp) {
+              setLastSegmentTimestamp(data.timestamp);
+              const segTime = new Date(data.timestamp).getTime();
+              const now = Date.now();
+              setLastSegmentLag((now - segTime) / 1000);
+            } else {
+              setLastSegmentTimestamp(null);
+              setLastSegmentLag(null);
+            }
+          }
+        } catch {
+          setLastSegmentTimestamp(null);
+          setLastSegmentLag(null);
+        }
+        await new Promise(res => setTimeout(res, 2000));
+      }
+    }
+    pollSegmentLag();
+
+    return () => { stop = true; };
+  }, [clientId, manifestReady]);
 
   // Opdater Sidst set live hvert 5. sekund så længe streamen er live
   useEffect(() => {
@@ -322,9 +364,13 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 1 }}>
                     Sidst set: {formatDateTimeWithDay(lastLive)}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
-                    stream kan være op til et minut forsinket
-                  </Typography>
+                  {lastSegmentTimestamp && lastSegmentLag !== null && (
+                    <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
+                      Live (forsinkelse: {formatLag(lastSegmentLag)}){lastSegmentLag > 6 && (
+                        <> – sidste billede modtaget: {formatDateTimeWithDay(new Date(lastSegmentTimestamp))}</>
+                      )}
+                    </Typography>
+                  )}
                 </>
               )}
             </Box>
