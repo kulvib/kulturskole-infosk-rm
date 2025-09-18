@@ -15,7 +15,7 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-// Pulsating badge (samme grønne basisfarve pulserer, ikonet tættere på teksten)
+// Pulsating badge
 function LiveStatusBadge({ isLive, clientId }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", ml: 2 }}>
@@ -105,14 +105,16 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
   const [lastSegmentLag, setLastSegmentLag] = useState(null);
 
-  // STOP STREAM & RYD OP VED UNLOAD
+  // RESET STREAM SEGMENTER VED UNLOAD (og ved refresh)
   useEffect(() => {
     if (!clientId) return;
 
-    function cleanupStream() {
-      navigator.sendBeacon(
-        `/api/clients/${clientId}/stop-hls`
-      );
+    // Kald reset-endpoint når streamen "forlades"
+    async function cleanupStream() {
+      try {
+        await fetch(`/api/hls/${clientId}/reset`, { method: "POST" });
+      } catch {}
+      navigator.sendBeacon(`/api/clients/${clientId}/stop-hls`);
     }
 
     window.addEventListener("beforeunload", cleanupStream);
@@ -132,6 +134,13 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     let manifestChecked = false;
     let stopPolling = false;
     let pollInterval;
+
+    // Kald reset-endpointet før vi starter streamen (hurtig opstart)
+    const resetSegments = async () => {
+      try {
+        await fetch(`/api/hls/${clientId}/reset`, { method: "POST" });
+      } catch {}
+    };
 
     const startPlayback = () => {
       setError("");
@@ -197,11 +206,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       }
     };
 
-    poll();
-    pollInterval = setInterval(() => {
-      if (stopPolling) return;
+    // Første reset, så poll/afspil starter på frisk
+    resetSegments().then(() => {
       poll();
-    }, manifestReady ? 5000 : 250);
+      pollInterval = setInterval(() => {
+        if (stopPolling) return;
+        poll();
+      }, manifestReady ? 5000 : 250);
+    });
 
     return () => {
       stopPolling = true;
