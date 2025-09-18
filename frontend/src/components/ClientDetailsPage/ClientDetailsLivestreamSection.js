@@ -14,37 +14,11 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
-import LiveTvIcon from "@mui/icons-material/LiveTv";
 
-function LiveStatusBadge({ isLive, clientId, lagText, lastFetched }) {
+function LiveStatusBadge({ lagText, lastFetched }) {
+  // Fjernet statusikon og tekst, da det nu vises i headeren
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", ml: 2 }}>
-      <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "flex-end" }}>
-        <Box sx={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          bgcolor: isLive ? "#43a047" : "#e53935",
-          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-          border: "1px solid #ddd",
-          mr: 0.5,
-          animation: isLive ? "pulsate 2s infinite" : "none"
-        }} />
-        <Typography
-          variant="body2"
-          sx={{
-            fontWeight: 400,
-            textTransform: "none",
-            color: "#222",
-            textAlign: "right",
-            minWidth: 220
-          }}
-        >
-          {isLive
-            ? `Streamforbindelse til klient ID: ${clientId}`
-            : "offline"}
-        </Typography>
-      </Box>
       {lagText && (
         <Typography variant="caption" sx={{ color: lagText === "Stream er live" ? "#43a047" : "#f90", textAlign: "right", mt: 0.5 }}>
           {lagText}
@@ -311,14 +285,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       <Grid item xs={12}>
         <Card elevation={2} sx={{ borderRadius: 2 }}>
           <CardContent sx={{ pb: 1.5 }}>
-            {/* Header med streamikon, titel, opdater, live indikator (yderst højre) */}
+            {/* Header med overskrift, refresh og status-ikon */}
             <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center" }}>
-                <LiveTvIcon sx={{ mr: 1, fontSize: 28 }} />
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Stream – klient ID: {clientId}
-                </Typography>
-              </Box>
+              <Typography component="span" variant="h6" sx={{ fontWeight: 700 }}>
+                Stream
+              </Typography>
+              <Typography component="span" variant="h6" sx={{ fontWeight: 400, ml: 1 }}>
+                – klient ID: {clientId}
+              </Typography>
               <Tooltip title="Genindlæs stream">
                 <span>
                   <IconButton
@@ -333,12 +307,26 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 </span>
               </Tooltip>
               <Box sx={{ flexGrow: 1 }} />
-              <LiveStatusBadge
-                isLive={manifestReady}
-                clientId={clientId}
-                lagText={lagText}
-                lastFetched={lastFetched}
-              />
+              {/* Status-ikon uden tekst */}
+              <Box sx={{
+                width: 12,
+                height: 12,
+                borderRadius: "50%",
+                bgcolor: manifestReady ? "#43a047" : "#e53935",
+                boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+                border: "1px solid #ddd",
+                ml: 2,
+                animation: manifestReady ? "pulsate 2s infinite" : "none"
+              }} />
+              <style>
+                {`
+                  @keyframes pulsate {
+                    0% { transform: scale(1); opacity: 1; background: #43a047; }
+                    50% { transform: scale(1.25); opacity: 0.5; background: #43a047; }
+                    100% { transform: scale(1); opacity: 1; background: #43a047; }
+                  }
+                `}
+              </style>
             </Box>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -401,6 +389,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   )}
                 </Typography>
               )}
+              {/* Statusbadge med lag og sidste hentet */}
+              <LiveStatusBadge
+                lagText={lagText}
+                lastFetched={lastFetched}
+              />
             </Box>
           </CardContent>
         </Card>
