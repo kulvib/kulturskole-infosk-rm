@@ -15,8 +15,8 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-// LiveStatusBadge komponent med nye formuleringer
-function LiveStatusBadge({ isLive, clientId, lagText }) {
+// LiveStatusBadge komponent med nye formuleringer og admin-lastFetched-support
+function LiveStatusBadge({ isLive, clientId, lagText, isAdmin, lastFetched }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", ml: 2 }}>
       <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "flex-end" }}>
@@ -37,7 +37,7 @@ function LiveStatusBadge({ isLive, clientId, lagText }) {
             textTransform: "none",
             color: "#222",
             textAlign: "right",
-            minWidth: 200
+            minWidth: 220
           }}
         >
           {isLive
@@ -48,6 +48,11 @@ function LiveStatusBadge({ isLive, clientId, lagText }) {
       {lagText && (
         <Typography variant="caption" sx={{ color: lagText === "Stream er live" ? "#43a047" : "#f90", textAlign: "right", mt: 0.5 }}>
           {lagText}
+        </Typography>
+      )}
+      {isAdmin && lastFetched && (
+        <Typography variant="caption" sx={{ color: "#888", textAlign: "right", mt: 0.5 }}>
+          Sidste stream hentet: {formatDateTimeWithDay(lastFetched)}
         </Typography>
       )}
       <style>
@@ -99,6 +104,9 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
 
   // Player-lag state (forsinkelse fra Hls.js live edge)
   const [playerLag, setPlayerLag] = useState(null);
+
+  // For admins: tidspunkt for sidste succesfulde manifest hentning
+  const [lastFetched, setLastFetched] = useState(null);
 
   // Intelligent reset: kun hvis sidste segment er >5 minutter gammelt eller ingen manifest
   useEffect(() => {
@@ -188,6 +196,7 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
       try {
         const resp = await fetch(hlsUrl, { method: "HEAD" });
         if (resp.ok) {
+          setLastFetched(new Date());
           if (!manifestChecked) {
             manifestChecked = true;
             setError("");
@@ -324,8 +333,6 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
   if (playerLag !== null) {
     if (playerLag < 1.5) {
       lagText = "Stream er live";
-    } else if (playerLag < 60) {
-      lagText = `Stream er ${formatLag(playerLag)} forsinket`;
     } else {
       lagText = `Stream er ${formatLag(playerLag)} forsinket`;
     }
@@ -369,7 +376,13 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
                 </Tooltip>
               )}
               <Box sx={{ flexGrow: 1 }} />
-              <LiveStatusBadge isLive={manifestReady} clientId={clientId} lagText={lagText} />
+              <LiveStatusBadge
+                isLive={manifestReady}
+                clientId={clientId}
+                lagText={lagText}
+                isAdmin={isAdmin}
+                lastFetched={lastFetched}
+              />
             </Box>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
