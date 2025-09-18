@@ -3,6 +3,7 @@ from typing import Dict, List
 import os
 import traceback
 import re
+from datetime import datetime
 
 router = APIRouter()
 
@@ -67,7 +68,7 @@ async def upload_hls_file(
         with open(seg_path, "wb") as f:
             f.write(content)
         print(f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes")
-        update_manifest(client_dir)  # <-- Opdater manifest straks efter upload!
+        update_manifest(client_dir)  # Opdater manifest straks efter upload!
         return {"filename": file.filename, "client_id": client_id}
     except Exception as e:
         print("[FEJL VED UPLOAD]", e)
@@ -105,6 +106,29 @@ async def cleanup_hls_files(
         print("[FEJL VED CLEANUP]", e)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Fejl i cleanup: {e}")
+
+# --- NYT: Endpoint til at hente timestamp for sidste segment ---
+@router.get("/hls/{client_id}/last-segment-info")
+def get_last_segment_info(client_id: str):
+    client_dir = os.path.join(HLS_DIR, client_id)
+    manifest_path = os.path.join(client_dir, "index.m3u8")
+    if not os.path.exists(manifest_path):
+        return {"error": "no manifest"}
+    # Find sidste segment i manifestet
+    with open(manifest_path, "r") as m3u:
+        lines = m3u.readlines()
+    segment_files = [line.strip() for line in lines if line.strip().startswith("segment_")]
+    if not segment_files:
+        return {"error": "no segments"}
+    last_segment = segment_files[-1]
+    seg_path = os.path.join(client_dir, last_segment)
+    if not os.path.exists(seg_path):
+        return {"error": "segment missing"}
+    mtime = os.path.getmtime(seg_path)
+    return {
+        "segment": last_segment,
+        "timestamp": datetime.utcfromtimestamp(mtime).isoformat() + "Z"
+    }
 
 # --- WebRTC signalering (samme som før) ---
 class Room:
