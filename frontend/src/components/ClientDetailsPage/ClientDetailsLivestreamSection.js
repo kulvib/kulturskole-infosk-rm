@@ -40,12 +40,15 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const hlsRef = useRef(null);
   const [manifestReady, setManifestReady] = useState(false);
   const [error, setError] = useState("");
+  const [lastLive, setLastLive] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
   const [lastSegmentLag, setLastSegmentLag] = useState(null);
+
   const [playerLag, setPlayerLag] = useState(null);
+
   const [lastFetched, setLastFetched] = useState(null);
 
   useEffect(() => {
@@ -91,6 +94,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     const startPlayback = () => {
       setError("");
       setManifestReady(true);
+      setLastLive(new Date());
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = hlsUrl;
       } else if (Hls.isSupported()) {
@@ -208,6 +212,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, [manifestReady]);
 
+  useEffect(() => {
+    let interval;
+    if (manifestReady) {
+      setLastLive(new Date());
+      interval = setInterval(() => {
+        setLastLive(new Date());
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [manifestReady]);
+
   const handleRefresh = () => {
     setRefreshing(true);
     setManifestReady(false);
@@ -243,100 +258,33 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       <Grid item xs={12}>
         <Card elevation={2} sx={{ borderRadius: 2 }}>
           <CardContent sx={{ pb: 1.5 }}>
-            {/* Flex row: header (venstre), video (center), statusinfo (højre) */}
+            {/* Header med venstre og højre side */}
             <Box
               sx={{
                 display: "flex",
-                flexDirection: "row",
-                justifyContent: "center",
+                justifyContent: "space-between",
                 alignItems: "flex-start",
-                width: "100%",
-                mb: 2,
-                minHeight: 40,
+                mb: 0.5
               }}
             >
-              {/* Venstre side: header */}
-              <Box sx={{ minWidth: 100, pr: 2 }}>
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
-                    Stream
-                  </Typography>
-                  <Box sx={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: "50%",
-                    bgcolor: manifestReady ? "#43a047" : "#e53935",
-                    boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-                    border: "1px solid #ddd",
-                    mr: 0.5,
-                    animation: manifestReady ? "pulsate 2s infinite" : "none"
-                  }} />
-                </Box>
-                <Box sx={{ mt: 1 }}>
-                  <Tooltip title="Genindlæs stream">
-                    <span>
-                      <IconButton
-                        aria-label="refresh"
-                        onClick={handleRefresh}
-                        size="small"
-                        disabled={refreshing}
-                      >
-                        {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </Box>
-              </Box>
-
-              {/* Center: Video - ALTID centerstillet og altid synlig */}
-              <Box
-                sx={{
-                  flex: 1,
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "flex-start",
-                  minHeight: 34,
-                  position: "relative",
-                }}
-              >
+              {/* Venstre: Stream + status */}
+              <Box sx={{ display: "flex", alignItems: "center", minHeight: 34 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
+                  Stream
+                </Typography>
                 <Box sx={{
-                  width: "100%",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "flex-start",
-                  minHeight: 160,
-                }}>
-                  {manifestReady ? (
-                    <video
-                      ref={videoRef}
-                      id="livestream-video"
-                      autoPlay
-                      playsInline
-                      muted
-                      style={{
-                        maxWidth: 420,
-                        maxHeight: 320,
-                        borderRadius: 8,
-                        border: "2px solid #444",
-                        boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
-                        background: "#000",
-                        margin: 0,
-                      }}
-                      tabIndex={-1}
-                    />
-                  ) : (
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: 160 }}>
-                      <CircularProgress size={32} />
-                      <Typography variant="body2" sx={{ ml: 2 }}>
-                        {error ? "Prøver igen ..." : "Venter på klientstream ..."}
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
+                  width: 12,
+                  height: 12,
+                  borderRadius: "50%",
+                  bgcolor: manifestReady ? "#43a047" : "#e53935",
+                  boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+                  border: "1px solid #ddd",
+                  mr: 0.5,
+                  animation: manifestReady ? "pulsate 2s infinite" : "none"
+                }} />
               </Box>
-
-              {/* Højre side: statusinfo */}
-              <Box sx={{ textAlign: "right", minWidth: 180, pl: 2 }}>
+              {/* Højre: Statusinfo, live, sidste hentet, klientID */}
+              <Box sx={{ textAlign: "right", minWidth: 180 }}>
                 <Typography variant="body2" sx={{ color: lagText === "Stream er live" ? "#43a047" : "#f90", fontWeight: 500 }}>
                   {lagText}
                 </Typography>
@@ -359,17 +307,73 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 `}
               </style>
             </Box>
-
-            {/* Eventuelle fejlbeskeder */}
+            {/* Refresh-knap under headeren til venstre */}
+            <Box sx={{ display: "flex", alignItems: "center", mt: 0, mb: 1 }}>
+              <Tooltip title="Genindlæs stream">
+                <span>
+                  <IconButton
+                    aria-label="refresh"
+                    onClick={handleRefresh}
+                    size="small"
+                    disabled={refreshing}
+                  >
+                    {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Box>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
               </Alert>
             )}
-
-            {/* Controls og ekstra info */}
-            {manifestReady && (
-              <Box sx={{ display: "flex", justifyContent: "center", width: "100%" }}>
+            {/* Video og controls */}
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                justifyContent: "flex-start",
+                minHeight: 200,
+                width: "100%",
+                mt: 0, // Ryk video op
+              }}
+            >
+              <Box
+                sx={{
+                  display: manifestReady ? "flex" : "none",
+                  alignItems: "flex-start", // så toppen flugter
+                  justifyContent: "flex-start",
+                  width: "100%",
+                }}
+              >
+                <video
+                  ref={videoRef}
+                  id="livestream-video"
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{
+                    maxWidth: 420,
+                    maxHeight: 320,
+                    borderRadius: 8,
+                    border: "2px solid #444",
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
+                    background: "#000",
+                    margin: "0 0 0 0",
+                  }}
+                  tabIndex={-1}
+                />
+              </Box>
+              {!manifestReady && (
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: "100%" }}>
+                  <CircularProgress size={32} />
+                  <Typography variant="body2" sx={{ ml: 2 }}>
+                    {error ? "Prøver igen ..." : "Venter på klientstream ..."}
+                  </Typography>
+                </Box>
+              )}
+              {manifestReady && (
                 <Button
                   startIcon={<FullscreenIcon />}
                   variant="outlined"
@@ -379,17 +383,16 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 >
                   Fuld skærm
                 </Button>
-              </Box>
-            )}
-
-            {lastSegmentTimestamp && lastSegmentLag !== null && (
-              <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
-                Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
-                {lastSegmentTimestamp && (
-                  <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
-                )}
-              </Typography>
-            )}
+              )}
+              {lastSegmentTimestamp && lastSegmentLag !== null && (
+                <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
+                  Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
+                  {lastSegmentTimestamp && (
+                    <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
+                  )}
+                </Typography>
+              )}
+            </Box>
           </CardContent>
         </Card>
       </Grid>
