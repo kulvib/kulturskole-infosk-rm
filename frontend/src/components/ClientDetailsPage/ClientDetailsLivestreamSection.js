@@ -332,8 +332,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "flex-start",
-                justifyContent: "flex-start",
+                alignItems: "center", // centrér indholdet vandret
+                justifyContent: "flex-start", // top-justér
                 minHeight: 200,
                 width: "100%",
                 mt: 0, // Ryk video op
@@ -343,7 +343,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 sx={{
                   display: manifestReady ? "flex" : "none",
                   alignItems: "flex-start", // så toppen flugter
-                  justifyContent: "flex-start",
+                  justifyContent: "center",
                   width: "100%",
                 }}
               >
