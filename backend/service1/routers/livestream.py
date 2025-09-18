@@ -1,13 +1,11 @@
+import os
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form, Body
 from typing import Dict, List
-import os
 import traceback
 import re
 from datetime import datetime
 
-router = APIRouter()
-
-# --- HLS setup ---
+# --- Central HLS_DIR-definition her ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SERVICE1_HLS_DIR = os.path.join(BASE_DIR, "..", "service1", "hls")
 ROOT_HLS_DIR = os.path.join(BASE_DIR, "..", "hls")
@@ -17,16 +15,13 @@ else:
     HLS_DIR = os.path.abspath(ROOT_HLS_DIR)
 os.makedirs(HLS_DIR, exist_ok=True)
 
+router = APIRouter()
+
 def extract_num(filename, prefix="segment_"):
     m = re.match(rf"{re.escape(prefix)}(\d+)\.(mp4|ts)$", filename)
     return int(m.group(1)) if m else -1
 
 def update_manifest(client_dir, keep_n=4, segment_duration=6):
-    """
-    Skriver manifest, så den kun peger på de nyeste keep_n segmenter,
-    som eksisterer fysisk i client_dir. Finder automatisk om .ts eller .mp4 bruges.
-    Skriver IKKE #EXT-X-ENDLIST, så manifestet bliver ved med at opdatere for live streaming.
-    """
     seg_types = [".ts", ".mp4"]
     for ext in seg_types:
         segs = sorted(
@@ -47,7 +42,6 @@ def update_manifest(client_dir, keep_n=4, segment_duration=6):
                 for seg in manifest_segs:
                     m3u.write(f"#EXTINF:{segment_duration}.0,\n")
                     m3u.write(f"{seg}\n")
-                # LIVE: IKKE skriv #EXT-X-ENDLIST!
             print(f"[MANIFEST] Opdateret manifest for {client_dir}: {manifest_path} ({media_seq}..{extract_num(manifest_segs[-1], 'segment_')})")
             return
     print(f"[MANIFEST] Ingen segmenter fundet til manifest i {client_dir}")
@@ -68,7 +62,7 @@ async def upload_hls_file(
         with open(seg_path, "wb") as f:
             f.write(content)
         print(f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes")
-        update_manifest(client_dir)  # Opdater manifest straks efter upload!
+        update_manifest(client_dir)
         return {"filename": file.filename, "client_id": client_id}
     except Exception as e:
         print("[FEJL VED UPLOAD]", e)
@@ -113,7 +107,6 @@ def get_last_segment_info(client_id: str):
     manifest_path = os.path.join(client_dir, "index.m3u8")
     if not os.path.exists(manifest_path):
         return {"error": "no manifest"}
-    # Find sidste segment i manifestet
     with open(manifest_path, "r") as m3u:
         lines = m3u.readlines()
     segment_files = [line.strip() for line in lines if line.strip().startswith("segment_")]
@@ -132,13 +125,17 @@ def get_last_segment_info(client_id: str):
 @router.post("/hls/{client_id}/reset")
 def reset_hls(client_id: str):
     client_dir = os.path.join(HLS_DIR, client_id)
+    print(f"[RESET] Prøver at nulstille {client_dir}")
     if not os.path.exists(client_dir):
+        print("[RESET] Mappen findes ikke.")
         return {"message": "already cleaned"}
     for f in os.listdir(client_dir):
         try:
             os.remove(os.path.join(client_dir, f))
         except Exception as e:
-            print(f"Could not delete {f}: {e}")
+            print(f"[RESET] Kunne ikke slette {f}: {e}")
+            raise HTTPException(status_code=400, detail=f"Could not delete {f}: {e}")
+    print("[RESET] Nulstilling færdig.")
     return {"message": "reset done"}
 
 # --- WebRTC signalering (samme som før) ---
