@@ -15,8 +15,8 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-// LiveStatusBadge komponent med nye formuleringer og admin-lastFetched-support
-function LiveStatusBadge({ isLive, clientId, lagText, isAdmin, lastFetched }) {
+// LiveStatusBadge komponent med nye formuleringer og lastFetched-support (uden admin-prop)
+function LiveStatusBadge({ isLive, clientId, lagText, lastFetched }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", ml: 2 }}>
       <Box sx={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "flex-end" }}>
@@ -50,7 +50,7 @@ function LiveStatusBadge({ isLive, clientId, lagText, isAdmin, lastFetched }) {
           {lagText}
         </Typography>
       )}
-      {isAdmin && lastFetched && (
+      {lastFetched && (
         <Typography variant="caption" sx={{ color: "#888", textAlign: "right", mt: 0.5 }}>
           Sidste stream hentet: {formatDateTimeWithDay(lastFetched)}
         </Typography>
@@ -89,7 +89,7 @@ function formatLag(lagSeconds) {
   return `${Math.round(lagSeconds/60)} minutter`;
 }
 
-export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
+export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const [manifestReady, setManifestReady] = useState(false);
@@ -105,7 +105,7 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
   // Player-lag state (forsinkelse fra Hls.js live edge)
   const [playerLag, setPlayerLag] = useState(null);
 
-  // For admins: tidspunkt for sidste succesfulde manifest hentning
+  // For alle: tidspunkt for sidste succesfulde manifest hentning
   const [lastFetched, setLastFetched] = useState(null);
 
   // Intelligent reset: kun hvis sidste segment er >5 minutter gammelt eller ingen manifest
@@ -312,22 +312,6 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
     }
   };
 
-  // Admin: manuel reset (kun for admins/support)
-  const handleAdminReset = async () => {
-    setError(""); // Clear any old error
-    try {
-      const resp = await fetch(`/api/hls/${clientId}/reset`, { method: "POST" });
-      const data = await resp.json();
-      if (!resp.ok || (data && data.message && data.message !== "reset done")) {
-        setError(data?.errors?.join(", ") || data?.message || "Fejl ved nulstilling");
-      } else {
-        setRefreshKey(prev => prev + 1); // force reload
-      }
-    } catch {
-      setError("Kunne ikke nulstille segmenter (netværksfejl)");
-    }
-  };
-
   // Udregn lagText til status-badge med brugerens ønskede formuleringer
   let lagText = "";
   if (playerLag !== null) {
@@ -361,26 +345,11 @@ export default function ClientDetailsLivestreamSection({ clientId, isAdmin }) {
                   </IconButton>
                 </span>
               </Tooltip>
-              {isAdmin && (
-                <Tooltip title="Nulstil segmenter (admin)">
-                  <span>
-                    <IconButton
-                      aria-label="reset"
-                      onClick={handleAdminReset}
-                      size="small"
-                      sx={{ ml: 1 }}
-                    >
-                      <RefreshIcon color="error" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              )}
               <Box sx={{ flexGrow: 1 }} />
               <LiveStatusBadge
                 isLive={manifestReady}
                 clientId={clientId}
                 lagText={lagText}
-                isAdmin={isAdmin}
                 lastFetched={lastFetched}
               />
             </Box>
