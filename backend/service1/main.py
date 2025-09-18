@@ -10,7 +10,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 print("### main.py: Pre-router-import ###")
 
-from routers import clients, calendar, meta, schools, users, livestream
+# Importer routers eksplicit for overblik
+from routers import clients
+from routers import calendar
+from routers import meta
+from routers import schools
+from routers import users
+from routers import livestream
 
 print("### main.py: livestream importeret ###")
 
@@ -73,7 +79,7 @@ os.makedirs(HLS_DIR, exist_ok=True)
 app.mount("/hls", StaticFiles(directory=HLS_DIR), name="hls")
 print(f"### main.py: Static mount for HLS på {HLS_DIR} ###")
 
-# --- EKSTRA CORS FOR HLS STATIC FILES (gør HLS tilgængeligt for alle domæner) ---
+# --- EKSTRA CORS + NO-CACHE FOR HLS STATIC FILES ---
 from starlette.responses import Response
 
 class HLSCORSMiddleware(BaseHTTPMiddleware):
@@ -83,7 +89,7 @@ class HLSCORSMiddleware(BaseHTTPMiddleware):
             response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "*"
-            response.headers["Cache-Control"] = "no-store"  # <- VIGTIGT: Undgå caching!
+            response.headers["Cache-Control"] = "no-store"  # <- VIGTIGT: Undgå caching for HLS!
         return response
 
 app.add_middleware(HLSCORSMiddleware)
