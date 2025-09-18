@@ -48,21 +48,9 @@ function LiveStatusBadge({ isLive, clientId }) {
       <style>
         {`
           @keyframes pulsate {
-            0% {
-              transform: scale(1);
-              opacity: 1;
-              background: #43a047;
-            }
-            50% {
-              transform: scale(1.25);
-              opacity: 0.5;
-              background: #43a047;
-            }
-            100% {
-              transform: scale(1);
-              opacity: 1;
-              background: #43a047;
-            }
+            0% { transform: scale(1); opacity: 1; background: #43a047; }
+            50% { transform: scale(1.25); opacity: 0.5; background: #43a047; }
+            100% { transform: scale(1); opacity: 1; background: #43a047; }
           }
         `}
       </style>
@@ -101,15 +89,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // NYT: Statet til segment-timestamp/forsinkelse
+  // Server-lag state (fra backend: tid siden sidste segment blev skrevet)
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
   const [lastSegmentLag, setLastSegmentLag] = useState(null);
+
+  // Player-lag state (forsinkelse fra Hls.js live edge)
+  const [playerLag, setPlayerLag] = useState(null);
 
   // RESET STREAM SEGMENTER VED UNLOAD (og ved refresh)
   useEffect(() => {
     if (!clientId) return;
 
-    // Kald reset-endpoint når streamen "forlades"
     async function cleanupStream() {
       try {
         await fetch(`/api/hls/${clientId}/reset`, { method: "POST" });
@@ -128,14 +118,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   useEffect(() => {
     if (!clientId) return;
     const video = videoRef.current;
-    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
+    // Skift evt. denne URL til din lokale/dev/prod backend:
+    const hlsUrl = `/hls/${clientId}/index.m3u8`;
 
     let hls;
     let manifestChecked = false;
     let stopPolling = false;
     let pollInterval;
 
-    // Kald reset-endpointet før vi starter streamen (hurtig opstart)
     const resetSegments = async () => {
       try {
         await fetch(`/api/hls/${clientId}/reset`, { method: "POST" });
@@ -222,11 +212,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     };
   }, [clientId, refreshKey]);
 
-  // NYT: Poll timestamp for sidste segment når manifestReady
+  // Poll server-side lag (tid siden server modtog sidste segment)
   useEffect(() => {
     if (!clientId || !manifestReady) return;
     let stop = false;
-
     async function pollSegmentLag() {
       while (!stop) {
         try {
@@ -251,9 +240,23 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       }
     }
     pollSegmentLag();
-
     return () => { stop = true; };
   }, [clientId, manifestReady]);
+
+  // Poll player-lag via Hls.js liveSyncPosition vs video.currentTime
+  useEffect(() => {
+    if (!manifestReady) return;
+    let interval;
+    interval = setInterval(() => {
+      const hls = hlsRef.current;
+      const video = videoRef.current;
+      if (hls && video && hls.liveSyncPosition && typeof video.currentTime === "number") {
+        const lag = hls.liveSyncPosition - video.currentTime;
+        setPlayerLag(lag);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [manifestReady]);
 
   // Opdater Sidst set live hvert 5. sekund så længe streamen er live
   useEffect(() => {
@@ -370,20 +373,26 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   Fuld skærm
                 </Button>
               )}
-              {/* Sidst set info og forsinkelsesinfo UNDER knappen */}
+              {/* Sidst set info og lag-info */}
               {lastLive && manifestReady && (
                 <>
                   <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 1 }}>
                     Sidst set: {formatDateTimeWithDay(lastLive)}
                   </Typography>
+                  {/* PLAYER-LAG: hvor langt bagud er brugeren ift. live edge */}
+                  {playerLag !== null && (
+                    <Typography variant="caption" sx={{ color: playerLag < 2 ? "#43a047" : "#f90", mt: 0.5, textAlign: "center", width: "100%" }}>
+                      {playerLag < 1.5
+                        ? "Du ser helt live!"
+                        : `Du ser streamen med ${formatLag(playerLag)} forsinkelse fra live`}
+                    </Typography>
+                  )}
+                  {/* SERVER-LAG: hvor gammelt er serverens seneste segment */}
                   {lastSegmentTimestamp && lastSegmentLag !== null && (
                     <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
-                      {lastSegmentLag < 2
-                        ? "Live (ingen nævneværdig forsinkelse)"
-                        : <>Live (forsinkelse: {formatLag(lastSegmentLag)})</>
-                      }
+                      Seneste segment modtaget for {formatLag(lastSegmentLag)} siden
                       {lastSegmentTimestamp && (
-                        <> – billede modtaget: {formatDateTimeWithDay(new Date(lastSegmentTimestamp))}</>
+                        <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
                       )}
                     </Typography>
                   )}
