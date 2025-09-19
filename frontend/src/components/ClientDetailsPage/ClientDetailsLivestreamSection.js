@@ -142,8 +142,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           const resp = await fetch(`/api/hls/${clientId}/last-segment-info`);
           if (resp.ok) {
             const data = await resp.json();
-            // Debug-log for at se hvad vi får!
-            // console.log("Segment info fra API:", data);
+            console.log("Segment info fra API:", data);
             if (data.timestamp) {
               setLastSegmentTimestamp(data.timestamp);
               const segTime = safeParseDate(data.timestamp).getTime();
@@ -190,6 +189,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       const video = videoRef.current;
       if (hls && video && hls.liveSyncPosition && typeof video.currentTime === "number") {
         const lag = hls.liveSyncPosition - video.currentTime;
+        console.log("liveSyncPosition:", hls.liveSyncPosition, "currentTime:", video.currentTime, "lag:", lag);
         setPlayerLag(lag);
       }
     }, 1000);
@@ -217,9 +217,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   };
 
-  // Livestream indikator tekst (ALTID vis)
+  // Livestream indikator tekst (ALTID vis) + forbedret fallback
   let lagText = "";
-  if (playerLag !== null) {
+  if (playerLag !== null && !isNaN(playerLag)) {
     if (playerLag < 1.5) {
       lagText = "Stream er live";
     } else {
@@ -227,15 +227,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   }
 
-  // fallback: hvis manifestReady=true men lagText er tom, sig "Stream er live"
-  const liveIndicatorValue = (lagText && lagText.length > 0)
-    ? lagText
-    : (manifestReady
-        ? "Stream er live"
-        : "Stream ikke aktiv");
+  // Fallback: hvis playerLag ikke kendes men manifestReady, sig "Stream status ukendt"
+  const liveIndicatorValue =
+    playerLag !== null && !isNaN(playerLag)
+      ? lagText
+      : (manifestReady
+          ? "Stream status ukendt"
+          : "Stream ikke aktiv");
 
-  // Debug-log for timestamp parsing
-  // console.log("lastSegmentTimestamp:", lastSegmentTimestamp, safeParseDate(lastSegmentTimestamp));
+  // Debug-log for timestamp parsing og rendering
+  console.log("lastSegmentTimestamp:", lastSegmentTimestamp, safeParseDate(lastSegmentTimestamp));
+  console.log("playerLag:", playerLag, "lagText:", lagText, "liveIndicatorValue:", liveIndicatorValue);
 
   return (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
@@ -349,7 +351,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             >
               {/* Livestream indikator - altid synlig */}
               <Typography variant="body2" sx={{
-                color: liveIndicatorValue === "Stream er live" ? "#43a047" : "#f90",
+                color: liveIndicatorValue === "Stream er live" ? "#43a047" : (liveIndicatorValue.includes("forsinket") ? "#f90" : "#888"),
                 fontWeight: 700,
                 fontSize: "1.1rem",
                 mb: 1,
