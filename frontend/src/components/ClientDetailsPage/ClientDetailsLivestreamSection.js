@@ -62,7 +62,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   // Debug: Vis lag-værdier i konsollen
   useEffect(() => {
     if (playerLag !== null || lastSegmentLag !== null) {
-      // Fjern evt. hvis du ikke vil have debug log
       console.log("playerLag:", playerLag, "lastSegmentLag:", lastSegmentLag);
     }
   }, [playerLag, lastSegmentLag]);
@@ -221,12 +220,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     let interval;
     interval = setInterval(() => {
       const hls = hlsRef.current;
-      const video = videoRef.current;
-      if (hls && video && typeof hls.liveSyncPosition === "number" && typeof video.currentTime === "number") {
-        // Debug: Udskriv værdierne
-        // console.log("liveSyncPosition", hls.liveSyncPosition, "currentTime", video.currentTime, "lag", hls.liveSyncPosition - video.currentTime);
-        const lag = hls.liveSyncPosition - video.currentTime;
-        setPlayerLag(lag);
+      if (hls && typeof hls.latency === "number") {
+        setPlayerLag(hls.latency);
+      } else if (hls && typeof hls.playbackLatency === "number") {
+        setPlayerLag(hls.playbackLatency);
+      } else {
+        setPlayerLag(null); // fallback til backend
       }
     }, 1000);
     return () => clearInterval(interval);
