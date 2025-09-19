@@ -267,6 +267,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                     display: manifestReady ? "flex" : "none",
                     alignItems: "flex-start",
                     justifyContent: "center",
+                    flexDirection: "column"
                   }}
                 >
                   <video
@@ -286,6 +287,18 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                     }}
                     tabIndex={-1}
                   />
+                  {/* Fuld skærm knap under videoen */}
+                  {manifestReady && (
+                    <Button
+                      startIcon={<FullscreenIcon />}
+                      variant="outlined"
+                      size="small"
+                      sx={{ mt: 2, mb: 1, borderRadius: 2, alignSelf: "flex-start" }}
+                      onClick={handleFullscreen}
+                    >
+                      Fuld skærm
+                    </Button>
+                  )}
                 </Box>
                 {!manifestReady && (
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: 420 }}>
@@ -304,7 +317,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                     height: "100%",
                   }}
                 >
-                  {/* Header */}
+                  {/* Header med statusikon og refresh */}
                   <Box sx={{ display: "flex", alignItems: "center", minHeight: 34 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
                       Stream
@@ -316,9 +329,23 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                       bgcolor: manifestReady ? "#43a047" : "#e53935",
                       boxShadow: "0 0 2px rgba(0,0,0,0.12)",
                       border: "1px solid #ddd",
-                      mr: 0.5,
+                      mr: 1,
                       animation: manifestReady ? "pulsate 2s infinite" : "none"
                     }} />
+                    {/* Opdater-knap nu helt til højre i headeren */}
+                    <Tooltip title="Genindlæs stream">
+                      <span>
+                        <IconButton
+                          aria-label="refresh"
+                          onClick={handleRefresh}
+                          size="small"
+                          disabled={refreshing}
+                          sx={{ ml: 1 }}
+                        >
+                          {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
                   </Box>
                   {/* Statusinfo */}
                   <Box sx={{ textAlign: "left", minWidth: 180, mb: 1 }}>
@@ -334,38 +361,13 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                       Klient ID: {clientId}
                     </Typography>
                   </Box>
-                  {/* Refresh-knap */}
-                  <Box sx={{ display: "flex", alignItems: "center", mt: 0, mb: 1 }}>
-                    <Tooltip title="Genindlæs stream">
-                      <span>
-                        <IconButton
-                          aria-label="refresh"
-                          onClick={handleRefresh}
-                          size="small"
-                          disabled={refreshing}
-                        >
-                          {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Box>
+                  {/* Fjernet refresh-knap herfra */}
                   {error && (
                     <Alert severity="error" sx={{ mb: 2 }}>
                       {error}
                     </Alert>
                   )}
-                  {/* Fullscreen og segmentinfo */}
-                  {manifestReady && (
-                    <Button
-                      startIcon={<FullscreenIcon />}
-                      variant="outlined"
-                      size="small"
-                      sx={{ mt: 2, mb: 1, borderRadius: 2 }}
-                      onClick={handleFullscreen}
-                    >
-                      Fuld skærm
-                    </Button>
-                  )}
+                  {/* Segmentinfo */}
                   {lastSegmentTimestamp && lastSegmentLag !== null && (
                     <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
                       Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
