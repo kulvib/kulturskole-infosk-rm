@@ -352,6 +352,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
                 Klient ID: {clientId}
               </Typography>
+              {/* NYT: Vis tidspunkt for nyeste videoindhold */}
+              {lastSegmentTimestamp && (
+                <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
+                  Nyeste videoindhold: {formatDateTimeWithDay(new Date(lastSegmentTimestamp))}
+                </Typography>
+              )}
               {lastSegmentTimestamp && lastSegmentLag !== null && (
                 <Typography variant="caption" sx={{ color: "#888", mt: 0.5 }}>
                   Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
