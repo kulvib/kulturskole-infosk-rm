@@ -23,7 +23,7 @@ import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-import { useAuth } from "./authcontext";
+import { useAuth } from "../auth/authcontext";
 
 const drawerWidth = 230;
 
