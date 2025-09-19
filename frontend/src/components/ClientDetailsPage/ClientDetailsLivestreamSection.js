@@ -59,6 +59,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   const [lastFetched, setLastFetched] = useState(null);
 
+  // Debug: Vis lag-værdier i konsollen
+  useEffect(() => {
+    if (playerLag !== null || lastSegmentLag !== null) {
+      // Fjern evt. hvis du ikke vil have debug log
+      console.log("playerLag:", playerLag, "lastSegmentLag:", lastSegmentLag);
+    }
+  }, [playerLag, lastSegmentLag]);
+
   useEffect(() => {
     if (!clientId) return;
     let ignore = false;
@@ -176,6 +184,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     };
   }, [clientId, refreshKey]);
 
+  // Poll segment info fra backend
   useEffect(() => {
     if (!clientId || !manifestReady) return;
     let stop = false;
@@ -206,6 +215,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => { stop = true; };
   }, [clientId, manifestReady]);
 
+  // Udregn playerLag fra Hls.js (hvis muligt)
   useEffect(() => {
     if (!manifestReady) return;
     let interval;
@@ -213,6 +223,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       const hls = hlsRef.current;
       const video = videoRef.current;
       if (hls && video && typeof hls.liveSyncPosition === "number" && typeof video.currentTime === "number") {
+        // Debug: Udskriv værdierne
+        // console.log("liveSyncPosition", hls.liveSyncPosition, "currentTime", video.currentTime, "lag", hls.liveSyncPosition - video.currentTime);
         const lag = hls.liveSyncPosition - video.currentTime;
         setPlayerLag(lag);
       }
@@ -251,9 +263,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       video.msRequestFullscreen();
     }
   };
-
-  // Debugging!
-  // console.log("playerLag:", playerLag, "lastSegmentLag:", lastSegmentLag);
 
   const lagStatus = getLagStatus(playerLag, lastSegmentLag);
 
@@ -327,6 +336,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   <Box sx={{ textAlign: "left", minWidth: 180, mb: 1 }}>
                     <Typography variant="body2" sx={{ color: lagStatus.color, fontWeight: 700 }}>
                       {lagStatus.text || "Ingen status"}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "#999" }}>
+                      (Debug: playerLag={playerLag}, lastSegmentLag={lastSegmentLag})
                     </Typography>
                     {lastFetched && (
                       <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
