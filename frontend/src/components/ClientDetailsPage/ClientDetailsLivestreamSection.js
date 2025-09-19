@@ -40,7 +40,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const hlsRef = useRef(null);
   const [manifestReady, setManifestReady] = useState(false);
   const [error, setError] = useState("");
-  const [lastLive, setLastLive] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -94,7 +93,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     const startPlayback = () => {
       setError("");
       setManifestReady(true);
-      setLastLive(new Date());
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = hlsUrl;
       } else if (Hls.isSupported()) {
@@ -212,17 +210,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, [manifestReady]);
 
-  useEffect(() => {
-    let interval;
-    if (manifestReady) {
-      setLastLive(new Date());
-      interval = setInterval(() => {
-        setLastLive(new Date());
-      }, 5000);
-    }
-    return () => clearInterval(interval);
-  }, [manifestReady]);
-
   const handleRefresh = () => {
     setRefreshing(true);
     setManifestReady(false);
@@ -311,39 +298,39 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 height: "100%",
               }}
             >
-              {manifestReady ? (
-                <>
-                  <video
-                    ref={videoRef}
-                    id="livestream-video"
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{
-                      maxWidth: 420,
-                      maxHeight: 320,
-                      borderRadius: 8,
-                      border: "2px solid #444",
-                      boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
-                      background: "#000",
-                      margin: 0,
-                    }}
-                    tabIndex={-1}
-                  />
-                  <Button
-                    startIcon={<FullscreenIcon />}
-                    variant="outlined"
-                    size="small"
-                    sx={{ mt: 2, mb: 1, borderRadius: 2, alignSelf: "flex-start" }}
-                    onClick={handleFullscreen}
-                  >
-                    Fuld skærm
-                  </Button>
-                </>
-              ) : (
+              <video
+                ref={videoRef}
+                id="livestream-video"
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  maxWidth: 420,
+                  maxHeight: 320,
+                  borderRadius: 8,
+                  border: "2px solid #444",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
+                  background: "#000",
+                  margin: 0,
+                  display: manifestReady ? "block" : "none",
+                }}
+                tabIndex={-1}
+              />
+              {!manifestReady && (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: 420 }}>
                   <CircularProgress size={32} />
                 </Box>
+              )}
+              {manifestReady && (
+                <Button
+                  startIcon={<FullscreenIcon />}
+                  variant="outlined"
+                  size="small"
+                  sx={{ mt: 2, mb: 1, borderRadius: 2, alignSelf: "flex-start" }}
+                  onClick={handleFullscreen}
+                >
+                  Fuld skærm
+                </Button>
               )}
             </Box>
           </Grid>
