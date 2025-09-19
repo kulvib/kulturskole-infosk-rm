@@ -1,11 +1,11 @@
 [[redirects]]
-  from = "/api/test"
-  to = "/index.html"
-  status = 200
-  force = true
-
-[[redirects]]
   from = "/api/*"
   to = "https://kulturskole-infosk-rm.onrender.com/api/:splat"
   status = 200
   force = true
+
+# SPA fallback (skal være SIDST!)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
