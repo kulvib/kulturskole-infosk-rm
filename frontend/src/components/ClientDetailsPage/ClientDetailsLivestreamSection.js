@@ -30,7 +30,7 @@ function formatDateTimeWithDay(date) {
   return `${dayName} ${day}.${month} ${year}, kl. ${hour}:${min}:${sec}`;
 }
 
-// NY: Trim mikrosekunder fra timestamp hvis nødvendigt
+// Trim mikrosekunder fra timestamp hvis nødvendigt
 function safeParseDate(ts) {
   if (!ts) return null;
   // Fjern mikrosekunder, fx ".499584" før Z
@@ -187,8 +187,15 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     interval = setInterval(() => {
       const hls = hlsRef.current;
       const video = videoRef.current;
-      if (hls && video && hls.liveSyncPosition && typeof video.currentTime === "number") {
-        const lag = hls.liveSyncPosition - video.currentTime;
+      if (
+        hls &&
+        video &&
+        typeof hls.liveSyncPosition === "number" &&
+        typeof video.currentTime === "number" &&
+        !isNaN(hls.liveSyncPosition) &&
+        !isNaN(video.currentTime)
+      ) {
+        const lag = Math.abs(hls.liveSyncPosition - video.currentTime);
         console.log("liveSyncPosition:", hls.liveSyncPosition, "currentTime:", video.currentTime, "lag:", lag);
         setPlayerLag(lag);
       }
