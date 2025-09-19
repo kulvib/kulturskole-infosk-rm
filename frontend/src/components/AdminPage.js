@@ -64,6 +64,7 @@ export default function AdminPage() {
     username: "",
     password: "",
     password2: "",
+    full_name: "",
     role: "bruger",
     is_active: true,
     school_id: "",
@@ -240,7 +241,7 @@ export default function AdminPage() {
   // Opret bruger
   const handleAddUser = () => {
     setUserError("");
-    const { username, password, password2, role, is_active, school_id } = newUser;
+    const { username, password, password2, full_name, role, is_active, school_id } = newUser;
     if (!username || !password || !password2) {
       setUserError("Brugernavn og begge kodeord skal udfyldes");
       showSnackbar("Brugernavn og begge kodeord skal udfyldes", "error");
@@ -259,6 +260,7 @@ export default function AdminPage() {
     axios.post(`${API_URL}/api/users/`, {
       username,
       password,
+      full_name,
       role: role === "administrator" ? "admin" : "bruger",
       is_active,
       school_id: role === "bruger" ? school_id : undefined
@@ -267,7 +269,7 @@ export default function AdminPage() {
     })
       .then(res => {
         setUsers(Array.isArray(users) ? [...users, res.data] : [res.data]);
-        setNewUser({ username: "", password: "", password2: "", role: "bruger", is_active: true, school_id: "" });
+        setNewUser({ username: "", password: "", password2: "", full_name: "", role: "bruger", is_active: true, school_id: "" });
         showSnackbar("Bruger oprettet!", "success");
       })
       .catch(e => {
@@ -318,7 +320,7 @@ export default function AdminPage() {
 
   const handleEditUser = () => {
     if (!editUser) return;
-    const { id, role, is_active, password, password2 } = editUser;
+    const { id, role, is_active, password, password2, full_name } = editUser;
     if (password && password !== password2) {
       setUserError("Kodeordene matcher ikke");
       showSnackbar("Kodeordene matcher ikke", "error");
@@ -328,6 +330,7 @@ export default function AdminPage() {
       role: role === "administrator" ? "admin" : "bruger",
       is_active,
       password: password ? password : undefined,
+      full_name,
     }, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
@@ -370,7 +373,8 @@ export default function AdminPage() {
       const search = userSearch.trim().toLowerCase();
       return (
         search === "" ||
-        u.username.toLowerCase().includes(search) ||
+        (u.username && u.username.toLowerCase().includes(search)) ||
+        (u.full_name && u.full_name.toLowerCase().includes(search)) ||
         (u.role === "admin" ? "administrator" : "bruger").includes(search) ||
         schoolName.toLowerCase().includes(search)
       );
@@ -382,6 +386,10 @@ export default function AdminPage() {
         case "username":
           aVal = a.username || "";
           bVal = b.username || "";
+          break;
+        case "fullname":
+          aVal = a.full_name || "";
+          bVal = b.full_name || "";
           break;
         case "role":
           aVal = a.role === "admin" ? "administrator" : "bruger";
@@ -653,6 +661,14 @@ export default function AdminPage() {
                 fullWidth
               />
               <TextField
+                label="Fuldt navn"
+                value={newUser.full_name}
+                onChange={e => setNewUser({ ...newUser, full_name: e.target.value })}
+                size="small"
+                sx={inputSx}
+                fullWidth
+              />
+              <TextField
                 label="Kodeord"
                 type={showPassword ? "text" : "password"}
                 value={newUser.password}
@@ -752,7 +768,7 @@ export default function AdminPage() {
                   value={userSearch}
                   onChange={e => setUserSearch(e.target.value)}
                   sx={{ minWidth: 120 }}
-                  placeholder="Søg bruger, rolle, skole..."
+                  placeholder="Søg bruger, navn, rolle, skole..."
                 />
               </Box>
             </Stack>
@@ -767,6 +783,15 @@ export default function AdminPage() {
                     >
                       Brugernavn
                       {userSort.key === "username" &&
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
+                    <TableCell
+                      sx={{ fontWeight: 700, cursor: "pointer" }}
+                      onClick={() => handleUserTableSort("fullname")}
+                    >
+                      Fuldt navn
+                      {userSort.key === "fullname" &&
                         (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
                           : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
@@ -803,13 +828,13 @@ export default function AdminPage() {
                 <TableBody>
                   {loadingUsers ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center">
+                      <TableCell colSpan={7} align="center">
                         <CircularProgress size={24} />
                       </TableCell>
                     </TableRow>
                   ) : getSortedUsers().length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ color: "#888" }}>
+                      <TableCell colSpan={7} align="center" sx={{ color: "#888" }}>
                         Ingen brugere oprettet endnu
                       </TableCell>
                     </TableRow>
@@ -817,6 +842,7 @@ export default function AdminPage() {
                     getSortedUsers().map(user => (
                       <TableRow key={user.id} hover>
                         <TableCell>{user.username}</TableCell>
+                        <TableCell>{user.full_name || ""}</TableCell>
                         <TableCell>{user.role === "admin" ? "administrator" : "bruger"}</TableCell>
                         <TableCell>{user.is_active ? "Aktiv" : "Spærret"}</TableCell>
                         <TableCell>
@@ -857,6 +883,14 @@ export default function AdminPage() {
                 {editUser && (
                   <Stack gap={2} sx={{ mt: 1 }}>
                     <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" sx={inputSx} />
+                    <TextField
+                      label="Fuldt navn"
+                      value={editUser.full_name || ""}
+                      onChange={e => setEditUser({ ...editUser, full_name: e.target.value })}
+                      fullWidth
+                      size="small"
+                      sx={inputSx}
+                    />
                     <FormControl fullWidth size="small" sx={inputSx}>
                       <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                       <Select
