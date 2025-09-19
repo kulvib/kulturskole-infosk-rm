@@ -3,5 +3,3 @@
   to = "https://kulturskole-infosk-rm.onrender.com/api/:splat"
   status = 200
   force = true
-
-# (Eventuelt kan du tilføje flere redirects her, men dette er alt du behøver for at proxy'e alle /api-kald til din FastAPI-backend)
