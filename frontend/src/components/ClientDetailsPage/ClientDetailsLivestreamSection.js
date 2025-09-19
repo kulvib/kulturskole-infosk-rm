@@ -194,7 +194,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   // Poll segment info fra backend
   useEffect(() => {
-    if (!clientId || !manifestReady) return;
+    // Safari: start polling bare clientId findes
+    if (!clientId) return;
+    if (!isSafari() && !manifestReady) return;
     let stop = false;
     async function pollSegmentLag() {
       while (!stop) {
