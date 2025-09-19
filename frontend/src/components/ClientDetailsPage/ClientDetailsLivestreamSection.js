@@ -19,6 +19,7 @@ function formatDateTimeWithDay(date) {
   if (!date) return "";
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
   const d = new Date(date);
+  if (isNaN(d.getTime())) return "Ugyldig dato";
   const dayName = ukedage[d.getDay()];
   const day = d.getDate().toString().padStart(2, "0");
   const month = (d.getMonth() + 1).toString().padStart(2, "0");
@@ -27,6 +28,13 @@ function formatDateTimeWithDay(date) {
   const min = d.getMinutes().toString().padStart(2, "0");
   const sec = d.getSeconds().toString().padStart(2, "0");
   return `${dayName} ${day}.${month} ${year}, kl. ${hour}:${min}:${sec}`;
+}
+
+// NY: Trim mikrosekunder fra timestamp hvis nødvendigt
+function safeParseDate(ts) {
+  if (!ts) return null;
+  // Fjern mikrosekunder, fx ".499584" før Z
+  return new Date(ts.replace(/\.\d+Z$/, "Z"));
 }
 
 function formatLag(lagSeconds) {
@@ -134,9 +142,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           const resp = await fetch(`/api/hls/${clientId}/last-segment-info`);
           if (resp.ok) {
             const data = await resp.json();
+            // Debug-log for at se hvad vi får!
+            // console.log("Segment info fra API:", data);
             if (data.timestamp) {
               setLastSegmentTimestamp(data.timestamp);
-              const segTime = new Date(data.timestamp).getTime();
+              const segTime = safeParseDate(data.timestamp).getTime();
               const now = Date.now();
               setLastSegmentLag((now - segTime) / 1000);
             } else {
@@ -223,6 +233,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     : (manifestReady
         ? "Stream er live"
         : "Stream ikke aktiv");
+
+  // Debug-log for timestamp parsing
+  // console.log("lastSegmentTimestamp:", lastSegmentTimestamp, safeParseDate(lastSegmentTimestamp));
 
   return (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
@@ -355,14 +368,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               {/* NYT: Vis tidspunkt for nyeste videoindhold */}
               {lastSegmentTimestamp && (
                 <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
-                  Nyeste videoindhold: {formatDateTimeWithDay(new Date(lastSegmentTimestamp))}
+                  Nyeste videoindhold: {formatDateTimeWithDay(safeParseDate(lastSegmentTimestamp))}
                 </Typography>
               )}
               {lastSegmentTimestamp && lastSegmentLag !== null && (
                 <Typography variant="caption" sx={{ color: "#888", mt: 0.5 }}>
                   Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
                   {lastSegmentTimestamp && (
-                    <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
+                    <> ({formatDateTimeWithDay(safeParseDate(lastSegmentTimestamp))})</>
                   )}
                 </Typography>
               )}
