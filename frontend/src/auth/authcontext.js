@@ -10,15 +10,22 @@ import Typography from "@mui/material/Typography";
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(localStorage.getItem("token") || "");
-  const [user, setUser] = useState(
-    JSON.parse(localStorage.getItem("user")) || null
-  );
+  // Start med at læse fra localStorage, hvis muligt:
+  const [token, setToken] = useState(() => localStorage.getItem("token") || "");
+  const [user, setUser] = useState(() => {
+    try {
+      const u = localStorage.getItem("user");
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
+    }
+  });
   const [showWarning, setShowWarning] = useState(false);
   const inactivityTimer = useRef();
   const warningTimer = useRef();
   const navigate = useNavigate();
 
+  // Opdater localStorage når token eller user ændres
   useEffect(() => {
     if (token) {
       localStorage.setItem("token", token);
@@ -32,9 +39,10 @@ export function AuthProvider({ children }) {
     }
   }, [token, user]);
 
-  const loginUser = (newToken, newUser) => {
+  // Korrekt initialisering på login
+  const loginUser = (newToken, userData) => {
     setToken(newToken);
-    setUser(newUser);
+    setUser(userData);
   };
 
   const logoutUser = () => {
@@ -45,13 +53,12 @@ export function AuthProvider({ children }) {
     navigate("/login", { replace: true });
   };
 
-  // Nulstil (start ny) 5 min periode ved aktivitet
+  // Inaktivitets-timer
   const resetInactivityTimer = () => {
     setShowWarning(false);
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     if (warningTimer.current) clearTimeout(warningTimer.current);
 
-    // Advarsel efter 4 min (240.000 ms), logout efter 5 min (300.000 ms)
     warningTimer.current = setTimeout(() => {
       setShowWarning(true);
       inactivityTimer.current = setTimeout(() => {
@@ -82,7 +89,7 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   const handleContinueSession = () => {
-    resetInactivityTimer(); // Starter ny 5 min periode
+    resetInactivityTimer();
   };
 
   return (
