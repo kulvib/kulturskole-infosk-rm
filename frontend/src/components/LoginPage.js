@@ -41,22 +41,28 @@ export default function LoginPage() {
     setStatus("Forbinder til server...");
     setLoading(true);
 
-    // Simulér netværksforsinkelse (kun til test/demo - kan fjernes)
-    // await new Promise((r) => setTimeout(r, 500));
-
     try {
       setStatus("Tjekker brugernavn og kodeord...");
       const data = await login(username, password);
 
       if (data && data.access_token) {
         setStatus("Login gennemført. Omdirigerer...");
-        loginUser(data.access_token);
+
+        // Her: Byg brugerobjektet til AuthContext
+        let userObj;
+        if (data.user) {
+          userObj = data.user;
+        } else {
+          // Hvis backend kun returnerer token, brug input
+          userObj = { username, fullName: username };
+        }
+
+        loginUser(data.access_token, userObj);
       } else {
         setError("Uventet svar fra serveren.");
         setStatus("Login mislykkedes.");
       }
     } catch (err) {
-      // Ekstra: Netværksfejl eller 401-Unauthorized
       if (err && err.message) {
         if (
           err.message.toLowerCase().includes("network") ||
@@ -166,7 +172,6 @@ export default function LoginPage() {
               "Log ind"
             )}
           </Button>
-          {/* Statusbesked */}
           {(status || error) && (
             <Typography
               sx={{
@@ -180,7 +185,6 @@ export default function LoginPage() {
               {status}
             </Typography>
           )}
-          {/* Fejl vises med Alert for mere synlighed */}
           {error && (
             <Alert severity="error" sx={{ mt: 1 }}>
               {error}
