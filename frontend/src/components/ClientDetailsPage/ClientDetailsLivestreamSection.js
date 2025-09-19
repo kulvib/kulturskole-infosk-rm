@@ -247,6 +247,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   // === Fallback logic for lagText ===
   let lagText = "";
 
+  // Debugging logs
+  console.log("playerLag:", playerLag);
+  console.log("lastSegmentLag:", lastSegmentLag);
+
   // Først: brug playerLag, hvis tilgængelig (Hls.js aktiv)
   if (playerLag !== null) {
     if (playerLag < 1.5) {
@@ -263,6 +267,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       lagText = `Stream er ${formatLag(lastSegmentLag)} forsinket`;
     }
   }
+
+  console.log("lagText:", lagText);
 
   // Læg video og tekst i grid side om side, så de starter i samme top
   return (
