@@ -81,7 +81,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
     async function maybeResetSegments() {
       try {
-        const resp = await fetch(`/api/hls/${clientId}/last-segment-info`);
+        const resp = await fetch(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
         let doReset = false;
         if (!resp.ok) {
           doReset = true;
@@ -201,9 +201,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     async function pollSegmentLag() {
       while (!stop) {
         try {
-          const resp = await fetch(`/api/hls/${clientId}/last-segment-info`);
+          // Tilføj cache-buster for at undgå Netlify/Safari cache!
+          const resp = await fetch(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
           if (resp.ok) {
             const data = await resp.json();
+            console.log("last-segment-info response", data); // ekstra debug!
             if (data.timestamp) {
               setLastSegmentTimestamp(data.timestamp);
               const segTime = new Date(data.timestamp).getTime();
