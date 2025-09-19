@@ -10,7 +10,7 @@ import Typography from "@mui/material/Typography";
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  // Start med at læse fra localStorage, hvis muligt:
+  // Initialiser fra localStorage hvis muligt
   const [token, setToken] = useState(() => localStorage.getItem("token") || "");
   const [user, setUser] = useState(() => {
     try {
