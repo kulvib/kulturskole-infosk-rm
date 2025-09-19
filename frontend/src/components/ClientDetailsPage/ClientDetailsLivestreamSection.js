@@ -35,8 +35,17 @@ function formatLag(lagSeconds) {
   return `${Math.round(lagSeconds / 60)} minutter`;
 }
 
+function isSafari() {
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
+
 function getLagStatus(playerLag, lastSegmentLag) {
-  let lag = playerLag !== null ? playerLag : lastSegmentLag;
+  let lag;
+  if (isSafari()) {
+    lag = lastSegmentLag;
+  } else {
+    lag = playerLag !== null ? playerLag : lastSegmentLag;
+  }
   if (lag == null) return { text: "", color: "#888" };
   if (lag < 2) return { text: "Live", color: "#43a047" };
   if (lag < 30) return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#f90" };
@@ -336,6 +345,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                     <Typography variant="body2" sx={{ color: lagStatus.color, fontWeight: 700 }}>
                       {lagStatus.text || "Ingen status"}
                     </Typography>
+                    {isSafari() && (
+                      <Typography variant="caption" sx={{ color: "#f90" }}>
+                        (Safari: Forsinkelse er estimeret ud fra serverens sidste segment)
+                      </Typography>
+                    )}
                     <Typography variant="caption" sx={{ color: "#999" }}>
                       (Debug: playerLag={playerLag}, lastSegmentLag={lastSegmentLag})
                     </Typography>
