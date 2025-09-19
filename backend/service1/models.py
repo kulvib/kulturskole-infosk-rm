@@ -29,6 +29,7 @@ class User(SQLModel, table=True):
     role: str = "admin"
     is_active: bool = True
     school_id: Optional[int] = Field(default=None, foreign_key="school.id")
+    full_name: Optional[str] = None  # <-- tilføjet
 
 class ClientBase(SQLModel):
     name: str
