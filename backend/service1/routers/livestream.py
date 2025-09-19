@@ -117,10 +117,17 @@ def get_last_segment_info(client_id: str):
     if not os.path.exists(seg_path):
         return {"error": "segment missing"}
     mtime = os.path.getmtime(seg_path)
-    return {
+    # Lav timestamp uden mikrosekunder
+    dt = datetime.utcfromtimestamp(mtime).replace(microsecond=0)
+    timestamp_iso = dt.isoformat() + "Z"
+    result = {
         "segment": last_segment,
-        "timestamp": datetime.utcfromtimestamp(mtime).isoformat() + "Z"
+        "timestamp": timestamp_iso,
+        "epoch": mtime
     }
+    # Debug-print
+    # import json; print("[DEBUG][last-segment-info]", json.dumps(result))
+    return result
 
 @router.post("/hls/{client_id}/reset")
 def reset_hls(client_id: str):
