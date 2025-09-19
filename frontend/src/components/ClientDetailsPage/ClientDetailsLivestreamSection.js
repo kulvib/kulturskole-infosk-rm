@@ -322,15 +322,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 </Box>
               )}
               {manifestReady && (
-                <Button
-                  startIcon={<FullscreenIcon />}
-                  variant="outlined"
-                  size="small"
-                  sx={{ mt: 2, mb: 1, borderRadius: 2, alignSelf: "flex-start" }}
-                  onClick={handleFullscreen}
-                >
-                  Fuld skærm
-                </Button>
+                <Box sx={{ display: "flex", justifyContent: "center", width: "100%" }}>
+                  <Button
+                    startIcon={<FullscreenIcon />}
+                    variant="outlined"
+                    size="small"
+                    sx={{ mt: 2, mb: 1, borderRadius: 2 }}
+                    onClick={handleFullscreen}
+                  >
+                    Fuld skærm
+                  </Button>
+                </Box>
               )}
             </Box>
           </Grid>
@@ -340,11 +342,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: { xs: "flex-start", md: "flex-start" },
+                alignItems: { xs: "flex-end", md: "flex-end" },
                 justifyContent: "flex-start",
                 height: "100%",
                 gap: 1,
-                mt: 1
+                mt: 1,
+                textAlign: "right"
               }}
             >
               <Typography variant="body2" sx={{ color: lagText === "Stream er live" ? "#43a047" : "#f90", fontWeight: 500 }}>
