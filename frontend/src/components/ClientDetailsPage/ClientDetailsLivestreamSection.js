@@ -35,6 +35,14 @@ function formatLag(lagSeconds) {
   return `${Math.round(lagSeconds / 60)} minutter`;
 }
 
+function getLagStatus(playerLag, lastSegmentLag) {
+  let lag = playerLag !== null ? playerLag : lastSegmentLag;
+  if (lag == null) return { text: "", color: "#888" };
+  if (lag < 2) return { text: "Live", color: "#43a047" };
+  if (lag < 30) return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#f90" };
+  return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#e53935" };
+}
+
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -204,7 +212,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     interval = setInterval(() => {
       const hls = hlsRef.current;
       const video = videoRef.current;
-      if (hls && video && hls.liveSyncPosition && typeof video.currentTime === "number") {
+      if (hls && video && typeof hls.liveSyncPosition === "number" && typeof video.currentTime === "number") {
         const lag = hls.liveSyncPosition - video.currentTime;
         setPlayerLag(lag);
       }
@@ -244,33 +252,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   };
 
-  // === Fallback logic for lagText ===
-  let lagText = "";
+  // Debugging!
+  // console.log("playerLag:", playerLag, "lastSegmentLag:", lastSegmentLag);
 
-  // Debugging logs
-  console.log("playerLag:", playerLag);
-  console.log("lastSegmentLag:", lastSegmentLag);
+  const lagStatus = getLagStatus(playerLag, lastSegmentLag);
 
-  // Først: brug playerLag, hvis tilgængelig (Hls.js aktiv)
-  if (playerLag !== null) {
-    if (playerLag < 1.5) {
-      lagText = "Stream er live";
-    } else {
-      lagText = `Stream er ${formatLag(playerLag)} forsinket`;
-    }
-  }
-  // Fallback: hvis playerLag ikke er tilgængelig, brug lastSegmentLag fra backend
-  else if (lastSegmentLag !== null) {
-    if (lastSegmentLag < 1.5) {
-      lagText = "Stream er live";
-    } else {
-      lagText = `Stream er ${formatLag(lastSegmentLag)} forsinket`;
-    }
-  }
-
-  console.log("lagText:", lagText);
-
-  // Læg video og tekst i grid side om side, så de starter i samme top
   return (
     <Grid container spacing={0}>
       <Grid item xs={12}>
@@ -339,8 +325,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   </Box>
                   {/* Statusinfo */}
                   <Box sx={{ textAlign: "left", minWidth: 180, mb: 1 }}>
-                    <Typography variant="body2" sx={{ color: lagText === "Stream er live" ? "#43a047" : "#f90", fontWeight: 500 }}>
-                      {lagText}
+                    <Typography variant="body2" sx={{ color: lagStatus.color, fontWeight: 700 }}>
+                      {lagStatus.text || "Ingen status"}
                     </Typography>
                     {lastFetched && (
                       <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
