@@ -30,13 +30,6 @@ function formatDateTimeWithDay(date) {
   return `${dayName} ${day}.${month} ${year}, kl. ${hour}:${min}:${sec}`;
 }
 
-// Trim mikrosekunder fra timestamp hvis nødvendigt
-function safeParseDate(ts) {
-  if (!ts) return null;
-  // Fjern mikrosekunder, fx ".499584" før Z
-  return new Date(ts.replace(/\.\d+Z$/, "Z"));
-}
-
 function formatLag(lagSeconds) {
   if (lagSeconds < 1.5) return "";
   if (lagSeconds < 60) return `${Math.round(lagSeconds)} sekunder`;
@@ -145,9 +138,15 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             console.log("Segment info fra API:", data);
             if (data.timestamp) {
               setLastSegmentTimestamp(data.timestamp);
-              const segTime = safeParseDate(data.timestamp).getTime();
-              const now = Date.now();
-              setLastSegmentLag((now - segTime) / 1000);
+              // Brug epoch direkte for lag hvis muligt
+              const nowEpoch = Date.now() / 1000;
+              if (typeof data.epoch === "number") {
+                setLastSegmentLag(nowEpoch - data.epoch);
+              } else {
+                // fallback til Date parsing
+                const segTime = new Date(data.timestamp).getTime();
+                setLastSegmentLag((Date.now() - segTime) / 1000);
+              }
             } else {
               setLastSegmentTimestamp(null);
               setLastSegmentLag(null);
@@ -243,7 +242,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           : "Stream ikke aktiv");
 
   // Debug-log for timestamp parsing og rendering
-  console.log("lastSegmentTimestamp:", lastSegmentTimestamp, safeParseDate(lastSegmentTimestamp));
+  console.log("lastSegmentTimestamp:", lastSegmentTimestamp);
   console.log("playerLag:", playerLag, "lagText:", lagText, "liveIndicatorValue:", liveIndicatorValue);
 
   return (
@@ -377,14 +376,14 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               {/* NYT: Vis tidspunkt for nyeste videoindhold */}
               {lastSegmentTimestamp && (
                 <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
-                  Nyeste videoindhold: {formatDateTimeWithDay(safeParseDate(lastSegmentTimestamp))}
+                  Nyeste videoindhold: {formatDateTimeWithDay(new Date(lastSegmentTimestamp))}
                 </Typography>
               )}
               {lastSegmentTimestamp && lastSegmentLag !== null && (
                 <Typography variant="caption" sx={{ color: "#888", mt: 0.5 }}>
                   Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
                   {lastSegmentTimestamp && (
-                    <> ({formatDateTimeWithDay(safeParseDate(lastSegmentTimestamp))})</>
+                    <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
                   )}
                 </Typography>
               )}
