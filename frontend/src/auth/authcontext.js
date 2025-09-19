@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -10,10 +11,13 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
-  const [username, setUsername] = useState(localStorage.getItem("username") || "");
+  const [user, setUser] = useState(
+    JSON.parse(localStorage.getItem("user")) || null
+  );
   const [showWarning, setShowWarning] = useState(false);
   const inactivityTimer = useRef();
   const warningTimer = useRef();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (token) {
@@ -21,25 +25,24 @@ export function AuthProvider({ children }) {
     } else {
       localStorage.removeItem("token");
     }
-    if (username) {
-      localStorage.setItem("username", username);
+    if (user) {
+      localStorage.setItem("user", JSON.stringify(user));
     } else {
-      localStorage.removeItem("username");
+      localStorage.removeItem("user");
     }
-  }, [token, username]);
+  }, [token, user]);
 
-  // loginUser skal nu tage både token og username
-  const loginUser = (newToken, newUsername) => {
+  const loginUser = (newToken, newUser) => {
     setToken(newToken);
-    setUsername(newUsername);
+    setUser(newUser);
   };
 
   const logoutUser = () => {
     setToken("");
-    setUsername("");
+    setUser(null);
     localStorage.removeItem("token");
-    localStorage.removeItem("username");
-    window.location.href = "/login";
+    localStorage.removeItem("user");
+    navigate("/login", { replace: true });
   };
 
   // Nulstil (start ny) 5 min periode ved aktivitet
@@ -83,7 +86,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ token, username, loginUser, logoutUser }}>
+    <AuthContext.Provider value={{ token, user, loginUser, logoutUser }}>
       {children}
       <Dialog open={showWarning}>
         <DialogTitle>Inaktivitet registreret</DialogTitle>
