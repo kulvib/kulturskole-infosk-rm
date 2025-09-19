@@ -17,6 +17,7 @@ import {
   useMediaQuery,
   CssBaseline,
   Avatar,
+  Skeleton,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import HomeIcon from "@mui/icons-material/Home";
@@ -39,7 +40,7 @@ export default function Dashboard() {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { username } = useAuth();
+  const { user } = useAuth();
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
@@ -58,6 +59,13 @@ export default function Dashboard() {
                   ? location.pathname === "/"
                   : location.pathname.startsWith(item.match)
               }
+              onClick={() => { if (isMobile) setMobileOpen(false); }}
+              aria-current={
+                (item.path === "/" && location.pathname === "/") ||
+                (item.path !== "/" && location.pathname.startsWith(item.match))
+                  ? "page"
+                  : undefined
+              }
               sx={{
                 borderRadius: 2,
                 mx: 1,
@@ -72,7 +80,8 @@ export default function Dashboard() {
                       : "inherit",
                 "&:hover, &:focus": {
                   backgroundColor: "#b2ebf2",
-                  outline: "2px solid #036", // Fokusindikator
+                  outline: "2px solid",
+                  outlineColor: theme.palette.primary.main,
                   outlineOffset: "-2px",
                 },
                 transition: "background-color 0.2s",
@@ -94,7 +103,7 @@ export default function Dashboard() {
                           : location.pathname.startsWith(item.match)
                             ? 700
                             : 400,
-                      color: "#036",
+                      color: theme.palette.primary.dark,
                     }}
                   >
                     {item.text}
@@ -115,7 +124,7 @@ export default function Dashboard() {
         position="fixed"
         sx={{
           zIndex: (theme) => theme.zIndex.drawer + 1,
-          background: "#036",
+          background: theme.palette.primary.main,
           color: "#fff",
           boxShadow: 2,
           height: 64,
@@ -140,12 +149,21 @@ export default function Dashboard() {
             Kulturskolen Viborg - infoskærm administration
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Avatar sx={{ width: 28, height: 28, bgcolor: "#015"}}>
-              {username ? username.charAt(0).toUpperCase() : "?"}
-            </Avatar>
-            <Typography variant="subtitle2" sx={{ color: "#fff", opacity: 0.8, mr: 2 }}>
-              {username}
-            </Typography>
+            {user ? (
+              <>
+                <Avatar sx={{ width: 28, height: 28, bgcolor: theme.palette.secondary.main }}>
+                  {user.username ? user.username.charAt(0).toUpperCase() : "?"}
+                </Avatar>
+                <Typography variant="subtitle2" sx={{ color: "#fff", opacity: 0.8, mr: 2 }}>
+                  {user.fullName || user.username}
+                </Typography>
+              </>
+            ) : (
+              <>
+                <Skeleton variant="circular" width={28} height={28} />
+                <Skeleton variant="text" width={60} sx={{ bgcolor: "grey.700" }} />
+              </>
+            )}
             <LogoutButton color="inherit" />
           </Box>
         </Toolbar>
@@ -165,8 +183,8 @@ export default function Dashboard() {
             "& .MuiDrawer-paper": {
               width: drawerWidth,
               boxSizing: "border-box",
-              background: "#eee",
-              borderRight: "1px solid #e0e0e0",
+              background: theme.palette.background.default,
+              borderRight: `1px solid ${theme.palette.divider}`,
             },
           }}
         >
