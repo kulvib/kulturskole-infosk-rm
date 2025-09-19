@@ -10,6 +10,7 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
+  const [username, setUsername] = useState(localStorage.getItem("username") || "");
   const [showWarning, setShowWarning] = useState(false);
   const inactivityTimer = useRef();
   const warningTimer = useRef();
@@ -20,15 +21,24 @@ export function AuthProvider({ children }) {
     } else {
       localStorage.removeItem("token");
     }
-  }, [token]);
+    if (username) {
+      localStorage.setItem("username", username);
+    } else {
+      localStorage.removeItem("username");
+    }
+  }, [token, username]);
 
-  const loginUser = (newToken) => {
+  // loginUser skal nu tage både token og username
+  const loginUser = (newToken, newUsername) => {
     setToken(newToken);
+    setUsername(newUsername);
   };
 
   const logoutUser = () => {
     setToken("");
+    setUsername("");
     localStorage.removeItem("token");
+    localStorage.removeItem("username");
     window.location.href = "/login";
   };
 
@@ -73,7 +83,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ token, loginUser, logoutUser }}>
+    <AuthContext.Provider value={{ token, username, loginUser, logoutUser }}>
       {children}
       <Dialog open={showWarning}>
         <DialogTitle>Inaktivitet registreret</DialogTitle>
