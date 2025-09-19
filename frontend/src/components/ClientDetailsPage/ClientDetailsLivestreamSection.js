@@ -19,7 +19,6 @@ function formatDateTimeWithDay(date) {
   if (!date) return "";
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
   const d = new Date(date);
-  if (isNaN(d.getTime())) return "Ugyldig dato";
   const dayName = ukedage[d.getDay()];
   const day = d.getDate().toString().padStart(2, "0");
   const month = (d.getMonth() + 1).toString().padStart(2, "0");
@@ -41,52 +40,73 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const hlsRef = useRef(null);
   const [manifestReady, setManifestReady] = useState(false);
   const [error, setError] = useState("");
+  const [lastLive, setLastLive] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
   const [lastSegmentLag, setLastSegmentLag] = useState(null);
+
   const [playerLag, setPlayerLag] = useState(null);
+
   const [lastFetched, setLastFetched] = useState(null);
 
-  // Setup HLS only once per (clientId, refreshKey)
+  useEffect(() => {
+    if (!clientId) return;
+    let ignore = false;
+
+    async function maybeResetSegments() {
+      try {
+        const resp = await fetch(`/api/hls/${clientId}/last-segment-info`);
+        let doReset = false;
+        if (!resp.ok) {
+          doReset = true;
+        } else {
+          const data = await resp.json();
+          if (!data.timestamp || data.error) {
+            doReset = true;
+          } else {
+            const segTime = new Date(data.timestamp).getTime();
+            if (Date.now() - segTime > 5 * 60 * 1000) {
+              doReset = true;
+            }
+          }
+        }
+        if (!ignore && doReset) {
+          await fetch(`/api/hls/${clientId}/reset`, { method: "POST" });
+        }
+      } catch (e) {}
+    }
+    maybeResetSegments();
+    return () => { ignore = true; };
+  }, [clientId, refreshKey]);
+
   useEffect(() => {
     if (!clientId) return;
     const video = videoRef.current;
-    if (!video) return;
-
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
+
     let hls;
-    let destroyed = false;
+    let manifestChecked = false;
+    let stopPolling = false;
+    let pollInterval;
 
-    async function setupStream() {
+    const startPlayback = () => {
       setError("");
-      setManifestReady(false);
-      // First, check if manifest exists
-      try {
-        const resp = await fetch(hlsUrl, { method: "HEAD" });
-        if (!resp.ok) throw new Error("Streamen ikke fundet endnu");
-        setManifestReady(true);
-      } catch (e) {
-        setError("Kan ikke finde klientstream endnu.");
-        setManifestReady(false);
-        return;
-      }
-
-      // Setup HLS
+      setManifestReady(true);
+      setLastLive(new Date());
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = hlsUrl;
-        video.load();
       } else if (Hls.isSupported()) {
         hls = new Hls();
         hlsRef.current = hls;
         hls.loadSource(hlsUrl);
         hls.attachMedia(video);
         hls.on(Hls.Events.ERROR, (event, data) => {
-          if (data.fatal && !destroyed) {
+          if (data.fatal) {
             setError("Streamen blev afbrudt. Prøver igen ...");
             setManifestReady(false);
-            hls.destroy();
+            cleanup();
           }
         });
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -96,12 +116,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       video.muted = true;
       video.autoplay = true;
       video.playsInline = true;
-    }
+    };
 
-    setupStream();
-
-    return () => {
-      destroyed = true;
+    const cleanup = () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
@@ -111,23 +128,48 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         videoRef.current.load();
       }
     };
+
+    const poll = async () => {
+      try {
+        const resp = await fetch(hlsUrl, { method: "HEAD" });
+        if (resp.ok) {
+          setLastFetched(new Date());
+          if (!manifestChecked) {
+            manifestChecked = true;
+            setError("");
+            setManifestReady(true);
+            startPlayback();
+          }
+        } else {
+          throw new Error("404");
+        }
+      } catch (e) {
+        if (manifestChecked) {
+          setError("Streamen blev afbrudt eller forsvandt. Prøver igen ...");
+          setManifestReady(false);
+          cleanup();
+        } else {
+          setError("Kan ikke finde klientstream endnu.");
+        }
+        manifestChecked = false;
+      }
+    };
+
+    poll();
+    pollInterval = setInterval(() => {
+      if (stopPolling) return;
+      poll();
+    }, manifestReady ? 5000 : 250);
+
+    return () => {
+      stopPolling = true;
+      clearInterval(pollInterval);
+      cleanup();
+    };
   }, [clientId, refreshKey]);
 
-  // Safari/Native stream fallback: mark manifestReady if video plays
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const handle = setInterval(() => {
-      if (video.readyState >= 2 && !manifestReady) {
-        setManifestReady(true);
-      }
-    }, 1000);
-    return () => clearInterval(handle);
-  }, [manifestReady]);
-
-  // Poll for lag/segment info
-  useEffect(() => {
-    if (!clientId) return;
+    if (!clientId || !manifestReady) return;
     let stop = false;
     async function pollSegmentLag() {
       while (!stop) {
@@ -135,18 +177,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           const resp = await fetch(`/api/hls/${clientId}/last-segment-info`);
           if (resp.ok) {
             const data = await resp.json();
-            console.log("Segment info fra API:", data);
             if (data.timestamp) {
               setLastSegmentTimestamp(data.timestamp);
-              // Brug epoch direkte for lag hvis muligt
-              const nowEpoch = Date.now() / 1000;
-              if (typeof data.epoch === "number") {
-                setLastSegmentLag(nowEpoch - data.epoch);
-              } else {
-                // fallback til Date parsing
-                const segTime = new Date(data.timestamp).getTime();
-                setLastSegmentLag((Date.now() - segTime) / 1000);
-              }
+              const segTime = new Date(data.timestamp).getTime();
+              const now = Date.now();
+              setLastSegmentLag((now - segTime) / 1000);
             } else {
               setLastSegmentTimestamp(null);
               setLastSegmentLag(null);
@@ -161,46 +196,32 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
     pollSegmentLag();
     return () => { stop = true; };
-  }, [clientId, refreshKey]);
+  }, [clientId, manifestReady]);
 
-  // Poll for lastFetched
   useEffect(() => {
-    if (!clientId) return;
-    let stop = false;
-    async function pollFetched() {
-      while (!stop) {
-        try {
-          const resp = await fetch(`https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`, { method: "HEAD" });
-          if (resp.ok) setLastFetched(new Date());
-        } catch {}
-        await new Promise(res => setTimeout(res, 5000));
-      }
-    }
-    pollFetched();
-    return () => { stop = true; };
-  }, [clientId, refreshKey]);
-
-  // Poll for player lag (only with HLS)
-  useEffect(() => {
+    if (!manifestReady) return;
     let interval;
     interval = setInterval(() => {
       const hls = hlsRef.current;
       const video = videoRef.current;
-      if (
-        hls &&
-        video &&
-        typeof hls.liveSyncPosition === "number" &&
-        typeof video.currentTime === "number" &&
-        !isNaN(hls.liveSyncPosition) &&
-        !isNaN(video.currentTime)
-      ) {
-        const lag = Math.abs(hls.liveSyncPosition - video.currentTime);
-        console.log("liveSyncPosition:", hls.liveSyncPosition, "currentTime:", video.currentTime, "lag:", lag);
+      if (hls && video && hls.liveSyncPosition && typeof video.currentTime === "number") {
+        const lag = hls.liveSyncPosition - video.currentTime;
         setPlayerLag(lag);
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [manifestReady]);
+
+  useEffect(() => {
+    let interval;
+    if (manifestReady) {
+      setLastLive(new Date());
+      interval = setInterval(() => {
+        setLastLive(new Date());
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [manifestReady]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -223,9 +244,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   };
 
-  // Livestream indikator tekst (ALTID vis) + forbedret fallback
   let lagText = "";
-  if (playerLag !== null && !isNaN(playerLag)) {
+  if (playerLag !== null) {
     if (playerLag < 1.5) {
       lagText = "Stream er live";
     } else {
@@ -233,173 +253,142 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   }
 
-  // Fallback: hvis playerLag ikke kendes men manifestReady, sig "Stream status ukendt"
-  const liveIndicatorValue =
-    playerLag !== null && !isNaN(playerLag)
-      ? lagText
-      : (manifestReady
-          ? "Stream status ukendt"
-          : "Stream ikke aktiv");
-
-  // Debug-log for timestamp parsing og rendering
-  console.log("lastSegmentTimestamp:", lastSegmentTimestamp);
-  console.log("playerLag:", playerLag, "lagText:", lagText, "liveIndicatorValue:", liveIndicatorValue);
-
+  // Læg video og tekst i grid side om side, så de starter i samme top
   return (
-    <Card elevation={2} sx={{ borderRadius: 2 }}>
-      <CardContent>
-        <Grid container spacing={2} alignItems="flex-start">
-          {/* Kolonne 1: Header/kontrol */}
-          <Grid item xs={12} md={4}>
-            <Box sx={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-              alignItems: { xs: "flex-start", md: "flex-start" },
-              height: "100%",
-              mt: 1,
-            }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Stream
-                </Typography>
-                <Box sx={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: "50%",
-                  bgcolor: manifestReady ? "#43a047" : "#e53935",
-                  boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-                  border: "1px solid #ddd",
-                  animation: manifestReady ? "pulsate 2s infinite" : "none"
-                }} />
-                <Tooltip title="Genindlæs stream">
-                  <span>
-                    <IconButton
-                      aria-label="refresh"
-                      onClick={handleRefresh}
-                      size="small"
-                      disabled={refreshing}
-                    >
-                      {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              </Box>
-              {error && (
-                <Alert severity="error" sx={{ mt: 2 }}>
-                  {error}
-                </Alert>
-              )}
-            </Box>
-          </Grid>
-          {/* Kolonne 2: Video + Fuld skærm */}
-          <Grid item xs={12} md={4}>
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "flex-start",
-                height: "100%",
-              }}
-            >
-              <video
-                ref={videoRef}
-                id="livestream-video"
-                autoPlay
-                playsInline
-                muted
-                style={{
-                  maxWidth: 420,
-                  maxHeight: 320,
-                  borderRadius: 8,
-                  border: "2px solid #444",
-                  boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
-                  background: "#000",
-                  margin: 0,
-                  display: manifestReady ? "block" : "none",
-                }}
-                tabIndex={-1}
-              />
-              {!manifestReady && (
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: 420 }}>
-                  <CircularProgress size={32} />
+    <Grid container spacing={0}>
+      <Grid item xs={12}>
+        <Card elevation={2} sx={{ borderRadius: 2 }}>
+          <CardContent sx={{ pb: 1.5 }}>
+            <Grid container alignItems="flex-start" spacing={2}>
+              {/* Venstre: Video */}
+              <Grid item>
+                <Box
+                  sx={{
+                    display: manifestReady ? "flex" : "none",
+                    alignItems: "flex-start",
+                    justifyContent: "center",
+                  }}
+                >
+                  <video
+                    ref={videoRef}
+                    id="livestream-video"
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{
+                      maxWidth: 420,
+                      maxHeight: 320,
+                      borderRadius: 8,
+                      border: "2px solid #444",
+                      boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
+                      background: "#000",
+                      margin: 0,
+                    }}
+                    tabIndex={-1}
+                  />
                 </Box>
-              )}
-              {manifestReady && (
-                <Box sx={{ display: "flex", justifyContent: "center", width: "100%" }}>
-                  <Button
-                    startIcon={<FullscreenIcon />}
-                    variant="outlined"
-                    size="small"
-                    sx={{ mt: 2, mb: 1, borderRadius: 2 }}
-                    onClick={handleFullscreen}
-                  >
-                    Fuld skærm
-                  </Button>
-                </Box>
-              )}
-            </Box>
-          </Grid>
-          {/* Kolonne 3: Livestream-indikator + Statusinfo */}
-          <Grid item xs={12} md={4}>
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: { xs: "flex-end", md: "flex-end" },
-                justifyContent: "flex-start",
-                height: "100%",
-                gap: 1,
-                mt: 1,
-                textAlign: "right"
-              }}
-            >
-              {/* Livestream indikator - altid synlig */}
-              <Typography variant="body2" sx={{
-                color: liveIndicatorValue === "Stream er live" ? "#43a047" : (liveIndicatorValue.includes("forsinket") ? "#f90" : "#888"),
-                fontWeight: 700,
-                fontSize: "1.1rem",
-                mb: 1,
-                letterSpacing: "0.02em",
-              }}>
-                {liveIndicatorValue}
-              </Typography>
-              {lastFetched && (
-                <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
-                  Sidste stream hentet: {formatDateTimeWithDay(lastFetched)}
-                </Typography>
-              )}
-              <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
-                Klient ID: {clientId}
-              </Typography>
-              {/* NYT: Vis tidspunkt for nyeste videoindhold */}
-              {lastSegmentTimestamp && (
-                <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
-                  Nyeste videoindhold: {formatDateTimeWithDay(new Date(lastSegmentTimestamp))}
-                </Typography>
-              )}
-              {lastSegmentTimestamp && lastSegmentLag !== null && (
-                <Typography variant="caption" sx={{ color: "#888", mt: 0.5 }}>
-                  Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
-                  {lastSegmentTimestamp && (
-                    <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
+                {!manifestReady && (
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: 420 }}>
+                    <CircularProgress size={32} />
+                  </Box>
+                )}
+              </Grid>
+              {/* Højre: Tekst og kontrol */}
+              <Grid item xs>
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    justifyContent: "flex-start",
+                    height: "100%",
+                  }}
+                >
+                  {/* Header */}
+                  <Box sx={{ display: "flex", alignItems: "center", minHeight: 34 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
+                      Stream
+                    </Typography>
+                    <Box sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      bgcolor: manifestReady ? "#43a047" : "#e53935",
+                      boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+                      border: "1px solid #ddd",
+                      mr: 0.5,
+                      animation: manifestReady ? "pulsate 2s infinite" : "none"
+                    }} />
+                  </Box>
+                  {/* Statusinfo */}
+                  <Box sx={{ textAlign: "left", minWidth: 180, mb: 1 }}>
+                    <Typography variant="body2" sx={{ color: lagText === "Stream er live" ? "#43a047" : "#f90", fontWeight: 500 }}>
+                      {lagText}
+                    </Typography>
+                    {lastFetched && (
+                      <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
+                        Sidste stream hentet: {formatDateTimeWithDay(lastFetched)}
+                      </Typography>
+                    )}
+                    <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
+                      Klient ID: {clientId}
+                    </Typography>
+                  </Box>
+                  {/* Refresh-knap */}
+                  <Box sx={{ display: "flex", alignItems: "center", mt: 0, mb: 1 }}>
+                    <Tooltip title="Genindlæs stream">
+                      <span>
+                        <IconButton
+                          aria-label="refresh"
+                          onClick={handleRefresh}
+                          size="small"
+                          disabled={refreshing}
+                        >
+                          {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Box>
+                  {error && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {error}
+                    </Alert>
                   )}
-                </Typography>
-              )}
-            </Box>
-          </Grid>
-        </Grid>
-        <style>
-          {`
-            @keyframes pulsate {
-              0% { transform: scale(1); opacity: 1; background: #43a047; }
-              50% { transform: scale(1.25); opacity: 0.5; background: #43a047; }
-              100% { transform: scale(1); opacity: 1; background: #43a047; }
-            }
-          `}
-        </style>
-      </CardContent>
-    </Card>
+                  {/* Fullscreen og segmentinfo */}
+                  {manifestReady && (
+                    <Button
+                      startIcon={<FullscreenIcon />}
+                      variant="outlined"
+                      size="small"
+                      sx={{ mt: 2, mb: 1, borderRadius: 2 }}
+                      onClick={handleFullscreen}
+                    >
+                      Fuld skærm
+                    </Button>
+                  )}
+                  {lastSegmentTimestamp && lastSegmentLag !== null && (
+                    <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
+                      Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
+                      {lastSegmentTimestamp && (
+                        <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
+                      )}
+                    </Typography>
+                  )}
+                </Box>
+              </Grid>
+            </Grid>
+            <style>
+              {`
+                @keyframes pulsate {
+                  0% { transform: scale(1); opacity: 1; background: #43a047; }
+                  50% { transform: scale(1.25); opacity: 0.5; background: #43a047; }
+                  100% { transform: scale(1); opacity: 1; background: #43a047; }
+                }
+              `}
+            </style>
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
   );
 }
