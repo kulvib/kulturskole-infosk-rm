@@ -253,23 +253,66 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   }
 
-  // Læg video og tekst i grid side om side, så de starter i samme top
   return (
-    <Grid container spacing={0}>
-      <Grid item xs={12}>
-        <Card elevation={2} sx={{ borderRadius: 2 }}>
-          <CardContent sx={{ pb: 1.5 }}>
-            <Grid container alignItems="flex-start" spacing={2}>
-              {/* Venstre: Video */}
-              <Grid item>
-                <Box
-                  sx={{
-                    display: manifestReady ? "flex" : "none",
-                    alignItems: "flex-start",
-                    justifyContent: "center",
-                    flexDirection: "column"
-                  }}
-                >
+    <Card elevation={2} sx={{ borderRadius: 2 }}>
+      <CardContent>
+        <Grid container spacing={2} alignItems="flex-start">
+          {/* Kolonne 1: Header/kontrol */}
+          <Grid item xs={12} md={4}>
+            <Box sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              alignItems: { xs: "flex-start", md: "flex-start" },
+              height: "100%",
+              mt: 1,
+            }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Stream
+                </Typography>
+                <Box sx={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: "50%",
+                  bgcolor: manifestReady ? "#43a047" : "#e53935",
+                  boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+                  border: "1px solid #ddd",
+                  animation: manifestReady ? "pulsate 2s infinite" : "none"
+                }} />
+                <Tooltip title="Genindlæs stream">
+                  <span>
+                    <IconButton
+                      aria-label="refresh"
+                      onClick={handleRefresh}
+                      size="small"
+                      disabled={refreshing}
+                    >
+                      {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Box>
+              {error && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {error}
+                </Alert>
+              )}
+            </Box>
+          </Grid>
+          {/* Kolonne 2: Video + Fuld skærm */}
+          <Grid item xs={12} md={4}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "flex-start",
+                height: "100%",
+              }}
+            >
+              {manifestReady ? (
+                <>
                   <video
                     ref={videoRef}
                     id="livestream-video"
@@ -287,110 +330,68 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                     }}
                     tabIndex={-1}
                   />
-                  {/* Fuld skærm knap under videoen */}
-                  {manifestReady && (
-                    <Button
-                      startIcon={<FullscreenIcon />}
-                      variant="outlined"
-                      size="small"
-                      sx={{ mt: 2, mb: 1, borderRadius: 2, alignSelf: "flex-start" }}
-                      onClick={handleFullscreen}
-                    >
-                      Fuld skærm
-                    </Button>
-                  )}
+                  <Button
+                    startIcon={<FullscreenIcon />}
+                    variant="outlined"
+                    size="small"
+                    sx={{ mt: 2, mb: 1, borderRadius: 2, alignSelf: "flex-start" }}
+                    onClick={handleFullscreen}
+                  >
+                    Fuld skærm
+                  </Button>
+                </>
+              ) : (
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: 420 }}>
+                  <CircularProgress size={32} />
                 </Box>
-                {!manifestReady && (
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: 420 }}>
-                    <CircularProgress size={32} />
-                  </Box>
-                )}
-              </Grid>
-              {/* Højre: Tekst og kontrol */}
-              <Grid item xs>
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    justifyContent: "flex-start",
-                    height: "100%",
-                  }}
-                >
-                  {/* Header med statusikon og refresh */}
-                  <Box sx={{ display: "flex", alignItems: "center", minHeight: 34 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
-                      Stream
-                    </Typography>
-                    <Box sx={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      bgcolor: manifestReady ? "#43a047" : "#e53935",
-                      boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-                      border: "1px solid #ddd",
-                      mr: 1,
-                      animation: manifestReady ? "pulsate 2s infinite" : "none"
-                    }} />
-                    {/* Opdater-knap nu helt til højre i headeren */}
-                    <Tooltip title="Genindlæs stream">
-                      <span>
-                        <IconButton
-                          aria-label="refresh"
-                          onClick={handleRefresh}
-                          size="small"
-                          disabled={refreshing}
-                          sx={{ ml: 1 }}
-                        >
-                          {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Box>
-                  {/* Statusinfo */}
-                  <Box sx={{ textAlign: "left", minWidth: 180, mb: 1 }}>
-                    <Typography variant="body2" sx={{ color: lagText === "Stream er live" ? "#43a047" : "#f90", fontWeight: 500 }}>
-                      {lagText}
-                    </Typography>
-                    {lastFetched && (
-                      <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
-                        Sidste stream hentet: {formatDateTimeWithDay(lastFetched)}
-                      </Typography>
-                    )}
-                    <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
-                      Klient ID: {clientId}
-                    </Typography>
-                  </Box>
-                  {/* Fjernet refresh-knap herfra */}
-                  {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {error}
-                    </Alert>
+              )}
+            </Box>
+          </Grid>
+          {/* Kolonne 3: Statusinfo */}
+          <Grid item xs={12} md={4}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: { xs: "flex-start", md: "flex-start" },
+                justifyContent: "flex-start",
+                height: "100%",
+                gap: 1,
+                mt: 1
+              }}
+            >
+              <Typography variant="body2" sx={{ color: lagText === "Stream er live" ? "#43a047" : "#f90", fontWeight: 500 }}>
+                {lagText}
+              </Typography>
+              {lastFetched && (
+                <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
+                  Sidste stream hentet: {formatDateTimeWithDay(lastFetched)}
+                </Typography>
+              )}
+              <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
+                Klient ID: {clientId}
+              </Typography>
+              {lastSegmentTimestamp && lastSegmentLag !== null && (
+                <Typography variant="caption" sx={{ color: "#888", mt: 0.5 }}>
+                  Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
+                  {lastSegmentTimestamp && (
+                    <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
                   )}
-                  {/* Segmentinfo */}
-                  {lastSegmentTimestamp && lastSegmentLag !== null && (
-                    <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
-                      Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
-                      {lastSegmentTimestamp && (
-                        <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
-                      )}
-                    </Typography>
-                  )}
-                </Box>
-              </Grid>
-            </Grid>
-            <style>
-              {`
-                @keyframes pulsate {
-                  0% { transform: scale(1); opacity: 1; background: #43a047; }
-                  50% { transform: scale(1.25); opacity: 0.5; background: #43a047; }
-                  100% { transform: scale(1); opacity: 1; background: #43a047; }
-                }
-              `}
-            </style>
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
+                </Typography>
+              )}
+            </Box>
+          </Grid>
+        </Grid>
+        <style>
+          {`
+            @keyframes pulsate {
+              0% { transform: scale(1); opacity: 1; background: #43a047; }
+              50% { transform: scale(1.25); opacity: 0.5; background: #43a047; }
+              100% { transform: scale(1); opacity: 1; background: #43a047; }
+            }
+          `}
+        </style>
+      </CardContent>
+    </Card>
   );
 }
