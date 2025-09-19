@@ -24,6 +24,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 class Token(BaseModel):
     access_token: str
     token_type: str
+    # user er ikke i response_model men sendes alligevel i dict
 
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -56,8 +57,21 @@ def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token = create_access_token(data={"sub": user.username, "role": getattr(user, "role", "admin")})
-    return {"access_token": access_token, "token_type": "bearer"}
+    access_token = create_access_token(data={
+        "sub": user.username,
+        "role": getattr(user, "role", "admin")
+    })
+    # Byg bruger-objekt til frontend. Hvis du har et fullName-felt, brug det!
+    user_data = {
+        "username": user.username,
+        "role": getattr(user, "role", "admin"),
+        # Tilføj evt. "fullName": user.full_name, hvis du har det
+    }
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user_data
+    }
 
 def get_current_admin_user(
     token: str = Depends(oauth2_scheme),
