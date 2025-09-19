@@ -244,12 +244,23 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   };
 
+  // === Fallback logic for lagText ===
   let lagText = "";
+
+  // Først: brug playerLag, hvis tilgængelig (Hls.js aktiv)
   if (playerLag !== null) {
     if (playerLag < 1.5) {
       lagText = "Stream er live";
     } else {
       lagText = `Stream er ${formatLag(playerLag)} forsinket`;
+    }
+  }
+  // Fallback: hvis playerLag ikke er tilgængelig, brug lastSegmentLag fra backend
+  else if (lastSegmentLag !== null) {
+    if (lastSegmentLag < 1.5) {
+      lagText = "Stream er live";
+    } else {
+      lagText = `Stream er ${formatLag(lastSegmentLag)} forsinket`;
     }
   }
 
