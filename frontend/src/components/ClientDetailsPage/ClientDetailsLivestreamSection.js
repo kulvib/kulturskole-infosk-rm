@@ -10,14 +10,14 @@ import {
   IconButton,
   Tooltip,
   Grid,
-  Button
+  Button,
+  Stack,
+  Divider,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
-/**
- * Læs program-date-time fra manifest for præcis latency (baseret på det segment der faktisk afspilles)
- */
+// Helper functions
 async function fetchLatestProgramDateTime(hlsUrl) {
   try {
     const resp = await fetch(hlsUrl + "?cachebust=" + Date.now());
@@ -30,7 +30,7 @@ async function fetchLatestProgramDateTime(hlsUrl) {
         lastDateTime = lines[i].substring(25);
       }
     }
-    return lastDateTime; // ISO8601 string eller null
+    return lastDateTime;
   } catch {
     return null;
   }
@@ -91,7 +91,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   const [lastFetched, setLastFetched] = useState(null);
 
-  // NYT: State til auto-refresh besked
+  // Auto-refresh besked
   const [autoRefreshed, setAutoRefreshed] = useState(false);
 
   useEffect(() => {
@@ -301,10 +301,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   // Auto-refresh hvert 45. sekund
   useEffect(() => {
     const interval = setInterval(() => {
-      setAutoRefreshed(true); // Sæt beskedflag
+      setAutoRefreshed(true);
       setManifestReady(false);
       setRefreshKey(prev => prev + 1);
-    }, 45000); // 45 sekunder
+    }, 45000);
     return () => clearInterval(interval);
   }, []);
 
@@ -370,155 +370,159 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   const lagStatus = getLagStatus(sanitizedLag, lastSegmentLag);
 
+  // === 3-kolonne layout ===
   return (
-    <Grid container spacing={0}>
-      <Grid item xs={12}>
-        <Card elevation={2} sx={{ borderRadius: 2 }}>
-          <CardContent sx={{ pb: 1.5 }}>
-            <Grid container alignItems="flex-start" spacing={2}>
-              <Grid item>
-                <Box
-                  sx={{
-                    display: manifestReady ? "flex" : "none",
-                    alignItems: "flex-start",
-                    justifyContent: "center",
-                  }}
-                >
-                  <video
-                    ref={videoRef}
-                    id="livestream-video"
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{
-                      maxWidth: 420,
-                      maxHeight: 320,
-                      borderRadius: 8,
-                      border: "2px solid #444",
-                      boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
-                      background: "#000",
-                      margin: 0,
-                    }}
-                    tabIndex={-1}
-                  />
-                </Box>
-                {!manifestReady && (
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: 420 }}>
-                    <CircularProgress size={32} />
-                  </Box>
-                )}
-              </Grid>
-              <Grid item xs>
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    justifyContent: "flex-start",
-                    height: "100%",
-                  }}
-                >
-                  <Box sx={{ display: "flex", alignItems: "center", minHeight: 34 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
-                      Stream
-                    </Typography>
-                    <Box sx={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      bgcolor: manifestReady ? "#43a047" : "#e53935",
-                      boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-                      border: "1px solid #ddd",
-                      mr: 0.5,
-                      animation: manifestReady ? "pulsate 2s infinite" : "none"
-                    }} />
-                  </Box>
-                  <Box sx={{ textAlign: "left", minWidth: 180, mb: 1 }}>
-                    <Typography variant="body2" sx={{ color: lagStatus.color, fontWeight: 700 }}>
-                      {lagStatus.text || "Ingen status"}
-                    </Typography>
-                    {isSafari() && (
-                      <Typography variant="caption" sx={{ color: "#f90" }}>
-                        (Safari: Forsinkelse er estimeret ud fra serverens sidste segment)
-                      </Typography>
-                    )}
-                    <Typography variant="caption" sx={{ color: "#999" }}>
-                      (Debug: playerLag={playerLag}, manifestProgramLag={manifestProgramLag}, backendLag={lastSegmentLag}, lagType={lagType})
-                    </Typography>
-                    {lastFetched && (
-                      <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
-                        Sidste stream hentet: {formatDateTimeWithDay(lastFetched)}
-                      </Typography>
-                    )}
-                    <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
-                      Klient ID: {clientId}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: "flex", alignItems: "center", mt: 0, mb: 1 }}>
-                    <Tooltip title="Genindlæs stream">
-                      <span>
-                        <IconButton
-                          aria-label="refresh"
-                          onClick={handleRefresh}
-                          size="small"
-                          disabled={refreshing}
-                        >
-                          {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Box>
-                  {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {error}
-                    </Alert>
-                  )}
-                  {autoRefreshed && (
-                    <Alert severity="info" sx={{ mb: 2 }}>
-                      Streamen blev genstartet automatisk for at sikre fortsat live-afspilning.
-                    </Alert>
-                  )}
-                  {manifestReady && (
-                    <Button
-                      startIcon={<FullscreenIcon />}
-                      variant="outlined"
-                      size="small"
-                      sx={{ mt: 2, mb: 1, borderRadius: 2 }}
-                      onClick={handleFullscreen}
-                    >
-                      Fuld skærm
-                    </Button>
-                  )}
-                  {(manifestProgramDateTime || lastSegmentTimestamp) && sanitizedLag !== null && (
-                    <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
-                      Seneste program-date-time:{" "}
-                      {manifestProgramDateTime
-                        ? formatDateTimeWithDay(new Date(manifestProgramDateTime))
-                        : lastSegmentTimestamp
-                          ? formatDateTimeWithDay(new Date(lastSegmentTimestamp))
-                          : ""}
-                      <br />
-                      {sanitizedLag < 1.5 ? "mindre end 2 sekunder" : formatLag(sanitizedLag)} siden
-                      {lagType === "player" && " (player)"}
-                      {lagType === "manifest" && " (manifest)"}
-                      {lagType === "backend" && " (backend)"}
-                    </Typography>
-                  )}
-                </Box>
-              </Grid>
-            </Grid>
-            <style>
-              {`
-                @keyframes pulsate {
-                  0% { transform: scale(1); opacity: 1; background: #43a047; }
-                  50% { transform: scale(1.25); opacity: 0.5; background: #43a047; }
-                  100% { transform: scale(1); opacity: 1; background: #43a047; }
-                }
-              `}
-            </style>
-          </CardContent>
-        </Card>
+    <Card elevation={2} sx={{ borderRadius: 2, p: 2 }}>
+      <Grid container spacing={2} alignItems="flex-start">
+        {/* Kolonne 1 */}
+        <Grid item xs={12} md={3}>
+          <Stack spacing={1}>
+            {/* Første linje: Stream, statusikon, refresh */}
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
+                Stream
+              </Typography>
+              <Box
+                sx={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  bgcolor: manifestReady ? "#43a047" : "#e53935",
+                  border: "1px solid #ddd",
+                  mr: 1,
+                  animation: manifestReady ? "pulsate 2s infinite" : "none"
+                }}
+              />
+              <Tooltip title="Genindlæs stream">
+                <span>
+                  <IconButton
+                    aria-label="refresh"
+                    onClick={handleRefresh}
+                    size="small"
+                    disabled={refreshing}
+                  >
+                    {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Box>
+            {/* Popop advarsler/status */}
+            <Box>
+              {error && (
+                <Alert severity="error" sx={{ mb: 1 }}>
+                  {error}
+                </Alert>
+              )}
+              {autoRefreshed && (
+                <Alert severity="info" sx={{ mb: 1 }}>
+                  Streamen blev genstartet automatisk for at sikre fortsat live-afspilning.
+                </Alert>
+              )}
+            </Box>
+          </Stack>
+        </Grid>
+        {/* Kolonne 2 */}
+        <Grid item xs={12} md={5}>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center"
+            }}
+          >
+            <Box
+              sx={{
+                display: manifestReady ? "flex" : "none",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <video
+                ref={videoRef}
+                id="livestream-video"
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  maxWidth: 420,
+                  maxHeight: 320,
+                  borderRadius: 8,
+                  border: "2px solid #444",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
+                  background: "#000",
+                  margin: 0,
+                }}
+                tabIndex={-1}
+              />
+            </Box>
+            {!manifestReady && (
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: 420 }}>
+                <CircularProgress size={32} />
+              </Box>
+            )}
+            {manifestReady && (
+              <Button
+                startIcon={<FullscreenIcon />}
+                variant="outlined"
+                size="small"
+                sx={{ mt: 2, borderRadius: 2, alignSelf: "center" }}
+                onClick={handleFullscreen}
+              >
+                Fuld skærm
+              </Button>
+            )}
+          </Box>
+        </Grid>
+        {/* Kolonne 3 */}
+        <Grid item xs={12} md={4}>
+          <Stack spacing={1}>
+            {/* Forsinkelse */}
+            <Typography variant="body1" sx={{ color: lagStatus.color, fontWeight: 700 }}>
+              {lagStatus.text || "Ingen status"}
+            </Typography>
+            {/* Klient ID */}
+            <Typography variant="body2" sx={{ color: "#888" }}>
+              Klient ID: {clientId}
+            </Typography>
+            {/* Seneste program-date-time */}
+            {(manifestProgramDateTime || lastSegmentTimestamp) && (
+              <Typography variant="body2" sx={{ color: "#888" }}>
+                Sidste manifest hentet:{" "}
+                {manifestProgramDateTime
+                  ? formatDateTimeWithDay(new Date(manifestProgramDateTime))
+                  : lastSegmentTimestamp
+                    ? formatDateTimeWithDay(new Date(lastSegmentTimestamp))
+                    : ""}
+              </Typography>
+            )}
+            {/* Sidste stream hentet */}
+            {lastFetched && (
+              <Typography variant="body2" sx={{ color: "#888" }}>
+                Sidste kontakt til serveren: {formatDateTimeWithDay(lastFetched)}
+              </Typography>
+            )}
+            {/* Debug */}
+            <Divider sx={{ my: 1 }} />
+            <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace" }}>
+              (Debug: playerLag={playerLag}, manifestProgramLag={manifestProgramLag}, backendLag={lastSegmentLag}, lagType={lagType})
+            </Typography>
+            {isSafari() && (
+              <Typography variant="caption" sx={{ color: "#f90" }}>
+                (Safari: Forsinkelse er estimeret ud fra serverens sidste segment)
+              </Typography>
+            )}
+          </Stack>
+        </Grid>
       </Grid>
-    </Grid>
+      <style>
+        {`
+          @keyframes pulsate {
+            0% { transform: scale(1); opacity: 1; background: #43a047; }
+            50% { transform: scale(1.25); opacity: 0.5; background: #43a047; }
+            100% { transform: scale(1); opacity: 1; background: #43a047; }
+          }
+        `}
+      </style>
+    </Card>
   );
 }
