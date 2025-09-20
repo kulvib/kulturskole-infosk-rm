@@ -551,43 +551,68 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               </Typography>
             )}
             <Divider sx={{ my: 1 }} />
-            <Typography
-              variant="caption"
+            <Box
               sx={{
-                color: "#999",
-                fontFamily: '"Courier New", Courier, monospace',
-                textAlign: "left",
-                lineHeight: 1.5,
+                background: "#f7f7f7",
+                borderRadius: 1,
+                p: 1,
+                mt: 1,
+                mb: 1,
+                display: 'inline-block'
               }}
             >
-              Debug: playerLag={playerLag}, manifestProgramLag={manifestProgramLag}, backendLag={lastSegmentLag}, lagType={lagType}
-            </Typography>
-            {!isSafari() && (
               <Typography
                 variant="caption"
                 sx={{
-                  color: "#999",
+                  color: "#111",
                   fontFamily: '"Courier New", Courier, monospace',
-                  textAlign: "left",
-                  lineHeight: 1.5,
+                  fontWeight: 700,
+                  letterSpacing: 0.2,
+                  display: "block",
+                  mb: 0.5,
                 }}
               >
-                Segment: {currentSegment}
+                Debug info:
               </Typography>
-            )}
-            {isSafari() && (
               <Typography
                 variant="caption"
                 sx={{
-                  color: "#f90",
+                  color: "#222",
                   fontFamily: '"Courier New", Courier, monospace',
-                  textAlign: "left",
-                  lineHeight: 1.5,
+                  display: "block",
                 }}
               >
-                Safari browser: segmentnummer ikke tilgængelig. Forsinkelse er estimeret ud fra serverens sidste segment
+                playerLag={<b>{playerLag ?? "-"}</b>}, manifestProgramLag={<b>{manifestProgramLag ?? "-"}</b>}, backendLag={<b>{lastSegmentLag ?? "-"}</b>}, lagType={<b>{lagType}</b>}
               </Typography>
-            )}
+              {!isSafari() && (
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: "#444",
+                    fontFamily: '"Courier New", Courier, monospace',
+                    textAlign: "left",
+                    mt: 1,
+                  }}
+                >
+                  Segment: <b>{currentSegment}</b>
+                </Typography>
+              )}
+              {isSafari() && (
+                <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+                  <span role="img" aria-label="advarsel" style={{ fontSize: "1.2em", marginRight: 4 }}>⚠️</span>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "#b25c00",
+                      fontFamily: '"Courier New", Courier, monospace',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Safari: Segmentnummer vises ikke. Forsinkelse er kun estimeret ud fra serverens sidste segment.
+                  </Typography>
+                </Box>
+              )}
+            </Box>
           </Stack>
         </Grid>
       </Grid>
