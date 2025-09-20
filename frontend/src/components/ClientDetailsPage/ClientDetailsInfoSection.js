@@ -13,18 +13,20 @@ import {
   TableContainer,
   TableRow,
   Box,
-  IconButton
+  IconButton,
+  useMediaQuery
 } from "@mui/material";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import { useTheme } from "@mui/material/styles";
 
 // Fælles StatusBadge med 2 sekunders puls animation
-function StatusBadge({ color, text, animate = false }) {
+function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
       <Box sx={{
-        width: 10,
-        height: 10,
+        width: isMobile ? 8 : 10,
+        height: isMobile ? 8 : 10,
         borderRadius: "50%",
         bgcolor: color,
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
@@ -32,7 +34,7 @@ function StatusBadge({ color, text, animate = false }) {
         mr: 1,
         animation: animate ? "pulsate 2s infinite" : "none"
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none" }}>
+      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : undefined }}>
         {text}
       </Typography>
       {animate && (
@@ -60,14 +62,14 @@ function StatusBadge({ color, text, animate = false }) {
 }
 
 // Online/offline badge med 2s puls, grøn/rød
-function OnlineStatusBadge({ isOnline }) {
+function OnlineStatusBadge({ isOnline, isMobile=false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
-  return <StatusBadge color={color} text={text} animate={true} />;
+  return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
 }
 
 // State badge med 2s puls på farvede states, ikke på "ukendt"
-function StateBadge({ state }) {
+function StateBadge({ state, isMobile=false }) {
   let color = "grey.400";
   let text = state || "ukendt";
   let animate = false;
@@ -98,7 +100,7 @@ function StateBadge({ state }) {
         animate = false;
     }
   }
-  return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} />;
+  return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
 }
 
 function formatDateShort(dt) {
@@ -121,21 +123,22 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
     powerOff: data.offTime || ""
   };
 }
-function StatusText({ status }) {
+function StatusText({ status, isMobile=false }) {
   return (
     <Typography
       variant="body2"
       sx={{
         fontWeight: 600,
         color: status === "on" ? "#43a047" : "#e53935",
-        textTransform: "lowercase"
+        textTransform: "lowercase",
+        fontSize: isMobile ? 12 : undefined
       }}
     >
       {status.toLowerCase()}
     </Typography>
   );
 }
-function ClientPowerShortTable({ markedDays }) {
+function ClientPowerShortTable({ markedDays, isMobile=false }) {
   const days = [];
   const now = new Date();
   for (let i = 0; i < 3; i++) {
@@ -143,13 +146,13 @@ function ClientPowerShortTable({ markedDays }) {
     d.setDate(now.getDate() + i);
     days.push(d);
   }
-  const cellStyle = { whiteSpace: "nowrap", py: 0, px: 1.625 };
+  const cellStyle = { whiteSpace: "nowrap", py: 0, px: isMobile ? 1 : 1.625, fontSize: isMobile ? 12 : 14 };
 
   return (
-    <TableContainer>
+    <TableContainer sx={isMobile ? { maxWidth: "100vw" } : {}}>
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ height: 30 }}>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Dato</TableCell>
             <TableCell sx={cellStyle}>Status</TableCell>
             <TableCell sx={cellStyle}>Tænd</TableCell>
@@ -160,9 +163,9 @@ function ClientPowerShortTable({ markedDays }) {
           {days.map((dt) => {
             const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
-              <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: 30 }}>
+              <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: isMobile ? 22 : 30 }}>
                 <TableCell sx={cellStyle}>{formatDateShort(dt)}</TableCell>
-                <TableCell sx={cellStyle}><StatusText status={status} /></TableCell>
+                <TableCell sx={cellStyle}><StatusText status={status} isMobile={isMobile} /></TableCell>
                 <TableCell sx={cellStyle}>
                   {status === "on" && powerOn ? powerOn : ""}
                 </TableCell>
@@ -236,55 +239,57 @@ function formatUptime(uptimeStr) {
 
   return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
 }
-function SystemInfoTable({ client, uptime, lastSeen }) {
+function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
   const cellStyle = {
     border: 0,
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: 0.5,
+    pr: isMobile ? 0.25 : 0.5,
     py: 0,
     verticalAlign: "middle",
-    height: 30,
+    height: isMobile ? 22 : 30,
+    fontSize: isMobile ? 12 : 14,
   };
   const valueCellStyle = {
     border: 0,
-    pl: 0.5,
+    pl: isMobile ? 0.25 : 0.5,
     py: 0,
     verticalAlign: "middle",
-    height: 30,
+    height: isMobile ? 22 : 30,
+    fontSize: isMobile ? 12 : 14,
   };
   return (
     <TableContainer>
       <Table size="small" aria-label="systeminfo">
         <TableBody>
-          <TableRow sx={{ height: 30 }}>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
                 {client.ubuntu_version || "ukendt"}
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30 }}>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Oppetid:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
                 {formatUptime(uptime)}
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30 }}>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Sidst set:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
                 {formatDateTime(lastSeen, true)}
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30 }}>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Tilføjet:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
+              <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
                 {formatDateTime(client.created_at, true)}
               </Box>
             </TableCell>
@@ -296,7 +301,7 @@ function SystemInfoTable({ client, uptime, lastSeen }) {
 }
 
 // Helper for clipboard copy
-function CopyField({ value }) {
+function CopyField({ value, isMobile=false }) {
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = () => {
@@ -307,17 +312,17 @@ function CopyField({ value }) {
   };
 
   return (
-    <Box sx={{ display: "flex", alignItems: "center", lineHeight: "30px" }}>
-      <span>{value}</span>
+    <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
+      <span style={{ fontSize: isMobile ? 12 : undefined }}>{value}</span>
       {value && value !== "ukendt" && (
         <Tooltip title={copied ? "Kopieret!" : "Kopier"} arrow>
           <IconButton
             aria-label="kopier"
             onClick={handleCopy}
-            size="small"
-            sx={{ ml: 0.5, p: 0, height: "1em", width: "1em" }}
+            size={isMobile ? "small" : "small"}
+            sx={{ ml: 0.5, p: 0, height: isMobile ? "1em" : "1.4em", width: isMobile ? "1em" : "1.4em" }}
           >
-            <ContentCopyIcon sx={{ fontSize: "0.8em", verticalAlign: "middle" }} />
+            <ContentCopyIcon sx={{ fontSize: isMobile ? "0.8em" : "1em", verticalAlign: "middle" }} />
           </IconButton>
         </Tooltip>
       )}
@@ -325,49 +330,51 @@ function CopyField({ value }) {
   );
 }
 
-function NetworkInfoTable({ client }) {
+function NetworkInfoTable({ client, isMobile=false }) {
   const cellStyle = {
     border: 0,
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: 0.5,
+    pr: isMobile ? 0.25 : 0.5,
     py: 0,
     verticalAlign: "middle",
-    height: 30,
+    height: isMobile ? 22 : 30,
+    fontSize: isMobile ? 12 : 14,
   };
   const valueCellStyle = {
     border: 0,
-    pl: 0.5,
+    pl: isMobile ? 0.25 : 0.5,
     py: 0,
     verticalAlign: "middle",
-    height: 30,
+    height: isMobile ? 22 : 30,
+    fontSize: isMobile ? 12 : 14,
   };
   return (
     <TableContainer>
       <Table size="small" aria-label="netværksinfo">
         <TableBody>
-          <TableRow sx={{ height: 30 }}>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>IP-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <CopyField value={client.wifi_ip_address || "ukendt"} />
+              <CopyField value={client.wifi_ip_address || "ukendt"} isMobile={isMobile} />
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30 }}>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <CopyField value={client.wifi_mac_address || "ukendt"} />
+              <CopyField value={client.wifi_mac_address || "ukendt"} isMobile={isMobile} />
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30 }}>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>IP-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <CopyField value={client.lan_ip_address || "ukendt"} />
+              <CopyField value={client.lan_ip_address || "ukendt"} isMobile={isMobile} />
             </TableCell>
           </TableRow>
-          <TableRow sx={{ height: 30 }}>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <CopyField value={client.lan_mac_address || "ukendt"} />
+              <CopyField value={client.lan_mac_address || "ukendt"} isMobile={isMobile} />
             </TableCell>
           </TableRow>
         </TableBody>
@@ -384,13 +391,16 @@ export default function ClientDetailsInfoSection({
   calendarDialogOpen,
   setCalendarDialogOpen,
 }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
   return (
-    <Grid container spacing={1}>
+    <Grid container spacing={isMobile ? 0.5 : 1}>
       <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-          <CardContent>
-            <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1 }}>
+        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+          <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : undefined }}>
                 Kalender
               </Typography>
               <Tooltip title="Vis kalender">
@@ -401,46 +411,46 @@ export default function ClientDetailsInfoSection({
                     sx={{
                       minWidth: 0,
                       color: "text.secondary",
-                      fontSize: "0.85rem",
+                      fontSize: isMobile ? "0.8rem" : "0.85rem",
                       textTransform: "none",
-                      px: 1,
+                      px: isMobile ? 0.5 : 1,
                       verticalAlign: "middle",
-                      borderRadius: 8
+                      borderRadius: isMobile ? 5 : 8
                     }}
                     onClick={() => setCalendarDialogOpen(true)}
                   >
-                    <ArrowForwardIosIcon sx={{ fontSize: 16 }} />
+                    <ArrowForwardIosIcon sx={{ fontSize: isMobile ? 13 : 16 }} />
                   </Button>
                 </span>
               </Tooltip>
             </Box>
-            <ClientPowerShortTable markedDays={markedDays} />
+            <ClientPowerShortTable markedDays={markedDays} isMobile={isMobile} />
           </CardContent>
         </Card>
       </Grid>
       <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-          <CardContent>
-            <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+          <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
                 Systeminfo
               </Typography>
-              <StateBadge state={client.state} />
+              <StateBadge state={client.state} isMobile={isMobile} />
             </Box>
-            <SystemInfoTable client={client} uptime={uptime} lastSeen={lastSeen} />
+            <SystemInfoTable client={client} uptime={uptime} lastSeen={lastSeen} isMobile={isMobile} />
           </CardContent>
         </Card>
       </Grid>
       <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={{ borderRadius: 2, height: "100%" }}>
-          <CardContent>
-            <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+          <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
                 Netværksinfo
               </Typography>
-              <OnlineStatusBadge isOnline={client.isOnline} />
+              <OnlineStatusBadge isOnline={client.isOnline} isMobile={isMobile} />
             </Box>
-            <NetworkInfoTable client={client} />
+            <NetworkInfoTable client={client} isMobile={isMobile} />
           </CardContent>
         </Card>
       </Grid>
