@@ -59,7 +59,7 @@ function isSafari() {
   return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 }
 
-// Speciallag-status og farver
+// Status og farver med ny tekstlogik
 function getLagStatus(playerLag, lastSegmentLag) {
   let lag;
   if (isSafari()) {
@@ -69,9 +69,9 @@ function getLagStatus(playerLag, lastSegmentLag) {
   }
   if (lag == null) return { text: "", color: "#888" };
   if (lag < 2) return { text: "Live", color: "#43a047" }; // Grøn: Live
-  if (lag < 10) return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#43a047" }; // Grøn: Forsinket under 10 sek
-  if (lag < 30) return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#f90" }; // Orange: 10-29 sek
-  return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#e53935" }; // Rød: 30+ sek
+  if (lag < 10) return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#43a047" }; // Grøn: Forsinket under 10 sek
+  if (lag < 30) return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#f90" }; // Orange: 10-29 sek
+  return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#e53935" }; // Rød: 30+ sek
 }
 
 export default function ClientDetailsLivestreamSection({ clientId }) {
@@ -420,7 +420,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               )}
               {autoRefreshed && (
                 <Alert severity="info" sx={{ mb: 1 }}>
-                  Streamen blev genstartet automatisk for at sikre fortsat live-afspilning.
+                  Stream blev automatisk genstartet
                 </Alert>
               )}
             </Box>
@@ -481,10 +481,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         {/* Kolonne 3 */}
         <Grid item xs={12} md={4}>
           <Stack spacing={1}>
-            {/* De første tre linjer: sort tekst og venstrestillet */}
-            <Typography variant="body1" sx={{ color: "#000", textAlign: "left" }}>
-              {lagStatus.text || "Ingen status"}
-            </Typography>
             <Typography variant="body2" sx={{ color: "#000", textAlign: "left" }}>
               Klient ID: {clientId}
             </Typography>
@@ -498,7 +494,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                     : ""}
               </Typography>
             )}
-            {/* Sidste stream hentet */}
             {lastFetched && (
               <Typography variant="body2" sx={{ color: "#888", textAlign: "left" }}>
                 Sidste kontakt til serveren: {formatDateTimeWithDay(lastFetched)}
