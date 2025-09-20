@@ -178,6 +178,9 @@ export default function ClientDetailsPage({
       />
       <Grid container spacing={2}>
         <Grid item xs={12}>
+          <ClientDetailsLivestreamSection clientId={client?.id} />
+        </Grid>
+        <Grid item xs={12}>
           <ClientDetailsInfoSection
             client={client}
             markedDays={markedDays}
@@ -197,9 +200,6 @@ export default function ClientDetailsPage({
             shutdownDialogOpen={shutdownDialogOpen}
             setShutdownDialogOpen={setShutdownDialogOpen}
           />
-        </Grid>
-        <Grid item xs={12}>
-          <ClientDetailsLivestreamSection clientId={client?.id} />
         </Grid>
       </Grid>
       <ClientCalendarDialog
