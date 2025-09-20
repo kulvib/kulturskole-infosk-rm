@@ -81,8 +81,11 @@ export default function ClientDetailsPage({
     }
   }, [client]);
 
+  // showSnackbar bruges kun til lokale handlinger (Gem osv.)
   const showSnackbar = (message, severity = "success") => {
-    if (typeof snackbar === "function") {
+    // Her skal du KUN bruge denne funktion til lokale beskeder, ikke til refresh!
+    // Refresh-snackbar styres i wrapperen.
+    if (snackbar && typeof snackbar === "function") {
       snackbar({ open: true, message, severity });
     }
   };
@@ -170,11 +173,7 @@ export default function ClientDetailsPage({
         liveChromeStatus={liveChromeStatus}
         liveChromeColor={liveChromeColor}
         refreshing={refreshing}
-        // Opdater både data og stream, og vis snackbar
-        handleRefresh={() => {
-          handleRefresh(() => showSnackbar("Data opdateret!", "success"));
-          if (onRestartStream) onRestartStream();
-        }}
+        handleRefresh={handleRefresh}
         snackbar={snackbar}
         handleCloseSnackbar={handleCloseSnackbar}
       />
@@ -182,7 +181,7 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <ClientDetailsLivestreamSection
             clientId={client?.id}
-            key={streamKey} // <-- tving genmount af stream ved opdatering
+            key={streamKey}
           />
         </Grid>
         <Grid item xs={12}>
