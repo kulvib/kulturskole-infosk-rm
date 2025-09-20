@@ -91,6 +91,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   const [lastFetched, setLastFetched] = useState(null);
 
+  // NYT: State til auto-refresh besked
+  const [autoRefreshed, setAutoRefreshed] = useState(false);
+
   // Debug: Vis lag-værdier i konsollen
   useEffect(() => {
     if (playerLag !== null || lastSegmentLag !== null || manifestProgramLag !== null) {
@@ -302,6 +305,24 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, [manifestReady]);
 
+  // Auto-refresh hvert 45. sekund
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAutoRefreshed(true); // Sæt beskedflag
+      setManifestReady(false);
+      setRefreshKey(prev => prev + 1);
+    }, 45000); // 45 sekunder
+    return () => clearInterval(interval);
+  }, []);
+
+  // Skjul auto-refresh besked efter 8 sekunder
+  useEffect(() => {
+    if (autoRefreshed) {
+      const timeout = setTimeout(() => setAutoRefreshed(false), 8000);
+      return () => clearTimeout(timeout);
+    }
+  }, [autoRefreshed]);
+
   const handleRefresh = () => {
     setRefreshing(true);
     setManifestReady(false);
@@ -309,6 +330,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       setRefreshing(false);
       setRefreshKey(prev => prev + 1);
     }, 500);
+    setAutoRefreshed(false); // Brugeren refresher manuelt = ingen auto-besked
   };
 
   const handleFullscreen = () => {
@@ -335,7 +357,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     lagType = "backend";
   }
 
-  // --- KODEEKSEMPEL: Sikrer at negativ lag aldrig vises ---
+  // Sikrer at negativ lag aldrig vises
   let sanitizedLag = lagToShow;
   if (sanitizedLag != null && sanitizedLag < 0) {
     console.warn(
@@ -354,7 +376,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     );
     sanitizedLag = 0; // Vis aldrig negativ lag til brugeren
   }
-  // --------------------------------------------------------
 
   // Brug sanitizedLag i stedet for lagToShow til status
   const lagStatus = getLagStatus(sanitizedLag, lastSegmentLag);
@@ -465,6 +486,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   {error && (
                     <Alert severity="error" sx={{ mb: 2 }}>
                       {error}
+                    </Alert>
+                  )}
+                  {/* NYT: Auto-refresh besked */}
+                  {autoRefreshed && (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      Streamen blev genstartet automatisk for at sikre fortsat live-afspilning.
                     </Alert>
                   )}
                   {/* Fullscreen og segmentinfo */}
