@@ -94,14 +94,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   // NYT: State til auto-refresh besked
   const [autoRefreshed, setAutoRefreshed] = useState(false);
 
-  // Debug: Vis lag-værdier i konsollen
   useEffect(() => {
     if (playerLag !== null || lastSegmentLag !== null || manifestProgramLag !== null) {
       console.log("playerLag:", playerLag, "lastSegmentLag:", lastSegmentLag, "manifestProgramLag:", manifestProgramLag);
     }
   }, [playerLag, lastSegmentLag, manifestProgramLag]);
 
-  // Reset segmenter hvis streamen er gået død
   useEffect(() => {
     if (!clientId) return;
     let ignore = false;
@@ -132,7 +130,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => { ignore = true; };
   }, [clientId, refreshKey]);
 
-  // Playback + manifest poll
   useEffect(() => {
     if (!clientId) return;
     const video = videoRef.current;
@@ -220,7 +217,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     };
   }, [clientId, refreshKey]);
 
-  // Poll segment info fra backend
   useEffect(() => {
     if (!clientId) return;
     if (!isSafari() && !manifestReady) return;
@@ -228,7 +224,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     async function pollSegmentLag() {
       while (!stop) {
         try {
-          // Tilføj cache-buster for at undgå Netlify/Safari cache!
           const resp = await fetch(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
           if (resp.ok) {
             const data = await resp.json();
@@ -253,7 +248,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => { stop = true; };
   }, [clientId, manifestReady]);
 
-  // Udregn playerLag fra Hls.js (hvis muligt)
   useEffect(() => {
     if (!manifestReady) return;
     let interval;
@@ -264,13 +258,12 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       } else if (hls && typeof hls.playbackLatency === "number") {
         setPlayerLag(hls.playbackLatency);
       } else {
-        setPlayerLag(null); // fallback til backend
+        setPlayerLag(null);
       }
     }, 1000);
     return () => clearInterval(interval);
   }, [manifestReady]);
 
-  // Ekstra: Poll manifestens EXT-X-PROGRAM-DATE-TIME for præcis player-lag
   useEffect(() => {
     if (!clientId || !manifestReady) return;
     let stop = false;
@@ -315,10 +308,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Skjul auto-refresh besked efter 8 sekunder
+  // Skjul auto-refresh besked efter 3 sekunder
   useEffect(() => {
     if (autoRefreshed) {
-      const timeout = setTimeout(() => setAutoRefreshed(false), 8000);
+      const timeout = setTimeout(() => setAutoRefreshed(false), 3000);
       return () => clearTimeout(timeout);
     }
   }, [autoRefreshed]);
@@ -330,7 +323,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       setRefreshing(false);
       setRefreshKey(prev => prev + 1);
     }, 500);
-    setAutoRefreshed(false); // Brugeren refresher manuelt = ingen auto-besked
+    setAutoRefreshed(false);
   };
 
   const handleFullscreen = () => {
@@ -345,7 +338,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   };
 
-  // Vælg status: Player-lag først (hvis muligt), så manifest-program-lag, ellers backend-lag
   let lagToShow = playerLag;
   let lagType = "player";
   if (lagToShow == null && manifestProgramLag != null) {
@@ -357,7 +349,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     lagType = "backend";
   }
 
-  // Sikrer at negativ lag aldrig vises
   let sanitizedLag = lagToShow;
   if (sanitizedLag != null && sanitizedLag < 0) {
     console.warn(
@@ -374,10 +365,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         lastSegmentTimestamp,
       }
     );
-    sanitizedLag = 0; // Vis aldrig negativ lag til brugeren
+    sanitizedLag = 0;
   }
 
-  // Brug sanitizedLag i stedet for lagToShow til status
   const lagStatus = getLagStatus(sanitizedLag, lastSegmentLag);
 
   return (
@@ -386,7 +376,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         <Card elevation={2} sx={{ borderRadius: 2 }}>
           <CardContent sx={{ pb: 1.5 }}>
             <Grid container alignItems="flex-start" spacing={2}>
-              {/* Venstre: Video */}
               <Grid item>
                 <Box
                   sx={{
@@ -419,7 +408,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   </Box>
                 )}
               </Grid>
-              {/* Højre: Tekst og kontrol */}
               <Grid item xs>
                 <Box
                   sx={{
@@ -430,7 +418,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                     height: "100%",
                   }}
                 >
-                  {/* Header */}
                   <Box sx={{ display: "flex", alignItems: "center", minHeight: 34 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
                       Stream
@@ -446,7 +433,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                       animation: manifestReady ? "pulsate 2s infinite" : "none"
                     }} />
                   </Box>
-                  {/* Statusinfo */}
                   <Box sx={{ textAlign: "left", minWidth: 180, mb: 1 }}>
                     <Typography variant="body2" sx={{ color: lagStatus.color, fontWeight: 700 }}>
                       {lagStatus.text || "Ingen status"}
@@ -468,7 +454,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                       Klient ID: {clientId}
                     </Typography>
                   </Box>
-                  {/* Refresh-knap */}
                   <Box sx={{ display: "flex", alignItems: "center", mt: 0, mb: 1 }}>
                     <Tooltip title="Genindlæs stream">
                       <span>
@@ -488,13 +473,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                       {error}
                     </Alert>
                   )}
-                  {/* NYT: Auto-refresh besked */}
                   {autoRefreshed && (
                     <Alert severity="info" sx={{ mb: 2 }}>
                       Streamen blev genstartet automatisk for at sikre fortsat live-afspilning.
                     </Alert>
                   )}
-                  {/* Fullscreen og segmentinfo */}
                   {manifestReady && (
                     <Button
                       startIcon={<FullscreenIcon />}
