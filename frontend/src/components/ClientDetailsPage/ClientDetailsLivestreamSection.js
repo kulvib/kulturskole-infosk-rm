@@ -100,10 +100,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   const [autoRefreshed, setAutoRefreshed] = useState(false);
 
-  // Responsive font size for debug
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const debugFontSize = isMobile ? 11 : 12;
 
   function handleVideoWaiting() {
     setBuffering(true);
@@ -398,7 +396,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         <Grid item xs={12} md={3} minWidth={0}>
           <Stack spacing={1}>
             <Box sx={{ display: "flex", alignItems: "center" }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1, fontSize: isMobile ? 18 : 22 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
                 Stream
               </Typography>
               <Box
@@ -425,7 +423,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 </span>
               </Tooltip>
             </Box>
-            <Typography variant="body1" sx={{ color: lagStatus.color, fontSize: isMobile ? 14 : 16 }}>
+            <Typography variant="body2" sx={{ color: lagStatus.color }}>
               {lagStatus.text || "Ingen status"}
             </Typography>
             <Box>
@@ -500,7 +498,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   }}
                 >
                   <CircularProgress size={isMobile ? 30 : 40} color="inherit" />
-                  <Typography sx={{ color: "#fff", ml: 2, fontSize: isMobile ? 13 : 15 }}>
+                  <Typography variant="body2" sx={{ color: "#fff", ml: 2 }}>
                     Buffering …
                   </Typography>
                 </Box>
@@ -515,7 +513,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 width: "100%"
               }}>
                 <CircularProgress size={isMobile ? 24 : 32} />
-                <Typography sx={{ ml: 2, fontSize: isMobile ? 13 : 15 }}>Forbinder til stream …</Typography>
+                <Typography variant="body2" sx={{ ml: 2 }}>Forbinder til stream …</Typography>
               </Box>
             )}
             {manifestReady && (
@@ -534,11 +532,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         {/* Kolonne 3 */}
         <Grid item xs={12} md={4} minWidth={0}>
           <Stack spacing={1}>
-            <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : 15 }}>
+            <Typography variant="body2" sx={{ color: "#000", textAlign: "left" }}>
               Klient ID: {clientId}
             </Typography>
             {(manifestProgramDateTime || lastSegmentTimestamp) && (
-              <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : 15 }}>
+              <Typography variant="body2" sx={{ color: "#000", textAlign: "left" }}>
                 Sidste manifest hentet:{" "}
                 {manifestProgramDateTime
                   ? formatDateTimeWithDay(new Date(manifestProgramDateTime))
@@ -548,7 +546,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               </Typography>
             )}
             {lastFetched && (
-              <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : 15 }}>
+              <Typography variant="body2" sx={{ color: "#000", textAlign: "left" }}>
                 Sidste kontakt til serveren: {formatDateTimeWithDay(lastFetched)}
               </Typography>
             )}
@@ -557,9 +555,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               variant="caption"
               sx={{
                 color: "#999",
-                fontFamily: "monospace",
+                fontFamily: '"Courier New", Courier, monospace',
                 textAlign: "left",
-                fontSize: debugFontSize,
+                lineHeight: 1.5,
               }}
             >
               Debug: playerLag={playerLag}, manifestProgramLag={manifestProgramLag}, backendLag={lastSegmentLag}, lagType={lagType}
@@ -569,9 +567,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 variant="caption"
                 sx={{
                   color: "#999",
-                  fontFamily: "monospace",
+                  fontFamily: '"Courier New", Courier, monospace',
                   textAlign: "left",
-                  fontSize: debugFontSize,
+                  lineHeight: 1.5,
                 }}
               >
                 Segment: {currentSegment}
@@ -582,9 +580,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 variant="caption"
                 sx={{
                   color: "#f90",
-                  fontFamily: "monospace",
+                  fontFamily: '"Courier New", Courier, monospace',
                   textAlign: "left",
-                  fontSize: debugFontSize,
+                  lineHeight: 1.5,
                 }}
               >
                 Safari browser: segmentnummer ikke tilgængelig. Forsinkelse er estimeret ud fra serverens sidste segment
