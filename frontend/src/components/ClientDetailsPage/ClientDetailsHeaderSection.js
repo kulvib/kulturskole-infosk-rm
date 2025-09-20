@@ -15,19 +15,21 @@ import {
   TableContainer,
   TableRow,
   TextField,
+  useMediaQuery
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 
 // StatusBadge med 2s puls animation hvis animate=true
-function StatusBadge({ color, text, animate = false }) {
+function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
       <Box sx={{
-        width: 10,
-        height: 10,
+        width: isMobile ? 8 : 10,
+        height: isMobile ? 8 : 10,
         borderRadius: "50%",
         bgcolor: color,
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
@@ -35,7 +37,7 @@ function StatusBadge({ color, text, animate = false }) {
         mr: 1,
         animation: animate ? "pulsate 2s infinite" : "none"
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none" }}>
+      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : undefined }}>
         {text}
       </Typography>
       {animate && (
@@ -62,7 +64,7 @@ function StatusBadge({ color, text, animate = false }) {
   );
 }
 
-function CopyIconButton({ value, disabled, iconSize = 16 }) {
+function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = async () => {
@@ -80,10 +82,10 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
           size="small"
           onClick={handleCopy}
           style={{
-            minWidth: 24,
-            maxWidth: 24,
-            minHeight: 24,
-            maxHeight: 24,
+            minWidth: isMobile ? 20 : 24,
+            maxWidth: isMobile ? 20 : 24,
+            minHeight: isMobile ? 20 : 24,
+            maxHeight: isMobile ? 20 : 24,
             padding: 0,
             margin: 0,
             display: "flex",
@@ -93,7 +95,7 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
           }}
           disabled={disabled}
         >
-          <ContentCopyIcon style={{ fontSize: iconSize }} color={copied ? "success" : "inherit"} />
+          <ContentCopyIcon style={{ fontSize: isMobile ? 13 : iconSize }} color={copied ? "success" : "inherit"} />
         </Button>
       </span>
     </Tooltip>
@@ -101,7 +103,7 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
 }
 
 // ChromeStatusIcon med badge og 2s puls (animeret hvis browser kører)
-function ChromeStatusIcon({ status, color }) {
+function ChromeStatusIcon({ status, color, isMobile = false }) {
   let fallbackColor = "grey.400";
   let text = status || "Ukendt";
   let dotColor = color || fallbackColor;
@@ -132,7 +134,7 @@ function ChromeStatusIcon({ status, color }) {
     }
   }
 
-  return <StatusBadge color={dotColor} text={text} animate={animate} />;
+  return <StatusBadge color={dotColor} text={text} animate={animate} isMobile={isMobile} />;
 }
 
 export default function ClientDetailsHeaderSection({
@@ -155,18 +157,30 @@ export default function ClientDetailsHeaderSection({
   handleCloseSnackbar,
 }) {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const inputStyle = {
-    width: 300,
+    width: isMobile ? "100%" : 300,
     height: 32,
-    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
-    "& .MuiInputBase-root": { height: "32px" },
+    "& .MuiInputBase-input": {
+      fontSize: isMobile ? "0.90rem" : "0.95rem",
+      height: isMobile ? "30px" : "32px",
+      boxSizing: "border-box",
+      padding: isMobile ? "6px 10px" : "8px 14px"
+    },
+    "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
   const kioskInputStyle = {
-    width: 550,
+    width: isMobile ? "100%" : 550,
     height: 32,
-    "& .MuiInputBase-input": { fontSize: "0.95rem", height: "32px", boxSizing: "border-box", padding: "8px 14px" },
-    "& .MuiInputBase-root": { height: "32px" },
+    "& .MuiInputBase-input": {
+      fontSize: isMobile ? "0.90rem" : "0.95rem",
+      height: isMobile ? "30px" : "32px",
+      boxSizing: "border-box",
+      padding: isMobile ? "6px 10px" : "8px 14px"
+    },
+    "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
   const valueCellStyle = {
@@ -174,11 +188,12 @@ export default function ClientDetailsHeaderSection({
     pl: 0,
     py: 0,
     verticalAlign: "middle",
-    height: 40,
+    height: isMobile ? 32 : 40,
+    fontSize: isMobile ? 13 : 14,
   };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 3 }}>
+    <Box sx={{ maxWidth: 1200, mx: "auto", mt: isMobile ? 1 : 3 }}>
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3500}
@@ -189,16 +204,18 @@ export default function ClientDetailsHeaderSection({
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", mb: 1, gap: isMobile ? 1 : 0 }}>
         <Button
           variant="outlined"
-          startIcon={<ArrowBackIcon />}
+          startIcon={<ArrowBackIcon sx={{ fontSize: isMobile ? 19 : undefined }} />}
           onClick={() => navigate("/clients")}
           sx={{
             textTransform: "none",
             fontWeight: 500,
             minWidth: 0,
-            px: 2,
+            px: isMobile ? 1.2 : 2,
+            fontSize: isMobile ? "0.93rem" : undefined,
+            mb: isMobile ? 0.5 : 0,
           }}
         >
           Tilbage til klientoversigt
@@ -206,37 +223,44 @@ export default function ClientDetailsHeaderSection({
         <Tooltip title="Opdater klient">
           <span>
             <Button
-              startIcon={refreshing ? <CircularProgress size={18} /> : <RefreshIcon fontSize="medium" />}
+              startIcon={refreshing ? <CircularProgress size={isMobile ? 15 : 18} /> : <RefreshIcon fontSize={isMobile ? "small" : "medium"} />}
               disabled={refreshing}
               color="primary"
               onClick={handleRefresh}
-              sx={{ fontWeight: 500, textTransform: "none", minWidth: 0, mr: 1, px: 2 }}
+              sx={{
+                fontWeight: 500,
+                textTransform: "none",
+                minWidth: 0,
+                mr: isMobile ? 0 : 1,
+                px: isMobile ? 1.2 : 2,
+                fontSize: isMobile ? "0.93rem" : undefined
+              }}
             >
               {refreshing ? "Opdaterer..." : "Opdater"}
             </Button>
           </span>
         </Tooltip>
       </Box>
-      <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
-        <CardContent>
-          <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+      <Card elevation={2} sx={{ borderRadius: isMobile ? 1.5 : 2, mb: 2 }}>
+        <CardContent sx={{ px: isMobile ? 1 : undefined, py: isMobile ? 1.5 : undefined }}>
+          <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
             <Typography
               variant="h6"
               sx={{
                 fontWeight: 700,
                 lineHeight: 1.2,
                 letterSpacing: 0.5,
-                fontSize: { xs: "1rem", sm: "1.15rem", md: "1.25rem" },
+                fontSize: isMobile ? "1rem" : { xs: "1rem", sm: "1.15rem", md: "1.25rem" },
               }}
             >
               {client.name}
             </Typography>
           </Box>
-          <Box mt={2}>
+          <Box mt={isMobile ? 1 : 2}>
             <TableContainer>
               <Table size="small" aria-label="client-details">
                 <TableBody>
-                  <TableRow sx={{ height: 40 }}>
+                  <TableRow sx={{ height: isMobile ? 32 : 40 }}>
                     <TableCell
                       sx={{
                         border: 0,
@@ -245,7 +269,8 @@ export default function ClientDetailsHeaderSection({
                         pr: 0.5,
                         py: 0,
                         verticalAlign: "middle",
-                        height: 40,
+                        height: isMobile ? 32 : 40,
+                        fontSize: isMobile ? 13 : 14,
                       }}
                     >
                       Klient ID:
@@ -256,7 +281,7 @@ export default function ClientDetailsHeaderSection({
                         sx={{
                           color: "text.primary",
                           fontWeight: 700,
-                          fontSize: "0.9rem",
+                          fontSize: isMobile ? "0.86rem" : "0.9rem",
                           display: "inline",
                         }}
                       >
@@ -264,16 +289,16 @@ export default function ClientDetailsHeaderSection({
                       </Typography>
                     </TableCell>
                   </TableRow>
-                  <TableRow sx={{ height: 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                  <TableRow sx={{ height: isMobile ? 32 : 40 }}>
+                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
                       Lokation:
                     </TableCell>
                     <TableCell sx={valueCellStyle}>
                       <Box sx={{
                         display: "flex",
                         alignItems: "center",
-                        lineHeight: "40px",
-                        gap: "8px"
+                        lineHeight: isMobile ? "32px" : "40px",
+                        gap: isMobile ? "4px" : "8px"
                       }}>
                         <TextField
                           size="small"
@@ -281,40 +306,41 @@ export default function ClientDetailsHeaderSection({
                           onChange={handleLocalityChange}
                           sx={inputStyle}
                           disabled={savingLocality}
+                          inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
                         />
-                        <CopyIconButton value={locality} disabled={!locality} iconSize={15} />
+                        <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
                         <Button
                           size="small"
                           variant="outlined"
                           onClick={handleLocalitySave}
                           disabled={savingLocality}
-                          sx={{ minWidth: 44, maxWidth: 44 }}
+                          sx={{ minWidth: isMobile ? 34 : 44, maxWidth: isMobile ? 34 : 44, fontSize: isMobile ? "0.81rem" : undefined, height: isMobile ? 28 : 32 }}
                         >
-                          {savingLocality ? <CircularProgress size={16} /> : "Gem"}
+                          {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                         </Button>
                       </Box>
                     </TableCell>
                   </TableRow>
-                  <TableRow sx={{ height: 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                  <TableRow sx={{ height: isMobile ? 32 : 40 }}>
+                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
                       Kiosk browser status:
                     </TableCell>
                     <TableCell sx={valueCellStyle}>
-                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: "40px" }}>
-                        <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} />
+                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: isMobile ? "32px" : "40px" }}>
+                        <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </Box>
                     </TableCell>
                   </TableRow>
-                  <TableRow sx={{ height: 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: 40 }}>
+                  <TableRow sx={{ height: isMobile ? 32 : 40 }}>
+                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
                       Kiosk URL:
                     </TableCell>
                     <TableCell sx={valueCellStyle}>
                       <Box sx={{
                         display: "flex",
                         alignItems: "center",
-                        lineHeight: "40px",
-                        gap: "8px"
+                        lineHeight: isMobile ? "32px" : "40px",
+                        gap: isMobile ? "4px" : "8px"
                       }}>
                         <TextField
                           size="small"
@@ -322,17 +348,18 @@ export default function ClientDetailsHeaderSection({
                           onChange={handleKioskUrlChange}
                           sx={kioskInputStyle}
                           disabled={savingKioskUrl}
+                          inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
                         />
-                        <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={15} />
+                        <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
                         <Button
                           size="small"
                           variant="outlined"
                           color="primary"
                           onClick={handleKioskUrlSave}
                           disabled={savingKioskUrl}
-                          sx={{ minWidth: 44, maxWidth: 44 }}
+                          sx={{ minWidth: isMobile ? 34 : 44, maxWidth: isMobile ? 34 : 44, fontSize: isMobile ? "0.81rem" : undefined, height: isMobile ? 28 : 32 }}
                         >
-                          {savingKioskUrl ? <CircularProgress size={16} /> : "Gem"}
+                          {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                         </Button>
                       </Box>
                     </TableCell>
