@@ -59,7 +59,7 @@ function isSafari() {
   return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 }
 
-// Ændret grænser: Grøn < 10, Orange < 30, Rød >= 30
+// Speciallag-status og farver
 function getLagStatus(playerLag, lastSegmentLag) {
   let lag;
   if (isSafari()) {
@@ -68,9 +68,10 @@ function getLagStatus(playerLag, lastSegmentLag) {
     lag = playerLag !== null ? playerLag : lastSegmentLag;
   }
   if (lag == null) return { text: "", color: "#888" };
-  if (lag < 10) return { text: "Live", color: "#43a047" };
-  if (lag < 30) return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#f90" };
-  return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#e53935" };
+  if (lag < 2) return { text: "Live", color: "#43a047" }; // Grøn: Live
+  if (lag < 10) return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#43a047" }; // Grøn: Forsinket under 10 sek
+  if (lag < 30) return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#f90" }; // Orange: 10-29 sek
+  return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#e53935" }; // Rød: 30+ sek
 }
 
 export default function ClientDetailsLivestreamSection({ clientId }) {
@@ -406,6 +407,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 </span>
               </Tooltip>
             </Box>
+            {/* NY: Lag-status på linje 2 */}
+            <Typography variant="body1" sx={{ color: lagStatus.color, fontWeight: 700 }}>
+              {lagStatus.text || "Ingen status"}
+            </Typography>
             {/* Popop advarsler/status */}
             <Box>
               {error && (
@@ -476,17 +481,13 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         {/* Kolonne 3 */}
         <Grid item xs={12} md={4}>
           <Stack spacing={1}>
-            {/* Forsinkelse */}
-            <Typography variant="body1" sx={{ color: lagStatus.color, fontWeight: 700, textAlign: "right" }}>
-              {lagStatus.text || "Ingen status"}
-            </Typography>
             {/* Klient ID */}
-            <Typography variant="body2" sx={{ color: "#888", textAlign: "right" }}>
+            <Typography variant="body2" sx={{ color: "#888", textAlign: "left" }}>
               Klient ID: {clientId}
             </Typography>
             {/* Seneste program-date-time */}
             {(manifestProgramDateTime || lastSegmentTimestamp) && (
-              <Typography variant="body2" sx={{ color: "#888", textAlign: "right" }}>
+              <Typography variant="body2" sx={{ color: "#888", textAlign: "left" }}>
                 Sidste manifest hentet:{" "}
                 {manifestProgramDateTime
                   ? formatDateTimeWithDay(new Date(manifestProgramDateTime))
@@ -497,16 +498,16 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             )}
             {/* Sidste stream hentet */}
             {lastFetched && (
-              <Typography variant="body2" sx={{ color: "#888", textAlign: "right" }}>
+              <Typography variant="body2" sx={{ color: "#888", textAlign: "left" }}>
                 Sidste kontakt til serveren: {formatDateTimeWithDay(lastFetched)}
               </Typography>
             )}
             <Divider sx={{ my: 1 }} />
-            <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace" }}>
+            <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace", textAlign: "left" }}>
               (Debug: playerLag={playerLag}, manifestProgramLag={manifestProgramLag}, backendLag={lastSegmentLag}, lagType={lagType})
             </Typography>
             {isSafari() && (
-              <Typography variant="caption" sx={{ color: "#f90" }}>
+              <Typography variant="caption" sx={{ color: "#f90", textAlign: "left" }}>
                 (Safari: Forsinkelse er estimeret ud fra serverens sidste segment)
               </Typography>
             )}
