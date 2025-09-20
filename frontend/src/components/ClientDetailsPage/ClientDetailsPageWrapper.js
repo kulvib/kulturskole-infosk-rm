@@ -10,6 +10,7 @@ export default function ClientDetailsPageWrapper() {
   const [markedDays, setMarkedDays] = useState({});
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [streamKey, setStreamKey] = useState(0);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const fetchAllData = async (forceUpdate = false) => {
     if (!clientId) return;
@@ -42,14 +43,23 @@ export default function ClientDetailsPageWrapper() {
     return () => clearInterval(timer);
   }, [clientId]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = async (onSuccess) => {
     setRefreshing(true);
     await fetchAllData(true);
     setRefreshing(false);
+    if (onSuccess) onSuccess();
   };
 
   const handleRestartStream = () => {
     setStreamKey(k => k + 1);
+  };
+
+  const handleShowSnackbar = (snackbarUpdate) => {
+    setSnackbar({ ...snackbar, ...snackbarUpdate });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ open: false, message: "", severity: "success" });
   };
 
   return (
@@ -61,6 +71,8 @@ export default function ClientDetailsPageWrapper() {
       calendarLoading={calendarLoading}
       streamKey={streamKey}
       onRestartStream={handleRestartStream}
+      snackbar={snackbar}
+      handleCloseSnackbar={handleCloseSnackbar}
     />
   );
 }
