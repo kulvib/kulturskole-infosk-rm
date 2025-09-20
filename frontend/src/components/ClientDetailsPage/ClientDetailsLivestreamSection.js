@@ -335,7 +335,29 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     lagType = "backend";
   }
 
-  const lagStatus = getLagStatus(lagToShow, lastSegmentLag);
+  // --- KODEEKSEMPEL: Sikrer at negativ lag aldrig vises ---
+  let sanitizedLag = lagToShow;
+  if (sanitizedLag != null && sanitizedLag < 0) {
+    console.warn(
+      "[Lag warning] Negativ lag opdaget! Dette bør ikke ske.",
+      {
+        sanitizedLag,
+        lagToShow,
+        lagType,
+        playerLag,
+        manifestProgramLag,
+        lastSegmentLag,
+        clientTime: new Date().toISOString(),
+        manifestProgramDateTime,
+        lastSegmentTimestamp,
+      }
+    );
+    sanitizedLag = 0; // Vis aldrig negativ lag til brugeren
+  }
+  // --------------------------------------------------------
+
+  // Brug sanitizedLag i stedet for lagToShow til status
+  const lagStatus = getLagStatus(sanitizedLag, lastSegmentLag);
 
   return (
     <Grid container spacing={0}>
@@ -457,7 +479,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                       Fuld skærm
                     </Button>
                   )}
-                  {(manifestProgramDateTime || lastSegmentTimestamp) && lagToShow !== null && (
+                  {(manifestProgramDateTime || lastSegmentTimestamp) && sanitizedLag !== null && (
                     <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
                       Seneste program-date-time:{" "}
                       {manifestProgramDateTime
@@ -466,7 +488,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                           ? formatDateTimeWithDay(new Date(lastSegmentTimestamp))
                           : ""}
                       <br />
-                      {lagToShow < 1.5 ? "mindre end 2 sekunder" : formatLag(lagToShow)} siden
+                      {sanitizedLag < 1.5 ? "mindre end 2 sekunder" : formatLag(sanitizedLag)} siden
                       {lagType === "player" && " (player)"}
                       {lagType === "manifest" && " (manifest)"}
                       {lagType === "backend" && " (backend)"}
