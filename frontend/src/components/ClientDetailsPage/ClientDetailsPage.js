@@ -21,7 +21,9 @@ export default function ClientDetailsPage({
   markedDays,
   calendarLoading,
   streamKey,
-  onRestartStream
+  onRestartStream,
+  snackbar,
+  handleCloseSnackbar
 }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -38,8 +40,6 @@ export default function ClientDetailsPage({
   const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color || null);
   const [lastSeen, setLastSeen] = useState(client?.last_seen || null);
   const [uptime, setUptime] = useState(client?.uptime || null);
-
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
 
@@ -82,11 +82,9 @@ export default function ClientDetailsPage({
   }, [client]);
 
   const showSnackbar = (message, severity = "success") => {
-    setSnackbar({ open: true, message, severity });
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar({ open: false, message: "", severity: "success" });
+    if (typeof snackbar === "function") {
+      snackbar({ open: true, message, severity });
+    }
   };
 
   const handleLocalityChange = (e) => {
@@ -172,9 +170,9 @@ export default function ClientDetailsPage({
         liveChromeStatus={liveChromeStatus}
         liveChromeColor={liveChromeColor}
         refreshing={refreshing}
-        // VIGTIGT: denne opdaterer både data og stream!
+        // Opdater både data og stream, og vis snackbar
         handleRefresh={() => {
-          handleRefresh();
+          handleRefresh(() => showSnackbar("Data opdateret!", "success"));
           if (onRestartStream) onRestartStream();
         }}
         snackbar={snackbar}
