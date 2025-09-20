@@ -165,6 +165,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         hlsRef.current = hls;
         hls.loadSource(hlsUrl);
         hls.attachMedia(video);
+
         hls.on(Hls.Events.ERROR, (event, data) => {
           if (data.fatal) {
             setError("Streamen blev afbrudt. Prøver igen ...");
@@ -172,19 +173,31 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             cleanup();
           }
         });
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          video.play().catch(() => {});
+
+        // Bitrate på niveau-skift
+        hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+          if (hls.levels && data.level >= 0 && hls.levels[data.level]) {
+            setCurrentBitrate(hls.levels[data.level].bitrate);
+          }
         });
+
+        // Bitrate og segmentnummer på segment-skift
         hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
-          // Segmentnummer (sn)
           if (data && data.frag && typeof data.frag.sn === "number") {
             setCurrentSegment(data.frag.sn);
           }
+          // Fang bitrate hver gang vi skifter segment
+          if (hls.currentLevel >= 0 && hls.levels && hls.levels[hls.currentLevel]) {
+            setCurrentBitrate(hls.levels[hls.currentLevel].bitrate);
+          }
         });
-        hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
-          // Bitrate
-          if (hls.levels && data.level >= 0 && hls.levels[data.level]) {
-            setCurrentBitrate(hls.levels[data.level].bitrate);
+
+        // Bitrate ved manifest load (første gang)
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          if (hls.currentLevel >= 0 && hls.levels && hls.levels[hls.currentLevel]) {
+            setCurrentBitrate(hls.levels[hls.currentLevel].bitrate);
+          } else if (hls.levels && hls.levels.length === 1 && hls.levels[0].bitrate) {
+            setCurrentBitrate(hls.levels[0].bitrate);
           }
         });
       }
