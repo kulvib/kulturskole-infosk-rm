@@ -75,7 +75,6 @@ function getLagStatus(playerLag, lastSegmentLag) {
   return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#e53935" };
 }
 
-// Formatter der altid viser tal med max 3 decimaler, uden trailing nuller
 function formatLagValue(val) {
   if (val == null) return "-";
   return Number(val).toFixed(3).replace(/(\.\d*?[1-9])0+$|\.0*$/, "$1");
@@ -108,7 +107,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [manualRefreshed, setManualRefreshed] = useState(false);
 
   const theme = useTheme();
-  // Ekstra: tablet breakpoint
+  // Mobil og tablet breakpoints
   const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // <600px
   const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md")); // 600-900px
 
