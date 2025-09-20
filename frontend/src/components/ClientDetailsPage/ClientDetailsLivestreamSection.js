@@ -401,22 +401,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const lagStatus = getLagStatus(sanitizedLag, lastSegmentLag);
 
   return (
-    <Card elevation={2} sx={{
-      borderRadius: isMobile ? 1 : 2,
-      p: isMobile ? 0.5 : 2,
-      boxShadow: isMobile ? 1 : 2,
-      m: isMobile ? 0 : 2
-    }}>
+    <Card elevation={2} sx={{ borderRadius: 2, p: isMobile ? 1 : 2 }}>
       <Grid
         container
-        spacing={isMobile ? 0.5 : 2}
+        spacing={isMobile ? 1 : 2}
         alignItems="flex-start"
       >
         {/* Kolonne 1 */}
         <Grid item xs={12} md={3} minWidth={0}>
-          <Stack spacing={isMobile ? 0.5 : 1}>
+          <Stack spacing={1}>
             <Box sx={{ display: "flex", alignItems: "center" }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1, fontSize: isMobile ? 16 : undefined }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
                 Stream
               </Typography>
               <Box
@@ -435,12 +430,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   <IconButton
                     aria-label="refresh"
                     onClick={handleRefresh}
-                    size={isMobile ? "medium" : "medium"}
-                    sx={{
-                      padding: isMobile ? 1.25 : undefined,
-                      borderRadius: isMobile ? 2 : undefined,
-                      fontSize: isMobile ? 26 : undefined
-                    }}
+                    size={isMobile ? "small" : "medium"}
                     disabled={refreshing}
                   >
                     {refreshing ? <CircularProgress size={isMobile ? 20 : 18} color="inherit" /> : <RefreshIcon sx={{ fontSize: isMobile ? 26 : undefined }} />}
@@ -499,17 +489,15 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 onPlaying={handleVideoPlaying}
                 onCanPlay={handleVideoCanPlay}
                 style={{
-                  width: "100%",
-                  maxWidth: "100vw",
-                  height: isMobile ? 180 : "auto",
-                  maxHeight: isMobile ? "32vw" : 320,
-                  borderRadius: isMobile ? 4 : 8,
-                  border: isMobile ? "1px solid #999" : "2px solid #444",
-                  boxShadow: isMobile ? "0 1px 6px rgba(0,0,0,0.16)" : "0 2px 12px rgba(0,0,0,0.19)",
+                  width: isMobile ? "100%" : 420,
+                  maxWidth: "100%",
+                  maxHeight: isMobile ? 200 : 320,
+                  borderRadius: 8,
+                  border: "2px solid #444",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
                   background: "#000",
                   margin: 0,
                   display: "block",
-                  objectFit: isMobile ? "cover" : "contain",
                 }}
                 tabIndex={-1}
               />
@@ -526,11 +514,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                     justifyContent: "center",
                     zIndex: 10,
                     background: "rgba(0,0,0,0.18)",
-                    borderRadius: isMobile ? 4 : 8,
+                    borderRadius: 8,
                   }}
                 >
                   <CircularProgress size={isMobile ? 20 : 40} color="inherit" />
-                  <Typography variant="body2" sx={{ color: "#fff", ml: 1, fontSize: isMobile ? 12 : undefined }}>
+                  <Typography variant="body2" sx={{ color: "#fff", ml: isMobile ? 1 : 2, fontSize: isMobile ? 12 : undefined }}>
                     Buffering …
                   </Typography>
                 </Box>
@@ -551,16 +539,15 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             {manifestReady && (
               <Button
                 startIcon={<FullscreenIcon sx={{ fontSize: isMobile ? 28 : undefined }} />}
-                variant={isMobile ? "contained" : "outlined"}
-                color="primary"
-                size={isMobile ? "medium" : "medium"}
+                variant="outlined"
+                size={isMobile ? "small" : "medium"}
                 sx={{
                   mt: isMobile ? 1 : 2,
                   borderRadius: isMobile ? 4 : 2,
                   alignSelf: "center",
-                  fontWeight: 600,
                   fontSize: isMobile ? 16 : undefined,
                   minWidth: isMobile ? 160 : undefined,
+                  fontWeight: 400, // Ikke fed
                 }}
                 onClick={handleFullscreen}
                 fullWidth={isMobile}
@@ -572,7 +559,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         </Grid>
         {/* Kolonne 3 */}
         <Grid item xs={12} md={4} minWidth={0}>
-          <Stack spacing={isMobile ? 0.5 : 1}>
+          <Stack spacing={1}>
             <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
               Klient ID: {clientId}
             </Typography>
@@ -678,15 +665,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             0% { transform: scale(1); opacity: 1; background: #43a047; }
             50% { transform: scale(1.25); opacity: 0.5; background: #43a047; }
             100% { transform: scale(1); opacity: 1; background: #43a047; }
-          }
-          ${
-            isMobile
-              ? `
-          #livestream-video {
-            touch-action: manipulation;
-          }
-          `
-              : ""
           }
         `}
       </style>
