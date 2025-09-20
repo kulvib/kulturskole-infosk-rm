@@ -407,8 +407,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 </span>
               </Tooltip>
             </Box>
-            {/* NY: Lag-status på linje 2 */}
-            <Typography variant="body1" sx={{ color: lagStatus.color, fontWeight: 700 }}>
+            {/* Lag-status på linje 2, ikke fed */}
+            <Typography variant="body1" sx={{ color: lagStatus.color }}>
               {lagStatus.text || "Ingen status"}
             </Typography>
             {/* Popop advarsler/status */}
@@ -481,13 +481,15 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         {/* Kolonne 3 */}
         <Grid item xs={12} md={4}>
           <Stack spacing={1}>
-            {/* Klient ID */}
-            <Typography variant="body2" sx={{ color: "#888", textAlign: "left" }}>
+            {/* De første tre linjer: sort tekst og venstrestillet */}
+            <Typography variant="body1" sx={{ color: "#000", textAlign: "left" }}>
+              {lagStatus.text || "Ingen status"}
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#000", textAlign: "left" }}>
               Klient ID: {clientId}
             </Typography>
-            {/* Seneste program-date-time */}
             {(manifestProgramDateTime || lastSegmentTimestamp) && (
-              <Typography variant="body2" sx={{ color: "#888", textAlign: "left" }}>
+              <Typography variant="body2" sx={{ color: "#000", textAlign: "left" }}>
                 Sidste manifest hentet:{" "}
                 {manifestProgramDateTime
                   ? formatDateTimeWithDay(new Date(manifestProgramDateTime))
