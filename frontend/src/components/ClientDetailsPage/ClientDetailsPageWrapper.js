@@ -43,19 +43,17 @@ export default function ClientDetailsPageWrapper() {
     return () => clearInterval(timer);
   }, [clientId]);
 
-  const handleRefresh = async (onSuccess) => {
+  // VIGTIGT: Denne tager ikke længere en callback, men viser snackbar direkte
+  const handleRefresh = async () => {
     setRefreshing(true);
     await fetchAllData(true);
     setRefreshing(false);
-    if (onSuccess) onSuccess();
+    setSnackbar({ open: true, message: "Data opdateret!", severity: "success" });
+    setStreamKey(k => k + 1); // Genstart stream sammen med opdatering
   };
 
   const handleRestartStream = () => {
     setStreamKey(k => k + 1);
-  };
-
-  const handleShowSnackbar = (snackbarUpdate) => {
-    setSnackbar({ ...snackbar, ...snackbarUpdate });
   };
 
   const handleCloseSnackbar = () => {
