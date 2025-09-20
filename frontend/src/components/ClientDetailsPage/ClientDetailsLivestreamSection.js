@@ -12,9 +12,11 @@ import {
   Button,
   Stack,
   Divider,
+  useMediaQuery
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import { useTheme } from "@mui/material/styles";
 
 // Helper functions
 async function fetchLatestProgramDateTime(hlsUrl) {
@@ -59,7 +61,6 @@ function isSafari() {
   return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 }
 
-// Status og farver med ny tekstlogik
 function getLagStatus(playerLag, lastSegmentLag) {
   let lag;
   if (isSafari()) {
@@ -68,10 +69,10 @@ function getLagStatus(playerLag, lastSegmentLag) {
     lag = playerLag !== null ? playerLag : lastSegmentLag;
   }
   if (lag == null) return { text: "", color: "#888" };
-  if (lag < 2) return { text: "Live", color: "#43a047" }; // Grøn: Live
-  if (lag < 10) return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#43a047" }; // Grøn: Forsinket under 10 sek
-  if (lag < 30) return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#f90" }; // Orange: 10-29 sek
-  return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#e53935" }; // Rød: 30+ sek
+  if (lag < 2) return { text: "Live", color: "#43a047" };
+  if (lag < 10) return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#43a047" };
+  if (lag < 30) return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#f90" };
+  return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#e53935" };
 }
 
 export default function ClientDetailsLivestreamSection({ clientId }) {
@@ -93,17 +94,16 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   const [lastFetched, setLastFetched] = useState(null);
 
-  // Buffering state (for video spinner)
   const [buffering, setBuffering] = useState(false);
 
-  // Debug info
-  const [currentBitrate, setCurrentBitrate] = useState("-");
   const [currentSegment, setCurrentSegment] = useState("-");
 
-  // Auto-refresh besked
   const [autoRefreshed, setAutoRefreshed] = useState(false);
 
-  // --- Event handlers for buffering spinner ---
+  // Responsive
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
   function handleVideoWaiting() {
     setBuffering(true);
   }
@@ -174,30 +174,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           }
         });
 
-        // Bitrate på niveau-skift
-        hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
-          if (hls.levels && data.level >= 0 && hls.levels[data.level]) {
-            setCurrentBitrate(hls.levels[data.level].bitrate);
-          }
-        });
-
-        // Bitrate og segmentnummer på segment-skift
         hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
           if (data && data.frag && typeof data.frag.sn === "number") {
             setCurrentSegment(data.frag.sn);
-          }
-          // Fang bitrate hver gang vi skifter segment
-          if (hls.currentLevel >= 0 && hls.levels && hls.levels[hls.currentLevel]) {
-            setCurrentBitrate(hls.levels[hls.currentLevel].bitrate);
-          }
-        });
-
-        // Bitrate ved manifest load (første gang)
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          if (hls.currentLevel >= 0 && hls.levels && hls.levels[hls.currentLevel]) {
-            setCurrentBitrate(hls.levels[hls.currentLevel].bitrate);
-          } else if (hls.levels && hls.levels.length === 1 && hls.levels[0].bitrate) {
-            setCurrentBitrate(hls.levels[0].bitrate);
           }
         });
       }
@@ -337,20 +316,18 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, [manifestReady]);
 
-  // Auto-refresh hvert minut
   useEffect(() => {
     const interval = setInterval(() => {
       setAutoRefreshed(true);
       setManifestReady(false);
       setRefreshKey(prev => prev + 1);
-    }, 60000); // 1 minut
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Skjul auto-refresh besked efter 5 sekunder
   useEffect(() => {
     if (autoRefreshed) {
-      const timeout = setTimeout(() => setAutoRefreshed(false), 5000); // 5 sekunder
+      const timeout = setTimeout(() => setAutoRefreshed(false), 5000);
       return () => clearTimeout(timeout);
     }
   }, [autoRefreshed]);
@@ -409,16 +386,18 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   const lagStatus = getLagStatus(sanitizedLag, lastSegmentLag);
 
-  // === 3-kolonne layout ===
   return (
-    <Card elevation={2} sx={{ borderRadius: 2, p: 2 }}>
-      <Grid container spacing={2} alignItems="flex-start">
+    <Card elevation={2} sx={{ borderRadius: 2, p: isMobile ? 1 : 2 }}>
+      <Grid
+        container
+        spacing={isMobile ? 1 : 2}
+        alignItems="flex-start"
+      >
         {/* Kolonne 1 */}
-        <Grid item xs={12} md={3}>
+        <Grid item xs={12} md={3} minWidth={0}>
           <Stack spacing={1}>
-            {/* Første linje: Stream, statusikon, refresh */}
             <Box sx={{ display: "flex", alignItems: "center" }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1, fontSize: isMobile ? 18 : 22 }}>
                 Stream
               </Typography>
               <Box
@@ -437,7 +416,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   <IconButton
                     aria-label="refresh"
                     onClick={handleRefresh}
-                    size="small"
+                    size={isMobile ? "small" : "medium"}
                     disabled={refreshing}
                   >
                     {refreshing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
@@ -445,11 +424,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 </span>
               </Tooltip>
             </Box>
-            {/* Lag-status på linje 2, ikke fed */}
-            <Typography variant="body1" sx={{ color: lagStatus.color }}>
+            <Typography variant="body1" sx={{ color: lagStatus.color, fontSize: isMobile ? 14 : 16 }}>
               {lagStatus.text || "Ingen status"}
             </Typography>
-            {/* Popop advarsler/status */}
             <Box>
               {error && (
                 <Alert severity="error" sx={{ mb: 1 }}>
@@ -465,7 +442,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           </Stack>
         </Grid>
         {/* Kolonne 2 */}
-        <Grid item xs={12} md={5}>
+        <Grid item xs={12} md={5} minWidth={0}>
           <Box
             sx={{
               display: "flex",
@@ -479,7 +456,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 display: manifestReady ? "flex" : "none",
                 alignItems: "center",
                 justifyContent: "center",
-                position: "relative"
+                position: "relative",
+                width: "100%"
               }}
             >
               <video
@@ -492,8 +470,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 onPlaying={handleVideoPlaying}
                 onCanPlay={handleVideoCanPlay}
                 style={{
-                  maxWidth: 420,
-                  maxHeight: 320,
+                  width: isMobile ? "100%" : 420,
+                  maxWidth: "100%",
+                  maxHeight: isMobile ? 200 : 320,
                   borderRadius: 8,
                   border: "2px solid #444",
                   boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
@@ -503,7 +482,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 }}
                 tabIndex={-1}
               />
-              {/* Loader ved buffering */}
               {buffering && (
                 <Box
                   sx={{
@@ -520,20 +498,30 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                     borderRadius: 8,
                   }}
                 >
-                  <CircularProgress size={40} color="inherit" />
+                  <CircularProgress size={isMobile ? 30 : 40} color="inherit" />
+                  <Typography sx={{ color: "#fff", ml: 2, fontSize: isMobile ? 13 : 15 }}>
+                    Buffering …
+                  </Typography>
                 </Box>
               )}
             </Box>
             {!manifestReady && (
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: 420 }}>
-                <CircularProgress size={32} />
+              <Box sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: isMobile ? 100 : 160,
+                width: "100%"
+              }}>
+                <CircularProgress size={isMobile ? 24 : 32} />
+                <Typography sx={{ ml: 2, fontSize: isMobile ? 13 : 15 }}>Forbinder til stream …</Typography>
               </Box>
             )}
             {manifestReady && (
               <Button
                 startIcon={<FullscreenIcon />}
                 variant="outlined"
-                size="small"
+                size={isMobile ? "small" : "medium"}
                 sx={{ mt: 2, borderRadius: 2, alignSelf: "center" }}
                 onClick={handleFullscreen}
               >
@@ -543,14 +531,13 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           </Box>
         </Grid>
         {/* Kolonne 3 */}
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={4} minWidth={0}>
           <Stack spacing={1}>
-            {/* Øverste tre linjer sort */}
-            <Typography variant="body2" sx={{ color: "#000", textAlign: "left" }}>
+            <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : 15 }}>
               Klient ID: {clientId}
             </Typography>
             {(manifestProgramDateTime || lastSegmentTimestamp) && (
-              <Typography variant="body2" sx={{ color: "#000", textAlign: "left" }}>
+              <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : 15 }}>
                 Sidste manifest hentet:{" "}
                 {manifestProgramDateTime
                   ? formatDateTimeWithDay(new Date(manifestProgramDateTime))
@@ -560,20 +547,26 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               </Typography>
             )}
             {lastFetched && (
-              <Typography variant="body2" sx={{ color: "#000", textAlign: "left" }}>
+              <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : 15 }}>
                 Sidste kontakt til serveren: {formatDateTimeWithDay(lastFetched)}
               </Typography>
             )}
             <Divider sx={{ my: 1 }} />
-            {/* Udvidet debug-info */}
-            <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace", textAlign: "left" }}>
+            <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace", textAlign: "left", fontSize: isMobile ? 11 : 13 }}>
               (Debug: playerLag={playerLag}, manifestProgramLag={manifestProgramLag}, backendLag={lastSegmentLag}, lagType={lagType})
             </Typography>
-            <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace", textAlign: "left" }}>
-              Bitrate: {currentBitrate !== "-" ? `${currentBitrate} bps` : "-"}, Segment: {currentSegment}
-            </Typography>
+            {!isSafari() && (
+              <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace", textAlign: "left", fontSize: isMobile ? 11 : 13 }}>
+                Segment: {currentSegment}
+              </Typography>
+            )}
             {isSafari() && (
-              <Typography variant="caption" sx={{ color: "#f90", textAlign: "left" }}>
+              <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace", textAlign: "left", fontSize: isMobile ? 11 : 13 }}>
+                (Segmentnummer ikke tilgængeligt i Safari)
+              </Typography>
+            )}
+            {isSafari() && (
+              <Typography variant="caption" sx={{ color: "#f90", textAlign: "left", fontSize: isMobile ? 11 : 13 }}>
                 (Safari: Forsinkelse er estimeret ud fra serverens sidste segment)
               </Typography>
             )}
