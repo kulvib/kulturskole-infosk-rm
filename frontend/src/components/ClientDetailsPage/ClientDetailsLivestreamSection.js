@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, alpha } from "@mui/material/styles";
 
 // Helper functions
 async function fetchLatestProgramDateTime(hlsUrl) {
@@ -109,6 +109,19 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // --- NYT: State for at vise fullscreen overlay-knap ---
+  const [showControls, setShowControls] = useState(false);
+
+  // --- NYT: Timer til at skjule controls automatisk ---
+  useEffect(() => {
+    if (!showControls) return;
+    const timeout = setTimeout(() => setShowControls(false), 2200);
+    return () => clearTimeout(timeout);
+  }, [showControls]);
+
+  // --- NYT: Mouse events til at vise/skjule controls ---
+  const handleMouseMove = () => setShowControls(true);
 
   function handleVideoWaiting() {
     setBuffering(true);
@@ -470,14 +483,20 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               position: "relative"
             }}
           >
+            {/* --- VIDEO-WRAPPER MED OVERLAY-KNAP --- */}
             <Box
               sx={{
+                position: "relative",
+                width: "100%",
                 display: manifestReady ? "flex" : "none",
                 alignItems: "center",
-                justifyContent: "center",
-                position: "relative",
-                width: "100%"
+                justifyContent: "center"
               }}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={() => setShowControls(false)}
+              tabIndex={0}
+              onFocus={() => setShowControls(true)}
+              onBlur={() => setShowControls(false)}
             >
               <video
                 ref={videoRef}
@@ -501,6 +520,34 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 }}
                 tabIndex={-1}
               />
+              {/* --- FULLSCREEN KNAP SOM OVERLAY --- */}
+              {manifestReady && (
+                <IconButton
+                  onClick={handleFullscreen}
+                  aria-label="Fuld skærm"
+                  sx={{
+                    position: "absolute",
+                    bottom: 12,
+                    right: 12,
+                    bgcolor: alpha("#222", 0.6),
+                    color: "#fff",
+                    borderRadius: "50%",
+                    zIndex: 20,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.19)",
+                    opacity: showControls ? 1 : 0,
+                    pointerEvents: showControls ? "auto" : "none",
+                    transition: "opacity 0.3s",
+                    "&:hover": {
+                      bgcolor: alpha("#111", 0.85)
+                    }
+                  }}
+                  size={isMobile ? "small" : "medium"}
+                  tabIndex={0}
+                >
+                  <FullscreenIcon sx={{ fontSize: isMobile ? 26 : 32 }} />
+                </IconButton>
+              )}
+              {/* evt. buffering overlay som før */}
               {buffering && (
                 <Box
                   sx={{
@@ -524,6 +571,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 </Box>
               )}
             </Box>
+            {/* ... loading state ... */}
             {!manifestReady && (
               <Box sx={{
                 display: "flex",
@@ -535,25 +583,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 <CircularProgress size={isMobile ? 24 : 32} />
                 <Typography variant="body2" sx={{ ml: 2, fontSize: isMobile ? 13 : undefined }}>Forbinder til stream …</Typography>
               </Box>
-            )}
-            {manifestReady && (
-              <Button
-                startIcon={<FullscreenIcon sx={{ fontSize: isMobile ? 28 : undefined }} />}
-                variant="outlined"
-                size={isMobile ? "small" : "medium"}
-                sx={{
-                  mt: isMobile ? 1 : 2,
-                  borderRadius: isMobile ? 4 : 2,
-                  alignSelf: "center",
-                  fontSize: isMobile ? 16 : undefined,
-                  minWidth: isMobile ? 160 : undefined,
-                  fontWeight: 400, // Ikke fed
-                }}
-                onClick={handleFullscreen}
-                fullWidth={isMobile}
-              >
-                Fuld skærm
-              </Button>
             )}
           </Box>
         </Grid>
