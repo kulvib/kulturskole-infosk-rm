@@ -75,10 +75,9 @@ function getLagStatus(playerLag, lastSegmentLag) {
   return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#e53935" };
 }
 
-// Formatter der altid viser tal med max 3 decimaler
+// Formatter der altid viser tal med max 3 decimaler, uden trailing nuller
 function formatLagValue(val) {
   if (val == null) return "-";
-  // Vis max 3 decimaler, uden trailing nuller
   return Number(val).toFixed(3).replace(/(\.\d*?[1-9])0+$|\.0*$/, "$1");
 }
 
@@ -106,6 +105,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [currentSegment, setCurrentSegment] = useState("-");
 
   const [autoRefreshed, setAutoRefreshed] = useState(false);
+  const [manualRefreshed, setManualRefreshed] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -338,9 +338,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   }, [autoRefreshed]);
 
+  useEffect(() => {
+    if (manualRefreshed) {
+      const timeout = setTimeout(() => setManualRefreshed(false), 5000);
+      return () => clearTimeout(timeout);
+    }
+  }, [manualRefreshed]);
+
   const handleRefresh = () => {
     setRefreshing(true);
     setManifestReady(false);
+    setManualRefreshed(true);
     setTimeout(() => {
       setRefreshing(false);
       setRefreshKey(prev => prev + 1);
@@ -434,14 +442,19 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               {lagStatus.text || "Ingen status"}
             </Typography>
             <Box>
-              {error && (
-                <Alert severity="error" sx={{ mb: 1 }}>
-                  {error}
+              {manualRefreshed && (
+                <Alert severity="info" sx={{ mb: 1 }}>
+                  Stream blev genstartet manuelt
                 </Alert>
               )}
               {autoRefreshed && (
                 <Alert severity="info" sx={{ mb: 1 }}>
                   Stream blev automatisk genstartet
+                </Alert>
+              )}
+              {error && (
+                <Alert severity="error" sx={{ mb: 1 }}>
+                  {error}
                 </Alert>
               )}
             </Box>
@@ -589,7 +602,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   display: "block",
                 }}
               >
-                {/* Tooltip med råværdier */}
                 <Tooltip title={`Råværdi: ${playerLag ?? "-"}`}>
                   <span>playerLag=<b>{formatLagValue(playerLag)}</b></span>
                 </Tooltip>
