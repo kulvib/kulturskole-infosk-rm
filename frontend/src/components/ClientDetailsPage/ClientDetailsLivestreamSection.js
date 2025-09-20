@@ -103,6 +103,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   // Responsive
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const debugFontSize = isMobile ? 11 : 13;
 
   function handleVideoWaiting() {
     setBuffering(true);
@@ -552,22 +553,54 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               </Typography>
             )}
             <Divider sx={{ my: 1 }} />
-            <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace", textAlign: "left", fontSize: isMobile ? 11 : 13 }}>
-              (Debug: playerLag={playerLag}, manifestProgramLag={manifestProgramLag}, backendLag={lastSegmentLag}, lagType={lagType})
+            <Typography
+              variant="caption"
+              sx={{
+                color: "#999",
+                fontFamily: "monospace",
+                textAlign: "left",
+                fontSize: debugFontSize,
+              }}
+            >
+              Debug: playerLag={playerLag}, manifestProgramLag={manifestProgramLag}, backendLag={lastSegmentLag}, lagType={lagType}
             </Typography>
             {!isSafari() && (
-              <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace", textAlign: "left", fontSize: isMobile ? 11 : 13 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "#999",
+                  fontFamily: "monospace",
+                  textAlign: "left",
+                  fontSize: debugFontSize,
+                }}
+              >
                 Segment: {currentSegment}
               </Typography>
             )}
             {isSafari() && (
-              <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace", textAlign: "left", fontSize: isMobile ? 11 : 13 }}>
-                (Segmentnummer ikke tilgængeligt i Safari)
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "#f90",
+                  fontFamily: "monospace",
+                  textAlign: "left",
+                  fontSize: debugFontSize,
+                }}
+              >
+                Segmentnummer ikke tilgængeligt i Safari
               </Typography>
             )}
             {isSafari() && (
-              <Typography variant="caption" sx={{ color: "#f90", textAlign: "left", fontSize: isMobile ? 11 : 13 }}>
-                (Safari: Forsinkelse er estimeret ud fra serverens sidste segment)
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "#f90",
+                  fontFamily: "monospace",
+                  textAlign: "left",
+                  fontSize: debugFontSize,
+                }}
+              >
+                Safari: Forsinkelse er estimeret ud fra serverens sidste segment
               </Typography>
             )}
           </Stack>
