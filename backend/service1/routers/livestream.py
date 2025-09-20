@@ -18,8 +18,21 @@ os.makedirs(HLS_DIR, exist_ok=True)
 router = APIRouter()
 
 def extract_num(filename, prefix="segment_"):
-    m = re.match(rf"{re.escape(prefix)}(\d+)\.(mp4|ts)$", filename)
+    # Matcher både segment_00001.ts og segment_00001_20250920T095400Z.ts
+    m = re.match(rf"{re.escape(prefix)}(\d+)(?:_([0-9TtZz]+))?\.(mp4|ts)$", filename)
     return int(m.group(1)) if m else -1
+
+def extract_program_date_time(filename):
+    # Matcher segment_00001_20250920T095400Z.ts
+    m = re.match(r"segment_\d+_([0-9TtZz]+)\.(mp4|ts)$", filename)
+    if not m:
+        return None
+    dt_str = m.group(1).replace("Z", "")
+    try:
+        dt = datetime.strptime(dt_str, "%Y%m%dT%H%M%S")
+        return dt
+    except Exception:
+        return None
 
 def update_manifest(client_dir, keep_n=4, segment_duration=6):
     seg_types = [".ts", ".mp4"]
@@ -40,6 +53,9 @@ def update_manifest(client_dir, keep_n=4, segment_duration=6):
                 m3u.write(f"#EXT-X-TARGETDURATION:{segment_duration}\n")
                 m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
                 for seg in manifest_segs:
+                    dt = extract_program_date_time(seg)
+                    if dt:
+                        m3u.write(f"#EXT-X-PROGRAM-DATE-TIME:{dt.isoformat()}Z\n")
                     m3u.write(f"#EXTINF:{segment_duration}.0,\n")
                     m3u.write(f"{seg}\n")
             print(f"[MANIFEST] Opdateret manifest for {client_dir}: {manifest_path} ({media_seq}..{extract_num(manifest_segs[-1], 'segment_')})")
@@ -116,17 +132,19 @@ def get_last_segment_info(client_id: str):
     seg_path = os.path.join(client_dir, last_segment)
     if not os.path.exists(seg_path):
         return {"error": "segment missing"}
-    mtime = os.path.getmtime(seg_path)
-    # Lav timestamp uden mikrosekunder
-    dt = datetime.utcfromtimestamp(mtime).replace(microsecond=0)
-    timestamp_iso = dt.isoformat() + "Z"
+    # Prøv at parse program-date-time fra filnavn
+    dt = extract_program_date_time(last_segment)
+    if dt:
+        timestamp_iso = dt.isoformat() + "Z"
+    else:
+        mtime = os.path.getmtime(seg_path)
+        dt = datetime.utcfromtimestamp(mtime).replace(microsecond=0)
+        timestamp_iso = dt.isoformat() + "Z"
     result = {
         "segment": last_segment,
         "timestamp": timestamp_iso,
-        "epoch": mtime
+        "epoch": dt.timestamp() if dt else None
     }
-    # Debug-print
-    # import json; print("[DEBUG][last-segment-info]", json.dumps(result))
     return result
 
 @router.post("/hls/{client_id}/reset")
