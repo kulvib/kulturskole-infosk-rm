@@ -77,6 +77,7 @@ function getLagStatus(playerLag, lastSegmentLag) {
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
+
   const [manifestReady, setManifestReady] = useState(false);
   const [error, setError] = useState("");
   const [lastLive, setLastLive] = useState(null);
@@ -92,14 +93,26 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   const [lastFetched, setLastFetched] = useState(null);
 
+  // Buffering state (for video spinner)
+  const [buffering, setBuffering] = useState(false);
+
+  // Debug info
+  const [currentBitrate, setCurrentBitrate] = useState("-");
+  const [currentSegment, setCurrentSegment] = useState("-");
+
   // Auto-refresh besked
   const [autoRefreshed, setAutoRefreshed] = useState(false);
 
-  useEffect(() => {
-    if (playerLag !== null || lastSegmentLag !== null || manifestProgramLag !== null) {
-      console.log("playerLag:", playerLag, "lastSegmentLag:", lastSegmentLag, "manifestProgramLag:", manifestProgramLag);
-    }
-  }, [playerLag, lastSegmentLag, manifestProgramLag]);
+  // --- Event handlers for buffering spinner ---
+  function handleVideoWaiting() {
+    setBuffering(true);
+  }
+  function handleVideoPlaying() {
+    setBuffering(false);
+  }
+  function handleVideoCanPlay() {
+    setBuffering(false);
+  }
 
   useEffect(() => {
     if (!clientId) return;
@@ -161,6 +174,18 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         });
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           video.play().catch(() => {});
+        });
+        hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
+          // Segmentnummer (sn)
+          if (data && data.frag && typeof data.frag.sn === "number") {
+            setCurrentSegment(data.frag.sn);
+          }
+        });
+        hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+          // Bitrate
+          if (hls.levels && data.level >= 0 && hls.levels[data.level]) {
+            setCurrentBitrate(hls.levels[data.level].bitrate);
+          }
         });
       }
       video.muted = true;
@@ -432,7 +457,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             sx={{
               display: "flex",
               flexDirection: "column",
-              alignItems: "center"
+              alignItems: "center",
+              position: "relative"
             }}
           >
             <Box
@@ -440,6 +466,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 display: manifestReady ? "flex" : "none",
                 alignItems: "center",
                 justifyContent: "center",
+                position: "relative"
               }}
             >
               <video
@@ -448,6 +475,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 autoPlay
                 playsInline
                 muted
+                onWaiting={handleVideoWaiting}
+                onPlaying={handleVideoPlaying}
+                onCanPlay={handleVideoCanPlay}
                 style={{
                   maxWidth: 420,
                   maxHeight: 320,
@@ -456,9 +486,30 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
                   background: "#000",
                   margin: 0,
+                  display: "block",
                 }}
                 tabIndex={-1}
               />
+              {/* Loader ved buffering */}
+              {buffering && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 10,
+                    background: "rgba(0,0,0,0.18)",
+                    borderRadius: 8,
+                  }}
+                >
+                  <CircularProgress size={40} color="inherit" />
+                </Box>
+              )}
             </Box>
             {!manifestReady && (
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 160, width: 420 }}>
@@ -481,6 +532,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         {/* Kolonne 3 */}
         <Grid item xs={12} md={4}>
           <Stack spacing={1}>
+            {/* Øverste tre linjer sort */}
             <Typography variant="body2" sx={{ color: "#000", textAlign: "left" }}>
               Klient ID: {clientId}
             </Typography>
@@ -495,13 +547,17 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               </Typography>
             )}
             {lastFetched && (
-              <Typography variant="body2" sx={{ color: "#888", textAlign: "left" }}>
+              <Typography variant="body2" sx={{ color: "#000", textAlign: "left" }}>
                 Sidste kontakt til serveren: {formatDateTimeWithDay(lastFetched)}
               </Typography>
             )}
             <Divider sx={{ my: 1 }} />
+            {/* Udvidet debug-info */}
             <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace", textAlign: "left" }}>
               (Debug: playerLag={playerLag}, manifestProgramLag={manifestProgramLag}, backendLag={lastSegmentLag}, lagType={lagType})
+            </Typography>
+            <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace", textAlign: "left" }}>
+              Bitrate: {currentBitrate !== "-" ? `${currentBitrate} bps` : "-"}, Segment: {currentSegment}
             </Typography>
             {isSafari() && (
               <Typography variant="caption" sx={{ color: "#f90", textAlign: "left" }}>
