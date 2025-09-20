@@ -15,6 +15,27 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 
+/**
+ * Læs program-date-time fra manifest for præcis latency (baseret på det segment der faktisk afspilles)
+ */
+async function fetchLatestProgramDateTime(hlsUrl) {
+  try {
+    const resp = await fetch(hlsUrl + "?cachebust=" + Date.now());
+    if (!resp.ok) return null;
+    const manifest = await resp.text();
+    const lines = manifest.split('\n');
+    let lastDateTime = null;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].startsWith('#EXT-X-PROGRAM-DATE-TIME:')) {
+        lastDateTime = lines[i].substring(25);
+      }
+    }
+    return lastDateTime; // ISO8601 string eller null
+  } catch {
+    return null;
+  }
+}
+
 function formatDateTimeWithDay(date) {
   if (!date) return "";
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
@@ -65,16 +86,19 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [lastSegmentLag, setLastSegmentLag] = useState(null);
 
   const [playerLag, setPlayerLag] = useState(null);
+  const [manifestProgramDateTime, setManifestProgramDateTime] = useState(null);
+  const [manifestProgramLag, setManifestProgramLag] = useState(null);
 
   const [lastFetched, setLastFetched] = useState(null);
 
   // Debug: Vis lag-værdier i konsollen
   useEffect(() => {
-    if (playerLag !== null || lastSegmentLag !== null) {
-      console.log("playerLag:", playerLag, "lastSegmentLag:", lastSegmentLag);
+    if (playerLag !== null || lastSegmentLag !== null || manifestProgramLag !== null) {
+      console.log("playerLag:", playerLag, "lastSegmentLag:", lastSegmentLag, "manifestProgramLag:", manifestProgramLag);
     }
-  }, [playerLag, lastSegmentLag]);
+  }, [playerLag, lastSegmentLag, manifestProgramLag]);
 
+  // Reset segmenter hvis streamen er gået død
   useEffect(() => {
     if (!clientId) return;
     let ignore = false;
@@ -105,6 +129,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => { ignore = true; };
   }, [clientId, refreshKey]);
 
+  // Playback + manifest poll
   useEffect(() => {
     if (!clientId) return;
     const video = videoRef.current;
@@ -194,7 +219,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   // Poll segment info fra backend
   useEffect(() => {
-    // Safari: start polling bare clientId findes
     if (!clientId) return;
     if (!isSafari() && !manifestReady) return;
     let stop = false;
@@ -205,7 +229,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           const resp = await fetch(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
           if (resp.ok) {
             const data = await resp.json();
-            console.log("last-segment-info response", data); // ekstra debug!
             if (data.timestamp) {
               setLastSegmentTimestamp(data.timestamp);
               const segTime = new Date(data.timestamp).getTime();
@@ -244,6 +267,30 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, [manifestReady]);
 
+  // Ekstra: Poll manifestens EXT-X-PROGRAM-DATE-TIME for præcis player-lag
+  useEffect(() => {
+    if (!clientId || !manifestReady) return;
+    let stop = false;
+    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
+    async function pollManifestProgramDateTime() {
+      while (!stop) {
+        const dtStr = await fetchLatestProgramDateTime(hlsUrl);
+        if (dtStr) {
+          setManifestProgramDateTime(dtStr);
+          const segTime = new Date(dtStr).getTime();
+          const now = Date.now();
+          setManifestProgramLag((now - segTime) / 1000);
+        } else {
+          setManifestProgramDateTime(null);
+          setManifestProgramLag(null);
+        }
+        await new Promise(res => setTimeout(res, 2000));
+      }
+    }
+    pollManifestProgramDateTime();
+    return () => { stop = true; };
+  }, [clientId, manifestReady]);
+
   useEffect(() => {
     let interval;
     if (manifestReady) {
@@ -276,7 +323,19 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   };
 
-  const lagStatus = getLagStatus(playerLag, lastSegmentLag);
+  // Vælg status: Player-lag først (hvis muligt), så manifest-program-lag, ellers backend-lag
+  let lagToShow = playerLag;
+  let lagType = "player";
+  if (lagToShow == null && manifestProgramLag != null) {
+    lagToShow = manifestProgramLag;
+    lagType = "manifest";
+  }
+  if (lagToShow == null && lastSegmentLag != null) {
+    lagToShow = lastSegmentLag;
+    lagType = "backend";
+  }
+
+  const lagStatus = getLagStatus(lagToShow, lastSegmentLag);
 
   return (
     <Grid container spacing={0}>
@@ -355,7 +414,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                       </Typography>
                     )}
                     <Typography variant="caption" sx={{ color: "#999" }}>
-                      (Debug: playerLag={playerLag}, lastSegmentLag={lastSegmentLag})
+                      (Debug: playerLag={playerLag}, manifestProgramLag={manifestProgramLag}, backendLag={lastSegmentLag}, lagType={lagType})
                     </Typography>
                     {lastFetched && (
                       <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
@@ -398,12 +457,19 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                       Fuld skærm
                     </Button>
                   )}
-                  {lastSegmentTimestamp && lastSegmentLag !== null && (
+                  {(manifestProgramDateTime || lastSegmentTimestamp) && lagToShow !== null && (
                     <Typography variant="caption" sx={{ color: "#888", mt: 0.5, textAlign: "center", width: "100%" }}>
-                      Seneste segment modtaget for {lastSegmentLag < 1.5 ? "mindre end 2 sekunder" : formatLag(lastSegmentLag)} siden
-                      {lastSegmentTimestamp && (
-                        <> ({formatDateTimeWithDay(new Date(lastSegmentTimestamp))})</>
-                      )}
+                      Seneste program-date-time:{" "}
+                      {manifestProgramDateTime
+                        ? formatDateTimeWithDay(new Date(manifestProgramDateTime))
+                        : lastSegmentTimestamp
+                          ? formatDateTimeWithDay(new Date(lastSegmentTimestamp))
+                          : ""}
+                      <br />
+                      {lagToShow < 1.5 ? "mindre end 2 sekunder" : formatLag(lagToShow)} siden
+                      {lagType === "player" && " (player)"}
+                      {lagType === "manifest" && " (manifest)"}
+                      {lagType === "backend" && " (backend)"}
                     </Typography>
                   )}
                 </Box>
