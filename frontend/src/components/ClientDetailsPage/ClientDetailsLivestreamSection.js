@@ -75,6 +75,13 @@ function getLagStatus(playerLag, lastSegmentLag) {
   return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#e53935" };
 }
 
+// Formatter der altid viser tal med max 3 decimaler
+function formatLagValue(val) {
+  if (val == null) return "-";
+  // Vis max 3 decimaler, uden trailing nuller
+  return Number(val).toFixed(3).replace(/(\.\d*?[1-9])0+$|\.0*$/, "$1");
+}
+
 export default function ClientDetailsLivestreamSection({ clientId }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -582,7 +589,19 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   display: "block",
                 }}
               >
-                playerLag={<b>{playerLag ?? "-"}</b>}, manifestProgramLag={<b>{manifestProgramLag ?? "-"}</b>}, backendLag={<b>{lastSegmentLag ?? "-"}</b>}, lagType={<b>{lagType}</b>}
+                {/* Tooltip med råværdier */}
+                <Tooltip title={`Råværdi: ${playerLag ?? "-"}`}>
+                  <span>playerLag=<b>{formatLagValue(playerLag)}</b></span>
+                </Tooltip>
+                ,{" "}
+                <Tooltip title={`Råværdi: ${manifestProgramLag ?? "-"}`}>
+                  <span>manifestProgramLag=<b>{formatLagValue(manifestProgramLag)}</b></span>
+                </Tooltip>
+                ,{" "}
+                <Tooltip title={`Råværdi: ${lastSegmentLag ?? "-"}`}>
+                  <span>backendLag=<b>{formatLagValue(lastSegmentLag)}</b></span>
+                </Tooltip>
+                , lagType=<b>{lagType}</b>
               </Typography>
               {!isSafari() && (
                 <Typography
