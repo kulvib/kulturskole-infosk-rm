@@ -100,10 +100,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   const [autoRefreshed, setAutoRefreshed] = useState(false);
 
-  // Responsive
+  // Responsive font size for debug
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const debugFontSize = isMobile ? 11 : 13;
+  const debugFontSize = isMobile ? 11 : 12;
 
   function handleVideoWaiting() {
     setBuffering(true);
@@ -587,20 +587,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   fontSize: debugFontSize,
                 }}
               >
-                Segmentnummer ikke tilgængeligt i Safari
-              </Typography>
-            )}
-            {isSafari() && (
-              <Typography
-                variant="caption"
-                sx={{
-                  color: "#f90",
-                  fontFamily: "monospace",
-                  textAlign: "left",
-                  fontSize: debugFontSize,
-                }}
-              >
-                Safari: Forsinkelse er estimeret ud fra serverens sidste segment
+                Safari browser: segmentnummer ikke tilgængelig. Forsinkelse er estimeret ud fra serverens sidste segment
               </Typography>
             )}
           </Stack>
