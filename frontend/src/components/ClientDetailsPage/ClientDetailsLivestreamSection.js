@@ -3,7 +3,6 @@ import Hls from "hls.js";
 import {
   Box,
   Card,
-  CardContent,
   Typography,
   CircularProgress,
   Alert,
@@ -60,6 +59,7 @@ function isSafari() {
   return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 }
 
+// Ændret grænser: Grøn < 10, Orange < 30, Rød >= 30
 function getLagStatus(playerLag, lastSegmentLag) {
   let lag;
   if (isSafari()) {
@@ -68,7 +68,7 @@ function getLagStatus(playerLag, lastSegmentLag) {
     lag = playerLag !== null ? playerLag : lastSegmentLag;
   }
   if (lag == null) return { text: "", color: "#888" };
-  if (lag < 2) return { text: "Live", color: "#43a047" };
+  if (lag < 10) return { text: "Live", color: "#43a047" };
   if (lag < 30) return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#f90" };
   return { text: `Forsinket: ${formatLag(lag)} bagud`, color: "#e53935" };
 }
@@ -298,20 +298,20 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     return () => clearInterval(interval);
   }, [manifestReady]);
 
-  // Auto-refresh hvert 45. sekund
+  // Auto-refresh hvert minut
   useEffect(() => {
     const interval = setInterval(() => {
       setAutoRefreshed(true);
       setManifestReady(false);
       setRefreshKey(prev => prev + 1);
-    }, 45000);
+    }, 60000); // 1 minut
     return () => clearInterval(interval);
   }, []);
 
-  // Skjul auto-refresh besked efter 3 sekunder
+  // Skjul auto-refresh besked efter 5 sekunder
   useEffect(() => {
     if (autoRefreshed) {
-      const timeout = setTimeout(() => setAutoRefreshed(false), 3000);
+      const timeout = setTimeout(() => setAutoRefreshed(false), 5000); // 5 sekunder
       return () => clearTimeout(timeout);
     }
   }, [autoRefreshed]);
@@ -477,16 +477,16 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         <Grid item xs={12} md={4}>
           <Stack spacing={1}>
             {/* Forsinkelse */}
-            <Typography variant="body1" sx={{ color: lagStatus.color, fontWeight: 700 }}>
+            <Typography variant="body1" sx={{ color: lagStatus.color, fontWeight: 700, textAlign: "right" }}>
               {lagStatus.text || "Ingen status"}
             </Typography>
             {/* Klient ID */}
-            <Typography variant="body2" sx={{ color: "#888" }}>
+            <Typography variant="body2" sx={{ color: "#888", textAlign: "right" }}>
               Klient ID: {clientId}
             </Typography>
             {/* Seneste program-date-time */}
             {(manifestProgramDateTime || lastSegmentTimestamp) && (
-              <Typography variant="body2" sx={{ color: "#888" }}>
+              <Typography variant="body2" sx={{ color: "#888", textAlign: "right" }}>
                 Sidste manifest hentet:{" "}
                 {manifestProgramDateTime
                   ? formatDateTimeWithDay(new Date(manifestProgramDateTime))
@@ -497,11 +497,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             )}
             {/* Sidste stream hentet */}
             {lastFetched && (
-              <Typography variant="body2" sx={{ color: "#888" }}>
+              <Typography variant="body2" sx={{ color: "#888", textAlign: "right" }}>
                 Sidste kontakt til serveren: {formatDateTimeWithDay(lastFetched)}
               </Typography>
             )}
-            {/* Debug */}
             <Divider sx={{ my: 1 }} />
             <Typography variant="caption" sx={{ color: "#999", fontFamily: "monospace" }}>
               (Debug: playerLag={playerLag}, manifestProgramLag={manifestProgramLag}, backendLag={lastSegmentLag}, lagType={lagType})
