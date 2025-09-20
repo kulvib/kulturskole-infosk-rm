@@ -172,13 +172,20 @@ export default function ClientDetailsPage({
         liveChromeStatus={liveChromeStatus}
         liveChromeColor={liveChromeColor}
         refreshing={refreshing}
-        handleRefresh={handleRefresh}
+        // VIGTIGT: denne opdaterer både data og stream!
+        handleRefresh={() => {
+          handleRefresh();
+          if (onRestartStream) onRestartStream();
+        }}
         snackbar={snackbar}
         handleCloseSnackbar={handleCloseSnackbar}
       />
       <Grid container spacing={2}>
         <Grid item xs={12}>
-          <ClientDetailsLivestreamSection clientId={client?.id} />
+          <ClientDetailsLivestreamSection
+            clientId={client?.id}
+            key={streamKey} // <-- tving genmount af stream ved opdatering
+          />
         </Grid>
         <Grid item xs={12}>
           <ClientDetailsInfoSection
