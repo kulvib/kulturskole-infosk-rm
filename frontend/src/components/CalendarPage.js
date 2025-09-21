@@ -116,7 +116,15 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
 
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          mb: 2,
+          flexDirection: { xs: "column", sm: "row" },
+          gap: { xs: 1, sm: 0 }
+        }}
+      >
         <TextField
           label="Søg klient"
           variant="outlined"
@@ -124,9 +132,15 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
           value={search}
           onChange={e => setSearch(e.target.value)}
           disabled={disabled}
+          sx={{ width: { xs: "100%", sm: "auto" } }}
         />
         <Button
-          sx={{ ml: 2, minWidth: 0, px: 2 }}
+          sx={{
+            ml: { xs: 0, sm: 2 },
+            mt: { xs: 1, sm: 0 },
+            minWidth: 0, px: 2,
+            width: { xs: "100%", sm: "auto" }
+          }}
           variant={allMarked ? "contained" : "outlined"}
           color={allMarked ? "success" : "primary"}
           onClick={handleToggleAll}
@@ -138,7 +152,11 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr", md: "repeat(4, 1fr)" },
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "1fr 1fr",
+            md: "repeat(4, 1fr)"
+          },
           gap: 1,
         }}
       >
@@ -153,7 +171,8 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
               background: selected.includes(client.id) ? "#f0f4ff" : "transparent",
               borderRadius: 1,
               cursor: disabled ? "not-allowed" : "pointer",
-              ":hover": { background: disabled ? "transparent" : "#f3f6fa" }
+              ":hover": { background: disabled ? "transparent" : "#f3f6fa" },
+              fontSize: { xs: "0.96rem", sm: "1rem" }
             }}
             onClick={() => {
               if (disabled) return;
@@ -173,7 +192,7 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
               inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
               disabled={disabled}
             />
-            <Typography variant="body2" noWrap>
+            <Typography variant="body2" noWrap sx={{ fontSize: { xs: "0.98rem", sm: "1rem" } }}>
               {(client.locality || client.name || "Ingen lokalitet") + " – " + getSchoolNameForClient(client)}
             </Typography>
           </Box>
@@ -221,7 +240,6 @@ export default function CalendarPage() {
   }, [token]);
   const allSchoolTimes = useAllSchoolTimes(schools);
 
-  // FLYT OPDATERKNAP UDENFOR PAPER OG GIV SUCCES-SNACKBAR
   const fetchClients = useCallback(async (showSuccess = false) => {
     setLoadingClients(true);
     try {
@@ -572,9 +590,19 @@ export default function CalendarPage() {
 
   // ----------- RENDER -----------
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
+    <Box sx={{
+      maxWidth: 1200,
+      mx: "auto",
+      mt: { xs: 1, sm: 4 },
+      fontFamily: "inherit",
+      px: { xs: 0.5, sm: 2 }
+    }}>
       {/* Opdater-knap ALTID synlig, udenfor Paper */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+      <Box sx={{
+        display: 'flex',
+        justifyContent: { xs: 'center', sm: 'flex-end' },
+        mb: 2
+      }}>
         <Tooltip title="Opdater klienter">
           <span>
             <Button
@@ -585,7 +613,12 @@ export default function CalendarPage() {
               }
               onClick={() => fetchClients(true)}
               disabled={loadingClients}
-              sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
+              sx={{
+                minWidth: 0,
+                fontWeight: 500,
+                textTransform: "none",
+                width: { xs: "100%", sm: "auto" }
+              }}
             >
               {loadingClients ? "Opdaterer..." : "Opdater"}
             </Button>
@@ -594,10 +627,21 @@ export default function CalendarPage() {
       </Box>
 
       {user?.role === "admin" && (
-        <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
-          <Stack direction="row" alignItems="center" justifyContent="flex-start">
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        <Paper elevation={2} sx={{
+          p: { xs: 1, sm: 2 },
+          mb: 3,
+          position: "relative",
+          display: "flex",
+          flexDirection: "column"
+        }}>
+          <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="flex-start">
+            <Box sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              width: { xs: "100%", sm: "auto" }
+            }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: "1rem", sm: "1.25rem" } }}>
                 Vælg skole:
               </Typography>
               <Select
@@ -605,7 +649,7 @@ export default function CalendarPage() {
                 value={selectedSchool}
                 displayEmpty
                 onChange={e => setSelectedSchool(e.target.value)}
-                sx={{ minWidth: 180 }}
+                sx={{ minWidth: 140, width: { xs: "100%", sm: 180 } }}
               >
                 <MenuItem value="">Alle skoler</MenuItem>
                 <MenuItem disabled>--------</MenuItem>
@@ -629,7 +673,13 @@ export default function CalendarPage() {
         </MuiAlert>
       </Snackbar>
 
-      <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
+      <Paper elevation={2} sx={{
+        p: { xs: 1, sm: 2 },
+        mb: 3,
+        position: "relative",
+        display: "flex",
+        flexDirection: "column"
+      }}>
         {loadingClients && (
           <Box sx={{
             position: "absolute",
@@ -651,14 +701,19 @@ export default function CalendarPage() {
           <Box sx={{
             mt: 2,
             display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between"
+            flexDirection: { xs: "column", sm: "row" },
+            alignItems: { xs: "stretch", sm: "center" },
+            justifyContent: "space-between",
+            gap: { xs: 1.5, sm: 0 }
           }}>
             <Box>
-              <Typography variant="body2" sx={{ fontSize: "1rem", fontWeight: 700 }}>
+              <Typography variant="body2" sx={{ fontSize: { xs: "1rem", sm: "1.1rem" }, fontWeight: 700 }}>
                 Viser kalender for: {activeClientName}
               </Typography>
-              <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "#555", fontWeight: 400 }}>
+              <Typography variant="body2" sx={{
+                fontSize: { xs: "0.9rem", sm: "0.8rem" },
+                color: "#555", fontWeight: 400
+              }}>
                 ændringerne slår også igennem på klienterne: {otherClientNames}
               </Typography>
             </Box>
@@ -673,8 +728,9 @@ export default function CalendarPage() {
                 bgcolor: selectedClients.length < 2 ? "#eee" : undefined,
                 color: selectedClients.length < 2 ? "#888" : undefined,
                 pointerEvents: selectedClients.length < 2 ? "none" : undefined,
-                minWidth: 220,
-                ml: 3
+                minWidth: 180,
+                width: { xs: "100%", sm: 220 },
+                mt: { xs: 1, sm: 0 }
               }}
             >
               {savingCalendar ? "Gemmer..." : "Gem kalender for valgte klienter"}
@@ -686,13 +742,21 @@ export default function CalendarPage() {
       <Box
         sx={{
           display: "flex",
-          alignItems: "center",
+          alignItems: { xs: "stretch", sm: "center" },
           mb: 3,
+          flexDirection: { xs: "column", sm: "row" },
+          gap: { xs: 1.5, sm: 0 },
           width: "100%",
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
-          <Typography variant="h6" sx={{ mr: 1, fontWeight: 700 }}>
+        <Box sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          flex: 1,
+          justifyContent: { xs: "center", sm: "flex-start" }
+        }}>
+          <Typography variant="h6" sx={{ mr: 1, fontWeight: 700, fontSize: { xs: "1rem", sm: "1.15rem" } }}>
             Markering:
           </Typography>
           <Button
@@ -716,27 +780,47 @@ export default function CalendarPage() {
             SLUKKET
           </Button>
         </Box>
-        <Box sx={{ flex: 1, display: "flex", justifyContent: "center" }}>
+        <Box sx={{
+          flex: 1,
+          display: "flex",
+          justifyContent: { xs: "center", sm: "center" },
+          mb: { xs: 1, sm: 0 }
+        }}>
           <Button
             variant="outlined"
             color="primary"
             size="medium"
-            sx={{ minWidth: 120, fontWeight: 700 }}
+            sx={{
+              minWidth: 120,
+              fontWeight: 700,
+              width: { xs: "100%", sm: 120 }
+            }}
             onClick={() => setCalendarDialogOpen(true)}
             disabled={isDisabled}
           >
             Vis liste
           </Button>
         </Box>
-        <Box sx={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2 }}>
+        <Box sx={{
+          flex: 1,
+          display: "flex",
+          justifyContent: { xs: "center", sm: "flex-end" },
+          alignItems: "center",
+          gap: 1
+        }}>
+          <Typography variant="h6" sx={{
+            fontWeight: 700,
+            color: "#0a275c",
+            mr: 2,
+            fontSize: { xs: "1rem", sm: "1.15rem" }
+          }}>
             Vælg sæson:
           </Typography>
           <Select
             size="small"
             value={selectedSeason}
             onChange={e => setSelectedSeason(Number(e.target.value))}
-            sx={{ minWidth: 120 }}
+            sx={{ minWidth: 100, width: { xs: 100, sm: 120 } }}
             disabled={isDisabled}
           >
             {seasons.map(season => (
@@ -751,7 +835,11 @@ export default function CalendarPage() {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "2fr 2fr", md: "repeat(4, 1fr)" },
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "1fr 1fr",
+            md: "repeat(4, 1fr)"
+          },
           gap: 3,
         }}
       >
@@ -866,19 +954,48 @@ function MonthCalendar({
   }, [isDragging]);
 
   return (
-    <Card sx={{ borderRadius: "14px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", minWidth: 0, background: "#f9fafc" }}>
-      <CardContent>
-        <Typography variant="h6" sx={{ color: "#0a275c", fontWeight: 700, textAlign: "center", fontSize: "1.08rem", mb: 1 }}>
+    <Card sx={{
+      borderRadius: "14px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+      minWidth: 0,
+      background: "#f9fafc",
+      p: { xs: 0.5, sm: 1 }
+    }}>
+      <CardContent sx={{
+        p: { xs: 1, sm: 2 }
+      }}>
+        <Typography variant="h6" sx={{
+          color: "#0a275c",
+          fontWeight: 700,
+          textAlign: "center",
+          fontSize: { xs: "1rem", sm: "1.08rem" },
+          mb: 1
+        }}>
           {name} {year}
         </Typography>
-        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.2, mb: 0.5 }}>
+        <Box sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          gap: 0.2,
+          mb: 0.5
+        }}>
           {weekdayNames.map(wd => (
-            <Typography key={wd} variant="caption" sx={{ fontWeight: 700, color: "#555", textAlign: "center", fontSize: "0.90rem", letterSpacing: "0.03em" }}>
+            <Typography key={wd} variant="caption" sx={{
+              fontWeight: 700,
+              color: "#555",
+              textAlign: "center",
+              fontSize: { xs: "0.82rem", sm: "0.90rem" },
+              letterSpacing: "0.03em"
+            }}>
               {wd}
             </Typography>
           ))}
         </Box>
-        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.2 }}>
+        <Box sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          gap: 0.2,
+        }}>
           {cells.map((day, idx) => {
             if (!day) return <Box key={idx + "-empty"} />;
             const dateString = formatDate(year, month, day);
@@ -896,12 +1013,20 @@ function MonthCalendar({
                 }}>
                 <Box
                   sx={{
-                    width: 23, height: 23, borderRadius: "50%", background: bg,
-                    border: "1px solid #eee", color: "#0a275c", fontWeight: 500,
-                    fontSize: "0.95rem", textAlign: "center", lineHeight: "23px",
+                    width: { xs: 26, sm: 23 },
+                    height: { xs: 26, sm: 23 },
+                    borderRadius: "50%",
+                    background: bg,
+                    border: "1px solid #eee",
+                    color: "#0a275c",
+                    fontWeight: 500,
+                    fontSize: { xs: "1rem", sm: "0.95rem" },
+                    textAlign: "center",
+                    lineHeight: { xs: "26px", sm: "23px" },
                     boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
                     cursor: clientId ? "pointer" : "default",
-                    transition: "background 0.2s", opacity: clientId ? 1 : 0.55,
+                    transition: "background 0.2s",
+                    opacity: clientId ? 1 : 0.55,
                     position: "relative"
                   }}
                   title={
