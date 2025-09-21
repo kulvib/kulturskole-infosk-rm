@@ -18,7 +18,7 @@ def get_clients_public(session=Depends(get_session)):
         "clients": [{"id": c.id, "name": c.name} for c in clients]
     }
 
-# Bruger-endpoint - kun godkendte klienter fra egen skole
+# Bruger-endpoint - kun godkendte klienter fra egen skole (rolle: bruger eller admin)
 @router.get("/clients/me", response_model=List[Client])
 def get_clients_for_my_school(session=Depends(get_session), user=Depends(get_current_user)):
     if not user.school_id:
