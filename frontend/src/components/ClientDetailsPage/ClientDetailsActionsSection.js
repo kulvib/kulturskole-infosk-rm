@@ -40,22 +40,22 @@ export default function ClientDetailsActionsSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Smallere og centrerede knapper, stadig 4 pr række
+  // Tilpasset knapstyle: height: 38px og harmoniske værdier
   const actionBtnStyle = {
     minWidth: 0,
-    maxWidth: 150,         // <--- Gør knappen smallere (fx 140-170 afh. af smag)
+    width: "100%",
     height: 38,
+    fontSize: "0.95rem",      // Lidt større for god læsbarhed
     textTransform: "none",
     fontWeight: 500,
-    fontSize: "0.87rem",
-    lineHeight: 1.1,
-    py: 0.25,
-    px: 1.1,
-    m: "0 auto",           // <--- Centrer knappen i gridcellen
+    lineHeight: 1.18,
+    py: 0.75,                 // 0.75*8 = 6px (vertikal padding)
+    px: 1.25,                 // 1.25*8 = 10px (horisontal padding)
+    m: 0,
     whiteSpace: "nowrap",
     display: "inline-flex",
     justifyContent: "center",
-    borderRadius: 2,
+    borderRadius: 2.8,        // Let afrunding
     boxShadow: 1,
   };
 
@@ -184,7 +184,7 @@ export default function ClientDetailsActionsSection({
   const renderButton = btn => (
     <Grid item xs={12} sm={6} md={3} key={btn.key}>
       <MaybeTooltip title={btn.tooltip}>
-        <span style={{ display: "flex", justifyContent: "center" }}>
+        <span style={{ width: "100%" }}>
           <Button
             variant={btn.variant}
             color={btn.color}
@@ -192,6 +192,7 @@ export default function ClientDetailsActionsSection({
             disabled={!!btn.loading}
             onClick={btn.onClick}
             sx={actionBtnStyle}
+            fullWidth
           >
             {btn.loading ? (
               <CircularProgress size={16} sx={{ mr: 1 }} />
@@ -211,7 +212,7 @@ export default function ClientDetailsActionsSection({
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {adminFirstRow.map(renderButton)}
             </Grid>
-            <Box sx={{ height: 10 }} />
+            <Box sx={{ height: 12 }} />
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {adminSecondRow.map(renderButton)}
             </Grid>
@@ -221,7 +222,7 @@ export default function ClientDetailsActionsSection({
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {userFirstRow.map(renderButton)}
             </Grid>
-            <Box sx={{ height: 10 }} />
+            <Box sx={{ height: 12 }} />
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {userSecondRow.map(renderButton)}
             </Grid>
