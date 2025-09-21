@@ -19,11 +19,15 @@ export default function HomePage() {
     >
       <Paper elevation={3} sx={{ p: 4, width: "100%", textAlign: "center", borderRadius: 3 }}>
         <Typography variant="h4" sx={{ mb: 2, fontWeight: 700 }}>
-          Kulturskole Infoskærm
+          Infoskærm administration
         </Typography>
-        <Typography variant="subtitle1" sx={{ mb: 4 }}>
-          Velkommen til administrationen af infoskærme.
-        </Typography>
+        {/* Besked til brugere/admins */}
+        {user?.role !== "admin" && user?.school_name && (
+          <Typography variant="subtitle1" sx={{ mb: 4 }}>
+            Velkommen til administrationen af infoskærme for {user.school_name}.
+          </Typography>
+        )}
+        {/* For admin: teksten vises ikke */}
         <Stack spacing={2} direction="column" alignItems="center">
           <Button
             variant="contained"
