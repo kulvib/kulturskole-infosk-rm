@@ -159,7 +159,6 @@ export default function ClientInfoPage() {
   const fetchClients = async (forceUpdate = false, showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
-      // VIGTIGT: Skift endpoint afhængig af rolle!
       const data =
         user?.role === "bruger"
           ? await getMyClients(token)
@@ -174,7 +173,6 @@ export default function ClientInfoPage() {
     if (showLoading) setLoading(false);
   };
 
-  // Første load med overlay, derefter polling uden overlay
   useEffect(() => {
     fetchClients(false, true);
     let timer = setInterval(() => {
@@ -184,15 +182,12 @@ export default function ClientInfoPage() {
     // eslint-disable-next-line
   }, [token, user?.role]);
 
-  // Hent skoler ved første load
   useEffect(() => {
     getSchools(token).then(setSchools).catch(() => setSchools([]));
   }, [token]);
 
-  // Filtrér klienter baseret på brugerens rolle og skole (men det håndteres også af backend nu)
   const filteredClients = clients;
 
-  // Drag/drop sortering og approved
   useEffect(() => {
     const approved = (filteredClients?.filter((c) => c.status === "approved") || []).slice();
     approved.sort((a, b) => {
@@ -211,7 +206,6 @@ export default function ClientInfoPage() {
     setDragClients(approved);
   }, [filteredClients]);
 
-  // Unapproved clients filtreret på rolle/skole
   const unapprovedClients = (filteredClients?.filter((c) => c.status !== "approved") || [])
     .slice()
     .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -286,11 +280,13 @@ export default function ClientInfoPage() {
     }
   };
 
-  // Hjælpefunktion til at vise skolenavn ud fra client.school_id
   const getSchoolName = (schoolId) => {
     const school = schools.find(s => s.id === schoolId);
     return school ? school.name : <span style={{ color: "#888" }}>Ingen skole</span>;
   };
+
+  // Vælg hvilke kolonner der skal vises afhængig af rolle
+  const isAdmin = user?.role === "admin";
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
@@ -340,7 +336,6 @@ export default function ClientInfoPage() {
       </Stack>
       <Paper sx={{ mb: 4 }}>
         <TableContainer style={{ position: "relative" }}>
-          {/* Spinner overlay for loading */}
           {loading && (
             <Box sx={{
               position: "absolute",
@@ -361,20 +356,20 @@ export default function ClientInfoPage() {
                 >
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Klient ID</TableCell>
+                      {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Klient ID</TableCell>}
                       <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Skole</TableCell>
                       <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
-                      <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>
+                      {isAdmin && <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>}
                       <TableCell sx={{ fontWeight: 700, width: 60, textAlign: "right" }}>Sortering</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {dragClients.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} align="center">
+                        <TableCell colSpan={isAdmin ? 8 : 6} align="center">
                           Ingen godkendte klienter.
                         </TableCell>
                       </TableRow>
@@ -397,7 +392,7 @@ export default function ClientInfoPage() {
                               }}
                               hover
                             >
-                              <TableCell>{client.id}</TableCell>
+                              {isAdmin && <TableCell>{client.id}</TableCell>}
                               <TableCell>{client.name}</TableCell>
                               <TableCell>
                                 {client.locality || <span style={{ color: "#888" }}>Ingen lokalitet</span>}
@@ -419,16 +414,18 @@ export default function ClientInfoPage() {
                                   </IconButton>
                                 </Tooltip>
                               </TableCell>
-                              <TableCell align="center">
-                                <Tooltip title="Fjern klient">
-                                  <IconButton
-                                    color="error"
-                                    onClick={() => openRemoveDialog(client.id)}
-                                  >
-                                    <DeleteIcon />
-                                  </IconButton>
-                                </Tooltip>
-                              </TableCell>
+                              {isAdmin && (
+                                <TableCell align="center">
+                                  <Tooltip title="Fjern klient">
+                                    <IconButton
+                                      color="error"
+                                      onClick={() => openRemoveDialog(client.id)}
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </Tooltip>
+                                </TableCell>
+                              )}
                               <TableCell align="right" {...provided.dragHandleProps} sx={{ cursor: "grab", width: 60 }}>
                                 <span style={{ fontSize: 20 }}>☰</span>
                               </TableCell>
@@ -446,7 +443,7 @@ export default function ClientInfoPage() {
         </TableContainer>
       </Paper>
       {/* Ikke godkendte klienter kun for admin */}
-      {user?.role === "admin" && (
+      {isAdmin && (
         <>
           <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
             Ikke godkendte klienter
