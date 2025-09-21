@@ -20,6 +20,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../auth/authcontext";
 
 // StatusBadge med 2s puls animation hvis animate=true
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
@@ -151,11 +152,11 @@ export default function ClientDetailsHeaderSection({
   liveChromeColor,
   refreshing,
   handleRefresh
-  // snackbar og handleCloseSnackbar ER FJERNET
 }) {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { user } = useAuth(); // Hent bruger fra authcontext
 
   const inputStyle = {
     width: isMobile ? "100%" : 300,
@@ -247,35 +248,38 @@ export default function ClientDetailsHeaderSection({
             <TableContainer>
               <Table size="small" aria-label="client-details">
                 <TableBody>
-                  <TableRow sx={{ height: isMobile ? 32 : 40 }}>
-                    <TableCell
-                      sx={{
-                        border: 0,
-                        fontWeight: 600,
-                        whiteSpace: "nowrap",
-                        pr: 0.5,
-                        py: 0,
-                        verticalAlign: "middle",
-                        height: isMobile ? 32 : 40,
-                        fontSize: isMobile ? 13 : 14,
-                      }}
-                    >
-                      Klient ID:
-                    </TableCell>
-                    <TableCell sx={valueCellStyle}>
-                      <Typography
-                        variant="body2"
+                  {/* Kun vis Klient ID hvis bruger er admin */}
+                  {user?.role === "admin" && (
+                    <TableRow sx={{ height: isMobile ? 32 : 40 }}>
+                      <TableCell
                         sx={{
-                          color: "text.primary",
-                          fontWeight: 700,
-                          fontSize: isMobile ? "0.86rem" : "0.9rem",
-                          display: "inline",
+                          border: 0,
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                          pr: 0.5,
+                          py: 0,
+                          verticalAlign: "middle",
+                          height: isMobile ? 32 : 40,
+                          fontSize: isMobile ? 13 : 14,
                         }}
                       >
-                        {client.id}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
+                        Klient ID:
+                      </TableCell>
+                      <TableCell sx={valueCellStyle}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: "text.primary",
+                            fontWeight: 700,
+                            fontSize: isMobile ? "0.86rem" : "0.9rem",
+                            display: "inline",
+                          }}
+                        >
+                          {client.id}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
                   <TableRow sx={{ height: isMobile ? 32 : 40 }}>
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
                       Lokation:
