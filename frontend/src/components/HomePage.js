@@ -1,8 +1,11 @@
 import React from "react";
 import { Box, Typography, Paper, Button, Stack } from "@mui/material";
 import { Link } from "react-router-dom";
+import { useAuth } from "../auth/authcontext";
 
 export default function HomePage() {
+  const { user } = useAuth();
+
   return (
     <Box
       sx={{
@@ -30,8 +33,30 @@ export default function HomePage() {
             size="large"
             sx={{ minWidth: 200 }}
           >
-            Gå til klientoversigt
+            Gå til klient side
           </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            component={Link}
+            to="/calendar"
+            size="large"
+            sx={{ minWidth: 200 }}
+          >
+            Gå til kalender side
+          </Button>
+          {user?.role === "admin" && (
+            <Button
+              variant="contained"
+              color="secondary"
+              component={Link}
+              to="/admin"
+              size="large"
+              sx={{ minWidth: 200 }}
+            >
+              Gå til administrator side
+            </Button>
+          )}
         </Stack>
       </Paper>
     </Box>
