@@ -17,6 +17,7 @@ import {
   useMediaQuery,
   CssBaseline,
   Skeleton,
+  Slide,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import HomeIcon from "@mui/icons-material/Home";
@@ -85,8 +86,18 @@ export default function Dashboard() {
     ? `${user.full_name || user.username} - ${getRoleText(user.role)}`
     : "";
 
+  // --- Mobil optimering: Luk drawer ved navigation, swipe, klik udenfor ---
+  useEffect(() => {
+    if (mobileOpen && (isMobile || isTablet)) setMobileOpen(false);
+    // eslint-disable-next-line
+  }, [location.pathname]); // Luk drawer ved navigation på mobil/tablet
+
+  // --- Mobil/tablet optimering: swipe gesture for at åbne/lukke drawer (kun på touch enheder) ---
+  // Kan evt. tilføjes med SwipeableDrawer fra MUI, men her holder vi os til Drawer for at matche desktop-udseende.
+
+  // --- MENU DRAWER ---
   const drawer = (
-    <Box>
+    <Box sx={{ minHeight: "100vh", bgcolor: { xs: "#f8fdff", md: "inherit" } }}>
       <Toolbar />
       <Divider />
       <List sx={{ mt: 2 }}>
@@ -129,6 +140,7 @@ export default function Dashboard() {
                   outlineOffset: "-2px",
                 },
                 transition: "background-color 0.2s",
+                minHeight: { xs: 44, sm: 48 },
               }}
               tabIndex={0}
             >
@@ -138,6 +150,8 @@ export default function Dashboard() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  mr: { xs: 1, sm: 2 },
+                  fontSize: { xs: 20, sm: 22 },
                 }}
               >
                 {item.icon}
@@ -156,6 +170,7 @@ export default function Dashboard() {
                           : 400,
                       color: theme.palette.primary.dark,
                       fontSize: { xs: "0.97rem", sm: "1.05rem", md: "1.10rem" },
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {item.text}
@@ -200,8 +215,9 @@ export default function Dashboard() {
               edge="start"
               onClick={handleDrawerToggle}
               sx={{ mr: 1 }}
+              size="large"
             >
-              <MenuIcon />
+              <MenuIcon sx={{ fontSize: { xs: 26, sm: 32 } }} />
             </IconButton>
           )}
           <Typography
@@ -213,7 +229,8 @@ export default function Dashboard() {
               textOverflow: "ellipsis",
               overflow: "hidden",
               whiteSpace: "nowrap",
-              maxWidth: { xs: "60vw", sm: "75vw", md: "unset" },
+              maxWidth: { xs: "55vw", sm: "65vw", md: "unset" },
+              ml: { xs: (isMobile || isTablet) ? 0 : 1 }
             }}
           >
             {title}
@@ -252,6 +269,7 @@ export default function Dashboard() {
           ModalProps={{
             keepMounted: true,
           }}
+          transitionDuration={isMobile ? 180 : 220}
           sx={{
             display: { xs: "block", md: "block" },
             "& .MuiDrawer-paper": {
@@ -259,10 +277,14 @@ export default function Dashboard() {
               boxSizing: "border-box",
               background: theme.palette.background.default,
               borderRight: `1px solid ${theme.palette.divider}`,
+              pt: { xs: 0, md: 0 },
+              zIndex: 1200,
             },
           }}
         >
-          {drawer}
+          <Slide in direction="right" appear={false}>
+            <div>{drawer}</div>
+          </Slide>
         </Drawer>
       </Box>
 
