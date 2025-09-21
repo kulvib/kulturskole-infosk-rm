@@ -3,7 +3,6 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from sqlmodel import Session, select
-from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
@@ -21,8 +20,8 @@ router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
-# Token model is not used as response_model anymore
-# because we want to include user in the response
+# Fjern eller udvid Token response_model, ellers skjuler FastAPI 'user' i svaret!
+# Vi vælger at fjerne response_model helt for maksimal fleksibilitet.
 
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -59,7 +58,6 @@ def login_for_access_token(
         "sub": user.username,
         "role": getattr(user, "role", "admin")
     })
-    # Nu med full_name og remarks i response til frontend
     user_data = {
         "username": user.username,
         "role": getattr(user, "role", "admin"),
