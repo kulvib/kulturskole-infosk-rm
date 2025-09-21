@@ -33,7 +33,7 @@ export default function HomePage() {
             size="large"
             sx={{ minWidth: 200 }}
           >
-            Gå til klient side
+            Gå til klientoversigt
           </Button>
           <Button
             variant="contained"
@@ -48,9 +48,9 @@ export default function HomePage() {
           {user?.role === "admin" && (
             <Button
               variant="contained"
-              color="secondary"
+              color="primary"
               component={Link}
-              to="/admin"
+              to="/administration"
               size="large"
               sx={{ minWidth: 200 }}
             >
