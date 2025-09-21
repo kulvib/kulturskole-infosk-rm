@@ -37,17 +37,17 @@ export default function ClientDetailsActionsSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Responsiv knapstyle
+  // Mindre knapstyle end før!
   const actionBtnStyle = {
     minWidth: 0,
     width: "100%",
-    height: 44,
+    height: 36,
     textTransform: "none",
     fontWeight: 500,
-    fontSize: "0.99rem",
+    fontSize: "0.90rem",
     lineHeight: 1.13,
-    py: 1,
-    px: 1.5,
+    py: 0.5,
+    px: 1,
     m: 0,
     whiteSpace: "nowrap",
     display: "inline-flex",
@@ -208,7 +208,7 @@ export default function ClientDetailsActionsSection({
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {adminFirstRow.map(renderButton)}
             </Grid>
-            <Box sx={{ height: 16 }} />
+            <Box sx={{ height: 12 }} />
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {adminSecondRow.map(renderButton)}
             </Grid>
@@ -218,7 +218,7 @@ export default function ClientDetailsActionsSection({
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {userFirstRow.map(renderButton)}
             </Grid>
-            <Box sx={{ height: 16 }} />
+            <Box sx={{ height: 12 }} />
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {userSecondRow.map(renderButton)}
             </Grid>
