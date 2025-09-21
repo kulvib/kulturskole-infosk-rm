@@ -13,6 +13,8 @@ import {
   Typography,
   useMediaQuery,
   Grid,
+  Snackbar,
+  Alert
 } from "@mui/material";
 import ChromeReaderModeIcon from "@mui/icons-material/ChromeReaderMode";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
@@ -32,6 +34,7 @@ export default function ClientDetailsActionsSection({
 }) {
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -61,8 +64,9 @@ export default function ClientDetailsActionsSection({
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
       await clientAction(clientId, action);
+      setSnackbar({ open: true, message: 'Handling udført!', severity: 'success' });
     } catch (err) {
-      console.error("Fejl ved handling:", err);
+      setSnackbar({ open: true, message: 'Fejl: ' + (err?.message || 'Kunne ikke udføre handling'), severity: 'error' });
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
@@ -249,6 +253,20 @@ export default function ClientDetailsActionsSection({
             </Button>
           </DialogActions>
         </Dialog>
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={3000}
+          onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+            severity={snackbar.severity}
+            sx={{ width: '100%' }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </CardContent>
     </Card>
   );
