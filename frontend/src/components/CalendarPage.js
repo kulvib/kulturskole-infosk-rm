@@ -614,6 +614,7 @@ export default function CalendarPage() {
                 ))}
               </Select>
             </Box>
+            {/* Opdater-knappen vises altid, også for admin her */}
             <Tooltip title="Opdater klienter">
               <span>
                 <Button
@@ -632,6 +633,27 @@ export default function CalendarPage() {
             </Tooltip>
           </Stack>
         </Paper>
+      )}
+      {/* Opdater-knappen for bruger (uden omkringliggende Paper eller dropdown) */}
+      {user?.role !== "admin" && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Tooltip title="Opdater klienter">
+            <span>
+              <Button
+                startIcon={
+                  loadingClients
+                    ? <CircularProgress size={20} />
+                    : <RefreshIcon />
+                }
+                onClick={fetchClients}
+                disabled={loadingClients}
+                sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
+              >
+                {loadingClients ? "Opdaterer..." : "Opdater"}
+              </Button>
+            </span>
+          </Tooltip>
+        </Box>
       )}
 
       <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
