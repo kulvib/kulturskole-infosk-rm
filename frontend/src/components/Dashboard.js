@@ -26,7 +26,6 @@ import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { useAuth } from "../auth/authcontext";
 import axios from "axios";
 
-const drawerWidth = 230;
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
 const menuItems = [
@@ -44,11 +43,15 @@ function getRoleText(role) {
 
 export default function Dashboard() {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // <600px
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md")); // 600-899px
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
   const [schoolName, setSchoolName] = useState("");
+
+  // Responsiv drawerWidth
+  const drawerWidth = isMobile ? 160 : isTablet ? 190 : 230;
 
   // Hent school name hvis bruger
   useEffect(() => {
@@ -95,7 +98,7 @@ export default function Dashboard() {
                   : location.pathname.startsWith(item.match)
               }
               onClick={() => {
-                if (isMobile) setMobileOpen(false);
+                if (isMobile || isTablet) setMobileOpen(false);
               }}
               aria-current={
                 (item.path === "/" && location.pathname === "/") ||
@@ -105,8 +108,9 @@ export default function Dashboard() {
               }
               sx={{
                 borderRadius: 2,
-                mx: 1,
+                mx: { xs: 0.5, sm: 1 },
                 my: 0.5,
+                px: { xs: 1, sm: 2 },
                 backgroundColor:
                   item.path === "/"
                     ? location.pathname === "/"
@@ -127,7 +131,7 @@ export default function Dashboard() {
             >
               <Box
                 sx={{
-                  minWidth: 32,
+                  minWidth: 28,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -148,6 +152,7 @@ export default function Dashboard() {
                           ? 700
                           : 400,
                       color: theme.palette.primary.dark,
+                      fontSize: { xs: "0.97rem", sm: "1.05rem", md: "1.10rem" },
                     }}
                   >
                     {item.text}
@@ -171,7 +176,7 @@ export default function Dashboard() {
           background: theme.palette.primary.main,
           color: "#fff",
           boxShadow: 2,
-          height: 64,
+          height: { xs: 48, md: 64 },
           display: "flex",
           justifyContent: "center",
         }}
@@ -181,45 +186,65 @@ export default function Dashboard() {
           sx={{
             display: "flex",
             justifyContent: "space-between",
-            minHeight: 64,
+            minHeight: { xs: 48, md: 64 },
+            px: { xs: 1, md: 2 },
           }}
         >
-          {isMobile && (
+          {(isMobile || isTablet) && (
             <IconButton
               color="inherit"
               aria-label="Åbn menu"
               edge="start"
               onClick={handleDrawerToggle}
-              sx={{ mr: 2, display: { md: "none" } }}
+              sx={{ mr: 1 }}
             >
               <MenuIcon />
             </IconButton>
           )}
-          <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>
+          <Typography
+            variant="h6"
+            noWrap
+            sx={{
+              fontWeight: 700,
+              fontSize: { xs: "1rem", md: "1.25rem" },
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              maxWidth: { xs: "60vw", sm: "75vw", md: "unset" },
+            }}
+          >
             {title}
           </Typography>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          {/* Skjul brugerinfo på helt små skærme */}
+          <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center", gap: 1 }}>
             {user ? (
-              <Typography variant="subtitle2" sx={{ color: "#fff", opacity: 0.8, mr: 2 }}>
+              <Typography variant="subtitle2" sx={{ color: "#fff", opacity: 0.8, mr: 2, fontSize: { sm: "0.93rem", md: "1rem" } }}>
                 {userDisplay}
               </Typography>
             ) : (
-              <Skeleton variant="text" width={100} sx={{ bgcolor: "grey.700" }} />
+              <Skeleton variant="text" width={80} sx={{ bgcolor: "grey.700" }} />
             )}
+            <LogoutButton color="inherit" />
+          </Box>
+          {/* På XS vis kun logout-knap */}
+          <Box sx={{ display: { xs: "flex", sm: "none" }, alignItems: "center" }}>
             <LogoutButton color="inherit" />
           </Box>
         </Toolbar>
       </AppBar>
 
-      {/* Responsiv Drawer: Temporary på mobil, permanent på desktop */}
+      {/* Responsiv Drawer: Temporary på mobil/tablet, permanent på desktop */}
       <Box
         component="nav"
-        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
+        sx={{
+          width: { md: drawerWidth },
+          flexShrink: { md: 0 },
+        }}
         aria-label="navigation"
       >
         <Drawer
-          variant={isMobile ? "temporary" : "permanent"}
-          open={isMobile ? mobileOpen : true}
+          variant={isMobile || isTablet ? "temporary" : "permanent"}
+          open={isMobile || isTablet ? mobileOpen : true}
           onClose={handleDrawerToggle}
           ModalProps={{
             keepMounted: true,
@@ -242,13 +267,13 @@ export default function Dashboard() {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p: { xs: 1, sm: 2, md: 3 },
           width: { xs: "100%", md: `calc(100% - ${drawerWidth}px)` },
           minHeight: "100vh",
           background: "#f6f9fb",
         }}
       >
-        <Toolbar />
+        <Toolbar sx={{ minHeight: { xs: 48, md: 64 } }} />
         <Outlet />
       </Box>
     </Box>
