@@ -448,16 +448,7 @@ export default function UserAdministration() {
                           : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell
-                      sx={{ fontWeight: 700, cursor: "pointer" }}
-                      onClick={() => handleUserTableSort("fullname")}
-                    >
-                      Fuldt navn
-                      {userSort.key === "fullname" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
-                    </TableCell>
-                    <TableCell
-                      sx={{ fontWeight: 700, cursor: "pointer" }}
+                      sx={{ fontWeight: 700, cursor: "pointer", width: "25%" }}
                       onClick={() => handleUserTableSort("role")}
                     >
                       Rolle
@@ -466,7 +457,7 @@ export default function UserAdministration() {
                           : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell
-                      sx={{ fontWeight: 700, cursor: "pointer" }}
+                      sx={{ fontWeight: 700, cursor: "pointer", width: "25%" }}
                       onClick={() => handleUserTableSort("school")}
                     >
                       Skole
@@ -474,20 +465,25 @@ export default function UserAdministration() {
                         (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
                           : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Bemærkninger</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: 120 }}>
+                      Status
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: "50%" }}>
+                      Bemærkninger
+                    </TableCell>
                     <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {loadingUsers ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center">
+                      <TableCell colSpan={8} align="center">
                         <CircularProgress size={24} />
                       </TableCell>
                     </TableRow>
                   ) : getSortedUsers().length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ color: "#888" }}>
+                      <TableCell colSpan={8} align="center" sx={{ color: "#888" }}>
                         Ingen brugere oprettet endnu
                       </TableCell>
                     </TableRow>
@@ -495,12 +491,16 @@ export default function UserAdministration() {
                     getSortedUsers().map(user => (
                       <TableRow key={user.id} hover>
                         <TableCell>{user.username}</TableCell>
-                        <TableCell>{user.full_name || ""}</TableCell>
-                        <TableCell>{user.role === "admin" ? "administrator" : "bruger"}</TableCell>
+                        <TableCell>
+                          {user.role === "admin" ? "administrator" : "bruger"}
+                        </TableCell>
                         <TableCell>
                           {user.school_id
                             ? (getAlphaSchools().find(s => s.id === user.school_id)?.name ?? user.school_id)
                             : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {user.is_active ? "Aktiv" : "Spærret"}
                         </TableCell>
                         <TableCell>{user.remarks || ""}</TableCell>
                         <TableCell align="right">
