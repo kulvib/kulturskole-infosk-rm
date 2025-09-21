@@ -14,7 +14,6 @@ import {
   Tooltip,
   CircularProgress,
   Stack,
-  useTheme,
   Snackbar,
   Alert as MuiAlert,
   Select,
@@ -24,6 +23,7 @@ import {
   DialogContent,
   DialogActions,
   useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -132,6 +132,12 @@ function ClientStatusCell({ isOnline }) {
 
 export default function ClientInfoPage() {
   const { token, user } = useAuth();
+  const theme = useTheme();
+  // Korrekt brug af useMediaQuery med ThemeProvider
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md")); // 600-899px
+  const isSmall = isMobile || isTablet;
+
   const [clients, setClients] = useState([]);
   const [schools, setSchools] = useState([]);
   const [schoolSelections, setSchoolSelections] = useState({});
@@ -146,10 +152,6 @@ export default function ClientInfoPage() {
 
   // Snackbar state
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-
-  // Responsive helpers
-  const isXs = useMediaQuery(theme => theme.breakpoints.down("sm"));
-  const isSm = useMediaQuery(theme => theme.breakpoints.down("md"));
 
   const showSnackbar = (message, severity = "success") => {
     setSnackbar({ open: true, message, severity });
@@ -294,16 +296,7 @@ export default function ClientInfoPage() {
 
   const isAdmin = user?.role === "admin";
 
-  // Responsiv: Kolonne-overskrifter og celler
-  const mobileHeaders = [
-    ...(isAdmin ? ["ID"] : []),
-    "Klientnavn",
-    "Status",
-    "Info",
-    ...(isAdmin ? ["Fjern"] : []),
-    "Sort"
-  ];
-
+  // Responsive mobil/tablet render
   const renderMobileRow = (client, idx, provided, snapshot) => (
     <TableRow
       ref={provided?.innerRef}
@@ -388,7 +381,12 @@ export default function ClientInfoPage() {
           <Button onClick={confirmRemoveClient} color="error" variant="contained">Fjern</Button>
         </DialogActions>
       </Dialog>
-      <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between" sx={{ mb: 2, gap: 1 }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ mb: 2, gap: 1 }}
+      >
         <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.1rem", sm: "1.4rem" } }}>
           Godkendte klienter
         </Typography>
@@ -453,11 +451,16 @@ export default function ClientInfoPage() {
                         whiteSpace: { xs: "nowrap", sm: "normal" }
                       }
                     }}>
-                      {isXs ? (
-                        // Mobil header
-                        mobileHeaders.map((header, idx) => (
-                          <TableCell key={header + idx}>{header}</TableCell>
-                        ))
+                      {isMobile ? (
+                        // Mobil header: kompakt
+                        [
+                          ...(isAdmin ? ["ID"] : []),
+                          "Klientnavn",
+                          "Status",
+                          "Info",
+                          ...(isAdmin ? ["Fjern"] : []),
+                          "Sort"
+                        ].map((header, idx) => <TableCell key={header + idx}>{header}</TableCell>)
                       ) : (
                         <>
                           {isAdmin && <TableCell>Klient ID</TableCell>}
@@ -475,13 +478,13 @@ export default function ClientInfoPage() {
                   <TableBody>
                     {dragClients.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? (isXs ? 6 : 8) : (isXs ? 4 : 6)} align="center">
+                        <TableCell colSpan={isAdmin ? (isMobile ? 6 : 8) : (isMobile ? 4 : 6)} align="center">
                           Ingen godkendte klienter.
                         </TableCell>
                       </TableRow>
                     ) : (
                       dragClients.map((client, idx) =>
-                        isXs
+                        isMobile
                           ? (
                             <Draggable
                               key={client.id}
