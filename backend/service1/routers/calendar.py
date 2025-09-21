@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Dict, List, Any
 from datetime import datetime, date
 import requests
+from auth import get_current_user  # Importér authentication
 
 router = APIRouter()
 
@@ -41,7 +42,8 @@ def publish_schedule_for_client(client: Client, markings: Dict[str, Any]):
 @router.post("/calendar/marked-days")
 def save_marked_days(
     data: MarkedDaysRequest,
-    session=Depends(get_session)
+    session=Depends(get_session),
+    user=Depends(get_current_user)
 ):
     client_ids = data.clients
     season = data.season
@@ -71,7 +73,8 @@ def save_marked_days(
 def get_marked_days(
     season: int = Query(...),
     client_id: int = Query(...),
-    session=Depends(get_session)
+    session=Depends(get_session),
+    user=Depends(get_current_user)
 ):
     existing = session.exec(
         select(CalendarMarking).where(
@@ -90,7 +93,10 @@ def get_marked_days(
     return {"markedDays": formatted_markings}
 
 @router.get("/calendar/seasons")
-def get_seasons_list(count: int = 20):
+def get_seasons_list(
+    count: int = 20,
+    user=Depends(get_current_user)
+):
     """
     Returnerer en liste af sæsoner (id og label), f.eks. [{"id":2025,"label":"2025/2026"}, ...].
     """
@@ -112,7 +118,9 @@ def get_seasons_list(count: int = 20):
     return result
 
 @router.get("/calendar/season")
-def get_current_season():
+def get_current_season(
+    user=Depends(get_current_user)
+):
     """
     Returnerer den aktuelle sæson, hvor sæsonen går fra 1. august til 31. juli året efter.
     Eksempel: Hvis i dag er mellem 1. august 2024 og 31. juli 2025, returneres 2024/2025.
@@ -132,7 +140,10 @@ def get_current_season():
     }
 
 @router.post("/calendar/cleanup-past-seasons")
-def cleanup_past_seasons(session=Depends(get_session)):
+def cleanup_past_seasons(
+    session=Depends(get_session),
+    user=Depends(get_current_user)
+):
     """
     Slet alle CalendarMarking for den forrige sæson,
     hvis vi er efter 10. august.
