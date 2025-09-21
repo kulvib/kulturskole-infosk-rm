@@ -26,9 +26,6 @@ export default function HomePage() {
     }
   }, [user]);
 
-  // Mobil/tablet optimering
-  // Små marginer, mindre padding, større knapper på mobil/tablet
-  // Desktop beholdes uændret
   return (
     <Box
       sx={{
@@ -87,13 +84,13 @@ export default function HomePage() {
           sx={{
             mt: { xs: 2, md: 0 },
             "& .MuiButton-root": {
-              fontSize: { xs: "1rem", sm: "1.08rem", md: "1.1rem" },
-              minHeight: { xs: 46, sm: 48, md: 52 },
-              minWidth: { xs: 180, sm: 200 },
-              px: { xs: 2, sm: 3 },
-              borderRadius: { xs: 2, sm: 3 },
+              fontSize: { xs: "0.98rem", sm: "1.03rem", md: "1.08rem" },
+              minHeight: { xs: 38, sm: 40, md: 44 }, // mindre knapper
+              minWidth: { xs: 145, sm: 170, md: 180 }, // mindre knapper
+              px: { xs: 1.5, sm: 2.5 },
+              borderRadius: { xs: 1.5, sm: 2 },
               boxShadow: { xs: 1, sm: 2 },
-              letterSpacing: 0.15,
+              letterSpacing: 0.13,
             },
           }}
         >
