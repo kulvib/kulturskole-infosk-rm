@@ -46,9 +46,9 @@ def get_clients(session=Depends(get_session), user=Depends(get_current_admin_use
     clients.sort(key=lambda c: (c.sort_order is None, c.sort_order if c.sort_order is not None else 9999, c.id))
     return clients
 
-# Admin: Hent én klient
+# Hent én klient (admin: alle, bruger: kun approved + egen skole)
 @router.get("/clients/{id}/", response_model=Client)
-def get_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+def get_client(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -56,7 +56,19 @@ def get_client(id: int, session=Depends(get_session), user=Depends(get_current_a
     client.isOnline = (
         client.last_seen is not None and (now - client.last_seen) < timedelta(minutes=2)
     )
-    return client
+
+    # Admin må altid se
+    if getattr(user, "role", None) == "admin":
+        return client
+
+    # Bruger må kun se hvis godkendt og samme skole
+    if getattr(user, "role", None) == "bruger":
+        if client.status != "approved" or client.school_id != user.school_id:
+            raise HTTPException(status_code=403, detail="Du har ikke adgang til denne klient")
+        return client
+
+    # Ellers ingen adgang
+    raise HTTPException(status_code=403, detail="Du har ikke adgang til denne klient")
 
 # Chrome-status (til frontend visning)
 @router.get("/clients/{id}/chrome-status")
