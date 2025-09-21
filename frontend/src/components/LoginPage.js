@@ -12,6 +12,8 @@ import {
   IconButton,
   InputAdornment,
   CircularProgress,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
@@ -25,6 +27,9 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
     if (token) {
@@ -104,28 +109,51 @@ export default function LoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        px: { xs: 1, sm: 0 },
       }}
     >
       <Paper
         elevation={6}
         sx={{
-          p: 4,
-          minWidth: 350,
+          p: { xs: 2, sm: 4 },
+          width: "100%",
+          minWidth: { xs: "unset", sm: 350 },
           maxWidth: 380,
           textAlign: "center",
-          borderRadius: 3,
+          borderRadius: { xs: 2, sm: 3 },
+          boxShadow: { xs: 2, sm: 6 },
         }}
       >
-        <Typography variant="h5" sx={{ mb: 0.5, fontWeight: 700 }}>
+        <Typography
+          variant="h5"
+          sx={{
+            mb: 0.5,
+            fontWeight: 700,
+            fontSize: { xs: "1.23rem", sm: "1.5rem" },
+            letterSpacing: 0.08,
+          }}
+        >
           Kulturskolen Viborg
         </Typography>
-        <Typography variant="h6" sx={{ mb: 4, fontWeight: 500 }}>
+        <Typography
+          variant="h6"
+          sx={{
+            mb: 4,
+            fontWeight: 500,
+            fontSize: { xs: "1.07rem", sm: "1.17rem" },
+          }}
+        >
           infoskærm administration
         </Typography>
         <Box
           component="form"
           onSubmit={handleSubmit}
-          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            width: "100%",
+          }}
         >
           <TextField
             label="Brugernavn"
@@ -134,6 +162,9 @@ export default function LoginPage() {
             autoFocus
             required
             variant="outlined"
+            fullWidth
+            size={isMobile ? "small" : "medium"}
+            inputProps={{ autoComplete: "username" }}
           />
           <TextField
             label="Kodeord"
@@ -142,6 +173,9 @@ export default function LoginPage() {
             type={showPassword ? "text" : "password"}
             required
             variant="outlined"
+            fullWidth
+            size={isMobile ? "small" : "medium"}
+            inputProps={{ autoComplete: "current-password" }}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
@@ -161,7 +195,14 @@ export default function LoginPage() {
             variant="contained"
             color="primary"
             disabled={loading}
-            sx={{ mt: 1, fontWeight: 600 }}
+            sx={{
+              mt: 1,
+              fontWeight: 600,
+              fontSize: { xs: "1.05rem", sm: "1.15rem" },
+              minHeight: { xs: 38, sm: 44 },
+            }}
+            fullWidth
+            size={isMobile ? "medium" : "large"}
           >
             {loading ? (
               <>
@@ -179,6 +220,7 @@ export default function LoginPage() {
                 color: error ? "error.main" : "text.secondary",
                 fontWeight: 500,
                 minHeight: 24,
+                fontSize: { xs: "0.94rem", sm: "1rem" },
               }}
               variant="body2"
             >
