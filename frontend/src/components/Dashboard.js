@@ -16,7 +16,6 @@ import {
   useTheme,
   useMediaQuery,
   CssBaseline,
-  Avatar,
   Skeleton,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -36,13 +35,6 @@ const menuItems = [
   { text: "Kalender", path: "/calendar", match: "/calendar", icon: <CalendarMonthIcon /> },
   { text: "Administration", path: "/administration", match: "/administration", icon: <AdminPanelSettingsIcon /> },
 ];
-
-function getInitialer(name) {
-  if (!name) return "";
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 function getRoleText(role) {
   if (role === "admin") return "Administrator";
@@ -208,19 +200,11 @@ export default function Dashboard() {
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             {user ? (
-              <>
-                <Avatar sx={{ width: 28, height: 28, bgcolor: theme.palette.secondary.main }}>
-                  {getInitialer(user.full_name || user.username)}
-                </Avatar>
-                <Typography variant="subtitle2" sx={{ color: "#fff", opacity: 0.8, mr: 2 }}>
-                  {userDisplay}
-                </Typography>
-              </>
+              <Typography variant="subtitle2" sx={{ color: "#fff", opacity: 0.8, mr: 2 }}>
+                {userDisplay}
+              </Typography>
             ) : (
-              <>
-                <Skeleton variant="circular" width={28} height={28} />
-                <Skeleton variant="text" width={60} sx={{ bgcolor: "grey.700" }} />
-              </>
+              <Skeleton variant="text" width={100} sx={{ bgcolor: "grey.700" }} />
             )}
             <LogoutButton color="inherit" />
           </Box>
