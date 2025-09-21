@@ -1,9 +1,10 @@
 import os
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form, Body
-from typing import Dict, List
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Body, Depends
+from typing import List
 import traceback
 import re
 from datetime import datetime
+from auth import get_current_user  # Tilføjet authentication
 
 # --- Central HLS_DIR-definition her ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -18,12 +19,10 @@ os.makedirs(HLS_DIR, exist_ok=True)
 router = APIRouter()
 
 def extract_num(filename, prefix="segment_"):
-    # Matcher både segment_00001.ts og segment_00001_20250920T095400Z.ts
     m = re.match(rf"{re.escape(prefix)}(\d+)(?:_([0-9TtZz]+))?\.(mp4|ts)$", filename)
     return int(m.group(1)) if m else -1
 
 def extract_program_date_time(filename):
-    # Matcher segment_00001_20250920T095400Z.ts
     m = re.match(r"segment_\d+_([0-9TtZz]+)\.(mp4|ts)$", filename)
     if not m:
         return None
@@ -65,7 +64,8 @@ def update_manifest(client_dir, keep_n=4, segment_duration=6):
 @router.post("/hls/upload")
 async def upload_hls_file(
     file: UploadFile = File(...),
-    client_id: str = Form(...)
+    client_id: str = Form(...),
+    user=Depends(get_current_user)
 ):
     try:
         allowed_exts = [".ts", ".mp4"]
@@ -91,6 +91,7 @@ async def cleanup_hls_files(
     keep_files: List[str] = Body(...),
     keep_n: int = 4,
     segment_duration: int = 6,
+    user=Depends(get_current_user)
 ):
     try:
         print(f"[SERVER][CLEANUP] Modtog keep_files: {keep_files}")
@@ -118,7 +119,7 @@ async def cleanup_hls_files(
         raise HTTPException(status_code=500, detail=f"Fejl i cleanup: {e}")
 
 @router.get("/hls/{client_id}/last-segment-info")
-def get_last_segment_info(client_id: str):
+def get_last_segment_info(client_id: str, user=Depends(get_current_user)):
     client_dir = os.path.join(HLS_DIR, client_id)
     manifest_path = os.path.join(client_dir, "index.m3u8")
     if not os.path.exists(manifest_path):
@@ -132,7 +133,6 @@ def get_last_segment_info(client_id: str):
     seg_path = os.path.join(client_dir, last_segment)
     if not os.path.exists(seg_path):
         return {"error": "segment missing"}
-    # Prøv at parse program-date-time fra filnavn
     dt = extract_program_date_time(last_segment)
     if dt:
         timestamp_iso = dt.isoformat() + "Z"
@@ -148,7 +148,7 @@ def get_last_segment_info(client_id: str):
     return result
 
 @router.post("/hls/{client_id}/reset")
-def reset_hls(client_id: str):
+def reset_hls(client_id: str, user=Depends(get_current_user)):
     client_dir = os.path.join(HLS_DIR, client_id)
     print(f"[RESET] Prøver at nulstille {client_dir}")
     if not os.path.exists(client_dir):
@@ -162,82 +162,3 @@ def reset_hls(client_id: str):
             raise HTTPException(status_code=400, detail=f"Could not delete {f}: {e}")
     print("[RESET] Nulstilling færdig.")
     return {"message": "reset done"}
-
-# --- WebRTC signalering (samme som før) ---
-class Room:
-    def __init__(self):
-        self.broadcaster: WebSocket = None
-        self.viewers: Dict[str, WebSocket] = {}
-
-rooms: Dict[str, Room] = {}
-
-@router.websocket("/ws/livestream/{client_id}")
-async def livestream_endpoint(websocket: WebSocket, client_id: str):
-    print(f"WebSocket-forbindelse forsøgt for client_id={client_id}")
-    await websocket.accept()
-    if client_id not in rooms:
-        rooms[client_id] = Room()
-    room = rooms[client_id]
-    try:
-        data = await websocket.receive_json()
-        print(f"Første besked modtaget fra {client_id}: {data}")
-        if data.get("type") == "broadcaster":
-            room.broadcaster = websocket
-            print(f"Broadcaster tilsluttet for client_id={client_id}")
-            await websocket.send_json({"type": "ack", "role": "broadcaster"})
-        elif data.get("type") == "newViewer":
-            viewer_id = str(data.get("viewer_id"))
-            room.viewers[viewer_id] = websocket
-            print(f"Viewer {viewer_id} tilsluttet for client_id={client_id}")
-            await websocket.send_json({"type": "ack", "role": "viewer", "viewer_id": viewer_id})
-            if room.broadcaster:
-                await room.broadcaster.send_json({
-                    "type": "newViewer",
-                    "viewer_id": viewer_id
-                })
-            else:
-                print(f"Ingen broadcaster tilsluttet for client_id={client_id} (viewer {viewer_id})")
-        else:
-            print(f"Ukendt type i første besked: {data}")
-            await websocket.close()
-            return
-
-        while True:
-            msg = await websocket.receive_json()
-            print(f"Besked modtaget på ws for client_id={client_id}: {msg}")
-            if websocket == room.broadcaster:
-                viewer_id = msg.get("viewer_id")
-                if viewer_id and viewer_id in room.viewers:
-                    print(f"Videresender besked fra broadcaster til viewer_id={viewer_id}")
-                    await room.viewers[viewer_id].send_json(msg)
-            else:
-                viewer_id = None
-                for vid, ws in room.viewers.items():
-                    if ws == websocket:
-                        viewer_id = vid
-                        break
-                if room.broadcaster and viewer_id:
-                    msg["viewer_id"] = viewer_id
-                    print(f"Videresender besked fra viewer {viewer_id} til broadcaster")
-                    await room.broadcaster.send_json(msg)
-    except WebSocketDisconnect:
-        print(f"WebSocketDisconnect for client_id={client_id}")
-        if websocket == room.broadcaster:
-            print(f"Broadcaster frakoblet for client_id={client_id}")
-            room.broadcaster = None
-        for vid, ws in list(room.viewers.items()):
-            if ws == websocket:
-                print(f"Viewer {vid} frakoblet for client_id={client_id}")
-                del room.viewers[vid]
-    except Exception as e:
-        print(f"Exception i ws for client_id={client_id}: {e}")
-        traceback.print_exc()
-        if websocket == room.broadcaster:
-            room.broadcaster = None
-        for vid, ws in list(room.viewers.items()):
-            if ws == websocket:
-                del room.viewers[vid]
-        try:
-            await websocket.close()
-        except:
-            pass
