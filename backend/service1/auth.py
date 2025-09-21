@@ -21,10 +21,8 @@ router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    # user er ikke i response_model men sendes alligevel i dict
+# Token model is not used as response_model anymore
+# because we want to include user in the response
 
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -45,7 +43,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-@router.post("/token", response_model=Token)
+@router.post("/token")
 def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_session)
@@ -65,8 +63,8 @@ def login_for_access_token(
     user_data = {
         "username": user.username,
         "role": getattr(user, "role", "admin"),
-        "full_name": user.full_name,  # <-- tilføjet!
-        "remarks": user.remarks       # <-- tilføjet!
+        "full_name": user.full_name,
+        "remarks": user.remarks
     }
     return {
         "access_token": access_token,
