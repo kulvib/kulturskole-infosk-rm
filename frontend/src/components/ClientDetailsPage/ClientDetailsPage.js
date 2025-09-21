@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Grid, Card, Typography } from "@mui/material";
+import { Box, Grid } from "@mui/material";
 import ClientDetailsHeaderSection from "./ClientDetailsHeaderSection";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
 import ClientDetailsActionsSection from "./ClientDetailsActionsSection";
@@ -22,8 +22,7 @@ export default function ClientDetailsPage({
   calendarLoading,
   streamKey,
   onRestartStream,
-  snackbar,
-  handleCloseSnackbar
+  showSnackbar // <- brug denne til lokale beskeder
 }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -81,15 +80,7 @@ export default function ClientDetailsPage({
     }
   }, [client]);
 
-  // showSnackbar bruges kun til lokale handlinger (Gem osv.)
-  const showSnackbar = (message, severity = "success") => {
-    // Her skal du KUN bruge denne funktion til lokale beskeder, ikke til refresh!
-    // Refresh-snackbar styres i wrapperen.
-    if (snackbar && typeof snackbar === "function") {
-      snackbar({ open: true, message, severity });
-    }
-  };
-
+  // Brug showSnackbar (prop fra wrapper) til lokale beskeder
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -99,9 +90,9 @@ export default function ClientDetailsPage({
     try {
       await updateClient(client.id, { locality });
       setLocalityDirty(false);
-      showSnackbar("Lokation gemt!", "success");
+      showSnackbar && showSnackbar({ message: "Lokation gemt!", severity: "success" });
     } catch (err) {
-      showSnackbar("Kunne ikke gemme lokation: " + err.message, "error");
+      showSnackbar && showSnackbar({ message: "Kunne ikke gemme lokation: " + err.message, severity: "error" });
     }
     setSavingLocality(false);
   };
@@ -115,9 +106,9 @@ export default function ClientDetailsPage({
     try {
       await pushKioskUrl(client.id, kioskUrl);
       setKioskUrlDirty(false);
-      showSnackbar("Kiosk webadresse opdateret!", "success");
+      showSnackbar && showSnackbar({ message: "Kiosk webadresse opdateret!", severity: "success" });
     } catch (err) {
-      showSnackbar("Kunne ikke opdatere kiosk webadresse: " + err.message, "error");
+      showSnackbar && showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + err.message, severity: "error" });
     }
     setSavingKioskUrl(false);
   };
@@ -126,10 +117,9 @@ export default function ClientDetailsPage({
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
       await clientAction(client.id, action);
-      showSnackbar("Handlingen blev udført!", "success");
-      // status opdateres i polleren
+      showSnackbar && showSnackbar({ message: "Handlingen blev udført!", severity: "success" });
     } catch (err) {
-      showSnackbar("Fejl: " + err.message, "error");
+      showSnackbar && showSnackbar({ message: "Fejl: " + err.message, severity: "error" });
     }
     setActionLoading((prev) => ({ ...prev, [action]: false }));
   };
@@ -147,13 +137,7 @@ export default function ClientDetailsPage({
   // --- SLUT AUTOMATISK START ---
 
   if (!client) {
-    return (
-      <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4 }}>
-        <Card sx={{ p: 3 }}>
-          <Typography variant="h6">Klientdata indlæses...</Typography>
-        </Card>
-      </Box>
-    );
+    return null;
   }
 
   return (
@@ -174,8 +158,6 @@ export default function ClientDetailsPage({
         liveChromeColor={liveChromeColor}
         refreshing={refreshing}
         handleRefresh={handleRefresh}
-        snackbar={snackbar}
-        handleCloseSnackbar={handleCloseSnackbar}
       />
       <Grid container spacing={2}>
         <Grid item xs={12}>
