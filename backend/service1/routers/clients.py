@@ -4,7 +4,7 @@ from typing import List
 from datetime import datetime, timedelta
 from db import get_session
 from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction
-from auth import get_current_admin_user, get_current_user
+from auth import get_current_user
 import os
 import glob
 
@@ -34,9 +34,9 @@ def get_clients_for_my_school(session=Depends(get_session), user=Depends(get_cur
     clients.sort(key=lambda c: (c.sort_order is None, c.sort_order if c.sort_order is not None else 9999, c.id))
     return clients
 
-# Admin: Liste af alle klienter
+# Liste af alle klienter (nu for både bruger og admin)
 @router.get("/clients/", response_model=List[Client])
-def get_clients(session=Depends(get_session), user=Depends(get_current_admin_user)):
+def get_clients(session=Depends(get_session), user=Depends(get_current_user)):
     clients = session.exec(select(Client)).all()
     now = datetime.utcnow()
     for client in clients:
@@ -75,7 +75,7 @@ def get_client(id: int, session=Depends(get_session), user=Depends(get_current_u
 def get_chrome_status(
     id: int,
     session=Depends(get_session),
-    user=Depends(get_current_admin_user)
+    user=Depends(get_current_user)
 ):
     client = session.get(Client, id)
     if not client:
@@ -92,7 +92,8 @@ def get_chrome_status(
 def update_chrome_status(
     id: int,
     data: dict = Body(...),
-    session=Depends(get_session)
+    session=Depends(get_session),
+    user=Depends(get_current_user)
 ):
     client = session.get(Client, id)
     if not client:
@@ -113,7 +114,8 @@ def update_chrome_status(
 def update_client_state(
     id: int,
     data: dict = Body(...),
-    session=Depends(get_session)
+    session=Depends(get_session),
+    user=Depends(get_current_user)
 ):
     client = session.get(Client, id)
     if not client:
@@ -131,7 +133,8 @@ def update_client_state(
 @router.get("/clients/{id}/state")
 def get_client_state(
     id: int,
-    session=Depends(get_session)
+    session=Depends(get_session),
+    user=Depends(get_current_user)
 ):
     client = session.get(Client, id)
     if not client:
@@ -144,7 +147,7 @@ def set_chrome_command(
     id: int,
     data: dict = Body(...),
     session=Depends(get_session),
-    user=Depends(get_current_admin_user)
+    user=Depends(get_current_user)
 ):
     client = session.get(Client, id)
     if not client:
@@ -166,7 +169,8 @@ def set_chrome_command(
 @router.get("/clients/{id}/chrome-command")
 def get_chrome_command(
     id: int,
-    session=Depends(get_session)
+    session=Depends(get_session),
+    user=Depends(get_current_user)
 ):
     client = session.get(Client, id)
     if not client:
@@ -178,7 +182,7 @@ def get_chrome_command(
 async def create_client(
     client_in: ClientCreate,
     session=Depends(get_session),
-    user=Depends(get_current_admin_user)
+    user=Depends(get_current_user)
 ):
     client = Client(
         name=client_in.name,
@@ -217,7 +221,7 @@ async def update_client(
     id: int,
     client_update: ClientUpdate,
     session=Depends(get_session),
-    user=Depends(get_current_admin_user)
+    user=Depends(get_current_user)
 ):
     client = session.get(Client, id)
     if not client:
@@ -279,7 +283,7 @@ async def update_kiosk_url(
     id: int,
     data: dict = Body(...),
     session=Depends(get_session),
-    user=Depends(get_current_admin_user)
+    user=Depends(get_current_user)
 ):
     client = session.get(Client, id)
     if not client:
@@ -299,7 +303,7 @@ async def approve_client(
     id: int,
     data: dict = Body(None),
     session=Depends(get_session),
-    user=Depends(get_current_admin_user)
+    user=Depends(get_current_user)
 ):
     client = session.get(Client, id)
     if not client:
@@ -322,7 +326,8 @@ async def approve_client(
 @router.post("/clients/{id}/heartbeat", response_model=Client)
 def client_heartbeat(
     id: int,
-    session=Depends(get_session)
+    session=Depends(get_session),
+    user=Depends(get_current_user)
 ):
     client = session.get(Client, id)
     if not client:
@@ -335,7 +340,7 @@ def client_heartbeat(
 
 # Slet klient + kalendermarkeringer
 @router.delete("/clients/{id}/remove")
-async def remove_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+async def remove_client(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -349,20 +354,20 @@ async def remove_client(id: int, session=Depends(get_session), user=Depends(get_
 
 # Streaming, terminal og remote desktop endpoints (til integration)
 @router.get("/clients/{id}/stream")
-def client_stream(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+def client_stream(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     return {"stream_url": f"/mjpeg/{id}"}
 
 @router.get("/clients/{id}/terminal")
-def client_terminal(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+def client_terminal(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     return {"terminal_url": f"/terminal/{id}"}
 
 @router.get("/clients/{id}/remote-desktop")
-def client_remote_desktop(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+def client_remote_desktop(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     return {"remote_desktop_url": f"/remote-desktop/{id}"}
 
 # --- RESET HLS FOR EN KLIENT ---
 @router.post("/clients/{client_id}/reset-hls")
-def reset_hls(client_id: int):
+def reset_hls(client_id: int, user=Depends(get_current_user)):
     hls_dir = f"/opt/render/project/src/backend/service1/hls/{client_id}/"
     if not os.path.exists(hls_dir):
         raise HTTPException(status_code=404, detail="HLS directory not found for client")
@@ -383,7 +388,7 @@ def reset_hls(client_id: int):
 
 # --- STOP HLS STREAM & RYD OP (frontend kalder denne ved "forlad side") ---
 @router.post("/clients/{client_id}/stop-hls")
-def stop_hls(client_id: int):
+def stop_hls(client_id: int, user=Depends(get_current_user)):
     hls_dir = f"/opt/render/project/src/backend/service1/hls/{client_id}/"
     if not os.path.exists(hls_dir):
         return {"status": "ok", "deleted_files": [], "errors": ["HLS directory not found for client"]}
