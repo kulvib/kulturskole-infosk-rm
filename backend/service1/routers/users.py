@@ -13,7 +13,15 @@ class UserCreate(BaseModel):
     password: str
     role: str = "elev"
     is_active: bool = True
-    school_id: Optional[int] = None  # Tilføj hvis du vil tilknytte skole til bruger
+    school_id: Optional[int] = None
+    full_name: Optional[str] = None  # <-- tilføjet
+
+class UserUpdate(BaseModel):
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = None
+    school_id: Optional[int] = None
+    full_name: Optional[str] = None  # <-- tilføjet
 
 # GET /api/users/ -- Hent alle brugere (kun admin)
 @router.get("/users/", response_model=List[User])
@@ -42,7 +50,8 @@ def create_user(
         hashed_password=get_password_hash(user.password),
         role=user.role,
         is_active=user.is_active,
-        school_id=user.school_id  # Husk at tilføje feltet til din User-model!
+        school_id=user.school_id,
+        full_name=user.full_name  # <-- tilføjet
     )
     session.add(user_obj)
     session.commit()
@@ -50,12 +59,6 @@ def create_user(
     return user_obj
 
 # PATCH /api/users/{user_id} -- Opdater brugerinfo (kun admin)
-class UserUpdate(BaseModel):
-    role: Optional[str] = None
-    is_active: Optional[bool] = None
-    password: Optional[str] = None
-    school_id: Optional[int] = None
-
 @router.patch("/users/{user_id}", response_model=User)
 def update_user(
     user_id: int,
@@ -64,7 +67,7 @@ def update_user(
     admin=Depends(get_current_admin_user)
 ):
     """
-    Opdaterer en brugers rolle, status eller kodeord.
+    Opdaterer en brugers rolle, status, kodeord eller navn.
     Endpointet er beskyttet, så kun admin kan ændre brugere.
     """
     user = session.get(User, user_id)
@@ -78,6 +81,8 @@ def update_user(
         user.hashed_password = get_password_hash(user_update.password)
     if user_update.school_id is not None:
         user.school_id = user_update.school_id
+    if user_update.full_name is not None:
+        user.full_name = user_update.full_name  # <-- tilføjet
     session.add(user)
     session.commit()
     session.refresh(user)
