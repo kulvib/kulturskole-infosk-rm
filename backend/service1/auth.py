@@ -20,9 +20,6 @@ router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
-# Fjern eller udvid Token response_model, ellers skjuler FastAPI 'user' i svaret!
-# Vi vælger at fjerne response_model helt for maksimal fleksibilitet.
-
 def get_password_hash(password):
     return pwd_context.hash(password)
 
@@ -62,7 +59,8 @@ def login_for_access_token(
         "username": user.username,
         "role": getattr(user, "role", "admin"),
         "full_name": user.full_name,
-        "remarks": user.remarks
+        "remarks": user.remarks,
+        "school_id": user.school_id  # <-- tilføj denne linje!
     }
     return {
         "access_token": access_token,
