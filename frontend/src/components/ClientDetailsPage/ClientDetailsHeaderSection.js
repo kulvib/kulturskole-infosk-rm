@@ -312,16 +312,7 @@ export default function ClientDetailsHeaderSection({
                       </Box>
                     </TableCell>
                   </TableRow>
-                  <TableRow sx={{ height: isMobile ? 32 : 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
-                      Kiosk browser status:
-                    </TableCell>
-                    <TableCell sx={valueCellStyle}>
-                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: isMobile ? "32px" : "40px" }}>
-                        <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                      </Box>
-                    </TableCell>
-                  </TableRow>
+                  {/* Kiosk URL først */}
                   <TableRow sx={{ height: isMobile ? 32 : 40 }}>
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
                       Kiosk URL:
@@ -352,6 +343,17 @@ export default function ClientDetailsHeaderSection({
                         >
                           {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                         </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                  {/* Kiosk browser status bagefter */}
+                  <TableRow sx={{ height: isMobile ? 32 : 40 }}>
+                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
+                      Kiosk browser status:
+                    </TableCell>
+                    <TableCell sx={valueCellStyle}>
+                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: isMobile ? "32px" : "40px" }}>
+                        <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </Box>
                     </TableCell>
                   </TableRow>
