@@ -7,7 +7,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes } from "../api";
 import DateTimeEditDialog from "./CalendarPage/DateTimeEditDialog";
 import ClientCalendarDialog from "./CalendarPage/ClientCalendarDialog";
-import { useAuth } from "../auth/authcontext"; // <-- ADDED
+import { useAuth } from "../auth/authcontext";
 
 // --------- Hjælpe-hook: Hent ALLE skoletider for alle skoler ---------
 function useAllSchoolTimes(schools) {
@@ -185,7 +185,7 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
 
 // ----------- MAIN COMPONENT START -----------
 export default function CalendarPage() {
-  const { user } = useAuth(); // <-- ADDED
+  const { user } = useAuth();
   const token = null; // Ret evt. til din auth-løsning
   const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
   const [schools, setSchools] = useState([]);
@@ -238,24 +238,35 @@ export default function CalendarPage() {
     fetchClients();
   }, [fetchClients]);
 
-  // -------- Differentierede rettigheder -----------
-  // Bruger: må kun vælge sin egen klient (client_id skal findes fra user-objektet)
+  // -------- Differentierede rettigheder og klientfiltrering --------
+  // Bruger ser kun klienter tilknyttet egen skole
+  const filteredClients = useMemo(() => {
+    if (user?.role === "bruger" && user?.school_id) {
+      return clients.filter(
+        c => String(c.schoolId || c.school_id) === String(user.school_id)
+      );
+    }
+    // Admin eller ingen bruger/rolle - vis alle eller filtrer på valgt skole
+    return selectedSchool === ""
+      ? clients
+      : clients.filter(
+          c => String(c.schoolId || c.school_id) === String(selectedSchool)
+        );
+  }, [clients, selectedSchool, user]);
+
+  // Bruger: må kun vælge klienter fra egen skole
   useEffect(() => {
     if (user?.role === "bruger" && user?.client_id) {
-      setSelectedClients([user.client_id]);
-      setActiveClient(user.client_id);
+      // Hvis bruger har valgt klienter fra en anden skole (fx ved skift brugertype)
+      const skoleKlienter = filteredClients.map(c => c.id);
+      if (!skoleKlienter.includes(selectedClients[0])) {
+        setSelectedClients([user.client_id]);
+        setActiveClient(user.client_id);
+      }
     }
-  }, [user]);
-  // ------------------------------------------------
+  }, [user, filteredClients]);
 
-  const filteredClients = useMemo(() =>
-    selectedSchool === ""
-      ? clients
-      : clients.filter(c =>
-          String(c.schoolId || c.school_id) === String(selectedSchool)
-        ),
-    [clients, selectedSchool]
-  );
+  // ------------------------------------------------
 
   useEffect(() => {
     if (!activeClient) return;
@@ -387,12 +398,21 @@ export default function CalendarPage() {
     setCalendarDialogOpen(false);
   };
 
-  // Admin må vælge flere klienter, bruger må kun vælge sin egen (onChange disables for bruger)
+  // Brugeren må kun vælge klienter fra egen skole (men gerne flere)
   const handleClientSelectorChange = (newSelected) => {
-    if (user?.role === "bruger") return;
-    setSelectedClients(newSelected);
-    if (!newSelected.includes(activeClient)) {
-      setActiveClient(newSelected.length > 0 ? newSelected[newSelected.length - 1] : null);
+    if (user?.role === "bruger") {
+      // Må kun vælge klienter fra egen skole
+      const skoleKlienter = filteredClients.map(c => c.id);
+      const kunEgne = newSelected.filter(id => skoleKlienter.includes(id));
+      setSelectedClients(kunEgne);
+      if (!kunEgne.includes(activeClient)) {
+        setActiveClient(kunEgne.length > 0 ? kunEgne[kunEgne.length - 1] : null);
+      }
+    } else {
+      setSelectedClients(newSelected);
+      if (!newSelected.includes(activeClient)) {
+        setActiveClient(newSelected.length > 0 ? newSelected[newSelected.length - 1] : null);
+      }
     }
   };
 
@@ -450,7 +470,6 @@ export default function CalendarPage() {
 
   const schoolYearMonths = useMemo(() => getSchoolYearMonths(selectedSeason), [selectedSeason]);
 
-  // ----------- VIGTIGT: Klientnavne + skole med i listen -----------
   const otherClientNames = selectedClients.length > 1
     ? filteredClients
         .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
@@ -469,12 +488,10 @@ export default function CalendarPage() {
         return c ? `${c.locality || c.name}${schoolName ? " – " + schoolName : ""}` : "Automatisk";
       })()
     : "Automatisk";
-  // ---------------------------------------------------------------
 
-  // Admin må gemme for flere klienter. Bruger ser ikke denne knap.
+  // Begge roller må gemme for flere klienter, men for bruger kun hvis alle klienter er fra samme skole (garanteret via filtrering)
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
-      if (user?.role !== "admin") return;
       if (selectedClients.length < 2) {
         setSnackbar({ open: true, message: "Vælg mindst to klienter", severity: "error" });
         return;
@@ -551,7 +568,7 @@ export default function CalendarPage() {
       } finally {
         setSavingCalendar(false);
       }
-    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes, user]
+    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]
   );
 
   useEffect(() => {
@@ -588,7 +605,7 @@ export default function CalendarPage() {
             displayEmpty
             onChange={handleSchoolChange}
             sx={{ minWidth: 180 }}
-            disabled={user?.role === "bruger"} // bruger må ikke vælge skole
+            disabled={user?.role === "bruger"}
           >
             <MenuItem value="">Alle skoler</MenuItem>
             <MenuItem disabled>--------</MenuItem>
@@ -631,10 +648,10 @@ export default function CalendarPage() {
           selected={selectedClients}
           onChange={handleClientSelectorChange}
           schools={schools}
-          disabled={user?.role === "bruger"} // bruger må ikke vælge klienter
+          disabled={false}
         />
-        {/* Kun admin ser gem-for-flere-knappen */}
-        {user?.role === "admin" && selectedClients.length > 1 && (
+        {/* Gem-knap for flere klienter vises for både admin og bruger hvis flere klienter valgt */}
+        {selectedClients.length > 1 && (
           <Box sx={{
             mt: 2,
             display: "flex",
@@ -671,7 +688,7 @@ export default function CalendarPage() {
         {/* Bruger ser info */}
         {user?.role === "bruger" && (
           <Typography sx={{ mt: 2, mb: 1, color: "primary.main", fontWeight: 500 }}>
-            Du kan kun redigere din egen kalender.
+            Du kan kun se og redigere klienter fra din egen skole.
           </Typography>
         )}
       </Paper>
