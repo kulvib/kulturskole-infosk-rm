@@ -255,10 +255,12 @@ export default function ClientInfoPage() {
     }
   };
 
+  // O P D A T E R - K N A P P E N : Nu får du også en grøn snackbar "Opdateret!" efter tryk
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchClients(true, true);
     setRefreshing(false);
+    showSnackbar("Opdateret!", "success");
   };
 
   const handleSchoolChange = (clientId, schoolId) => {
@@ -285,7 +287,6 @@ export default function ClientInfoPage() {
     return school ? school.name : <span style={{ color: "#888" }}>Ingen skole</span>;
   };
 
-  // Vælg hvilke kolonner der skal vises afhængig af rolle
   const isAdmin = user?.role === "admin";
 
   return (
