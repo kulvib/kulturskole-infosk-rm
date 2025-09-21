@@ -196,22 +196,7 @@ export default function SchoolAdministration() {
   const inputSx = { minWidth: 180, my: 0 };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, minHeight: "60vh", p: 2 }}>
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3400}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
-          {snackbar.message}
-        </MuiAlert>
-      </Snackbar>
-
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-        Skoleadministration
-      </Typography>
-
+    <Box sx={{}}>
       <Paper sx={{ mb: 4, p: 3 }}>
         <Stack
           direction="row"
@@ -475,6 +460,16 @@ export default function SchoolAdministration() {
           )}
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3400}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
     </Box>
   );
 }
