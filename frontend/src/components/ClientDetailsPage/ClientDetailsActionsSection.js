@@ -72,9 +72,8 @@ export default function ClientDetailsActionsSection({
   const MaybeTooltip = ({ title, children }) =>
     isMobile ? children : <Tooltip title={title}>{children}</Tooltip>;
 
-  // Alle mulige knapper, rækkefølge: 1. række, 2. række (adminOnly markerer hvilke der kun vises til admin)
-  const allButtons = [
-    // Første række
+  // --- Admin: 2 rækker af 4 knapper i ønsket rækkefølge ---
+  const adminFirstRow = [
     {
       key: "chrome-start",
       label: "Start kiosk browser",
@@ -84,7 +83,6 @@ export default function ClientDetailsActionsSection({
       onClick: () => handleClientAction("chrome-start"),
       loading: actionLoading["chrome-start"],
       tooltip: "Start kiosk browser",
-      adminOnly: false,
     },
     {
       key: "chrome-shutdown",
@@ -95,7 +93,6 @@ export default function ClientDetailsActionsSection({
       onClick: () => handleClientAction("chrome-shutdown"),
       loading: actionLoading["chrome-shutdown"],
       tooltip: "Luk kiosk browser",
-      adminOnly: false,
     },
     {
       key: "sleep",
@@ -106,7 +103,6 @@ export default function ClientDetailsActionsSection({
       onClick: () => handleClientAction("sleep"),
       loading: actionLoading["sleep"],
       tooltip: "Sæt klient i dvale",
-      adminOnly: false,
     },
     {
       key: "wakeup",
@@ -117,20 +113,10 @@ export default function ClientDetailsActionsSection({
       onClick: () => handleClientAction("wakeup"),
       loading: actionLoading["wakeup"],
       tooltip: "Væk klient fra dvale",
-      adminOnly: false,
     },
-    // Anden række
-    {
-      key: "restart",
-      label: "Genstart klient",
-      icon: <RestartAltIcon />,
-      color: "warning",
-      variant: "contained",
-      onClick: () => handleClientAction("restart"),
-      loading: actionLoading["restart"],
-      tooltip: "Genstart klient",
-      adminOnly: false,
-    },
+  ];
+
+  const adminSecondRow = [
     {
       key: "desktop",
       label: "Fjernskrivebord",
@@ -139,7 +125,6 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: handleOpenRemoteDesktop,
       tooltip: "Fjernskrivebord på klient",
-      adminOnly: true,
     },
     {
       key: "terminal",
@@ -149,7 +134,16 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: handleOpenTerminal,
       tooltip: "Terminal på klient",
-      adminOnly: true,
+    },
+    {
+      key: "restart",
+      label: "Genstart klient",
+      icon: <RestartAltIcon />,
+      color: "warning",
+      variant: "contained",
+      onClick: () => handleClientAction("restart"),
+      loading: actionLoading["restart"],
+      tooltip: "Genstart klient",
     },
     {
       key: "shutdown",
@@ -160,20 +154,29 @@ export default function ClientDetailsActionsSection({
       onClick: () => setShutdownDialogOpen(true),
       loading: actionLoading["shutdown"],
       tooltip: "Sluk klient",
-      adminOnly: true,
     },
   ];
 
-  // Filtrer knapper efter rolle
-  const visibleButtons = allButtons.filter(
-    btn => !btn.adminOnly || user?.role === "admin"
-  );
+  // --- Bruger: 1 række á 4 knapper, 2. række kun "Genstart klient" ---
+  const userFirstRow = [
+    adminFirstRow[0],
+    adminFirstRow[1],
+    adminFirstRow[2],
+    adminFirstRow[3],
+  ];
+  const userSecondRow = [
+    {
+      key: "restart",
+      label: "Genstart klient",
+      icon: <RestartAltIcon />,
+      color: "warning",
+      variant: "contained",
+      onClick: () => handleClientAction("restart"),
+      loading: actionLoading["restart"],
+      tooltip: "Genstart klient",
+    }
+  ];
 
-  // To rækker af fire knapper (eller så mange der er)
-  const firstRow = visibleButtons.slice(0, 4);
-  const secondRow = visibleButtons.slice(4, 8);
-
-  // Knap render
   const renderButton = btn => (
     <Grid item xs={12} sm={6} md={3} key={btn.key}>
       <MaybeTooltip title={btn.tooltip}>
@@ -200,13 +203,27 @@ export default function ClientDetailsActionsSection({
   return (
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
-        <Grid container spacing={2} alignItems="center" justifyContent="center">
-          {firstRow.map(renderButton)}
-        </Grid>
-        <Box sx={{ height: 16 }} />
-        <Grid container spacing={2} alignItems="center" justifyContent="center">
-          {secondRow.map(renderButton)}
-        </Grid>
+        {user?.role === "admin" ? (
+          <>
+            <Grid container spacing={2} alignItems="center" justifyContent="center">
+              {adminFirstRow.map(renderButton)}
+            </Grid>
+            <Box sx={{ height: 16 }} />
+            <Grid container spacing={2} alignItems="center" justifyContent="center">
+              {adminSecondRow.map(renderButton)}
+            </Grid>
+          </>
+        ) : (
+          <>
+            <Grid container spacing={2} alignItems="center" justifyContent="center">
+              {userFirstRow.map(renderButton)}
+            </Grid>
+            <Box sx={{ height: 16 }} />
+            <Grid container spacing={2} alignItems="center" justifyContent="center">
+              {userSecondRow.map(renderButton)}
+            </Grid>
+          </>
+        )}
         <Dialog open={shutdownDialogOpen} onClose={() => setShutdownDialogOpen(false)}>
           <DialogTitle>Bekræft slukning af klient</DialogTitle>
           <DialogContent>
