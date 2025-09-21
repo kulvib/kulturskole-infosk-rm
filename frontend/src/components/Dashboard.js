@@ -155,7 +155,7 @@ export default function Dashboard() {
                   {user.username ? user.username.charAt(0).toUpperCase() : "?"}
                 </Avatar>
                 <Typography variant="subtitle2" sx={{ color: "#fff", opacity: 0.8, mr: 2 }}>
-                  {user.fullName || user.username}
+                  {user.full_name || user.username}
                 </Typography>
               </>
             ) : (
