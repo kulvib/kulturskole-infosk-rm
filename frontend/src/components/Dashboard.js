@@ -28,13 +28,6 @@ import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
-const menuItems = [
-  { text: "Forside", path: "/", match: "/", icon: <HomeIcon /> },
-  { text: "Klienter", path: "/clients", match: "/clients", icon: <PeopleIcon /> },
-  { text: "Kalender", path: "/calendar", match: "/calendar", icon: <CalendarMonthIcon /> },
-  { text: "Administration", path: "/administration", match: "/administration", icon: <AdminPanelSettingsIcon /> },
-];
-
 function getRoleText(role) {
   if (role === "admin") return "Administrator";
   if (role === "bruger") return "Bruger";
@@ -52,6 +45,16 @@ export default function Dashboard() {
 
   // Responsiv drawerWidth
   const drawerWidth = isMobile ? 160 : isTablet ? 190 : 230;
+
+  // Dynamisk menu: "Administration" kun for admin
+  const menuItems = [
+    { text: "Forside", path: "/", match: "/", icon: <HomeIcon /> },
+    { text: "Klienter", path: "/clients", match: "/clients", icon: <PeopleIcon /> },
+    { text: "Kalender", path: "/calendar", match: "/calendar", icon: <CalendarMonthIcon /> },
+    ...(user?.role === "admin"
+      ? [{ text: "Administration", path: "/administration", match: "/administration", icon: <AdminPanelSettingsIcon /> }]
+      : []),
+  ];
 
   // Hent school name hvis bruger
   useEffect(() => {
