@@ -186,10 +186,10 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
 // ----------- MAIN COMPONENT START -----------
 export default function CalendarPage() {
   const { user } = useAuth();
-  const token = null; // Ret evt. til din auth-løsning
+  const token = null;
   const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
   const [schools, setSchools] = useState([]);
-  const [selectedSchool, setSelectedSchool] = useState(""); // "" = alle
+  const [selectedSchool, setSelectedSchool] = useState("");
   const [clients, setClients] = useState([]);
   const [selectedClients, setSelectedClients] = useState([]);
   const [activeClient, setActiveClient] = useState(null);
@@ -221,12 +221,14 @@ export default function CalendarPage() {
   }, [token]);
   const allSchoolTimes = useAllSchoolTimes(schools);
 
-  const fetchClients = useCallback(async () => {
+  // FLYT OPDATERKNAP UDENFOR PAPER OG GIV SUCCES-SNACKBAR
+  const fetchClients = useCallback(async (showSuccess = false) => {
     setLoadingClients(true);
     try {
       const data = await getClients(token);
       const approvedClients = (data?.filter((c) => c.status === "approved") || []).slice();
       setClients(approvedClients);
+      if (showSuccess) setSnackbar({ open: true, message: "Opdateret!", severity: "success" });
     } catch {
       setClients([]);
       setSnackbar({ open: true, message: "Kunne ikke hente klienter.", severity: "error" });
@@ -239,14 +241,12 @@ export default function CalendarPage() {
   }, [fetchClients]);
 
   // -------- Differentierede rettigheder og klientfiltrering --------
-  // Bruger ser kun klienter tilknyttet egen skole
   const filteredClients = useMemo(() => {
     if (user?.role === "bruger" && user?.school_id) {
       return clients.filter(
         c => String(c.schoolId || c.school_id) === String(user.school_id)
       );
     }
-    // Admin eller ingen bruger/rolle - vis alle eller filtrer på valgt skole
     return selectedSchool === ""
       ? clients
       : clients.filter(
@@ -254,10 +254,8 @@ export default function CalendarPage() {
         );
   }, [clients, selectedSchool, user]);
 
-  // Bruger: må kun vælge klienter fra egen skole
   useEffect(() => {
     if (user?.role === "bruger" && user?.client_id) {
-      // Hvis bruger har valgt klienter fra en anden skole (fx ved skift brugertype)
       const skoleKlienter = filteredClients.map(c => c.id);
       if (!skoleKlienter.includes(selectedClients[0])) {
         setSelectedClients([user.client_id]);
@@ -382,24 +380,8 @@ export default function CalendarPage() {
     }
   };
 
-  const handleSchoolChange = (e) => {
-    setSelectedSchool(e.target.value);
-    setSelectedClients([]);
-    setActiveClient(null);
-    setMarkedDays({});
-    setEditDialogOpen(false);
-    setEditDialogDate(null);
-    setEditDialogClient(null);
-    setLoadingDialogDate(null);
-    setLoadingDialogClient(null);
-    setSavingCalendar(false);
-    setCalendarDialogOpen(false);
-  };
-
-  // Brugeren må kun vælge klienter fra egen skole (men gerne flere)
   const handleClientSelectorChange = (newSelected) => {
     if (user?.role === "bruger") {
-      // Må kun vælge klienter fra egen skole
       const skoleKlienter = filteredClients.map(c => c.id);
       const kunEgne = newSelected.filter(id => skoleKlienter.includes(id));
       setSelectedClients(kunEgne);
@@ -487,7 +469,6 @@ export default function CalendarPage() {
       })()
     : "Automatisk";
 
-  // Begge roller må gemme for flere klienter, men for bruger kun hvis alle klienter er fra samme skole (garanteret via filtrering)
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
       if (selectedClients.length < 2) {
@@ -592,10 +573,29 @@ export default function CalendarPage() {
   // ----------- RENDER -----------
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      {/* Paper omkring Vælg skole: dropdown kun for admin */}
+      {/* Opdater-knap ALTID synlig, udenfor Paper */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Tooltip title="Opdater klienter">
+          <span>
+            <Button
+              startIcon={
+                loadingClients
+                  ? <CircularProgress size={20} />
+                  : <RefreshIcon />
+              }
+              onClick={() => fetchClients(true)}
+              disabled={loadingClients}
+              sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
+            >
+              {loadingClients ? "Opdaterer..." : "Opdater"}
+            </Button>
+          </span>
+        </Tooltip>
+      </Box>
+
       {user?.role === "admin" && (
         <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" alignItems="center" justifyContent="flex-start">
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Vælg skole:
@@ -614,47 +614,20 @@ export default function CalendarPage() {
                 ))}
               </Select>
             </Box>
-            {/* Opdater-knappen vises altid, også for admin her */}
-            <Tooltip title="Opdater klienter">
-              <span>
-                <Button
-                  startIcon={
-                    loadingClients
-                      ? <CircularProgress size={20} />
-                      : <RefreshIcon />
-                  }
-                  onClick={fetchClients}
-                  disabled={loadingClients}
-                  sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
-                >
-                  {loadingClients ? "Opdaterer..." : "Opdater"}
-                </Button>
-              </span>
-            </Tooltip>
           </Stack>
         </Paper>
       )}
-      {/* Opdater-knappen for bruger (uden omkringliggende Paper eller dropdown) */}
-      {user?.role !== "admin" && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-          <Tooltip title="Opdater klienter">
-            <span>
-              <Button
-                startIcon={
-                  loadingClients
-                    ? <CircularProgress size={20} />
-                    : <RefreshIcon />
-                }
-                onClick={fetchClients}
-                disabled={loadingClients}
-                sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
-              >
-                {loadingClients ? "Opdaterer..." : "Opdater"}
-              </Button>
-            </span>
-          </Tooltip>
-        </Box>
-      )}
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={2000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
 
       <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
         {loadingClients && (
@@ -774,17 +747,6 @@ export default function CalendarPage() {
           </Select>
         </Box>
       </Box>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={2000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
-          {snackbar.message}
-        </MuiAlert>
-      </Snackbar>
 
       <Box
         sx={{
