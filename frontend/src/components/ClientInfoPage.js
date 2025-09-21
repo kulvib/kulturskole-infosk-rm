@@ -23,6 +23,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  useMediaQuery,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -145,6 +146,10 @@ export default function ClientInfoPage() {
 
   // Snackbar state
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
+  // Responsive helpers
+  const isXs = useMediaQuery(theme => theme.breakpoints.down("sm"));
+  const isSm = useMediaQuery(theme => theme.breakpoints.down("md"));
 
   const showSnackbar = (message, severity = "success") => {
     setSnackbar({ open: true, message, severity });
@@ -289,8 +294,79 @@ export default function ClientInfoPage() {
 
   const isAdmin = user?.role === "admin";
 
+  // Responsiv: Kolonne-overskrifter og celler
+  const mobileHeaders = [
+    ...(isAdmin ? ["ID"] : []),
+    "Klientnavn",
+    "Status",
+    "Info",
+    ...(isAdmin ? ["Fjern"] : []),
+    "Sort"
+  ];
+
+  const renderMobileRow = (client, idx, provided, snapshot) => (
+    <TableRow
+      ref={provided?.innerRef}
+      {...(provided ? provided.draggableProps : {})}
+      style={{
+        ...provided?.draggableProps?.style,
+        background: snapshot?.isDragging ? "#e3f2fd" : undefined,
+      }}
+      hover
+    >
+      {isAdmin && <TableCell>{client.id}</TableCell>}
+      <TableCell>
+        <Stack direction="column" spacing={0.5}>
+          <Typography sx={{ fontWeight: 600 }}>{client.name}</Typography>
+          {client.locality && (
+            <Typography sx={{ fontSize: "0.92em", color: "#888" }}>{client.locality}</Typography>
+          )}
+          <Typography sx={{ fontSize: "0.92em" }}>{getSchoolName(client.school_id)}</Typography>
+        </Stack>
+      </TableCell>
+      <TableCell align="center">
+        <ClientStatusCell isOnline={client.isOnline} />
+      </TableCell>
+      <TableCell align="center">
+        <Tooltip title="Info">
+          <IconButton
+            component={Link}
+            to={`/clients/${client.id}`}
+            color="primary"
+            size="small"
+          >
+            <InfoIcon />
+          </IconButton>
+        </Tooltip>
+      </TableCell>
+      {isAdmin && (
+        <TableCell align="center">
+          <Tooltip title="Fjern klient">
+            <IconButton
+              color="error"
+              onClick={() => openRemoveDialog(client.id)}
+              size="small"
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+        </TableCell>
+      )}
+      <TableCell align="right" {...provided?.dragHandleProps} sx={{ cursor: "grab", width: 45 }}>
+        <span style={{ fontSize: 20 }}>☰</span>
+      </TableCell>
+    </TableRow>
+  );
+
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, position: "relative", minHeight: "60vh" }}>
+    <Box sx={{
+      maxWidth: 1200,
+      mx: "auto",
+      mt: { xs: 1, sm: 4 },
+      position: "relative",
+      minHeight: "60vh",
+      px: { xs: 0.5, sm: 2 }
+    }}>
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3400}
@@ -312,8 +388,8 @@ export default function ClientInfoPage() {
           <Button onClick={confirmRemoveClient} color="error" variant="contained">Fjern</Button>
         </DialogActions>
       </Dialog>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+      <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between" sx={{ mb: 2, gap: 1 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.1rem", sm: "1.4rem" } }}>
           Godkendte klienter
         </Typography>
         <Tooltip title="Opdater klientdata">
@@ -328,14 +404,19 @@ export default function ClientInfoPage() {
               }
               onClick={handleRefresh}
               disabled={refreshing}
-              sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
+              sx={{
+                minWidth: { xs: "unset", sm: 0 },
+                fontWeight: 500,
+                textTransform: "none",
+                width: { xs: "100%", sm: "auto" }
+              }}
             >
               {refreshing ? "Opdaterer..." : "Opdater"}
             </Button>
           </span>
         </Tooltip>
       </Stack>
-      <Paper sx={{ mb: 4 }}>
+      <Paper sx={{ mb: 4, px: { xs: 0.5, sm: 0 } }}>
         <TableContainer style={{ position: "relative" }}>
           {loading && (
             <Box sx={{
@@ -354,86 +435,122 @@ export default function ClientInfoPage() {
                   size="small"
                   ref={provided.innerRef}
                   {...provided.droppableProps}
+                  sx={{
+                    minWidth: 300,
+                    "& td, & th": {
+                      py: { xs: 1, sm: 1.2 },
+                      px: { xs: 0.5, sm: 2 },
+                      fontSize: { xs: "0.98em", sm: "1em" }
+                    }
+                  }}
                 >
                   <TableHead>
-                    <TableRow>
-                      {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Klient ID</TableCell>}
-                      <TableCell sx={{ fontWeight: 700 }}>Klientnavn</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Lokalitet</TableCell>
-                      <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Status</TableCell>
-                      <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Skole</TableCell>
-                      <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Info</TableCell>
-                      {isAdmin && <TableCell sx={{ fontWeight: 700, textAlign: "center" }}>Fjern</TableCell>}
-                      <TableCell sx={{ fontWeight: 700, width: 60, textAlign: "right" }}>Sortering</TableCell>
+                    <TableRow sx={{
+                      background: "#f6f9fc",
+                      "& th": {
+                        fontWeight: 700,
+                        fontSize: { xs: "1em", sm: "1.08em" },
+                        whiteSpace: { xs: "nowrap", sm: "normal" }
+                      }
+                    }}>
+                      {isXs ? (
+                        // Mobil header
+                        mobileHeaders.map((header, idx) => (
+                          <TableCell key={header + idx}>{header}</TableCell>
+                        ))
+                      ) : (
+                        <>
+                          {isAdmin && <TableCell>Klient ID</TableCell>}
+                          <TableCell>Klientnavn</TableCell>
+                          <TableCell>Lokalitet</TableCell>
+                          <TableCell sx={{ textAlign: "center" }}>Status</TableCell>
+                          <TableCell sx={{ textAlign: "center" }}>Skole</TableCell>
+                          <TableCell sx={{ textAlign: "center" }}>Info</TableCell>
+                          {isAdmin && <TableCell sx={{ textAlign: "center" }}>Fjern</TableCell>}
+                          <TableCell sx={{ width: 60, textAlign: "right" }}>Sortering</TableCell>
+                        </>
+                      )}
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {dragClients.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? 8 : 6} align="center">
+                        <TableCell colSpan={isAdmin ? (isXs ? 6 : 8) : (isXs ? 4 : 6)} align="center">
                           Ingen godkendte klienter.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      dragClients.map((client, idx) => (
-                        <Draggable
-                          key={client.id}
-                          draggableId={client.id.toString()}
-                          index={idx}
-                        >
-                          {(provided, snapshot) => (
-                            <TableRow
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              style={{
-                                ...provided.draggableProps.style,
-                                background: snapshot.isDragging
-                                  ? "#e3f2fd"
-                                  : undefined,
-                              }}
-                              hover
+                      dragClients.map((client, idx) =>
+                        isXs
+                          ? (
+                            <Draggable
+                              key={client.id}
+                              draggableId={client.id.toString()}
+                              index={idx}
                             >
-                              {isAdmin && <TableCell>{client.id}</TableCell>}
-                              <TableCell>{client.name}</TableCell>
-                              <TableCell>
-                                {client.locality || <span style={{ color: "#888" }}>Ingen lokalitet</span>}
-                              </TableCell>
-                              <TableCell align="center">
-                                <ClientStatusCell isOnline={client.isOnline} />
-                              </TableCell>
-                              <TableCell align="center">
-                                {getSchoolName(client.school_id)}
-                              </TableCell>
-                              <TableCell align="center">
-                                <Tooltip title="Info">
-                                  <IconButton
-                                    component={Link}
-                                    to={`/clients/${client.id}`}
-                                    color="primary"
-                                  >
-                                    <InfoIcon />
-                                  </IconButton>
-                                </Tooltip>
-                              </TableCell>
-                              {isAdmin && (
-                                <TableCell align="center">
-                                  <Tooltip title="Fjern klient">
-                                    <IconButton
-                                      color="error"
-                                      onClick={() => openRemoveDialog(client.id)}
-                                    >
-                                      <DeleteIcon />
-                                    </IconButton>
-                                  </Tooltip>
-                                </TableCell>
+                              {(provided, snapshot) => renderMobileRow(client, idx, provided, snapshot)}
+                            </Draggable>
+                          )
+                          : (
+                            <Draggable
+                              key={client.id}
+                              draggableId={client.id.toString()}
+                              index={idx}
+                            >
+                              {(provided, snapshot) => (
+                                <TableRow
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    background: snapshot.isDragging
+                                      ? "#e3f2fd"
+                                      : undefined,
+                                  }}
+                                  hover
+                                >
+                                  {isAdmin && <TableCell>{client.id}</TableCell>}
+                                  <TableCell>{client.name}</TableCell>
+                                  <TableCell>
+                                    {client.locality || <span style={{ color: "#888" }}>Ingen lokalitet</span>}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <ClientStatusCell isOnline={client.isOnline} />
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    {getSchoolName(client.school_id)}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Tooltip title="Info">
+                                      <IconButton
+                                        component={Link}
+                                        to={`/clients/${client.id}`}
+                                        color="primary"
+                                      >
+                                        <InfoIcon />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </TableCell>
+                                  {isAdmin && (
+                                    <TableCell align="center">
+                                      <Tooltip title="Fjern klient">
+                                        <IconButton
+                                          color="error"
+                                          onClick={() => openRemoveDialog(client.id)}
+                                        >
+                                          <DeleteIcon />
+                                        </IconButton>
+                                      </Tooltip>
+                                    </TableCell>
+                                  )}
+                                  <TableCell align="right" {...provided.dragHandleProps} sx={{ cursor: "grab", width: 60 }}>
+                                    <span style={{ fontSize: 20 }}>☰</span>
+                                  </TableCell>
+                                </TableRow>
                               )}
-                              <TableCell align="right" {...provided.dragHandleProps} sx={{ cursor: "grab", width: 60 }}>
-                                <span style={{ fontSize: 20 }}>☰</span>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </Draggable>
-                      ))
+                            </Draggable>
+                          )
+                      )
                     )}
                     {provided.placeholder}
                   </TableBody>
@@ -446,22 +563,33 @@ export default function ClientInfoPage() {
       {/* Ikke godkendte klienter kun for admin */}
       {isAdmin && (
         <>
-          <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
+          <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, fontSize: { xs: "1.1rem", sm: "1.4rem" } }}>
             Ikke godkendte klienter
           </Typography>
-          <Paper>
+          <Paper sx={{ px: { xs: 0.5, sm: 0 } }}>
             <TableContainer>
-              <Table size="small">
+              <Table size="small"
+                sx={{
+                  minWidth: 300,
+                  "& td, & th": {
+                    py: { xs: 1, sm: 1.2 },
+                    px: { xs: 0.5, sm: 2 },
+                    fontSize: { xs: "0.98em", sm: "1em" }
+                  }
+                }}>
                 <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Klient ID</TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Klientnavn</TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>IP-adresser</TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>MAC-adresser</TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Tilføjet</TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Skole</TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: "12.5%", textAlign: "center" }}>Godkend</TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: "12.5%", textAlign: "center" }}>Fjern</TableCell>
+                  <TableRow sx={{
+                    background: "#f6f9fc",
+                    "& th": { fontWeight: 700, fontSize: { xs: "1em", sm: "1.08em" }, whiteSpace: { xs: "nowrap", sm: "normal" } }
+                  }}>
+                    <TableCell sx={{ width: "12.5%" }}>Klient ID</TableCell>
+                    <TableCell sx={{ width: "12.5%" }}>Klientnavn</TableCell>
+                    <TableCell sx={{ width: "12.5%" }}>IP-adresser</TableCell>
+                    <TableCell sx={{ width: "12.5%" }}>MAC-adresser</TableCell>
+                    <TableCell sx={{ width: "12.5%" }}>Tilføjet</TableCell>
+                    <TableCell sx={{ width: "12.5%" }}>Skole</TableCell>
+                    <TableCell sx={{ width: "12.5%", textAlign: "center" }}>Godkend</TableCell>
+                    <TableCell sx={{ width: "12.5%", textAlign: "center" }}>Fjern</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -522,7 +650,7 @@ export default function ClientInfoPage() {
                             value={schoolSelections[client.id] || ""}
                             displayEmpty
                             onChange={e => handleSchoolChange(client.id, e.target.value)}
-                            sx={{ minWidth: 120 }}
+                            sx={{ minWidth: { xs: 70, sm: 120 }, fontSize: { xs: "0.97em", sm: "1em" } }}
                           >
                             <MenuItem value="">Vælg skole</MenuItem>
                             {schools.map(school => (
@@ -537,7 +665,7 @@ export default function ClientInfoPage() {
                             size="small"
                             startIcon={<AddIcon />}
                             onClick={() => handleApproveClient(client.id)}
-                            sx={{ minWidth: 44 }}
+                            sx={{ minWidth: 44, fontSize: { xs: "0.97em", sm: "1em" } }}
                           >
                             Godkend
                           </Button>
@@ -547,6 +675,7 @@ export default function ClientInfoPage() {
                             <IconButton
                               color="error"
                               onClick={() => openRemoveDialog(client.id)}
+                              size="small"
                             >
                               <DeleteIcon />
                             </IconButton>
