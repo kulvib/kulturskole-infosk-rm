@@ -130,7 +130,7 @@ function ClientStatusCell({ isOnline }) {
 }
 
 export default function ClientInfoPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth(); // <-- HENT user her!
   const [clients, setClients] = useState([]);
   const [schools, setSchools] = useState([]);
   const [schoolSelections, setSchoolSelections] = useState({});
@@ -184,9 +184,15 @@ export default function ClientInfoPage() {
     getSchools(token).then(setSchools).catch(() => setSchools([]));
   }, [token]);
 
+  // Filtrér klienter baseret på brugerens rolle og skole
+  const filteredClients = user?.role === "bruger"
+    ? clients.filter(client => client.school_id === user.school_id)
+    : clients;
+
+  // Drag/drop sortering og approved
   useEffect(() => {
     // Sortering: laveste sort_order først, derefter id
-    const approved = (clients?.filter((c) => c.status === "approved") || []).slice();
+    const approved = (filteredClients?.filter((c) => c.status === "approved") || []).slice();
     approved.sort((a, b) => {
       if (
         a.sort_order !== null &&
@@ -201,9 +207,10 @@ export default function ClientInfoPage() {
       return a.id - b.id;
     });
     setDragClients(approved);
-  }, [clients]);
+  }, [filteredClients]);
 
-  const unapprovedClients = (clients?.filter((c) => c.status !== "approved") || [])
+  // Unapproved clients filtreret på rolle/skole
+  const unapprovedClients = (filteredClients?.filter((c) => c.status !== "approved") || [])
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -439,120 +446,124 @@ export default function ClientInfoPage() {
           </DragDropContext>
         </TableContainer>
       </Paper>
-      {/* Ikke godkendte klienter */}
-      <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
-        Ikke godkendte klienter
-      </Typography>
-      <Paper>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Klient ID</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Klientnavn</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>IP-adresser</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>MAC-adresser</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Tilføjet</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Skole</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "12.5%", textAlign: "center" }}>Godkend</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: "12.5%", textAlign: "center" }}>Fjern</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {unapprovedClients.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center">
-                    Ingen ikke-godkendte klienter.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                unapprovedClients.map((client) => (
-                  <TableRow key={client.id} hover>
-                    <TableCell>{client.id}</TableCell>
-                    <TableCell>{client.name || "Ukendt navn"}</TableCell>
-                    <TableCell>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
-                          <b>WiFi:</b>&nbsp;
-                          <span style={{ whiteSpace: "nowrap" }}>{client.wifi_ip_address || "ukendt"}</span>
-                          <CopyIconButton value={client.wifi_ip_address || ""} disabled={!client.wifi_ip_address} iconSize={14.4} />
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
-                          <b>LAN:</b>&nbsp;
-                          <span style={{ whiteSpace: "nowrap" }}>{client.lan_ip_address || "ukendt"}</span>
-                          <CopyIconButton value={client.lan_ip_address || ""} disabled={!client.lan_ip_address} iconSize={14.4} />
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
-                          <b>WiFi:</b>&nbsp;
-                          <span style={{ whiteSpace: "nowrap" }}>{client.wifi_mac_address || "ukendt"}</span>
-                          <CopyIconButton value={client.wifi_mac_address || ""} disabled={!client.wifi_mac_address} iconSize={14.4} />
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
-                          <b>LAN:</b>&nbsp;
-                          <span style={{ whiteSpace: "nowrap" }}>{client.lan_mac_address || "ukendt"}</span>
-                          <CopyIconButton value={client.lan_mac_address || ""} disabled={!client.lan_mac_address} iconSize={14.4} />
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {(() => {
-                        const ts = formatTimestamp(client.created_at);
-                        return (
-                          <span style={{ whiteSpace: "pre-line" }}>
-                            {ts.date}
-                            {"\n"}
-                            {ts.time}
-                          </span>
-                        );
-                      })()}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        size="small"
-                        value={schoolSelections[client.id] || ""}
-                        displayEmpty
-                        onChange={e => handleSchoolChange(client.id, e.target.value)}
-                        sx={{ minWidth: 120 }}
-                      >
-                        <MenuItem value="">Vælg skole</MenuItem>
-                        {schools.map(school => (
-                          <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-                        ))}
-                      </Select>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Button
-                        variant="contained"
-                        color="success"
-                        size="small"
-                        startIcon={<AddIcon />}
-                        onClick={() => handleApproveClient(client.id)}
-                        sx={{ minWidth: 44 }}
-                      >
-                        Godkend
-                      </Button>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Tooltip title="Fjern klient">
-                        <IconButton
-                          color="error"
-                          onClick={() => openRemoveDialog(client.id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
+      {/* Ikke godkendte klienter kun for admin */}
+      {user?.role === "admin" && (
+        <>
+          <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
+            Ikke godkendte klienter
+          </Typography>
+          <Paper>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Klient ID</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Klientnavn</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>IP-adresser</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>MAC-adresser</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Tilføjet</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: "12.5%" }}>Skole</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: "12.5%", textAlign: "center" }}>Godkend</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: "12.5%", textAlign: "center" }}>Fjern</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                </TableHead>
+                <TableBody>
+                  {unapprovedClients.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center">
+                        Ingen ikke-godkendte klienter.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    unapprovedClients.map((client) => (
+                      <TableRow key={client.id} hover>
+                        <TableCell>{client.id}</TableCell>
+                        <TableCell>{client.name || "Ukendt navn"}</TableCell>
+                        <TableCell>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
+                              <b>WiFi:</b>&nbsp;
+                              <span style={{ whiteSpace: "nowrap" }}>{client.wifi_ip_address || "ukendt"}</span>
+                              <CopyIconButton value={client.wifi_ip_address || ""} disabled={!client.wifi_ip_address} iconSize={14.4} />
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
+                              <b>LAN:</b>&nbsp;
+                              <span style={{ whiteSpace: "nowrap" }}>{client.lan_ip_address || "ukendt"}</span>
+                              <CopyIconButton value={client.lan_ip_address || ""} disabled={!client.lan_ip_address} iconSize={14.4} />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
+                              <b>WiFi:</b>&nbsp;
+                              <span style={{ whiteSpace: "nowrap" }}>{client.wifi_mac_address || "ukendt"}</span>
+                              <CopyIconButton value={client.wifi_mac_address || ""} disabled={!client.wifi_mac_address} iconSize={14.4} />
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
+                              <b>LAN:</b>&nbsp;
+                              <span style={{ whiteSpace: "nowrap" }}>{client.lan_mac_address || "ukendt"}</span>
+                              <CopyIconButton value={client.lan_mac_address || ""} disabled={!client.lan_mac_address} iconSize={14.4} />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const ts = formatTimestamp(client.created_at);
+                            return (
+                              <span style={{ whiteSpace: "pre-line" }}>
+                                {ts.date}
+                                {"\n"}
+                                {ts.time}
+                              </span>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            size="small"
+                            value={schoolSelections[client.id] || ""}
+                            displayEmpty
+                            onChange={e => handleSchoolChange(client.id, e.target.value)}
+                            sx={{ minWidth: 120 }}
+                          >
+                            <MenuItem value="">Vælg skole</MenuItem>
+                            {schools.map(school => (
+                              <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                            ))}
+                          </Select>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            startIcon={<AddIcon />}
+                            onClick={() => handleApproveClient(client.id)}
+                            sx={{ minWidth: 44 }}
+                          >
+                            Godkend
+                          </Button>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="Fjern klient">
+                            <IconButton
+                              color="error"
+                              onClick={() => openRemoveDialog(client.id)}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </>
+      )}
     </Box>
   );
 }
