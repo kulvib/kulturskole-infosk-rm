@@ -49,6 +49,7 @@ export default function UserAdministration() {
     role: "bruger",
     is_active: true,
     school_id: "",
+    remarks: "",
   });
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
@@ -98,9 +99,11 @@ export default function UserAdministration() {
       .finally(() => setLoadingSchools(false));
   }, []);
 
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
   const handleAddUser = () => {
     setUserError("");
-    const { username, password, password2, full_name, role, is_active, school_id } = newUser;
+    const { username, password, password2, full_name, role, is_active, school_id, remarks } = newUser;
     if (!username || !password || !password2) {
       setUserError("Brugernavn og begge kodeord skal udfyldes");
       showSnackbar("Brugernavn og begge kodeord skal udfyldes", "error");
@@ -109,6 +112,11 @@ export default function UserAdministration() {
     if (!full_name) {
       setUserError("Fuldt navn skal udfyldes");
       showSnackbar("Fuldt navn skal udfyldes", "error");
+      return;
+    }
+    if (!passwordRegex.test(password)) {
+      setUserError("Kodeordet skal være mindst 8 tegn langt og indeholde både store og små bogstaver samt tal.");
+      showSnackbar("Kodeordet skal være mindst 8 tegn langt og indeholde både store og små bogstaver samt tal.", "error");
       return;
     }
     if (password !== password2) {
@@ -127,13 +135,14 @@ export default function UserAdministration() {
       full_name,
       role: role === "administrator" ? "admin" : "bruger",
       is_active,
-      school_id: role === "bruger" ? school_id : undefined
+      school_id: role === "bruger" ? school_id : undefined,
+      remarks,
     }, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
         setUsers(Array.isArray(users) ? [...users, res.data] : [res.data]);
-        setNewUser({ username: "", password: "", password2: "", full_name: "", role: "bruger", is_active: true, school_id: "" });
+        setNewUser({ username: "", password: "", password2: "", full_name: "", role: "bruger", is_active: true, school_id: "", remarks: "" });
         showSnackbar("Bruger oprettet!", "success");
       })
       .catch(e => {
@@ -182,10 +191,15 @@ export default function UserAdministration() {
 
   const handleEditUser = () => {
     if (!editUser) return;
-    const { id, role, is_active, password, password2, full_name } = editUser;
+    const { id, role, is_active, password, password2, full_name, remarks } = editUser;
     if (!full_name) {
       setUserError("Fuldt navn skal udfyldes");
       showSnackbar("Fuldt navn skal udfyldes", "error");
+      return;
+    }
+    if (password && !passwordRegex.test(password)) {
+      setUserError("Kodeordet skal være mindst 8 tegn langt og indeholde både store og små bogstaver samt tal.");
+      showSnackbar("Kodeordet skal være mindst 8 tegn langt og indeholde både store og små bogstaver samt tal.", "error");
       return;
     }
     if (password && password !== password2) {
@@ -198,6 +212,7 @@ export default function UserAdministration() {
       is_active,
       password: password ? password : undefined,
       full_name,
+      remarks,
     }, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
@@ -227,7 +242,8 @@ export default function UserAdministration() {
         (u.username && u.username.toLowerCase().includes(search)) ||
         (u.full_name && u.full_name.toLowerCase().includes(search)) ||
         (u.role === "admin" ? "administrator" : "bruger").includes(search) ||
-        schoolName.toLowerCase().includes(search)
+        schoolName.toLowerCase().includes(search) ||
+        (u.remarks && u.remarks.toLowerCase().includes(search))
       );
     });
 
@@ -245,10 +261,6 @@ export default function UserAdministration() {
         case "role":
           aVal = a.role === "admin" ? "administrator" : "bruger";
           bVal = b.role === "admin" ? "administrator" : "bruger";
-          break;
-        case "status":
-          aVal = a.is_active ? "Aktiv" : "Spærret";
-          bVal = b.is_active ? "Aktiv" : "Spærret";
           break;
         case "school":
           aVal = a.school_id
@@ -287,7 +299,8 @@ export default function UserAdministration() {
               Opret, redigér og slet brugere (kræver admin-rettigheder)
             </Typography>
             <Grid container spacing={2} sx={{ mb: 1 }}>
-              <Grid item xs={12} md={6} lg={4}>
+              {/* Række 1: brugernavn, fuldt navn */}
+              <Grid item xs={12} md={6}>
                 <TextField
                   required
                   label="Brugernavn"
@@ -297,7 +310,7 @@ export default function UserAdministration() {
                   fullWidth
                 />
               </Grid>
-              <Grid item xs={12} md={6} lg={4}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   required
                   label="Fuldt navn"
@@ -307,7 +320,8 @@ export default function UserAdministration() {
                   fullWidth
                 />
               </Grid>
-              <Grid item xs={12} md={6} lg={4}>
+              {/* Række 2: kodeord, gentag kodeord */}
+              <Grid item xs={12} md={6}>
                 <TextField
                   required
                   label="Kodeord"
@@ -333,7 +347,7 @@ export default function UserAdministration() {
                   }}
                 />
               </Grid>
-              <Grid item xs={12} md={6} lg={4}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   required
                   label="Gentag kodeord"
@@ -359,7 +373,8 @@ export default function UserAdministration() {
                   }}
                 />
               </Grid>
-              <Grid item xs={12} md={6} lg={3}>
+              {/* Række 3: rolle, skole, bemærkninger */}
+              <Grid item xs={12} md={4}>
                 <FormControl size="small" fullWidth>
                   <InputLabel id="rolle-label">Rolle</InputLabel>
                   <Select
@@ -374,7 +389,7 @@ export default function UserAdministration() {
                 </FormControl>
               </Grid>
               {newUser.role === "bruger" && (
-                <Grid item xs={12} md={6} lg={3}>
+                <Grid item xs={12} md={4}>
                   <FormControl size="small" fullWidth>
                     <InputLabel id="skole-label">Skole</InputLabel>
                     <Select
@@ -390,19 +405,17 @@ export default function UserAdministration() {
                   </FormControl>
                 </Grid>
               )}
-              <Grid item xs={12} md={6} lg={3}>
-                <FormControl size="small" fullWidth>
-                  <InputLabel id="status-label">Status</InputLabel>
-                  <Select
-                    labelId="status-label"
-                    value={newUser.is_active ? "true" : "false"}
-                    label="Status"
-                    onChange={e => setNewUser({ ...newUser, is_active: e.target.value === "true" })}
-                  >
-                    <MenuItem value="true">Aktiv</MenuItem>
-                    <MenuItem value="false">Spærret</MenuItem>
-                  </Select>
-                </FormControl>
+              <Grid item xs={12} md={newUser.role === "bruger" ? 4 : 8}>
+                <TextField
+                  label="Bemærkninger"
+                  value={newUser.remarks || ""}
+                  onChange={e => setNewUser({ ...newUser, remarks: e.target.value })}
+                  size="small"
+                  fullWidth
+                  multiline
+                  minRows={1}
+                  maxRows={3}
+                />
               </Grid>
             </Grid>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, mt: 2 }}>
@@ -416,7 +429,7 @@ export default function UserAdministration() {
                   value={userSearch}
                   onChange={e => setUserSearch(e.target.value)}
                   sx={{ minWidth: 120 }}
-                  placeholder="Søg bruger, navn, rolle, skole..."
+                  placeholder="Søg bruger, navn, rolle, skole, bemærkninger..."
                 />
               </Box>
             </Stack>
@@ -454,15 +467,6 @@ export default function UserAdministration() {
                     </TableCell>
                     <TableCell
                       sx={{ fontWeight: 700, cursor: "pointer" }}
-                      onClick={() => handleUserTableSort("status")}
-                    >
-                      Status
-                      {userSort.key === "status" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
-                    </TableCell>
-                    <TableCell
-                      sx={{ fontWeight: 700, cursor: "pointer" }}
                       onClick={() => handleUserTableSort("school")}
                     >
                       Skole
@@ -470,6 +474,7 @@ export default function UserAdministration() {
                         (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
                           : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Bemærkninger</TableCell>
                     <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
                   </TableRow>
                 </TableHead>
@@ -492,12 +497,12 @@ export default function UserAdministration() {
                         <TableCell>{user.username}</TableCell>
                         <TableCell>{user.full_name || ""}</TableCell>
                         <TableCell>{user.role === "admin" ? "administrator" : "bruger"}</TableCell>
-                        <TableCell>{user.is_active ? "Aktiv" : "Spærret"}</TableCell>
                         <TableCell>
                           {user.school_id
                             ? (getAlphaSchools().find(s => s.id === user.school_id)?.name ?? user.school_id)
                             : "-"}
                         </TableCell>
+                        <TableCell>{user.remarks || ""}</TableCell>
                         <TableCell align="right">
                           <Tooltip title="Rediger bruger">
                             <span>
@@ -563,6 +568,16 @@ export default function UserAdministration() {
                         <MenuItem value="false">Spærret</MenuItem>
                       </Select>
                     </FormControl>
+                    <TextField
+                      label="Bemærkninger"
+                      value={editUser.remarks || ""}
+                      onChange={e => setEditUser({ ...editUser, remarks: e.target.value })}
+                      fullWidth
+                      size="small"
+                      multiline
+                      minRows={1}
+                      maxRows={3}
+                    />
                     {editUser.role !== "admin" && (
                       <>
                         <TextField
