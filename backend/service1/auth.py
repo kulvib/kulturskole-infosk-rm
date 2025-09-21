@@ -61,11 +61,12 @@ def login_for_access_token(
         "sub": user.username,
         "role": getattr(user, "role", "admin")
     })
-    # Nu med full_name i response til frontend
+    # Nu med full_name og remarks i response til frontend
     user_data = {
         "username": user.username,
         "role": getattr(user, "role", "admin"),
         "full_name": user.full_name,  # <-- tilføjet!
+        "remarks": user.remarks       # <-- tilføjet!
     }
     return {
         "access_token": access_token,
