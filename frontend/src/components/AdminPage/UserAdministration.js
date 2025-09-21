@@ -448,7 +448,16 @@ export default function UserAdministration() {
                           : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell
-                      sx={{ fontWeight: 700, cursor: "pointer", width: "25%" }}
+                      sx={{ fontWeight: 700, cursor: "pointer" }}
+                      onClick={() => handleUserTableSort("fullname")}
+                    >
+                      Fuldt navn
+                      {userSort.key === "fullname" &&
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
+                    <TableCell
+                      sx={{ fontWeight: 700, cursor: "pointer" }}
                       onClick={() => handleUserTableSort("role")}
                     >
                       Rolle
@@ -457,7 +466,7 @@ export default function UserAdministration() {
                           : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell
-                      sx={{ fontWeight: 700, cursor: "pointer", width: "25%" }}
+                      sx={{ fontWeight: 700, cursor: "pointer" }}
                       onClick={() => handleUserTableSort("school")}
                     >
                       Skole
@@ -465,13 +474,15 @@ export default function UserAdministration() {
                         (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
                           : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: 120 }}>
+                    <TableCell sx={{ fontWeight: 700 }}>
                       Status
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: "50%" }}>
+                    <TableCell sx={{ fontWeight: 700 }}>
                       Bemærkninger
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
+                    <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>
+                      Handlinger
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -491,9 +502,8 @@ export default function UserAdministration() {
                     getSortedUsers().map(user => (
                       <TableRow key={user.id} hover>
                         <TableCell>{user.username}</TableCell>
-                        <TableCell>
-                          {user.role === "admin" ? "administrator" : "bruger"}
-                        </TableCell>
+                        <TableCell>{user.full_name || ""}</TableCell>
+                        <TableCell>{user.role === "admin" ? "administrator" : "bruger"}</TableCell>
                         <TableCell>
                           {user.school_id
                             ? (getAlphaSchools().find(s => s.id === user.school_id)?.name ?? user.school_id)
