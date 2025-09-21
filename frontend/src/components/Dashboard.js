@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import LogoutButton from "./LogoutButton";
 import {
@@ -25,8 +25,10 @@ import PeopleIcon from "@mui/icons-material/People";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { useAuth } from "../auth/authcontext";
+import axios from "axios";
 
 const drawerWidth = 230;
+const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
 const menuItems = [
   { text: "Forside", path: "/", match: "/", icon: <HomeIcon /> },
@@ -35,14 +37,55 @@ const menuItems = [
   { text: "Administration", path: "/administration", match: "/administration", icon: <AdminPanelSettingsIcon /> },
 ];
 
+function getInitialer(name) {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getRoleText(role) {
+  if (role === "admin") return "Administrator";
+  if (role === "bruger") return "Bruger";
+  return role || "";
+}
+
 export default function Dashboard() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
+  const [schoolName, setSchoolName] = useState("");
+
+  // Hent school name hvis bruger
+  useEffect(() => {
+    if (user && user.role === "bruger" && user.school_id) {
+      axios
+        .get(`${API_URL}/api/schools/`, {
+          headers: { Authorization: "Bearer " + localStorage.getItem("token") },
+        })
+        .then((res) => {
+          const schools = res.data;
+          const school = schools.find((s) => s.id === user.school_id);
+          setSchoolName(school ? school.name : "");
+        })
+        .catch(() => setSchoolName(""));
+    }
+  }, [user]);
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
+
+  // TITEL afhænger af rolle
+  let title = "Infoskærm administration";
+  if (user?.role === "bruger" && schoolName) {
+    title = `${schoolName} - infoskærm administration`;
+  }
+
+  // Fuldt navn + rolle (fx "Kulturskole Viborg - Administrator")
+  const userDisplay = user
+    ? `${user.full_name || user.username} - ${getRoleText(user.role)}`
+    : "";
 
   const drawer = (
     <Box>
@@ -59,7 +102,9 @@ export default function Dashboard() {
                   ? location.pathname === "/"
                   : location.pathname.startsWith(item.match)
               }
-              onClick={() => { if (isMobile) setMobileOpen(false); }}
+              onClick={() => {
+                if (isMobile) setMobileOpen(false);
+              }}
               aria-current={
                 (item.path === "/" && location.pathname === "/") ||
                 (item.path !== "/" && location.pathname.startsWith(item.match))
@@ -76,8 +121,8 @@ export default function Dashboard() {
                       ? "#e0f2f1"
                       : "inherit"
                     : location.pathname.startsWith(item.match)
-                      ? "#e0f2f1"
-                      : "inherit",
+                    ? "#e0f2f1"
+                    : "inherit",
                 "&:hover, &:focus": {
                   backgroundColor: "#b2ebf2",
                   outline: "2px solid",
@@ -88,7 +133,14 @@ export default function Dashboard() {
               }}
               tabIndex={0}
             >
-              <Box sx={{ minWidth: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Box
+                sx={{
+                  minWidth: 32,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
                 {item.icon}
               </Box>
               <ListItemText
@@ -101,8 +153,8 @@ export default function Dashboard() {
                             ? 700
                             : 400
                           : location.pathname.startsWith(item.match)
-                            ? 700
-                            : 400,
+                          ? 700
+                          : 400,
                       color: theme.palette.primary.dark,
                     }}
                   >
@@ -133,7 +185,13 @@ export default function Dashboard() {
         }}
         elevation={3}
       >
-        <Toolbar sx={{ display: "flex", justifyContent: "space-between", minHeight: 64 }}>
+        <Toolbar
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            minHeight: 64,
+          }}
+        >
           {isMobile && (
             <IconButton
               color="inherit"
@@ -146,16 +204,16 @@ export default function Dashboard() {
             </IconButton>
           )}
           <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>
-            Kulturskolen Viborg - infoskærm administration
+            {title}
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             {user ? (
               <>
                 <Avatar sx={{ width: 28, height: 28, bgcolor: theme.palette.secondary.main }}>
-                  {user.username ? user.username.charAt(0).toUpperCase() : "?"}
+                  {getInitialer(user.full_name || user.username)}
                 </Avatar>
                 <Typography variant="subtitle2" sx={{ color: "#fff", opacity: 0.8, mr: 2 }}>
-                  {user.full_name}
+                  {userDisplay}
                 </Typography>
               </>
             ) : (
@@ -170,7 +228,11 @@ export default function Dashboard() {
       </AppBar>
 
       {/* Responsiv Drawer: Temporary på mobil, permanent på desktop */}
-      <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }} aria-label="navigation">
+      <Box
+        component="nav"
+        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
+        aria-label="navigation"
+      >
         <Drawer
           variant={isMobile ? "temporary" : "permanent"}
           open={isMobile ? mobileOpen : true}
