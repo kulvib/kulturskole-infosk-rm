@@ -30,7 +30,7 @@ import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { Link } from "react-router-dom";
-import { getClients, approveClient, removeClient, updateClient, getSchools } from "../api";
+import { getClients, getMyClients, approveClient, removeClient, updateClient, getSchools } from "../api";
 import { useAuth } from "../auth/authcontext";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
@@ -130,7 +130,7 @@ function ClientStatusCell({ isOnline }) {
 }
 
 export default function ClientInfoPage() {
-  const { token, user } = useAuth(); // <-- HENT user her!
+  const { token, user } = useAuth();
   const [clients, setClients] = useState([]);
   const [schools, setSchools] = useState([]);
   const [schoolSelections, setSchoolSelections] = useState({});
@@ -159,7 +159,11 @@ export default function ClientInfoPage() {
   const fetchClients = async (forceUpdate = false, showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
-      const data = await getClients(token);
+      // VIGTIGT: Skift endpoint afhængig af rolle!
+      const data =
+        user?.role === "bruger"
+          ? await getMyClients(token)
+          : await getClients(token);
       if (forceUpdate || !isClientListEqual(data, lastFetchedClients.current)) {
         setClients(data);
         lastFetchedClients.current = data;
@@ -172,26 +176,24 @@ export default function ClientInfoPage() {
 
   // Første load med overlay, derefter polling uden overlay
   useEffect(() => {
-    fetchClients(false, true); // Første load med overlay!
+    fetchClients(false, true);
     let timer = setInterval(() => {
-      fetchClients(false, false); // Polling uden overlay!
-    }, 5000); // 5 sekunder
+      fetchClients(false, false);
+    }, 5000);
     return () => clearInterval(timer);
-  }, [token]);
+    // eslint-disable-next-line
+  }, [token, user?.role]);
 
   // Hent skoler ved første load
   useEffect(() => {
     getSchools(token).then(setSchools).catch(() => setSchools([]));
   }, [token]);
 
-  // Filtrér klienter baseret på brugerens rolle og skole
-  const filteredClients = user?.role === "bruger"
-    ? clients.filter(client => client.school_id === user.school_id)
-    : clients;
+  // Filtrér klienter baseret på brugerens rolle og skole (men det håndteres også af backend nu)
+  const filteredClients = clients;
 
   // Drag/drop sortering og approved
   useEffect(() => {
-    // Sortering: laveste sort_order først, derefter id
     const approved = (filteredClients?.filter((c) => c.status === "approved") || []).slice();
     approved.sort((a, b) => {
       if (
@@ -212,21 +214,18 @@ export default function ClientInfoPage() {
   // Unapproved clients filtreret på rolle/skole
   const unapprovedClients = (filteredClients?.filter((c) => c.status !== "approved") || [])
     .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
-  // Dialog: Åbn
   const openRemoveDialog = (clientId) => {
     setConfirmClientId(clientId);
     setConfirmOpen(true);
   };
 
-  // Dialog: Luk
   const closeRemoveDialog = () => {
     setConfirmOpen(false);
     setConfirmClientId(null);
   };
 
-  // Dialog: Bekræft sletning
   const confirmRemoveClient = async () => {
     if (confirmClientId) {
       await handleRemoveClient(confirmClientId);
@@ -238,7 +237,7 @@ export default function ClientInfoPage() {
     try {
       await removeClient(clientId, token);
       showSnackbar("Klient fjernet!", "success");
-      fetchClients(true, true); // force update med overlay
+      fetchClients(true, true);
     } catch (err) {
       showSnackbar("Kunne ikke fjerne klient: " + err.message, "error");
     }
@@ -256,7 +255,7 @@ export default function ClientInfoPage() {
         await updateClient(reordered[i].id, { sort_order: i + 1 }, token);
       }
       showSnackbar("Sortering opdateret!", "success");
-      fetchClients(true, true); // force update med overlay
+      fetchClients(true, true);
     } catch (err) {
       showSnackbar("Kunne ikke opdatere sortering: " + err.message, "error");
     }
@@ -264,7 +263,7 @@ export default function ClientInfoPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchClients(true, true); // force update med overlay
+    await fetchClients(true, true);
     setRefreshing(false);
   };
 
@@ -281,7 +280,7 @@ export default function ClientInfoPage() {
     try {
       await approveClient(clientId, school_id, token);
       showSnackbar("Klient godkendt!", "success");
-      fetchClients(true, true); // force update med overlay
+      fetchClients(true, true);
     } catch (err) {
       showSnackbar("Kunne ikke godkende klient: " + err.message, "error");
     }
