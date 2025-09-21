@@ -15,6 +15,7 @@ class UserCreate(BaseModel):
     is_active: bool = True
     school_id: Optional[int] = None
     full_name: Optional[str] = None  # <-- tilføjet
+    remarks: Optional[str] = None    # <-- NYT felt!
 
 class UserUpdate(BaseModel):
     role: Optional[str] = None
@@ -22,6 +23,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     school_id: Optional[int] = None
     full_name: Optional[str] = None  # <-- tilføjet
+    remarks: Optional[str] = None    # <-- NYT felt!
 
 # GET /api/users/ -- Hent alle brugere (kun admin)
 @router.get("/users/", response_model=List[User])
@@ -51,7 +53,8 @@ def create_user(
         role=user.role,
         is_active=user.is_active,
         school_id=user.school_id,
-        full_name=user.full_name  # <-- tilføjet
+        full_name=user.full_name,  # <-- tilføjet
+        remarks=user.remarks       # <-- NYT felt!
     )
     session.add(user_obj)
     session.commit()
@@ -83,6 +86,8 @@ def update_user(
         user.school_id = user_update.school_id
     if user_update.full_name is not None:
         user.full_name = user_update.full_name  # <-- tilføjet
+    if user_update.remarks is not None:
+        user.remarks = user_update.remarks      # <-- NYT felt!
     session.add(user)
     session.commit()
     session.refresh(user)
