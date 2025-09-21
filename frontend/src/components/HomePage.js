@@ -31,17 +31,18 @@ export default function HomePage() {
       sx={{
         maxWidth: { xs: "100vw", sm: 420, md: 500 },
         mx: "auto",
-        mt: { xs: 3, sm: 6, md: 8 },
-        px: { xs: 1, sm: 0 },
+        mt: { xs: 2, sm: 5, md: 8 },
+        px: { xs: 0.5, sm: 0 },
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+        minHeight: { xs: "100vh", sm: "auto" },
       }}
     >
       <Paper
         elevation={3}
         sx={{
-          p: { xs: 2, sm: 3, md: 4 },
+          p: { xs: 1.5, sm: 3, md: 4 },
           width: "100%",
           maxWidth: 500,
           textAlign: "center",
@@ -52,10 +53,11 @@ export default function HomePage() {
         <Typography
           variant="h4"
           sx={{
-            mb: { xs: 1.5, sm: 2 },
+            mb: { xs: 1.2, sm: 2 },
             fontWeight: 700,
-            fontSize: { xs: "1.35rem", sm: "1.65rem", md: "2.125rem" },
+            fontSize: { xs: "1.22rem", sm: "1.65rem", md: "2.125rem" },
             letterSpacing: 0.1,
+            lineHeight: 1.15,
           }}
         >
           Infoskærm administration
@@ -65,10 +67,11 @@ export default function HomePage() {
           <Typography
             variant="subtitle1"
             sx={{
-              mb: { xs: 3, sm: 4 },
+              mb: { xs: 2.5, sm: 4 },
               fontSize: { xs: "1.01rem", sm: "1.1rem", md: "1.18rem" },
               whiteSpace: "pre-line",
               fontWeight: 500,
+              lineHeight: 1.22,
             }}
           >
             Velkommen til administrationen af infoskærme for
@@ -83,11 +86,12 @@ export default function HomePage() {
           alignItems="center"
           sx={{
             mt: { xs: 2, md: 0 },
+            width: "100%",
             "& .MuiButton-root": {
-              fontSize: { xs: "0.98rem", sm: "1.03rem", md: "1.08rem" },
-              minHeight: { xs: 38, sm: 40, md: 44 }, // mindre knapper
-              minWidth: { xs: 145, sm: 170, md: 180 }, // mindre knapper
-              px: { xs: 1.5, sm: 2.5 },
+              fontSize: { xs: "0.99rem", sm: "1.03rem", md: "1.08rem" },
+              minHeight: { xs: 38, sm: 40, md: 44 },
+              minWidth: { xs: 130, sm: 170, md: 180 },
+              px: { xs: 1.2, sm: 2.5 },
               borderRadius: { xs: 1.5, sm: 2 },
               boxShadow: { xs: 1, sm: 2 },
               letterSpacing: 0.13,
@@ -100,6 +104,9 @@ export default function HomePage() {
             component={Link}
             to="/clients"
             size="large"
+            sx={{
+              width: { xs: "100%" },
+            }}
           >
             Gå til klientoversigt
           </Button>
@@ -109,6 +116,9 @@ export default function HomePage() {
             component={Link}
             to="/calendar"
             size="large"
+            sx={{
+              width: { xs: "100%" },
+            }}
           >
             Gå til kalender side
           </Button>
@@ -119,6 +129,9 @@ export default function HomePage() {
               component={Link}
               to="/administration"
               size="large"
+              sx={{
+                width: { xs: "100%" },
+              }}
             >
               Gå til administrator side
             </Button>
