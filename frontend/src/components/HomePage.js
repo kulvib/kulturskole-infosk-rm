@@ -1,10 +1,30 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Typography, Paper, Button, Stack } from "@mui/material";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/authcontext";
+import axios from "axios";
+
+const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
 export default function HomePage() {
   const { user } = useAuth();
+  const [schoolName, setSchoolName] = useState("");
+
+  // Hent school name hvis bruger
+  useEffect(() => {
+    if (user && user.role === "bruger" && user.school_id) {
+      axios
+        .get(`${API_URL}/api/schools/`, {
+          headers: { Authorization: "Bearer " + localStorage.getItem("token") },
+        })
+        .then((res) => {
+          const schools = res.data;
+          const school = schools.find((s) => s.id === user.school_id);
+          setSchoolName(school ? school.name : "");
+        })
+        .catch(() => setSchoolName(""));
+    }
+  }, [user]);
 
   return (
     <Box
@@ -22,9 +42,9 @@ export default function HomePage() {
           Infoskærm administration
         </Typography>
         {/* Besked til brugere/admins */}
-        {user?.role !== "admin" && user?.school_name && (
+        {user?.role !== "admin" && schoolName && (
           <Typography variant="subtitle1" sx={{ mb: 4 }}>
-            Velkommen til administrationen af infoskærme for {user.school_name}.
+            Velkommen til administrationen af infoskærme for {schoolName}.
           </Typography>
         )}
         {/* For admin: teksten vises ikke */}
