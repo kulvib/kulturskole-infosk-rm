@@ -267,22 +267,7 @@ export default function UserAdministration() {
   };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, minHeight: "60vh", p: 2 }}>
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3400}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
-          {snackbar.message}
-        </MuiAlert>
-      </Snackbar>
-
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-        Brugeradministration
-      </Typography>
-
+    <Box sx={{}}>
       <Paper sx={{ mb: 4, p: 3 }}>
         <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-end">
           <Box sx={{ flex: 2, minWidth: 340 }}>
@@ -664,6 +649,16 @@ export default function UserAdministration() {
           )}
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3400}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
     </Box>
   );
 }
