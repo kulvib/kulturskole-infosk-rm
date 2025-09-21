@@ -26,36 +26,83 @@ export default function HomePage() {
     }
   }, [user]);
 
+  // Mobil/tablet optimering
+  // Små marginer, mindre padding, større knapper på mobil/tablet
+  // Desktop beholdes uændret
   return (
     <Box
       sx={{
-        maxWidth: 500,
+        maxWidth: { xs: "100vw", sm: 420, md: 500 },
         mx: "auto",
-        mt: 8,
+        mt: { xs: 3, sm: 6, md: 8 },
+        px: { xs: 1, sm: 0 },
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
       }}
     >
-      <Paper elevation={3} sx={{ p: 4, width: "100%", textAlign: "center", borderRadius: 3 }}>
-        <Typography variant="h4" sx={{ mb: 2, fontWeight: 700 }}>
+      <Paper
+        elevation={3}
+        sx={{
+          p: { xs: 2, sm: 3, md: 4 },
+          width: "100%",
+          maxWidth: 500,
+          textAlign: "center",
+          borderRadius: { xs: 2, sm: 3 },
+          boxShadow: { xs: 1, sm: 3 },
+        }}
+      >
+        <Typography
+          variant="h4"
+          sx={{
+            mb: { xs: 1.5, sm: 2 },
+            fontWeight: 700,
+            fontSize: { xs: "1.35rem", sm: "1.65rem", md: "2.125rem" },
+            letterSpacing: 0.1,
+          }}
+        >
           Infoskærm administration
         </Typography>
         {/* Besked til brugere/admins */}
         {user?.role !== "admin" && schoolName && (
-          <Typography variant="subtitle1" sx={{ mb: 4 }}>
-            Velkommen til administrationen af infoskærme for {schoolName}.
+          <Typography
+            variant="subtitle1"
+            sx={{
+              mb: { xs: 3, sm: 4 },
+              fontSize: { xs: "1.01rem", sm: "1.1rem", md: "1.18rem" },
+              whiteSpace: "pre-line",
+              fontWeight: 500,
+            }}
+          >
+            Velkommen til administrationen af infoskærme for
+            {"\n"}
+            {schoolName}
           </Typography>
         )}
         {/* For admin: teksten vises ikke */}
-        <Stack spacing={2} direction="column" alignItems="center">
+        <Stack
+          spacing={2}
+          direction="column"
+          alignItems="center"
+          sx={{
+            mt: { xs: 2, md: 0 },
+            "& .MuiButton-root": {
+              fontSize: { xs: "1rem", sm: "1.08rem", md: "1.1rem" },
+              minHeight: { xs: 46, sm: 48, md: 52 },
+              minWidth: { xs: 180, sm: 200 },
+              px: { xs: 2, sm: 3 },
+              borderRadius: { xs: 2, sm: 3 },
+              boxShadow: { xs: 1, sm: 2 },
+              letterSpacing: 0.15,
+            },
+          }}
+        >
           <Button
             variant="contained"
             color="primary"
             component={Link}
             to="/clients"
             size="large"
-            sx={{ minWidth: 200 }}
           >
             Gå til klientoversigt
           </Button>
@@ -65,7 +112,6 @@ export default function HomePage() {
             component={Link}
             to="/calendar"
             size="large"
-            sx={{ minWidth: 200 }}
           >
             Gå til kalender side
           </Button>
@@ -76,7 +122,6 @@ export default function HomePage() {
               component={Link}
               to="/administration"
               size="large"
-              sx={{ minWidth: 200 }}
             >
               Gå til administrator side
             </Button>
