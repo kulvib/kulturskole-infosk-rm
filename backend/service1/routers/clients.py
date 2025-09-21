@@ -4,7 +4,7 @@ from typing import List
 from datetime import datetime, timedelta
 from db import get_session
 from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction
-from auth import get_current_admin_user
+from auth import get_current_admin_user, get_current_user
 import os
 import glob
 
@@ -17,6 +17,22 @@ def get_clients_public(session=Depends(get_session)):
     return {
         "clients": [{"id": c.id, "name": c.name} for c in clients]
     }
+
+# Bruger-endpoint - kun godkendte klienter fra egen skole
+@router.get("/clients/me", response_model=List[Client])
+def get_clients_for_my_school(session=Depends(get_session), user=Depends(get_current_user)):
+    if not user.school_id:
+        return []
+    clients = session.exec(
+        select(Client).where(Client.status == "approved", Client.school_id == user.school_id)
+    ).all()
+    now = datetime.utcnow()
+    for client in clients:
+        client.isOnline = (
+            client.last_seen is not None and (now - client.last_seen) < timedelta(minutes=2)
+        )
+    clients.sort(key=lambda c: (c.sort_order is None, c.sort_order if c.sort_order is not None else 9999, c.id))
+    return clients
 
 # Admin: Liste af alle klienter
 @router.get("/clients/", response_model=List[Client])
@@ -80,7 +96,7 @@ def update_chrome_status(
     session.refresh(client)
     return {"ok": True}
 
-# Klienten sender sin aktuelle state (uafhængigt af kommandoer)
+# Klienten sender sin aktuelle state
 @router.put("/clients/{id}/state")
 def update_client_state(
     id: int,
@@ -335,9 +351,6 @@ def client_remote_desktop(id: int, session=Depends(get_session), user=Depends(ge
 # --- RESET HLS FOR EN KLIENT ---
 @router.post("/clients/{client_id}/reset-hls")
 def reset_hls(client_id: int):
-    """
-    Sletter alle HLS-segmenter (.ts) og manifest (index.m3u8) for den specifikke klient.
-    """
     hls_dir = f"/opt/render/project/src/backend/service1/hls/{client_id}/"
     if not os.path.exists(hls_dir):
         raise HTTPException(status_code=404, detail="HLS directory not found for client")
@@ -359,11 +372,6 @@ def reset_hls(client_id: int):
 # --- STOP HLS STREAM & RYD OP (frontend kalder denne ved "forlad side") ---
 @router.post("/clients/{client_id}/stop-hls")
 def stop_hls(client_id: int):
-    """
-    Stopper evt. streamingproces og sletter alle HLS-segmenter (.ts) og manifest (index.m3u8) for klienten.
-    """
-    # TODO: Indsæt evt. logik til at stoppe Chrome-agent/stream her
-
     hls_dir = f"/opt/render/project/src/backend/service1/hls/{client_id}/"
     if not os.path.exists(hls_dir):
         return {"status": "ok", "deleted_files": [], "errors": ["HLS directory not found for client"]}
