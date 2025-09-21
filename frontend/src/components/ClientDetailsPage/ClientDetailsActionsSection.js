@@ -21,7 +21,8 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import NightlightIcon from "@mui/icons-material/Nightlight";
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
 import { useTheme } from "@mui/material/styles";
-import { clientAction } from "../../api"; // <-- Brug din api.js funktion!
+import { clientAction } from "../../api";
+import { useAuth } from "../../auth/authcontext";
 
 export default function ClientDetailsActionsSection({
   clientId,
@@ -33,6 +34,7 @@ export default function ClientDetailsActionsSection({
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { user } = useAuth();
 
   // Responsiv knapstyle
   const actionBtnStyle = {
@@ -54,16 +56,13 @@ export default function ClientDetailsActionsSection({
     boxShadow: isMobile ? 1 : undefined,
   };
 
-  // Main action handler - bruger api.js (clientAction)
+  // Main action handler
   async function handleClientAction(action) {
     setActionLoading(prev => ({ ...prev, [action]: true }));
-
     try {
-      await clientAction(clientId, action); // Kald til backend via api.js
-      // Optionelt: show feedback eller refetch data her
+      await clientAction(clientId, action);
     } catch (err) {
       console.error("Fejl ved handling:", err);
-      // Optionelt: show error feedback
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
@@ -73,158 +72,182 @@ export default function ClientDetailsActionsSection({
   const MaybeTooltip = ({ title, children }) =>
     isMobile ? children : <Tooltip title={title}>{children}</Tooltip>;
 
+  // --- KNAPLISTE FOR BRUGER ---
+  const userButtons = (
+    <>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          mb: isMobile ? 1.5 : 2,
+          gap: isMobile ? 1 : "20px",
+        }}
+      >
+        <MaybeTooltip title="Start kiosk browser">
+          <span style={{ width: isMobile ? "100%" : undefined }}>
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<ChromeReaderModeIcon />}
+              disabled={actionLoading["chrome-start"]}
+              onClick={() => handleClientAction("chrome-start")}
+              sx={actionBtnStyle}
+              fullWidth={isMobile}
+            >
+              {actionLoading["chrome-start"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+              Start kiosk browser
+            </Button>
+          </span>
+        </MaybeTooltip>
+        <MaybeTooltip title="Luk kiosk browser">
+          <span style={{ width: isMobile ? "100%" : undefined }}>
+            <Button
+              variant="outlined"
+              color="secondary"
+              startIcon={<PowerSettingsNewIcon />}
+              disabled={actionLoading["chrome-shutdown"]}
+              onClick={() => handleClientAction("chrome-shutdown")}
+              sx={actionBtnStyle}
+              fullWidth={isMobile}
+            >
+              {actionLoading["chrome-shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+              Luk kiosk browser
+            </Button>
+          </span>
+        </MaybeTooltip>
+        <MaybeTooltip title="Sæt klient i dvale">
+          <span style={{ width: isMobile ? "100%" : undefined }}>
+            <Button
+              variant="outlined"
+              color="info"
+              startIcon={<NightlightIcon />}
+              disabled={actionLoading["sleep"]}
+              onClick={() => handleClientAction("sleep")}
+              sx={actionBtnStyle}
+              fullWidth={isMobile}
+            >
+              {actionLoading["sleep"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+              Sæt i dvale
+            </Button>
+          </span>
+        </MaybeTooltip>
+        <MaybeTooltip title="Væk klient fra dvale">
+          <span style={{ width: isMobile ? "100%" : undefined }}>
+            <Button
+              variant="outlined"
+              color="success"
+              startIcon={<WbSunnyIcon />}
+              disabled={actionLoading["wakeup"]}
+              onClick={() => handleClientAction("wakeup")}
+              sx={actionBtnStyle}
+              fullWidth={isMobile}
+            >
+              {actionLoading["wakeup"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+              Væk fra dvale
+            </Button>
+          </span>
+        </MaybeTooltip>
+      </Box>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          gap: isMobile ? 1 : "20px",
+        }}
+      >
+        <MaybeTooltip title="Genstart klient">
+          <span style={{ width: isMobile ? "100%" : undefined }}>
+            <Button
+              variant="contained"
+              color="warning"
+              startIcon={<RestartAltIcon />}
+              disabled={actionLoading["restart"]}
+              onClick={() => handleClientAction("restart")}
+              sx={actionBtnStyle}
+              fullWidth={isMobile}
+            >
+              {actionLoading["restart"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+              Genstart klient
+            </Button>
+          </span>
+        </MaybeTooltip>
+      </Box>
+    </>
+  );
+
+  // --- KNAPLISTE FOR ADMIN (viser ALT) ---
+  const adminButtons = (
+    <>
+      {userButtons}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          gap: isMobile ? 1 : "20px",
+          mt: isMobile ? 1.5 : 2,
+        }}
+      >
+        <MaybeTooltip title="Fjernskrivebord på klient">
+          <span style={{ width: isMobile ? "100%" : undefined }}>
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<DesktopWindowsIcon />}
+              onClick={handleOpenRemoteDesktop}
+              sx={actionBtnStyle}
+              fullWidth={isMobile}
+            >
+              Fjernskrivebord
+            </Button>
+          </span>
+        </MaybeTooltip>
+        <MaybeTooltip title="Terminal på klient">
+          <span style={{ width: isMobile ? "100%" : undefined }}>
+            <Button
+              variant="outlined"
+              color="inherit"
+              startIcon={<TerminalIcon />}
+              onClick={handleOpenTerminal}
+              sx={actionBtnStyle}
+              fullWidth={isMobile}
+            >
+              Terminal på klient
+            </Button>
+          </span>
+        </MaybeTooltip>
+        <MaybeTooltip title="Sluk klient">
+          <span style={{ width: isMobile ? "100%" : undefined }}>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<PowerSettingsNewIcon />}
+              disabled={actionLoading["shutdown"]}
+              onClick={() => setShutdownDialogOpen(true)}
+              sx={actionBtnStyle}
+              fullWidth={isMobile}
+            >
+              {actionLoading["shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
+              Sluk klient
+            </Button>
+          </span>
+        </MaybeTooltip>
+      </Box>
+    </>
+  );
+
   return (
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
-        {/* Første række: Kiosk + dvale/væk */}
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "100%",
-            mb: isMobile ? 1.5 : 2,
-            gap: isMobile ? 1 : "20px",
-          }}
-        >
-          <MaybeTooltip title="Start kiosk browser">
-            <span style={{ width: isMobile ? "100%" : undefined }}>
-              <Button
-                variant="outlined"
-                color="primary"
-                startIcon={<ChromeReaderModeIcon />}
-                disabled={actionLoading["chrome-start"]}
-                onClick={() => handleClientAction("chrome-start")}
-                sx={actionBtnStyle}
-                fullWidth={isMobile}
-              >
-                {actionLoading["chrome-start"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
-                Start kiosk browser
-              </Button>
-            </span>
-          </MaybeTooltip>
-          <MaybeTooltip title="Luk kiosk browser">
-            <span style={{ width: isMobile ? "100%" : undefined }}>
-              <Button
-                variant="outlined"
-                color="secondary"
-                startIcon={<PowerSettingsNewIcon />}
-                disabled={actionLoading["chrome-shutdown"]}
-                onClick={() => handleClientAction("chrome-shutdown")}
-                sx={actionBtnStyle}
-                fullWidth={isMobile}
-              >
-                {actionLoading["chrome-shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
-                Luk kiosk browser
-              </Button>
-            </span>
-          </MaybeTooltip>
-          <MaybeTooltip title="Sæt klient i dvale">
-            <span style={{ width: isMobile ? "100%" : undefined }}>
-              <Button
-                variant="outlined"
-                color="info"
-                startIcon={<NightlightIcon />}
-                disabled={actionLoading["sleep"]}
-                onClick={() => handleClientAction("sleep")}
-                sx={actionBtnStyle}
-                fullWidth={isMobile}
-              >
-                {actionLoading["sleep"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
-                Sæt i dvale
-              </Button>
-            </span>
-          </MaybeTooltip>
-          <MaybeTooltip title="Væk klient fra dvale">
-            <span style={{ width: isMobile ? "100%" : undefined }}>
-              <Button
-                variant="outlined"
-                color="success"
-                startIcon={<WbSunnyIcon />}
-                disabled={actionLoading["wakeup"]}
-                onClick={() => handleClientAction("wakeup")}
-                sx={actionBtnStyle}
-                fullWidth={isMobile}
-              >
-                {actionLoading["wakeup"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
-                Væk fra dvale
-              </Button>
-            </span>
-          </MaybeTooltip>
-        </Box>
-        {/* Anden række: system og remote */}
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "100%",
-            gap: isMobile ? 1 : "20px",
-          }}
-        >
-          <MaybeTooltip title="Fjernskrivebord på klient">
-            <span style={{ width: isMobile ? "100%" : undefined }}>
-              <Button
-                variant="outlined"
-                color="primary"
-                startIcon={<DesktopWindowsIcon />}
-                onClick={handleOpenRemoteDesktop}
-                sx={actionBtnStyle}
-                fullWidth={isMobile}
-              >
-                Fjernskrivebord
-              </Button>
-            </span>
-          </MaybeTooltip>
-          <MaybeTooltip title="Terminal på klient">
-            <span style={{ width: isMobile ? "100%" : undefined }}>
-              <Button
-                variant="outlined"
-                color="inherit"
-                startIcon={<TerminalIcon />}
-                onClick={handleOpenTerminal}
-                sx={actionBtnStyle}
-                fullWidth={isMobile}
-              >
-                Terminal på klient
-              </Button>
-            </span>
-          </MaybeTooltip>
-          <MaybeTooltip title="Genstart klient">
-            <span style={{ width: isMobile ? "100%" : undefined }}>
-              <Button
-                variant="contained"
-                color="warning"
-                startIcon={<RestartAltIcon />}
-                disabled={actionLoading["restart"]}
-                onClick={() => handleClientAction("restart")}
-                sx={actionBtnStyle}
-                fullWidth={isMobile}
-              >
-                {actionLoading["restart"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
-                Genstart klient
-              </Button>
-            </span>
-          </MaybeTooltip>
-          <MaybeTooltip title="Sluk klient">
-            <span style={{ width: isMobile ? "100%" : undefined }}>
-              <Button
-                variant="contained"
-                color="error"
-                startIcon={<PowerSettingsNewIcon />}
-                disabled={actionLoading["shutdown"]}
-                onClick={() => setShutdownDialogOpen(true)}
-                sx={actionBtnStyle}
-                fullWidth={isMobile}
-              >
-                {actionLoading["shutdown"] ? <CircularProgress size={16} sx={{ mr: 1 }} /> : null}
-                Sluk klient
-              </Button>
-            </span>
-          </MaybeTooltip>
-        </Box>
+        {user?.role === "admin" ? adminButtons : userButtons}
         <Dialog open={shutdownDialogOpen} onClose={() => setShutdownDialogOpen(false)}>
           <DialogTitle>Bekræft slukning af klient</DialogTitle>
           <DialogContent>
