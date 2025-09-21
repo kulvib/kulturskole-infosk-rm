@@ -23,10 +23,9 @@ export async function login(username, password) {
   return await res.json();
 }
 
-// HENT KLIENTER (login)
+// HENT KLIENTER (admin)
 export async function getClients() {
   const token = getToken();
-  console.log("[getClients] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/clients/`, {
     headers: { Authorization: "Bearer " + token },
@@ -37,6 +36,28 @@ export async function getClients() {
   }
   if (!res.ok) {
     let msg = "Kunne ikke hente klienter";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
+// HENT KLIENTER (bruger - kun egne godkendte)
+export async function getMyClients() {
+  const token = getToken();
+  if (!token) throw new Error("Token mangler - du er ikke logget ind");
+  const res = await fetch(`${apiUrl}/api/clients/me`, {
+    headers: { Authorization: "Bearer " + token },
+  });
+  if (res.status === 401) {
+    localStorage.removeItem("token");
+    throw new Error("401 Unauthorized: Login udløbet – log ind igen");
+  }
+  if (!res.ok) {
+    let msg = "Kunne ikke hente klienter (me)";
     try {
       const data = await res.json();
       msg = data.detail || data.message || msg;
@@ -63,7 +84,6 @@ export async function getClientsPublic() {
 // HENT ÉN KLIENT (login)
 export async function getClient(id) {
   const token = getToken();
-  console.log("[getClient] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/clients/${id}/`, {
     headers: { Authorization: "Bearer " + token },
@@ -86,7 +106,6 @@ export async function getClient(id) {
 // OPDATÉR KLIENT (login)
 export async function updateClient(id, updates) {
   const token = getToken();
-  console.log("[updateClient] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/clients/${id}/update`, {
     method: "PUT",
@@ -114,7 +133,6 @@ export async function updateClient(id, updates) {
 // GODKEND KLIENT
 export async function approveClient(id, school_id) {
   const token = getToken();
-  console.log("[approveClient] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const opts = {
     method: "POST",
@@ -140,7 +158,6 @@ export async function approveClient(id, school_id) {
 // FJERN KLIENT
 export async function removeClient(id) {
   const token = getToken();
-  console.log("[removeClient] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/clients/${id}/remove`, {
     method: "DELETE",
@@ -163,7 +180,6 @@ export async function removeClient(id) {
 // KIOSK URL
 export async function pushKioskUrl(id, url) {
   const token = getToken();
-  console.log("[pushKioskUrl] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/clients/${id}/kiosk_url`, {
     method: "PUT",
@@ -191,7 +207,6 @@ export async function pushKioskUrl(id, url) {
 // KLIENT ACTIONS (KORREKT MAPPING TIL ENDPOINTS)
 export async function clientAction(id, action) {
   const token = getToken();
-  console.log("[clientAction] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
 
   let url, method, payload;
@@ -266,7 +281,6 @@ export async function clientAction(id, action) {
 // SÆT KLIENTENS STATE (fx til 'normal' eller 'sleep')
 export async function setClientState(id, state) {
   const token = getToken();
-  console.log("[setClientState] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/clients/${id}/state`, {
     method: "PUT",
@@ -307,7 +321,6 @@ export function getClientStream(id) {
 // HELLIGDAGE / KALENDER
 export async function getHolidays() {
   const token = getToken();
-  console.log("[getHolidays] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/holidays/`, {
     headers: { Authorization: "Bearer " + token },
@@ -329,7 +342,6 @@ export async function getHolidays() {
 
 export async function addHoliday(date, description) {
   const token = getToken();
-  console.log("[addHoliday] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/holidays/`, {
     method: "POST",
@@ -356,7 +368,6 @@ export async function addHoliday(date, description) {
 
 export async function deleteHoliday(id) {
   const token = getToken();
-  console.log("[deleteHoliday] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/holidays/${id}`, {
     method: "DELETE",
@@ -378,7 +389,6 @@ export async function deleteHoliday(id) {
 
 export async function saveMarkedDays(payload) {
   const token = getToken();
-  console.log("[saveMarkedDays] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/calendar/marked-days`, {
     method: "POST",
@@ -406,7 +416,6 @@ export async function saveMarkedDays(payload) {
 // OPDATERET! Nu med startDate og endDate som optionale parametre
 export async function getMarkedDays(season, client_id, startDate, endDate) {
   const token = getToken();
-  console.log("[getMarkedDays] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const params = new URLSearchParams({
     season,
@@ -430,7 +439,6 @@ export async function getMarkedDays(season, client_id, startDate, endDate) {
 
 export async function getCurrentSeason() {
   const token = getToken();
-  console.log("[getCurrentSeason] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/calendar/season`, {
     headers: { Authorization: "Bearer " + token },
@@ -448,7 +456,6 @@ export async function getCurrentSeason() {
 // SKOLER
 export async function getSchools() {
   const token = getToken();
-  console.log("[getSchools] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/schools/`, {
     headers: { Authorization: "Bearer " + token },
@@ -470,7 +477,6 @@ export async function getSchools() {
 
 export async function addSchool(name) {
   const token = getToken();
-  console.log("[addSchool] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/schools/`, {
     method: "POST",
@@ -498,7 +504,6 @@ export async function addSchool(name) {
 // HENT TIDER FOR EN SKOLE
 export async function getSchoolTimes(schoolId) {
   const token = getToken();
-  console.log("[getSchoolTimes] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/schools/${schoolId}/times`, {
     headers: { Authorization: "Bearer " + token },
@@ -521,7 +526,6 @@ export async function getSchoolTimes(schoolId) {
 // OPDATER TIDER FOR EN SKOLE
 export async function updateSchoolTimes(schoolId, updates) {
   const token = getToken();
-  console.log("[updateSchoolTimes] token:", token);
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
   const res = await fetch(`${apiUrl}/api/schools/${schoolId}/times`, {
     method: "PATCH",
@@ -550,7 +554,6 @@ export async function updateSchoolTimes(schoolId, updates) {
 
 export async function getLivestreamStatus(clientId) {
   const token = getToken();
-  console.log("[getLivestreamStatus] token:", token);
   const res = await fetch(`${apiUrl}/api/livestream/status/${clientId}`, {
     headers: token ? { Authorization: "Bearer " + token } : {},
   });
@@ -571,7 +574,6 @@ export async function getLivestreamStatus(clientId) {
 
 export async function startLivestream(clientId) {
   const token = getToken();
-  console.log("[startLivestream] token:", token);
   const res = await fetch(`${apiUrl}/api/livestream/start/${clientId}`, {
     method: "POST",
     headers: token ? { Authorization: "Bearer " + token } : {},
@@ -593,7 +595,6 @@ export async function startLivestream(clientId) {
 
 export async function stopLivestream(clientId) {
   const token = getToken();
-  console.log("[stopLivestream] token:", token);
   const res = await fetch(`${apiUrl}/api/livestream/stop/${clientId}`, {
     method: "POST",
     headers: token ? { Authorization: "Bearer " + token } : {},
