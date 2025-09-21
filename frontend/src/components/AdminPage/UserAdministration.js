@@ -26,6 +26,7 @@ import {
   InputLabel,
   TextField,
   InputAdornment,
+  Grid,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
@@ -105,6 +106,11 @@ export default function UserAdministration() {
       showSnackbar("Brugernavn og begge kodeord skal udfyldes", "error");
       return;
     }
+    if (!full_name) {
+      setUserError("Fuldt navn skal udfyldes");
+      showSnackbar("Fuldt navn skal udfyldes", "error");
+      return;
+    }
     if (password !== password2) {
       setUserError("Kodeordene matcher ikke");
       showSnackbar("Kodeordene matcher ikke", "error");
@@ -177,6 +183,11 @@ export default function UserAdministration() {
   const handleEditUser = () => {
     if (!editUser) return;
     const { id, role, is_active, password, password2, full_name } = editUser;
+    if (!full_name) {
+      setUserError("Fuldt navn skal udfyldes");
+      showSnackbar("Fuldt navn skal udfyldes", "error");
+      return;
+    }
     if (password && password !== password2) {
       setUserError("Kodeordene matcher ikke");
       showSnackbar("Kodeordene matcher ikke", "error");
@@ -257,8 +268,6 @@ export default function UserAdministration() {
     return arr;
   };
 
-  const inputSx = { minWidth: 180, my: 0 };
-
   const handleUserTableSort = (key) => {
     setUserSort(prev => ({
       key,
@@ -277,111 +286,125 @@ export default function UserAdministration() {
             <Typography variant="body2" sx={{ mb: 2 }}>
               Opret, redigér og slet brugere (kræver admin-rettigheder)
             </Typography>
-            <Stack direction="row" gap={2} alignItems="flex-end" sx={{ mb: 0 }}>
-              <TextField
-                label="Brugernavn"
-                value={newUser.username}
-                onChange={e => setNewUser({ ...newUser, username: e.target.value })}
-                size="small"
-                sx={inputSx}
-                fullWidth
-              />
-              <TextField
-                label="Fuldt navn"
-                value={newUser.full_name}
-                onChange={e => setNewUser({ ...newUser, full_name: e.target.value })}
-                size="small"
-                sx={inputSx}
-                fullWidth
-              />
-              <TextField
-                label="Kodeord"
-                type={showPassword ? "text" : "password"}
-                value={newUser.password}
-                onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-                size="small"
-                sx={inputSx}
-                fullWidth
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword((show) => !show)}
-                        edge="end"
-                        tabIndex={-1}
-                        size="small"
-                        sx={{ fontSize: 18 }}
-                      >
-                        {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-              />
-              <TextField
-                label="Gentag kodeord"
-                type={showPassword2 ? "text" : "password"}
-                value={newUser.password2}
-                onChange={e => setNewUser({ ...newUser, password2: e.target.value })}
-                size="small"
-                sx={inputSx}
-                fullWidth
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword2((show) => !show)}
-                        edge="end"
-                        tabIndex={-1}
-                        size="small"
-                        sx={{ fontSize: 18 }}
-                      >
-                        {showPassword2 ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-              />
-              <FormControl size="small" sx={inputSx} fullWidth>
-                <InputLabel id="rolle-label">Rolle</InputLabel>
-                <Select
-                  labelId="rolle-label"
-                  value={newUser.role}
-                  label="Rolle"
-                  onChange={e => setNewUser({ ...newUser, role: e.target.value })}
-                >
-                  <MenuItem value="administrator">Administrator</MenuItem>
-                  <MenuItem value="bruger">Bruger</MenuItem>
-                </Select>
-              </FormControl>
-              {newUser.role === "bruger" && (
-                <FormControl size="small" sx={inputSx} fullWidth>
-                  <InputLabel id="skole-label">Skole</InputLabel>
+            <Grid container spacing={2} sx={{ mb: 1 }}>
+              <Grid item xs={12} md={6} lg={4}>
+                <TextField
+                  required
+                  label="Brugernavn"
+                  value={newUser.username}
+                  onChange={e => setNewUser({ ...newUser, username: e.target.value })}
+                  size="small"
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={4}>
+                <TextField
+                  required
+                  label="Fuldt navn"
+                  value={newUser.full_name}
+                  onChange={e => setNewUser({ ...newUser, full_name: e.target.value })}
+                  size="small"
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={4}>
+                <TextField
+                  required
+                  label="Kodeord"
+                  type={showPassword ? "text" : "password"}
+                  value={newUser.password}
+                  onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                  size="small"
+                  fullWidth
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => setShowPassword((show) => !show)}
+                          edge="end"
+                          tabIndex={-1}
+                          size="small"
+                          sx={{ fontSize: 18 }}
+                        >
+                          {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={4}>
+                <TextField
+                  required
+                  label="Gentag kodeord"
+                  type={showPassword2 ? "text" : "password"}
+                  value={newUser.password2}
+                  onChange={e => setNewUser({ ...newUser, password2: e.target.value })}
+                  size="small"
+                  fullWidth
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => setShowPassword2((show) => !show)}
+                          edge="end"
+                          tabIndex={-1}
+                          size="small"
+                          sx={{ fontSize: 18 }}
+                        >
+                          {showPassword2 ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6} lg={3}>
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="rolle-label">Rolle</InputLabel>
                   <Select
-                    labelId="skole-label"
-                    value={newUser.school_id}
-                    label="Skole"
-                    onChange={e => setNewUser({ ...newUser, school_id: e.target.value })}
+                    labelId="rolle-label"
+                    value={newUser.role}
+                    label="Rolle"
+                    onChange={e => setNewUser({ ...newUser, role: e.target.value, school_id: "" })}
                   >
-                    {getAlphaSchools().map(school => (
-                      <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-                    ))}
+                    <MenuItem value="administrator">Administrator</MenuItem>
+                    <MenuItem value="bruger">Bruger</MenuItem>
                   </Select>
                 </FormControl>
+              </Grid>
+              {newUser.role === "bruger" && (
+                <Grid item xs={12} md={6} lg={3}>
+                  <FormControl size="small" fullWidth>
+                    <InputLabel id="skole-label">Skole</InputLabel>
+                    <Select
+                      labelId="skole-label"
+                      value={newUser.school_id}
+                      label="Skole"
+                      onChange={e => setNewUser({ ...newUser, school_id: e.target.value })}
+                    >
+                      {getAlphaSchools().map(school => (
+                        <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
               )}
-              <FormControl size="small" sx={inputSx} fullWidth>
-                <InputLabel id="status-label">Status</InputLabel>
-                <Select
-                  labelId="status-label"
-                  value={newUser.is_active ? "true" : "false"}
-                  label="Status"
-                  onChange={e => setNewUser({ ...newUser, is_active: e.target.value === "true" })}
-                >
-                  <MenuItem value="true">Aktiv</MenuItem>
-                  <MenuItem value="false">Spærret</MenuItem>
-                </Select>
-              </FormControl>
-            </Stack>
+              <Grid item xs={12} md={6} lg={3}>
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="status-label">Status</InputLabel>
+                  <Select
+                    labelId="status-label"
+                    value={newUser.is_active ? "true" : "false"}
+                    label="Status"
+                    onChange={e => setNewUser({ ...newUser, is_active: e.target.value === "true" })}
+                  >
+                    <MenuItem value="true">Aktiv</MenuItem>
+                    <MenuItem value="false">Spærret</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, mt: 2 }}>
               <Button variant="contained" onClick={handleAddUser}>
                 Opret bruger
@@ -506,16 +529,16 @@ export default function UserAdministration() {
               <DialogContent>
                 {editUser && (
                   <Stack gap={2} sx={{ mt: 1 }}>
-                    <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" sx={inputSx} />
+                    <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" />
                     <TextField
+                      required
                       label="Fuldt navn"
                       value={editUser.full_name || ""}
                       onChange={e => setEditUser({ ...editUser, full_name: e.target.value })}
                       fullWidth
                       size="small"
-                      sx={inputSx}
                     />
-                    <FormControl fullWidth size="small" sx={inputSx}>
+                    <FormControl fullWidth size="small">
                       <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                       <Select
                         labelId="edit-rolle-label"
@@ -528,7 +551,7 @@ export default function UserAdministration() {
                         <MenuItem value="bruger">Bruger</MenuItem>
                       </Select>
                     </FormControl>
-                    <FormControl fullWidth size="small" sx={inputSx}>
+                    <FormControl fullWidth size="small">
                       <InputLabel id="edit-status-label">Status</InputLabel>
                       <Select
                         labelId="edit-status-label"
@@ -549,7 +572,6 @@ export default function UserAdministration() {
                           onChange={e => setEditUser({ ...editUser, password: e.target.value })}
                           fullWidth
                           size="small"
-                          sx={inputSx}
                           InputProps={{
                             endAdornment: (
                               <InputAdornment position="end">
@@ -573,7 +595,6 @@ export default function UserAdministration() {
                           onChange={e => setEditUser({ ...editUser, password2: e.target.value })}
                           fullWidth
                           size="small"
-                          sx={inputSx}
                           InputProps={{
                             endAdornment: (
                               <InputAdornment position="end">
