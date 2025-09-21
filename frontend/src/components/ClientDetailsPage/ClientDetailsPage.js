@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Grid, Card, Typography, CircularProgress, Snackbar, Alert as MuiAlert } from "@mui/material";
-import { useParams } from "react-router-dom";
+import { Box, Grid, Card, Typography } from "@mui/material";
 import ClientDetailsHeaderSection from "./ClientDetailsHeaderSection";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
 import ClientDetailsActionsSection from "./ClientDetailsActionsSection";
@@ -14,18 +13,18 @@ import {
   openRemoteDesktop,
   getClient,
 } from "../../api";
-import { useAuth } from "../../auth/authcontext";
 
-export default function ClientDetailsPage() {
-  const { id } = useParams();
-  const { token } = useAuth();
-
-  const [client, setClient] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
-
-  // Local edit states
+export default function ClientDetailsPage({
+  client,
+  refreshing,
+  handleRefresh,
+  markedDays,
+  calendarLoading,
+  streamKey,
+  onRestartStream,
+  snackbar,
+  handleCloseSnackbar
+}) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
   const [savingLocality, setSavingLocality] = useState(false);
@@ -37,14 +36,13 @@ export default function ClientDetailsPage() {
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
 
-  const [liveChromeStatus, setLiveChromeStatus] = useState("unknown");
-  const [liveChromeColor, setLiveChromeColor] = useState(null);
-  const [lastSeen, setLastSeen] = useState(null);
-  const [uptime, setUptime] = useState(null);
+  const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status || "unknown");
+  const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color || null);
+  const [lastSeen, setLastSeen] = useState(client?.last_seen || null);
+  const [uptime, setUptime] = useState(client?.uptime || null);
 
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
 
-  // Livestream-related state
   const [loadingStartLivestream, setLoadingStartLivestream] = useState(false);
   const [loadingStopLivestream, setLoadingStopLivestream] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
@@ -72,30 +70,6 @@ export default function ClientDetailsPage() {
     return () => clearInterval(interval);
   }, [client?.id]);
 
-  // Fetch client data by id from API
-  useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-    setNotFound(false);
-    getClient(id)
-      .then((data) => {
-        setClient(data);
-        setLoading(false);
-        setLocality(data.locality || "");
-        setKioskUrl(data.kiosk_url || "");
-        setLiveChromeStatus(data.chrome_status || "unknown");
-        setLiveChromeColor(data.chrome_color || null);
-        setLastSeen(data.last_seen || null);
-        setUptime(data.uptime || null);
-      })
-      .catch((err) => {
-        setNotFound(true);
-        setLoading(false);
-        setSnackbar({ open: true, message: err.message || "Ingen adgang eller klient ikke fundet", severity: "error" });
-      });
-  }, [id, token]);
-
-  // Keep locality/kioskUrl in sync unless user is editing
   useEffect(() => {
     if (client) {
       if (!localityDirty) setLocality(client.locality || "");
@@ -105,16 +79,17 @@ export default function ClientDetailsPage() {
       setLastSeen(client.last_seen || null);
       setUptime(client.uptime || null);
     }
-    // eslint-disable-next-line
   }, [client]);
 
-  // Snackbar-håndtering
-  const handleShowSnackbar = (message, severity = "success") => {
-    setSnackbar({ open: true, message, severity });
+  // showSnackbar bruges kun til lokale handlinger (Gem osv.)
+  const showSnackbar = (message, severity = "success") => {
+    // Her skal du KUN bruge denne funktion til lokale beskeder, ikke til refresh!
+    // Refresh-snackbar styres i wrapperen.
+    if (snackbar && typeof snackbar === "function") {
+      snackbar({ open: true, message, severity });
+    }
   };
-  const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "info" });
 
-  // Handlers for local editing
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -124,9 +99,9 @@ export default function ClientDetailsPage() {
     try {
       await updateClient(client.id, { locality });
       setLocalityDirty(false);
-      handleShowSnackbar("Lokation gemt!", "success");
+      showSnackbar("Lokation gemt!", "success");
     } catch (err) {
-      handleShowSnackbar("Kunne ikke gemme lokation: " + err.message, "error");
+      showSnackbar("Kunne ikke gemme lokation: " + err.message, "error");
     }
     setSavingLocality(false);
   };
@@ -140,9 +115,9 @@ export default function ClientDetailsPage() {
     try {
       await pushKioskUrl(client.id, kioskUrl);
       setKioskUrlDirty(false);
-      handleShowSnackbar("Kiosk webadresse opdateret!", "success");
+      showSnackbar("Kiosk webadresse opdateret!", "success");
     } catch (err) {
-      handleShowSnackbar("Kunne ikke opdatere kiosk webadresse: " + err.message, "error");
+      showSnackbar("Kunne ikke opdatere kiosk webadresse: " + err.message, "error");
     }
     setSavingKioskUrl(false);
   };
@@ -151,10 +126,10 @@ export default function ClientDetailsPage() {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
       await clientAction(client.id, action);
-      handleShowSnackbar("Handlingen blev udført!", "success");
+      showSnackbar("Handlingen blev udført!", "success");
       // status opdateres i polleren
     } catch (err) {
-      handleShowSnackbar("Fejl: " + err.message, "error");
+      showSnackbar("Fejl: " + err.message, "error");
     }
     setActionLoading((prev) => ({ ...prev, [action]: false }));
   };
@@ -171,104 +146,71 @@ export default function ClientDetailsPage() {
   }, [client?.id]);
   // --- SLUT AUTOMATISK START ---
 
-  if (loading) {
+  if (!client) {
     return (
-      <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, textAlign: "center" }}>
-        <CircularProgress />
-        <Typography variant="h6" sx={{ mt: 2 }}>Indlæser klientdata...</Typography>
-      </Box>
-    );
-  }
-
-  if (notFound || !client) {
-    return (
-      <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
+      <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4 }}>
         <Card sx={{ p: 3 }}>
-          <Typography variant="h6" color="error">
-            Klienten blev ikke fundet eller du har ikke adgang.
-          </Typography>
+          <Typography variant="h6">Klientdata indlæses...</Typography>
         </Card>
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={3500}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
-          <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
-            {snackbar.message}
-          </MuiAlert>
-        </Snackbar>
       </Box>
     );
   }
 
   return (
-    <>
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3400}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
-          {snackbar.message}
-        </MuiAlert>
-      </Snackbar>
-      <Box sx={{ maxWidth: 1200, mx: "auto", mt: 3 }}>
-        <ClientDetailsHeaderSection
-          client={client}
-          locality={locality}
-          localityDirty={localityDirty}
-          savingLocality={savingLocality}
-          handleLocalityChange={handleLocalityChange}
-          handleLocalitySave={handleLocalitySave}
-          kioskUrl={kioskUrl}
-          kioskUrlDirty={kioskUrlDirty}
-          savingKioskUrl={savingKioskUrl}
-          handleKioskUrlChange={handleKioskUrlChange}
-          handleKioskUrlSave={handleKioskUrlSave}
-          liveChromeStatus={liveChromeStatus}
-          liveChromeColor={liveChromeColor}
-          refreshing={false}
-          handleRefresh={() => {}}
-          snackbar={handleShowSnackbar}
-          handleCloseSnackbar={handleCloseSnackbar}
-        />
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <ClientDetailsLivestreamSection
-              clientId={client?.id}
-              key={client?.id}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <ClientDetailsInfoSection
-              client={client}
-              markedDays={undefined}
-              uptime={uptime}
-              lastSeen={lastSeen}
-              calendarDialogOpen={calendarDialogOpen}
-              setCalendarDialogOpen={setCalendarDialogOpen}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <ClientDetailsActionsSection
-              clientId={client?.id}
-              actionLoading={actionLoading}
-              handleClientAction={handleClientAction}
-              handleOpenTerminal={handleOpenTerminal}
-              handleOpenRemoteDesktop={handleOpenRemoteDesktop}
-              shutdownDialogOpen={shutdownDialogOpen}
-              setShutdownDialogOpen={setShutdownDialogOpen}
-            />
-          </Grid>
+    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 3 }}>
+      <ClientDetailsHeaderSection
+        client={client}
+        locality={locality}
+        localityDirty={localityDirty}
+        savingLocality={savingLocality}
+        handleLocalityChange={handleLocalityChange}
+        handleLocalitySave={handleLocalitySave}
+        kioskUrl={kioskUrl}
+        kioskUrlDirty={kioskUrlDirty}
+        savingKioskUrl={savingKioskUrl}
+        handleKioskUrlChange={handleKioskUrlChange}
+        handleKioskUrlSave={handleKioskUrlSave}
+        liveChromeStatus={liveChromeStatus}
+        liveChromeColor={liveChromeColor}
+        refreshing={refreshing}
+        handleRefresh={handleRefresh}
+        snackbar={snackbar}
+        handleCloseSnackbar={handleCloseSnackbar}
+      />
+      <Grid container spacing={2}>
+        <Grid item xs={12}>
+          <ClientDetailsLivestreamSection
+            clientId={client?.id}
+            key={streamKey}
+          />
         </Grid>
-        <ClientCalendarDialog
-          open={calendarDialogOpen}
-          onClose={() => setCalendarDialogOpen(false)}
-          clientId={client.id}
-        />
-      </Box>
-    </>
+        <Grid item xs={12}>
+          <ClientDetailsInfoSection
+            client={client}
+            markedDays={markedDays}
+            uptime={uptime}
+            lastSeen={lastSeen}
+            calendarDialogOpen={calendarDialogOpen}
+            setCalendarDialogOpen={setCalendarDialogOpen}
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <ClientDetailsActionsSection
+            clientId={client?.id}
+            actionLoading={actionLoading}
+            handleClientAction={handleClientAction}
+            handleOpenTerminal={handleOpenTerminal}
+            handleOpenRemoteDesktop={handleOpenRemoteDesktop}
+            shutdownDialogOpen={shutdownDialogOpen}
+            setShutdownDialogOpen={setShutdownDialogOpen}
+          />
+        </Grid>
+      </Grid>
+      <ClientCalendarDialog
+        open={calendarDialogOpen}
+        onClose={() => setCalendarDialogOpen(false)}
+        clientId={client.id}
+      />
+    </Box>
   );
 }
