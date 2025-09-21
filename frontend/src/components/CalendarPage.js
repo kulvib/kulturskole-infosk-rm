@@ -266,8 +266,6 @@ export default function CalendarPage() {
     }
   }, [user, filteredClients]);
 
-  // ------------------------------------------------
-
   useEffect(() => {
     if (!activeClient) return;
     setMarkedDays(prev => ({ ...prev, [activeClient]: undefined }));
@@ -594,43 +592,47 @@ export default function CalendarPage() {
   // ----------- RENDER -----------
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4, fontFamily: "inherit" }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Vælg skole:
-          </Typography>
-          <Select
-            size="small"
-            value={selectedSchool}
-            displayEmpty
-            onChange={handleSchoolChange}
-            sx={{ minWidth: 180 }}
-            disabled={user?.role === "bruger"}
-          >
-            <MenuItem value="">Alle skoler</MenuItem>
-            <MenuItem disabled>--------</MenuItem>
-            {sortedSchools.map(school => (
-              <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-            ))}
-          </Select>
-        </Box>
-        <Tooltip title="Opdater klienter">
-          <span>
-            <Button
-              startIcon={
-                loadingClients
-                  ? <CircularProgress size={20} />
-                  : <RefreshIcon />
-              }
-              onClick={fetchClients}
-              disabled={loadingClients}
-              sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
-            >
-              {loadingClients ? "Opdaterer..." : "Opdater"}
-            </Button>
-          </span>
-        </Tooltip>
-      </Stack>
+      {/* Paper omkring Vælg skole: dropdown kun for admin */}
+      {user?.role === "admin" && (
+        <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Vælg skole:
+              </Typography>
+              <Select
+                size="small"
+                value={selectedSchool}
+                displayEmpty
+                onChange={e => setSelectedSchool(e.target.value)}
+                sx={{ minWidth: 180 }}
+              >
+                <MenuItem value="">Alle skoler</MenuItem>
+                <MenuItem disabled>--------</MenuItem>
+                {sortedSchools.map(school => (
+                  <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                ))}
+              </Select>
+            </Box>
+            <Tooltip title="Opdater klienter">
+              <span>
+                <Button
+                  startIcon={
+                    loadingClients
+                      ? <CircularProgress size={20} />
+                      : <RefreshIcon />
+                  }
+                  onClick={fetchClients}
+                  disabled={loadingClients}
+                  sx={{ minWidth: 0, fontWeight: 500, textTransform: "none" }}
+                >
+                  {loadingClients ? "Opdaterer..." : "Opdater"}
+                </Button>
+              </span>
+            </Tooltip>
+          </Stack>
+        </Paper>
+      )}
 
       <Paper elevation={2} sx={{ p: 2, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
         {loadingClients && (
@@ -650,7 +652,6 @@ export default function CalendarPage() {
           schools={schools}
           disabled={false}
         />
-        {/* Gem-knap for flere klienter vises for både admin og bruger hvis flere klienter valgt */}
         {selectedClients.length > 1 && (
           <Box sx={{
             mt: 2,
@@ -684,12 +685,6 @@ export default function CalendarPage() {
               {savingCalendar ? "Gemmer..." : "Gem kalender for valgte klienter"}
             </Button>
           </Box>
-        )}
-        {/* Bruger ser info */}
-        {user?.role === "bruger" && (
-          <Typography sx={{ mt: 2, mb: 1, color: "primary.main", fontWeight: 500 }}>
-            Du kan kun se og redigere klienter fra din egen skole.
-          </Typography>
         )}
       </Paper>
 
