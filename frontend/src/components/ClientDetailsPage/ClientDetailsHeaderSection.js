@@ -7,8 +7,6 @@ import {
   Button,
   CircularProgress,
   Tooltip,
-  Snackbar,
-  Alert as MuiAlert,
   Table,
   TableBody,
   TableCell,
@@ -152,9 +150,8 @@ export default function ClientDetailsHeaderSection({
   liveChromeStatus,
   liveChromeColor,
   refreshing,
-  handleRefresh,
-  snackbar,
-  handleCloseSnackbar,
+  handleRefresh
+  // snackbar og handleCloseSnackbar ER FJERNET
 }) {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -194,16 +191,6 @@ export default function ClientDetailsHeaderSection({
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto", mt: isMobile ? 1 : 3 }}>
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3500}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
-          {snackbar.message}
-        </MuiAlert>
-      </Snackbar>
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", mb: 1, gap: isMobile ? 1 : 0 }}>
         <Button
           variant="outlined"
