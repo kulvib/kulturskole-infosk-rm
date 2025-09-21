@@ -9,7 +9,6 @@ import {
   IconButton,
   Tooltip,
   Grid,
-  Button,
   Stack,
   Divider,
   useMediaQuery
@@ -17,6 +16,7 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import { useTheme, alpha } from "@mui/material/styles";
+import { useAuth } from "../../auth/authcontext";
 
 // Helper functions
 async function fetchLatestProgramDateTime(hlsUrl) {
@@ -109,6 +109,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { user } = useAuth();
 
   // --- NYT: State for at vise fullscreen overlay-knap ---
   const [showControls, setShowControls] = useState(false);
@@ -586,107 +587,109 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             )}
           </Box>
         </Grid>
-        {/* Kolonne 3 */}
-        <Grid item xs={12} md={4} minWidth={0}>
-          <Stack spacing={1}>
-            <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
-              Klient ID: {clientId}
-            </Typography>
-            {(manifestProgramDateTime || lastSegmentTimestamp) && (
+        {/* Kolonne 3 - kun for admin */}
+        {user?.role === "admin" && (
+          <Grid item xs={12} md={4} minWidth={0}>
+            <Stack spacing={1}>
               <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
-                Sidste manifest hentet:{" "}
-                {manifestProgramDateTime
-                  ? formatDateTimeWithDay(new Date(manifestProgramDateTime))
-                  : lastSegmentTimestamp
-                    ? formatDateTimeWithDay(new Date(lastSegmentTimestamp))
-                    : ""}
+                Klient ID: {clientId}
               </Typography>
-            )}
-            {lastFetched && (
-              <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
-                Sidste kontakt til serveren: {formatDateTimeWithDay(lastFetched)}
-              </Typography>
-            )}
-            <Divider sx={{ my: isMobile ? 0.5 : 1 }} />
-            <Box
-              sx={{
-                background: "#f7f7f7",
-                borderRadius: 1,
-                p: 1,
-                mt: 1,
-                mb: 1,
-                display: 'inline-block'
-              }}
-            >
-              <Typography
-                variant="caption"
+              {(manifestProgramDateTime || lastSegmentTimestamp) && (
+                <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
+                  Sidste manifest hentet:{" "}
+                  {manifestProgramDateTime
+                    ? formatDateTimeWithDay(new Date(manifestProgramDateTime))
+                    : lastSegmentTimestamp
+                      ? formatDateTimeWithDay(new Date(lastSegmentTimestamp))
+                      : ""}
+                </Typography>
+              )}
+              {lastFetched && (
+                <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
+                  Sidste kontakt til serveren: {formatDateTimeWithDay(lastFetched)}
+                </Typography>
+              )}
+              <Divider sx={{ my: isMobile ? 0.5 : 1 }} />
+              <Box
                 sx={{
-                  color: "#111",
-                  fontFamily: '"Courier New", Courier, monospace',
-                  fontWeight: 700,
-                  letterSpacing: 0.2,
-                  display: "block",
-                  mb: 0.5,
-                  fontSize: isMobile ? 11 : undefined,
+                  background: "#f7f7f7",
+                  borderRadius: 1,
+                  p: 1,
+                  mt: 1,
+                  mb: 1,
+                  display: 'inline-block'
                 }}
               >
-                Debug info:
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{
-                  color: "#222",
-                  fontFamily: '"Courier New", Courier, monospace',
-                  display: "block",
-                  fontSize: isMobile ? 11 : undefined,
-                }}
-              >
-                <Tooltip title={`Råværdi: ${playerLag ?? "-"}`}>
-                  <span>playerLag=<b>{formatLagValue(playerLag)}</b></span>
-                </Tooltip>
-                ,{" "}
-                <Tooltip title={`Råværdi: ${manifestProgramLag ?? "-"}`}>
-                  <span>manifestProgramLag=<b>{formatLagValue(manifestProgramLag)}</b></span>
-                </Tooltip>
-                ,{" "}
-                <Tooltip title={`Råværdi: ${lastSegmentLag ?? "-"}`}>
-                  <span>backendLag=<b>{formatLagValue(lastSegmentLag)}</b></span>
-                </Tooltip>
-                , lagType=<b>{lagType}</b>
-              </Typography>
-              {!isSafari() && (
                 <Typography
                   variant="caption"
                   sx={{
-                    color: "#444",
+                    color: "#111",
                     fontFamily: '"Courier New", Courier, monospace',
-                    textAlign: "left",
-                    mt: 1,
+                    fontWeight: 700,
+                    letterSpacing: 0.2,
+                    display: "block",
+                    mb: 0.5,
                     fontSize: isMobile ? 11 : undefined,
                   }}
                 >
-                  Segment: <b>{currentSegment}</b>
+                  Debug info:
                 </Typography>
-              )}
-              {isSafari() && (
-                <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
-                  <span role="img" aria-label="advarsel" style={{ fontSize: "1.2em", marginRight: 4 }}>⚠️</span>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: "#222",
+                    fontFamily: '"Courier New", Courier, monospace',
+                    display: "block",
+                    fontSize: isMobile ? 11 : undefined,
+                  }}
+                >
+                  <Tooltip title={`Råværdi: ${playerLag ?? "-"}`}>
+                    <span>playerLag=<b>{formatLagValue(playerLag)}</b></span>
+                  </Tooltip>
+                  ,{" "}
+                  <Tooltip title={`Råværdi: ${manifestProgramLag ?? "-"}`}>
+                    <span>manifestProgramLag=<b>{formatLagValue(manifestProgramLag)}</b></span>
+                  </Tooltip>
+                  ,{" "}
+                  <Tooltip title={`Råværdi: ${lastSegmentLag ?? "-"}`}>
+                    <span>backendLag=<b>{formatLagValue(lastSegmentLag)}</b></span>
+                  </Tooltip>
+                  , lagType=<b>{lagType}</b>
+                </Typography>
+                {!isSafari() && (
                   <Typography
                     variant="caption"
                     sx={{
-                      color: "#b25c00",
+                      color: "#444",
                       fontFamily: '"Courier New", Courier, monospace',
-                      fontWeight: 700,
+                      textAlign: "left",
+                      mt: 1,
                       fontSize: isMobile ? 11 : undefined,
                     }}
                   >
-                    Safari: Segmentnummer vises ikke. Forsinkelse er kun estimeret ud fra serverens sidste segment.
+                    Segment: <b>{currentSegment}</b>
                   </Typography>
-                </Box>
-              )}
-            </Box>
-          </Stack>
-        </Grid>
+                )}
+                {isSafari() && (
+                  <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+                    <span role="img" aria-label="advarsel" style={{ fontSize: "1.2em", marginRight: 4 }}>⚠️</span>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#b25c00",
+                        fontFamily: '"Courier New", Courier, monospace',
+                        fontWeight: 700,
+                        fontSize: isMobile ? 11 : undefined,
+                      }}
+                    >
+                      Safari: Segmentnummer vises ikke. Forsinkelse er kun estimeret ud fra serverens sidste segment.
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Stack>
+          </Grid>
+        )}
       </Grid>
       <style>
         {`
