@@ -133,9 +133,8 @@ function ClientStatusCell({ isOnline }) {
 export default function ClientInfoPage() {
   const { token, user } = useAuth();
   const theme = useTheme();
-  // Korrekt brug af useMediaQuery med ThemeProvider
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md")); // 600-899px
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
   const isSmall = isMobile || isTablet;
 
   const [clients, setClients] = useState([]);
@@ -146,11 +145,9 @@ export default function ClientInfoPage() {
   const [dragClients, setDragClients] = useState([]);
   const lastFetchedClients = useRef([]);
 
-  // Dialog state for delete
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmClientId, setConfirmClientId] = useState(null);
 
-  // Snackbar state
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const showSnackbar = (message, severity = "success") => {
@@ -161,8 +158,6 @@ export default function ClientInfoPage() {
     setSnackbar({ open: false, message: "", severity: "success" });
   };
 
-  // Hent klienter fra API, kun opdatér hvis der er ændringer
-  // Brug showLoading=true for første load og manuel refresh, false for polling
   const fetchClients = async (forceUpdate = false, showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
@@ -186,7 +181,6 @@ export default function ClientInfoPage() {
       fetchClients(false, false);
     }, 5000);
     return () => clearInterval(timer);
-    // eslint-disable-next-line
   }, [token, user?.role]);
 
   useEffect(() => {
@@ -262,7 +256,6 @@ export default function ClientInfoPage() {
     }
   };
 
-  // O P D A T E R - K N A P P E N : Nu får du også en grøn snackbar "Opdateret!" efter tryk
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchClients(true, true);
@@ -370,7 +363,6 @@ export default function ClientInfoPage() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
-      {/* Dialog til bekræft sletning */}
       <Dialog open={confirmOpen} onClose={closeRemoveDialog}>
         <DialogTitle>Er du sikker?</DialogTitle>
         <DialogContent>
@@ -435,10 +427,11 @@ export default function ClientInfoPage() {
                   {...provided.droppableProps}
                   sx={{
                     minWidth: 300,
+                    // Kun desktop (sm+): fontSize 0.875rem, mobil/tablet: 0.98em/1em
                     "& td, & th": {
                       py: { xs: 1, sm: 1.2 },
                       px: { xs: 0.5, sm: 2 },
-                      fontSize: { xs: "0.98em", sm: "1em" }
+                      fontSize: { xs: "0.98em", sm: "0.875rem" }
                     }
                   }}
                 >
@@ -447,12 +440,11 @@ export default function ClientInfoPage() {
                       background: "#f6f9fc",
                       "& th": {
                         fontWeight: 700,
-                        fontSize: { xs: "1em", sm: "1.08em" },
+                        fontSize: { xs: "1em", sm: "0.875rem" },
                         whiteSpace: { xs: "nowrap", sm: "normal" }
                       }
                     }}>
                       {isMobile ? (
-                        // Mobil header: kompakt
                         [
                           ...(isAdmin ? ["ID"] : []),
                           "Klientnavn",
@@ -563,7 +555,6 @@ export default function ClientInfoPage() {
           </DragDropContext>
         </TableContainer>
       </Paper>
-      {/* Ikke godkendte klienter kun for admin */}
       {isAdmin && (
         <>
           <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, fontSize: { xs: "1.1rem", sm: "1.4rem" } }}>
@@ -577,13 +568,13 @@ export default function ClientInfoPage() {
                   "& td, & th": {
                     py: { xs: 1, sm: 1.2 },
                     px: { xs: 0.5, sm: 2 },
-                    fontSize: { xs: "0.98em", sm: "1em" }
+                    fontSize: { xs: "0.98em", sm: "0.875rem" }
                   }
                 }}>
                 <TableHead>
                   <TableRow sx={{
                     background: "#f6f9fc",
-                    "& th": { fontWeight: 700, fontSize: { xs: "1em", sm: "1.08em" }, whiteSpace: { xs: "nowrap", sm: "normal" } }
+                    "& th": { fontWeight: 700, fontSize: { xs: "1em", sm: "0.875rem" }, whiteSpace: { xs: "nowrap", sm: "normal" } }
                   }}>
                     <TableCell sx={{ width: "12.5%" }}>Klient ID</TableCell>
                     <TableCell sx={{ width: "12.5%" }}>Klientnavn</TableCell>
@@ -653,7 +644,7 @@ export default function ClientInfoPage() {
                             value={schoolSelections[client.id] || ""}
                             displayEmpty
                             onChange={e => handleSchoolChange(client.id, e.target.value)}
-                            sx={{ minWidth: { xs: 70, sm: 120 }, fontSize: { xs: "0.97em", sm: "1em" } }}
+                            sx={{ minWidth: { xs: 70, sm: 120 }, fontSize: { xs: "0.97em", sm: "0.875rem" } }}
                           >
                             <MenuItem value="">Vælg skole</MenuItem>
                             {schools.map(school => (
@@ -668,7 +659,7 @@ export default function ClientInfoPage() {
                             size="small"
                             startIcon={<AddIcon />}
                             onClick={() => handleApproveClient(client.id)}
-                            sx={{ minWidth: 44, fontSize: { xs: "0.97em", sm: "1em" } }}
+                            sx={{ minWidth: 44, fontSize: { xs: "0.97em", sm: "0.875rem" } }}
                           >
                             Godkend
                           </Button>
