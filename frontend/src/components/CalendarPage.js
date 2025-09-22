@@ -172,7 +172,8 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
               borderRadius: 1,
               cursor: disabled ? "not-allowed" : "pointer",
               ":hover": { background: disabled ? "transparent" : "#f3f6fa" },
-              fontSize: { xs: "0.96rem", sm: "1rem" }
+              // KUN DESKTOP: fontSize 0.875rem, mobil/tablet behold tidligere fontSize
+              fontSize: { xs: "0.96rem", sm: "0.96rem", md: "0.875rem" }
             }}
             onClick={() => {
               if (disabled) return;
@@ -192,7 +193,7 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
               inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
               disabled={disabled}
             />
-            <Typography variant="body2" noWrap sx={{ fontSize: { xs: "0.98rem", sm: "1rem" } }}>
+            <Typography variant="body2" noWrap sx={{ fontSize: { xs: "0.98rem", sm: "0.98rem", md: "0.875rem" } }}>
               {(client.locality || client.name || "Ingen lokalitet") + " – " + getSchoolNameForClient(client)}
             </Typography>
           </Box>
