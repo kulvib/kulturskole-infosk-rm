@@ -13,22 +13,40 @@ export default function AdminPage() {
           <Button
             onClick={() => setActiveTab("school")}
             color={activeTab === "school" ? "primary" : "inherit"}
-            sx={{ fontWeight: activeTab === "school" ? 700 : 400 }}
+            sx={{
+              fontWeight: activeTab === "school" ? 700 : 400,
+              borderRight: "2px solid #e0e0e0", // Adskil knapper visuelt
+              minWidth: 170
+            }}
           >
             Skoleadministration
           </Button>
           <Button
             onClick={() => setActiveTab("user")}
             color={activeTab === "user" ? "primary" : "inherit"}
-            sx={{ fontWeight: activeTab === "user" ? 700 : 400 }}
+            sx={{
+              fontWeight: activeTab === "user" ? 700 : 400,
+              minWidth: 170
+            }}
           >
             Brugeradministration
           </Button>
         </ButtonGroup>
       </Paper>
 
-      {activeTab === "school" && <SchoolAdministration />}
-      {activeTab === "user" && <UserAdministration />}
+      {/* Lille afstand mellem faner og indhold */}
+      <Box sx={{ mb: 2 }} />
+
+      {activeTab === "school" && (
+        <Box sx={{ mb: 4 }}>
+          <SchoolAdministration />
+        </Box>
+      )}
+      {activeTab === "user" && (
+        <Box sx={{ mb: 4 }}>
+          <UserAdministration />
+        </Box>
+      )}
     </Box>
   );
 }
