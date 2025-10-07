@@ -38,12 +38,36 @@ import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
+function generateSecurePassword() {
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const digits = "0123456789";
+  const specials = "!@#$%&*";
+  let password = "";
+  password += lower[Math.floor(Math.random() * lower.length)];
+  password += upper[Math.floor(Math.random() * upper.length)];
+  password += digits[Math.floor(Math.random() * digits.length)];
+  for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) {
+    password += specials[Math.floor(Math.random() * specials.length)];
+  }
+  // Fill to length 12
+  const all = lower + upper + digits + specials;
+  for (let i = password.length; i < 12; i++) {
+    password += all[Math.floor(Math.random() * all.length)];
+  }
+  // Shuffle
+  return password
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
+}
+
 export default function UserAdministration() {
   const [users, setUsers] = useState([]);
   const [userError, setUserError] = useState("");
   const [newUser, setNewUser] = useState({
     username: "",
-    password: "",
+    password: generateSecurePassword(),
     full_name: "",
     role: "bruger",
     is_active: true,
@@ -59,9 +83,6 @@ export default function UserAdministration() {
   const [deleteUserError, setDeleteUserError] = useState("");
   const [deleteUserStep, setDeleteUserStep] = useState(1);
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showEditPassword, setShowEditPassword] = useState(false);
-
   const [userSort, setUserSort] = useState({ key: "username", direction: "asc" });
   const [userSearch, setUserSearch] = useState("");
 
@@ -73,7 +94,7 @@ export default function UserAdministration() {
   const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
 
   // Download user info state for new user
-  const [newUserDownloadInfo, setNewUserDownloadInfo] = useState(null); // {full_name, username, password, schoolName}
+  const [newUserDownloadInfo, setNewUserDownloadInfo] = useState(null);
   const [showDownloadButton, setShowDownloadButton] = useState(false);
   const [downloadCountdown, setDownloadCountdown] = useState(10);
 
@@ -106,20 +127,39 @@ export default function UserAdministration() {
       .finally(() => setLoadingSchools(false));
   }, []);
 
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-
-  // Generer kodeord funktion (uden ikon)
-  const generatePassword = (forEdit = false) => {
-    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let password = "";
-    for (let i = 0; i < 12; i++) {
-      password += charset[Math.floor(Math.random() * charset.length)];
+  // Download-knap timer for ny bruger
+  useEffect(() => {
+    let timer;
+    if (showDownloadButton && downloadCountdown > 0) {
+      timer = setTimeout(() => setDownloadCountdown(downloadCountdown - 1), 1000);
+    } else if (downloadCountdown === 0) {
+      setShowDownloadButton(false);
+      setNewUserDownloadInfo(null);
+      setDownloadCountdown(10);
     }
+    return () => clearTimeout(timer);
+  }, [showDownloadButton, downloadCountdown]);
+
+  // Download-knap timer for rediger bruger
+  useEffect(() => {
+    let timer;
+    if (showEditDownloadButton && editDownloadCountdown > 0) {
+      timer = setTimeout(() => setEditDownloadCountdown(editDownloadCountdown - 1), 1000);
+    } else if (editDownloadCountdown === 0) {
+      setShowEditDownloadButton(false);
+      setEditUserDownloadInfo(null);
+      setEditDownloadCountdown(10);
+    }
+    return () => clearTimeout(timer);
+  }, [showEditDownloadButton, editDownloadCountdown]);
+
+  // Generer kodeord funktion (uden ikon og altid autogenereret)
+  const handleGeneratePassword = (forEdit = false) => {
+    const password = generateSecurePassword();
     if (forEdit) {
       setEditUser(editUser => ({ ...editUser, password }));
       // Show download button for edit user dialog
-      // Find skole-navn
-      const schoolName = editUser?.role === "bruger"
+      const schoolName = (editUser?.role === "bruger" && editUser?.school_id)
         ? (getAlphaSchools().find(s => s.id === editUser.school_id)?.name ?? "")
         : "";
       setEditUserDownloadInfo({
@@ -154,32 +194,6 @@ Kodeord: ${info.password}
     setTimeout(() => document.body.removeChild(link), 100);
   };
 
-  // Download-knap timer for ny bruger
-  useEffect(() => {
-    let timer;
-    if (showDownloadButton && downloadCountdown > 0) {
-      timer = setTimeout(() => setDownloadCountdown(downloadCountdown - 1), 1000);
-    } else if (downloadCountdown === 0) {
-      setShowDownloadButton(false);
-      setNewUserDownloadInfo(null);
-      setDownloadCountdown(10);
-    }
-    return () => clearTimeout(timer);
-  }, [showDownloadButton, downloadCountdown]);
-
-  // Download-knap timer for rediger bruger
-  useEffect(() => {
-    let timer;
-    if (showEditDownloadButton && editDownloadCountdown > 0) {
-      timer = setTimeout(() => setEditDownloadCountdown(editDownloadCountdown - 1), 1000);
-    } else if (editDownloadCountdown === 0) {
-      setShowEditDownloadButton(false);
-      setEditUserDownloadInfo(null);
-      setEditDownloadCountdown(10);
-    }
-    return () => clearTimeout(timer);
-  }, [showEditDownloadButton, editDownloadCountdown]);
-
   const handleAddUser = () => {
     setUserError("");
     const { username, password, full_name, role, is_active, school_id, remarks } = newUser;
@@ -191,11 +205,6 @@ Kodeord: ${info.password}
     if (!full_name) {
       setUserError("Fuldt navn skal udfyldes");
       showSnackbar("Fuldt navn skal udfyldes", "error");
-      return;
-    }
-    if (!passwordRegex.test(password)) {
-      setUserError("Kodeordet skal være mindst 8 tegn langt og indeholde både store og små bogstaver samt tal.");
-      showSnackbar("Kodeordet skal være mindst 8 tegn langt og indeholde både store og små bogstaver samt tal.", "error");
       return;
     }
     if (role === "bruger" && !school_id) {
@@ -216,9 +225,8 @@ Kodeord: ${info.password}
     })
       .then(res => {
         setUsers(Array.isArray(users) ? [...users, res.data] : [res.data]);
-        setNewUser({ username: "", password: "", full_name: "", role: "bruger", is_active: true, school_id: "", remarks: "" });
+        setNewUser({ username: "", password: generateSecurePassword(), full_name: "", role: "bruger", is_active: true, school_id: "", remarks: "" });
         showSnackbar("Bruger oprettet!", "success");
-        // Find skole-navn
         const schoolName = role === "bruger"
           ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
           : "";
@@ -270,7 +278,7 @@ Kodeord: ${info.password}
   };
 
   const openEditUserDialog = (user) => {
-    setEditUser({ ...user, password: "" });
+    setEditUser({ ...user, password: generateSecurePassword() });
     setUserDialogOpen(true);
     setUserError("");
     setShowEditDownloadButton(false);
@@ -286,15 +294,10 @@ Kodeord: ${info.password}
       showSnackbar("Fuldt navn skal udfyldes", "error");
       return;
     }
-    if (password && !passwordRegex.test(password)) {
-      setUserError("Kodeordet skal være mindst 8 tegn langt og indeholde både store og små bogstaver samt tal.");
-      showSnackbar("Kodeordet skal være mindst 8 tegn langt og indeholde både store og små bogstaver samt tal.", "error");
-      return;
-    }
     axios.patch(`${API_URL}/api/users/${id}`, {
       role: role === "administrator" ? "admin" : "bruger",
       is_active,
-      password: password ? password : undefined,
+      password,
       full_name,
       school_id: role === "bruger" ? school_id : undefined,
       remarks,
@@ -423,12 +426,12 @@ Kodeord: ${info.password}
                   </Select>
                 </FormControl>
               </Grid>
-              {/* Anden linje: generer kodeord, kodeord, skole */}
+              {/* Anden linje: generer kodeord (autogenereret), kodeord (vis kun), skole */}
               <Grid item xs={12} md={4} sx={{ display: "flex", alignItems: "center" }}>
                 <Button
                   variant="outlined"
                   color="primary"
-                  onClick={() => generatePassword(false)}
+                  onClick={() => handleGeneratePassword(false)}
                   sx={{ mr: 2 }}
                 >
                   Generer kodeord
@@ -438,26 +441,11 @@ Kodeord: ${info.password}
                 <TextField
                   required
                   label="Kodeord"
-                  type={showPassword ? "text" : "password"}
+                  type="text"
                   value={newUser.password}
-                  onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                  disabled
                   size="small"
                   fullWidth
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          onClick={() => setShowPassword((show) => !show)}
-                          edge="end"
-                          tabIndex={-1}
-                          size="small"
-                          sx={{ fontSize: 18 }}
-                        >
-                          {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                        </IconButton>
-                      </InputAdornment>
-                    )
-                  }}
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -503,7 +491,7 @@ Kodeord: ${info.password}
                     color="primary"
                     onClick={() => triggerDownloadUserInfo(newUserDownloadInfo)}
                   >
-                    Download brugerinfo
+                    Download brugerinfo ({downloadCountdown})
                   </Button>
                 )}
               </Box>
@@ -652,7 +640,14 @@ Kodeord: ${info.password}
                         value={editUser.role === "admin" ? "administrator" : "bruger"}
                         label="Rolle"
                         disabled={editUser.role === "admin"}
-                        onChange={e => setEditUser({ ...editUser, role: e.target.value, school_id: "" })}
+                        onChange={e => {
+                          const value = e.target.value;
+                          setEditUser(prev => ({
+                            ...prev,
+                            role: value,
+                            school_id: value === "bruger" ? prev.school_id : ""
+                          }));
+                        }}
                       >
                         <MenuItem value="administrator">Administrator</MenuItem>
                         <MenuItem value="bruger">Bruger</MenuItem>
@@ -698,32 +693,17 @@ Kodeord: ${info.password}
                     <Button
                       variant="outlined"
                       color="primary"
-                      onClick={() => generatePassword(true)}
+                      onClick={() => handleGeneratePassword(true)}
                     >
                       Generer kodeord
                     </Button>
                     <TextField
                       label="Kodeord"
-                      type={showEditPassword ? "text" : "password"}
+                      type="text"
                       value={editUser.password || ""}
-                      onChange={e => setEditUser({ ...editUser, password: e.target.value })}
+                      disabled
                       fullWidth
                       size="small"
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              onClick={() => setShowEditPassword((show) => !show)}
-                              edge="end"
-                              tabIndex={-1}
-                              size="small"
-                              sx={{ fontSize: 18 }}
-                            >
-                              {showEditPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                            </IconButton>
-                          </InputAdornment>
-                        )
-                      }}
                     />
                     {/* Download-knap for genereret kodeord når man redigerer bruger */}
                     {showEditDownloadButton && editUserDownloadInfo && (
@@ -732,7 +712,7 @@ Kodeord: ${info.password}
                         color="primary"
                         onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
                       >
-                        Download brugerinfo
+                        Download brugerinfo ({editDownloadCountdown})
                       </Button>
                     )}
                   </Stack>
