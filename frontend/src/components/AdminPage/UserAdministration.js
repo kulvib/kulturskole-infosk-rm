@@ -25,7 +25,6 @@ import {
   FormControl,
   InputLabel,
   TextField,
-  InputAdornment,
   Grid,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -36,7 +35,6 @@ import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
-// Secure password generator
 function generateSecurePassword() {
   const lower = "abcdefghijklmnopqrstuvwxyz";
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -49,12 +47,10 @@ function generateSecurePassword() {
   for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) {
     password += specials[Math.floor(Math.random() * specials.length)];
   }
-  // Fill to length 12
   const all = lower + upper + digits + specials;
   for (let i = password.length; i < 12; i++) {
     password += all[Math.floor(Math.random() * all.length)];
   }
-  // Shuffle
   return password
     .split("")
     .sort(() => Math.random() - 0.5)
@@ -68,7 +64,7 @@ export default function UserAdministration() {
     username: "",
     password: "",
     full_name: "",
-    role: "bruger",
+    role: "",
     is_active: true,
     school_id: "",
     remarks: "",
@@ -92,12 +88,10 @@ export default function UserAdministration() {
   const showSnackbar = (message, severity = "success") => setSnackbar({ open: true, message, severity });
   const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
 
-  // Download user info state for new user
   const [newUserDownloadInfo, setNewUserDownloadInfo] = useState(null);
   const [showDownloadButton, setShowDownloadButton] = useState(false);
   const [downloadCountdown, setDownloadCountdown] = useState(10);
 
-  // Download user info state for edit dialog
   const [editUserDownloadInfo, setEditUserDownloadInfo] = useState(null);
   const [showEditDownloadButton, setShowEditDownloadButton] = useState(false);
   const [editDownloadCountdown, setEditDownloadCountdown] = useState(10);
@@ -108,7 +102,15 @@ export default function UserAdministration() {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
-        setUsers(Array.isArray(res.data) ? res.data : []);
+        // Map "admin" to "administrator" for dropdown
+        setUsers(
+          Array.isArray(res.data)
+            ? res.data.map(u => ({
+                ...u,
+                role: u.role === "admin" ? "administrator" : u.role,
+              }))
+            : []
+        );
       })
       .catch(() => {
         setUsers([]);
@@ -126,7 +128,6 @@ export default function UserAdministration() {
       .finally(() => setLoadingSchools(false));
   }, []);
 
-  // Download-knap timer for ny bruger
   useEffect(() => {
     let timer;
     if (showDownloadButton && downloadCountdown > 0) {
@@ -139,7 +140,6 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showDownloadButton, downloadCountdown]);
 
-  // Download-knap timer for rediger bruger
   useEffect(() => {
     let timer;
     if (showEditDownloadButton && editDownloadCountdown > 0) {
@@ -152,19 +152,48 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showEditDownloadButton, editDownloadCountdown]);
 
-  // Generer kodeord funktion – nu kun på knaptryk
   const handleGeneratePassword = (forEdit = false) => {
     const password = generateSecurePassword();
     if (forEdit) {
-      setEditUser(editUser => ({ ...editUser, password }));
-      showSnackbar("Kodeord genereret!", "info");
+      setEditUser(editUser => {
+        const updated = { ...editUser, password };
+        // Prepare download info
+        const schoolName =
+          updated.role === "bruger" && updated.school_id
+            ? (getAlphaSchools().find(s => s.id === updated.school_id)?.name ?? "")
+            : "";
+        setEditUserDownloadInfo({
+          full_name: updated.full_name,
+          username: updated.username,
+          password,
+          schoolName,
+        });
+        setShowEditDownloadButton(true);
+        setEditDownloadCountdown(10);
+        showSnackbar("Kodeord genereret!", "info");
+        return updated;
+      });
     } else {
-      setNewUser(prev => ({ ...prev, password }));
-      showSnackbar("Kodeord genereret!", "info");
+      setNewUser(prev => {
+        const updated = { ...prev, password };
+        const schoolName =
+          updated.role === "bruger" && updated.school_id
+            ? (getAlphaSchools().find(s => s.id === updated.school_id)?.name ?? "")
+            : "";
+        setNewUserDownloadInfo({
+          full_name: updated.full_name,
+          username: updated.username,
+          password,
+          schoolName,
+        });
+        setShowDownloadButton(true);
+        setDownloadCountdown(10);
+        showSnackbar("Kodeord genereret!", "info");
+        return updated;
+      });
     }
   };
 
-  // Download brugerinfo funktion
   const triggerDownloadUserInfo = (info) => {
     const fileName = info.full_name.trim().replace(/\s+/g, "_") + ".txt";
     const content = `Fulde navn: ${info.full_name}
@@ -211,19 +240,17 @@ Kodeord: ${info.password}
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
-        setUsers(Array.isArray(users) ? [...users, res.data] : [res.data]);
-        setNewUser({ username: "", password: "", full_name: "", role: "bruger", is_active: true, school_id: "", remarks: "" });
+        setUsers(Array.isArray(users) ? [...users, {
+          ...res.data,
+          role: res.data.role === "admin" ? "administrator" : res.data.role
+        }] : [{
+          ...res.data,
+          role: res.data.role === "admin" ? "administrator" : res.data.role
+        }]);
+        setNewUser({ username: "", password: "", full_name: "", role: "", is_active: true, school_id: "", remarks: "" });
         showSnackbar("Bruger oprettet!", "success");
-        const schoolName = role === "bruger"
-          ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
-          : "";
-        setNewUserDownloadInfo({
-          full_name,
-          username,
-          password,
-          schoolName,
-        });
-        setShowDownloadButton(true);
+        setShowDownloadButton(false);
+        setNewUserDownloadInfo(null);
         setDownloadCountdown(10);
       })
       .catch(e => {
@@ -232,40 +259,14 @@ Kodeord: ${info.password}
       });
   };
 
-  const handleOpenDeleteUserDialog = (user) => {
-    setUserToDelete(user);
-    setDeleteUserDialogOpen(true);
-    setDeleteUserError("");
-    setDeleteUserStep(1);
-  };
-  const handleFirstDeleteUserConfirm = () => setDeleteUserStep(2);
-
-  const handleFinalDeleteUser = () => {
-    if (!userToDelete || userToDelete.role === "admin") return;
-    axios.delete(`${API_URL}/api/users/${userToDelete.id}`, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
-    })
-      .then(() => {
-        setUsers(Array.isArray(users) ? users.filter(u => u.id !== userToDelete.id) : []);
-        setDeleteUserDialogOpen(false);
-        setUserToDelete(null);
-        setDeleteUserStep(1);
-        showSnackbar("Bruger slettet!", "success");
-      })
-      .catch(e => {
-        setDeleteUserError("Kunne ikke slette bruger: " + (e.response?.data?.detail || ""));
-        showSnackbar("Fejl ved sletning af bruger", "error");
-      });
-  };
-  const handleCloseDeleteUserDialog = () => {
-    setDeleteUserDialogOpen(false);
-    setUserToDelete(null);
-    setDeleteUserError("");
-    setDeleteUserStep(1);
-  };
-
   const openEditUserDialog = (user) => {
-    setEditUser({ ...user, password: "" });
+    // Map "admin" to "administrator"
+    const mappedUser = {
+      ...user,
+      role: user.role === "admin" ? "administrator" : user.role,
+      password: "",
+    };
+    setEditUser(mappedUser);
     setUserDialogOpen(true);
     setUserError("");
     setShowEditDownloadButton(false);
@@ -275,7 +276,7 @@ Kodeord: ${info.password}
 
   const handleEditUser = () => {
     if (!editUser) return;
-    const { id, role, is_active, password, full_name, school_id, remarks } = editUser;
+    const { id, role, is_active, password, full_name, school_id, remarks, username } = editUser;
     if (!full_name) {
       setUserError("Fuldt navn skal udfyldes");
       showSnackbar("Fuldt navn skal udfyldes", "error");
@@ -292,16 +293,22 @@ Kodeord: ${info.password}
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
-        setUsers(Array.isArray(users) ? users.map(u => u.id === res.data.id ? res.data : u) : []);
+        setUsers(Array.isArray(users)
+          ? users.map(u => u.id === res.data.id
+              ? { ...res.data, role: res.data.role === "admin" ? "administrator" : res.data.role }
+              : u)
+          : []);
         setUserDialogOpen(false);
         setEditUser(null);
         showSnackbar("Bruger opdateret!", "success");
-        const schoolName = role === "bruger"
-          ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
-          : "";
+        // Download info skal vises
+        const schoolName =
+          role === "bruger" && school_id
+            ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
+            : "";
         setEditUserDownloadInfo({
           full_name,
-          username: editUser.username,
+          username,
           password,
           schoolName,
         });
@@ -327,7 +334,7 @@ Kodeord: ${info.password}
         search === "" ||
         (u.username && u.username.toLowerCase().includes(search)) ||
         (u.full_name && u.full_name.toLowerCase().includes(search)) ||
-        (u.role === "admin" ? "administrator" : "bruger").includes(search) ||
+        (u.role === "administrator" ? "administrator" : "bruger").includes(search) ||
         schoolName.toLowerCase().includes(search) ||
         (u.remarks && u.remarks.toLowerCase().includes(search))
       );
@@ -345,8 +352,8 @@ Kodeord: ${info.password}
           bVal = b.full_name || "";
           break;
         case "role":
-          aVal = a.role === "admin" ? "administrator" : "bruger";
-          bVal = b.role === "admin" ? "administrator" : "bruger";
+          aVal = a.role === "administrator" ? "administrator" : "bruger";
+          bVal = b.role === "administrator" ? "administrator" : "bruger";
           break;
         case "school":
           aVal = a.school_id
@@ -373,7 +380,6 @@ Kodeord: ${info.password}
     }));
   };
 
-  // Brugeroprettelse layout
   return (
     <Box sx={{}}>
       <Paper sx={{ mb: 4, p: 3 }}>
@@ -386,7 +392,7 @@ Kodeord: ${info.password}
               Opret, redigér og slet brugere (kræver admin-rettigheder)
             </Typography>
             <Grid container spacing={2} sx={{ mb: 1 }}>
-              {/* Første linje: brugernavn, fuldt navn, rolle */}
+              {/* Første linje */}
               <Grid item xs={12} md={4}>
                 <TextField
                   required
@@ -422,7 +428,7 @@ Kodeord: ${info.password}
                   </Select>
                 </FormControl>
               </Grid>
-              {/* Anden linje: generer kodeord, kodeord (vis kun), skole */}
+              {/* Anden linje */}
               <Grid item xs={12} md={4} sx={{ display: "flex", alignItems: "center" }}>
                 <Button
                   variant="outlined"
@@ -461,7 +467,7 @@ Kodeord: ${info.password}
                   </FormControl>
                 )}
               </Grid>
-              {/* Tredje linje: Bemærkninger */}
+              {/* Tredje linje */}
               <Grid item xs={12} md={12}>
                 <TextField
                   label="Bemærkninger"
@@ -480,7 +486,6 @@ Kodeord: ${info.password}
                 <Button variant="contained" onClick={handleAddUser}>
                   Opret bruger
                 </Button>
-                {/* Download-knap vises ved siden af opret bruger knappen i 10 sek */}
                 {showDownloadButton && newUserDownloadInfo && (
                   <Button
                     variant="outlined"
@@ -572,7 +577,7 @@ Kodeord: ${info.password}
                       <TableRow key={user.id} hover>
                         <TableCell>{user.username}</TableCell>
                         <TableCell>{user.full_name || ""}</TableCell>
-                        <TableCell>{user.role === "admin" ? "administrator" : "bruger"}</TableCell>
+                        <TableCell>{user.role === "administrator" ? "administrator" : "bruger"}</TableCell>
                         <TableCell>
                           {user.school_id
                             ? (getAlphaSchools().find(s => s.id === user.school_id)?.name ?? user.school_id)
@@ -590,12 +595,12 @@ Kodeord: ${info.password}
                               </IconButton>
                             </span>
                           </Tooltip>
-                          <Tooltip title={user.role === "admin" ? "Administrator kan ikke slettes" : "Slet bruger"}>
+                          <Tooltip title={user.role === "administrator" ? "Administrator kan ikke slettes" : "Slet bruger"}>
                             <span>
                               <IconButton
                                 color="error"
                                 onClick={() => handleOpenDeleteUserDialog(user)}
-                                disabled={user.role === "admin"}
+                                disabled={user.role === "administrator"}
                               >
                                 <DeleteIcon />
                               </IconButton>
@@ -614,7 +619,7 @@ Kodeord: ${info.password}
               onClose={() => setUserDialogOpen(false)}
               maxWidth="sm"
               fullWidth
-              sx={{ '& .MuiDialog-paper': { width: '110%' } }} // Make dialog 10% wider
+              sx={{ '& .MuiDialog-paper': { width: '110%' } }}
             >
               <DialogTitle>Rediger bruger</DialogTitle>
               <DialogContent>
@@ -639,9 +644,9 @@ Kodeord: ${info.password}
                       <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                       <Select
                         labelId="edit-rolle-label"
-                        value={editUser.role === "admin" ? "administrator" : "bruger"}
+                        value={editUser.role}
                         label="Rolle"
-                        disabled={editUser.role === "admin"}
+                        disabled={editUser.role === "administrator"}
                         onChange={e => {
                           const value = e.target.value;
                           setEditUser(prev => ({
@@ -724,16 +729,6 @@ Kodeord: ${info.password}
               <DialogActions>
                 <Button onClick={() => setUserDialogOpen(false)}>Annuller</Button>
                 <Button variant="contained" onClick={handleEditUser}>Gem ændringer</Button>
-                {/* Download after save */}
-                {showEditDownloadButton && editUserDownloadInfo && (
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
-                  >
-                    Download brugerinfo ({editDownloadCountdown})
-                  </Button>
-                )}
               </DialogActions>
             </Dialog>
           </Box>
@@ -748,17 +743,17 @@ Kodeord: ${info.password}
             Advarsel: Du er ved at slette brugeren <b>{userToDelete?.username}</b>.<br />
             Denne handling kan <b>ikke fortrydes!</b>
           </Typography>
-          {userToDelete?.role === "admin" && (
+          {userToDelete?.role === "administrator" && (
             <Typography color="error" sx={{ mb: 2 }}>
               Administrator-brugere kan ikke slettes.
             </Typography>
           )}
-          {deleteUserStep === 1 && userToDelete?.role !== "admin" && (
+          {deleteUserStep === 1 && userToDelete?.role !== "administrator" && (
             <Typography sx={{ mb: 2 }}>
               Er du sikker på at du vil slette denne bruger?
             </Typography>
           )}
-          {deleteUserStep === 2 && userToDelete?.role !== "admin" && (
+          {deleteUserStep === 2 && userToDelete?.role !== "administrator" && (
             <Typography color="error" sx={{ mb: 2 }}>
               Tryk <b>Slet endeligt</b> for at bekræfte.
             </Typography>
@@ -771,7 +766,7 @@ Kodeord: ${info.password}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDeleteUserDialog}>Annuller</Button>
-          {userToDelete?.role !== "admin" && (
+          {userToDelete?.role !== "administrator" && (
             deleteUserStep === 1 ? (
               <Button color="warning" variant="contained" onClick={handleFirstDeleteUserConfirm}>
                 Bekræft sletning
