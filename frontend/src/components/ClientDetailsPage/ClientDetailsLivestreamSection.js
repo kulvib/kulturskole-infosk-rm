@@ -134,36 +134,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     setBuffering(false);
   }
 
-  useEffect(() => {
-    if (!clientId) return;
-    let ignore = false;
-
-    async function maybeResetSegments() {
-      try {
-        const resp = await fetch(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
-        let doReset = false;
-        if (!resp.ok) {
-          doReset = true;
-        } else {
-          const data = await resp.json();
-          if (!data.timestamp || data.error) {
-            doReset = true;
-          } else {
-            const segTime = new Date(data.timestamp).getTime();
-            if (Date.now() - segTime > 5 * 60 * 1000) {
-              doReset = true;
-            }
-          }
-        }
-        if (!ignore && doReset) {
-          await fetch(`/api/hls/${clientId}/reset`, { method: "POST" });
-        }
-      } catch (e) {}
-    }
-    maybeResetSegments();
-    return () => { ignore = true; };
-  }, [clientId, refreshKey]);
-
+  // --- MODIFICERET LOGIK! Afspil først når der er mindst to segmenter, og vis næstsidste segment ---
   useEffect(() => {
     if (!clientId) return;
     const video = videoRef.current;
@@ -174,17 +145,37 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     let stopPolling = false;
     let pollInterval;
 
-    const startPlayback = () => {
+    const startPlayback = async () => {
       setError("");
       setManifestReady(true);
       setLastLive(new Date());
+
+      // Hent manifest og tæl segmenter
+      const manifestResp = await fetch(hlsUrl + "?cachebust=" + Date.now());
+      const manifestText = await manifestResp.text();
+      const manifestLines = manifestText.split('\n');
+      // Segment lines er dem som ikke starter med "#"
+      const segmentLines = manifestLines.filter(l => l && !l.startsWith('#'));
+      if (segmentLines.length < 2) {
+        setError("Venter på flere segmenter …");
+        setManifestReady(false);
+        return;
+      }
+      // Find næstsidste segment
+      const segmentCount = segmentLines.length;
+      const targetSegmentIndex = segmentCount - 2;
+
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = hlsUrl;
+        video.play();
       } else if (Hls.isSupported()) {
         hls = new Hls();
         hlsRef.current = hls;
         hls.loadSource(hlsUrl);
         hls.attachMedia(video);
+
+        // Sæt startPosition til næstsidste segment
+        hls.startPosition = targetSegmentIndex;
 
         hls.on(Hls.Events.ERROR, (event, data) => {
           if (data.fatal) {
@@ -197,6 +188,20 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
           if (data && data.frag && typeof data.frag.sn === "number") {
             setCurrentSegment(data.frag.sn);
+          }
+        });
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          // Forsøg at seek til næstsidste segment hvis muligt (ekstra sikkerhed)
+          if (hls.levels && hls.levels[0] && hls.levels[0].details && hls.levels[0].details.fragments) {
+            const fragments = hls.levels[0].details.fragments;
+            if (fragments.length >= 2) {
+              // Beregn tiden for næstsidste segment og seek
+              const targetFrag = fragments[fragments.length - 2];
+              if (targetFrag && typeof targetFrag.start === "number") {
+                video.currentTime = targetFrag.start;
+              }
+            }
           }
         });
       }
@@ -225,7 +230,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
             manifestChecked = true;
             setError("");
             setManifestReady(true);
-            startPlayback();
+            await startPlayback();
           }
         } else {
           throw new Error("404");
@@ -253,6 +258,37 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       clearInterval(pollInterval);
       cleanup();
     };
+  }, [clientId, refreshKey]);
+
+  // Resten er uændret
+  useEffect(() => {
+    if (!clientId) return;
+    let ignore = false;
+
+    async function maybeResetSegments() {
+      try {
+        const resp = await fetch(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
+        let doReset = false;
+        if (!resp.ok) {
+          doReset = true;
+        } else {
+          const data = await resp.json();
+          if (!data.timestamp || data.error) {
+            doReset = true;
+          } else {
+            const segTime = new Date(data.timestamp).getTime();
+            if (Date.now() - segTime > 5 * 60 * 1000) {
+              doReset = true;
+            }
+          }
+        }
+        if (!ignore && doReset) {
+          await fetch(`/api/hls/${clientId}/reset`, { method: "POST" });
+        }
+      } catch (e) {}
+    }
+    maybeResetSegments();
+    return () => { ignore = true; };
   }, [clientId, refreshKey]);
 
   useEffect(() => {
