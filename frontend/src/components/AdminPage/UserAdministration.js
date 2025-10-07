@@ -30,14 +30,13 @@ import {
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import Visibility from "@mui/icons-material/Visibility";
-import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
+// Secure password generator
 function generateSecurePassword() {
   const lower = "abcdefghijklmnopqrstuvwxyz";
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -67,7 +66,7 @@ export default function UserAdministration() {
   const [userError, setUserError] = useState("");
   const [newUser, setNewUser] = useState({
     username: "",
-    password: generateSecurePassword(),
+    password: "",
     full_name: "",
     role: "bruger",
     is_active: true,
@@ -153,12 +152,11 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showEditDownloadButton, editDownloadCountdown]);
 
-  // Generer kodeord funktion (uden ikon og altid autogenereret)
+  // Generer kodeord funktion – nu kun på knaptryk
   const handleGeneratePassword = (forEdit = false) => {
     const password = generateSecurePassword();
     if (forEdit) {
       setEditUser(editUser => ({ ...editUser, password }));
-      // Show download button for edit user dialog
       const schoolName = (editUser?.role === "bruger" && editUser?.school_id)
         ? (getAlphaSchools().find(s => s.id === editUser.school_id)?.name ?? "")
         : "";
@@ -172,7 +170,18 @@ export default function UserAdministration() {
       setEditDownloadCountdown(10);
       showSnackbar("Kodeord genereret!", "info");
     } else {
-      setNewUser({ ...newUser, password });
+      setNewUser(prev => ({ ...prev, password }));
+      const schoolName = (newUser?.role === "bruger" && newUser?.school_id)
+        ? (getAlphaSchools().find(s => s.id === newUser.school_id)?.name ?? "")
+        : "";
+      setNewUserDownloadInfo({
+        full_name: newUser.full_name,
+        username: newUser.username,
+        password,
+        schoolName,
+      });
+      setShowDownloadButton(true);
+      setDownloadCountdown(10);
       showSnackbar("Kodeord genereret!", "info");
     }
   };
@@ -225,18 +234,10 @@ Kodeord: ${info.password}
     })
       .then(res => {
         setUsers(Array.isArray(users) ? [...users, res.data] : [res.data]);
-        setNewUser({ username: "", password: generateSecurePassword(), full_name: "", role: "bruger", is_active: true, school_id: "", remarks: "" });
+        setNewUser({ username: "", password: "", full_name: "", role: "bruger", is_active: true, school_id: "", remarks: "" });
         showSnackbar("Bruger oprettet!", "success");
-        const schoolName = role === "bruger"
-          ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
-          : "";
-        setNewUserDownloadInfo({
-          full_name,
-          username,
-          password,
-          schoolName,
-        });
-        setShowDownloadButton(true);
+        setShowDownloadButton(false);
+        setNewUserDownloadInfo(null);
         setDownloadCountdown(10);
       })
       .catch(e => {
@@ -278,7 +279,7 @@ Kodeord: ${info.password}
   };
 
   const openEditUserDialog = (user) => {
-    setEditUser({ ...user, password: generateSecurePassword() });
+    setEditUser({ ...user, password: "" });
     setUserDialogOpen(true);
     setUserError("");
     setShowEditDownloadButton(false);
@@ -426,7 +427,7 @@ Kodeord: ${info.password}
                   </Select>
                 </FormControl>
               </Grid>
-              {/* Anden linje: generer kodeord (autogenereret), kodeord (vis kun), skole */}
+              {/* Anden linje: generer kodeord, kodeord (vis kun), skole */}
               <Grid item xs={12} md={4} sx={{ display: "flex", alignItems: "center" }}>
                 <Button
                   variant="outlined"
@@ -705,7 +706,6 @@ Kodeord: ${info.password}
                       fullWidth
                       size="small"
                     />
-                    {/* Download-knap for genereret kodeord når man redigerer bruger */}
                     {showEditDownloadButton && editUserDownloadInfo && (
                       <Button
                         variant="outlined"
