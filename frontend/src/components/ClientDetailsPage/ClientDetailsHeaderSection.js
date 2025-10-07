@@ -65,41 +65,17 @@ function StatusBadge({ color, text, animate = false, isMobile = false, showText 
   );
 }
 
-// Kiosk status badge med tekst og bounce
+// Kiosk status badge med tekst og bounce for ALLE statuser
 function ChromeStatusBadge({ status, color, isMobile = false }) {
   let fallbackColor = "grey.400";
   let text = status || "ukendt";
   let dotColor = color || fallbackColor;
-  let animate = false;
 
-  if (!color && typeof status === "string") {
-    const s = status.toLowerCase();
-    if (s === "running") {
-      dotColor = "#43a047";
-      text = "åben";
-      animate = true;
-    } else if (s === "stopped" || s === "closed") {
-      dotColor = "#e53935";
-      text = "lukket";
-      animate = false;
-    } else if (s === "unknown") {
-      dotColor = "grey.400";
-      text = "ukendt";
-      animate = false;
-    } else if (s.includes("kører")) {
-      dotColor = "#43a047";
-      text = status;
-      animate = true;
-    } else if (s.includes("lukket")) {
-      dotColor = "#e53935";
-      text = status;
-      animate = false;
-    }
-  }
+  // Bounce for alle statuser
+  const animate = true;
 
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
-      {/* Tekst først, badge bagefter */}
       <Typography
         variant="body2"
         sx={{
