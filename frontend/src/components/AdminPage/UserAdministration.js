@@ -34,7 +34,6 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
-import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
@@ -109,7 +108,7 @@ export default function UserAdministration() {
 
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
-  // Generer kodeord funktion
+  // Generer kodeord funktion (uden ikon)
   const generatePassword = (forEdit = false) => {
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let password = "";
@@ -430,12 +429,10 @@ Kodeord: ${info.password}
                   variant="outlined"
                   color="primary"
                   onClick={() => generatePassword(false)}
-                  startIcon={<FileDownloadIcon />}
                   sx={{ mr: 2 }}
                 >
                   Generer kodeord
                 </Button>
-                {/* tomt for spacing på desktop */}
               </Grid>
               <Grid item xs={12} md={4}>
                 <TextField
@@ -495,9 +492,21 @@ Kodeord: ${info.password}
               </Grid>
             </Grid>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, mt: 2 }}>
-              <Button variant="contained" onClick={handleAddUser}>
-                Opret bruger
-              </Button>
+              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                <Button variant="contained" onClick={handleAddUser}>
+                  Opret bruger
+                </Button>
+                {/* Download-knap vises ved siden af opret bruger knappen i 10 sek */}
+                {showDownloadButton && newUserDownloadInfo && (
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => triggerDownloadUserInfo(newUserDownloadInfo)}
+                  >
+                    Download brugerinfo
+                  </Button>
+                )}
+              </Box>
               <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
                 <TextField
                   label="Søg"
@@ -509,22 +518,6 @@ Kodeord: ${info.password}
                 />
               </Box>
             </Stack>
-            {/* Download-knap vises efter oprettelse i 10 sek med countdown */}
-            {showDownloadButton && newUserDownloadInfo && (
-              <Stack direction="row" alignItems="center" gap={2} sx={{ mt: 2 }}>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  onClick={() => triggerDownloadUserInfo(newUserDownloadInfo)}
-                  startIcon={<FileDownloadIcon />}
-                >
-                  Download brugerinfo ({downloadCountdown})
-                </Button>
-                <Typography variant="body2" color="text.secondary">
-                  Download forsvinder om {downloadCountdown} sek.
-                </Typography>
-              </Stack>
-            )}
             {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
             <TableContainer>
               <Table size="small">
@@ -706,7 +699,6 @@ Kodeord: ${info.password}
                       variant="outlined"
                       color="primary"
                       onClick={() => generatePassword(true)}
-                      startIcon={<FileDownloadIcon />}
                     >
                       Generer kodeord
                     </Button>
@@ -735,19 +727,13 @@ Kodeord: ${info.password}
                     />
                     {/* Download-knap for genereret kodeord når man redigerer bruger */}
                     {showEditDownloadButton && editUserDownloadInfo && (
-                      <Stack direction="row" alignItems="center" gap={2} sx={{ mt: 1 }}>
-                        <Button
-                          variant="outlined"
-                          color="primary"
-                          onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
-                          startIcon={<FileDownloadIcon />}
-                        >
-                          Download brugerinfo ({editDownloadCountdown})
-                        </Button>
-                        <Typography variant="body2" color="text.secondary">
-                          Download forsvinder om {editDownloadCountdown} sek.
-                        </Typography>
-                      </Stack>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
+                      >
+                        Download brugerinfo
+                      </Button>
                     )}
                   </Stack>
                 )}
