@@ -82,7 +82,7 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
           fontWeight: 400,
           textTransform: "none",
           fontSize: isMobile ? 12 : undefined,
-          mr: "3px", // <-- statusdot 3px tættere på teksten
+          mr: 1, // Samme afstand som i referencefilen
         }}
       >
         {text}
