@@ -48,12 +48,10 @@ function generateSecurePassword() {
   for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) {
     password += specials[Math.floor(Math.random() * specials.length)];
   }
-  // Fill to length 12
   const all = lower + upper + digits + specials;
   for (let i = password.length; i < 12; i++) {
     password += all[Math.floor(Math.random() * all.length)];
   }
-  // Shuffle
   return password
     .split("")
     .sort(() => Math.random() - 0.5)
@@ -91,21 +89,17 @@ export default function UserAdministration() {
   const showSnackbar = (message, severity = "success") => setSnackbar({ open: true, message, severity });
   const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
 
-  // Download knap state for ny user
   const [newUserDownloadInfo, setNewUserDownloadInfo] = useState(null);
   const [showDownloadButton, setShowDownloadButton] = useState(false);
   const [downloadCountdown, setDownloadCountdown] = useState(10);
 
-  // Download knap state for redigering
   const [editUserDownloadInfo, setEditUserDownloadInfo] = useState(null);
   const [showEditDownloadButton, setShowEditDownloadButton] = useState(false);
   const [editDownloadCountdown, setEditDownloadCountdown] = useState(10);
 
-  // Loading indicators
   const [savingNewUser, setSavingNewUser] = useState(false);
   const [savingEditUser, setSavingEditUser] = useState(false);
 
-  // Popup-hold state for redigering (kun hvis der ER genereret kodeord og gemt)
   const [holdEditDialogOpen, setHoldEditDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -139,7 +133,6 @@ export default function UserAdministration() {
       .finally(() => setLoadingSchools(false));
   }, []);
 
-  // Download timer for ny bruger
   useEffect(() => {
     let timer;
     if (showDownloadButton && downloadCountdown > 0) {
@@ -152,7 +145,6 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showDownloadButton, downloadCountdown]);
 
-  // Download timer for redigering
   useEffect(() => {
     let timer;
     if (showEditDownloadButton && editDownloadCountdown > 0) {
@@ -168,7 +160,6 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showEditDownloadButton, editDownloadCountdown]);
 
-  // Generer kodeord funktion
   const handleGeneratePassword = (forEdit = false) => {
     const password = generateSecurePassword();
     if (forEdit) {
@@ -180,7 +171,6 @@ export default function UserAdministration() {
     }
   };
 
-  // Download brugerinfo funktion
   const triggerDownloadUserInfo = (info) => {
     const fileName = info.full_name.trim().replace(/\s+/g, "_") + ".txt";
     const content = `Fulde navn: ${info.full_name}
@@ -197,35 +187,26 @@ Kodeord: ${info.password}
     setTimeout(() => document.body.removeChild(link), 100);
   };
 
-  // Opret ny bruger
+  // Opret ny bruger med samlet advarsel
   const handleAddUser = () => {
     setUserError("");
     setSavingNewUser(true);
     const { username, password, full_name, role, is_active, school_id, remarks } = newUser;
-    if (!username || !password) {
-      setUserError("Brugernavn og kodeord skal udfyldes");
+
+    let missing = [];
+    if (!username) missing.push("Brugernavn");
+    if (!password) missing.push("Kodeord");
+    if (!full_name) missing.push("Fuldt navn");
+    if (!role) missing.push("Rolle");
+    if (role === "bruger" && !school_id) missing.push("Skole");
+
+    if (missing.length > 0) {
+      setUserError(missing.join(", ") + " skal udfyldes");
       setSavingNewUser(false);
-      showSnackbar("Brugernavn og kodeord skal udfyldes", "error");
+      showSnackbar(missing.join(", ") + " skal udfyldes", "error");
       return;
     }
-    if (!full_name) {
-      setUserError("Fuldt navn skal udfyldes");
-      setSavingNewUser(false);
-      showSnackbar("Fuldt navn skal udfyldes", "error");
-      return;
-    }
-    if (!role) {
-      setUserError("Rolle skal vælges");
-      setSavingNewUser(false);
-      showSnackbar("Rolle skal vælges", "error");
-      return;
-    }
-    if (role === "bruger" && !school_id) {
-      setUserError("Bruger skal tilknyttes en skole");
-      setSavingNewUser(false);
-      showSnackbar("Bruger skal tilknyttes en skole", "error");
-      return;
-    }
+
     axios.post(`${API_URL}/api/users/`, {
       username,
       password,
@@ -247,7 +228,6 @@ Kodeord: ${info.password}
         }]);
         setNewUser({ username: "", password: "", full_name: "", role: "", is_active: true, school_id: "", remarks: "" });
         showSnackbar("Bruger oprettet!", "success");
-        // -- Download-knap logik --
         const schoolName = role === "bruger"
           ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
           : "";
@@ -266,7 +246,6 @@ Kodeord: ${info.password}
       }).finally(() => setSavingNewUser(false));
   };
 
-  // Rediger bruger
   const openEditUserDialog = (user) => {
     const mappedUser = {
       ...user,
@@ -310,13 +289,11 @@ Kodeord: ${info.password}
           : []);
         setUserError("");
         showSnackbar("Bruger opdateret!", "success");
-        // Logik for vinduelukning/hold
         const schoolName =
           role === "bruger" && school_id
             ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
             : "";
         if (password) {
-          // Hold dialogen åben, vis download/v videre
           setEditUserDownloadInfo({
             full_name,
             username,
@@ -327,7 +304,6 @@ Kodeord: ${info.password}
           setEditDownloadCountdown(10);
           setHoldEditDialogOpen(true);
         } else {
-          // Luk dialogen straks
           setUserDialogOpen(false);
         }
       })
@@ -337,7 +313,6 @@ Kodeord: ${info.password}
       }).finally(() => setSavingEditUser(false));
   };
 
-  // Slet bruger dialog
   const handleOpenDeleteUserDialog = (user) => {
     setUserToDelete(user);
     setDeleteUserDialogOpen(true);
@@ -370,11 +345,9 @@ Kodeord: ${info.password}
     setDeleteUserStep(1);
   };
 
-  // Skole sortering
   const getAlphaSchools = () =>
     schools.slice().sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
 
-  // Sortering og søgning af brugere
   const getSortedUsers = () => {
     let arr = users.filter(u => {
       const schoolName = u.school_id
@@ -431,7 +404,6 @@ Kodeord: ${info.password}
     }));
   };
 
-  // Render
   return (
     <Box sx={{}}>
       <Paper sx={{ mb: 4, p: 3 }}>
@@ -444,7 +416,6 @@ Kodeord: ${info.password}
               Opret, redigér og slet brugere (kræver admin-rettigheder)
             </Typography>
             <Grid container spacing={2} sx={{ mb: 1 }}>
-              {/* Første linje */}
               <Grid item xs={12} md={4}>
                 <TextField
                   required
@@ -465,6 +436,7 @@ Kodeord: ${info.password}
                   fullWidth
                 />
               </Grid>
+              {/* Rolle dropdown - uden "Vælg rolle..." */}
               <Grid item xs={12} md={4}>
                 <FormControl size="small" fullWidth required>
                   <InputLabel id="rolle-label">Rolle</InputLabel>
@@ -475,13 +447,11 @@ Kodeord: ${info.password}
                     required
                     onChange={e => setNewUser({ ...newUser, role: e.target.value, school_id: "" })}
                   >
-                    <MenuItem value="">Vælg rolle...</MenuItem>
                     <MenuItem value="administrator">Administrator</MenuItem>
                     <MenuItem value="bruger">Bruger</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
-              {/* Anden linje */}
               <Grid item xs={12} md={4} sx={{ display: "flex", alignItems: "center" }}>
                 <Button
                   variant="outlined"
@@ -522,7 +492,6 @@ Kodeord: ${info.password}
                   </FormControl>
                 )}
               </Grid>
-              {/* Tredje linje */}
               <Grid item xs={12} md={12}>
                 <TextField
                   label="Bemærkninger"
@@ -567,51 +536,33 @@ Kodeord: ${info.password}
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell
-                      sx={{ fontWeight: 700, cursor: "pointer" }}
-                      onClick={() => handleUserTableSort("username")}
-                    >
+                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("username")}>
                       Brugernavn
                       {userSort.key === "username" &&
                         (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                         : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
-                    <TableCell
-                      sx={{ fontWeight: 700, cursor: "pointer" }}
-                      onClick={() => handleUserTableSort("fullname")}
-                    >
+                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("fullname")}>
                       Fuldt navn
                       {userSort.key === "fullname" &&
                         (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                         : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
-                    <TableCell
-                      sx={{ fontWeight: 700, cursor: "pointer" }}
-                      onClick={() => handleUserTableSort("role")}
-                    >
+                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("role")}>
                       Rolle
                       {userSort.key === "role" &&
                         (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                         : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
-                    <TableCell
-                      sx={{ fontWeight: 700, cursor: "pointer" }}
-                      onClick={() => handleUserTableSort("school")}
-                    >
+                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("school")}>
                       Skole
                       {userSort.key === "school" &&
                         (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                         : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>
-                      Status
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>
-                      Bemærkninger
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>
-                      Handlinger
-                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Bemærkninger</TableCell>
+                    <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -680,21 +631,8 @@ Kodeord: ${info.password}
               <DialogContent>
                 {editUser && (
                   <Stack gap={2} sx={{ mt: 1 }}>
-                    <TextField
-                      label="Brugernavn"
-                      value={editUser.username}
-                      disabled
-                      fullWidth
-                      size="small"
-                    />
-                    <TextField
-                      required
-                      label="Fuldt navn"
-                      value={editUser.full_name || ""}
-                      onChange={e => setEditUser({ ...editUser, full_name: e.target.value })}
-                      fullWidth
-                      size="small"
-                    />
+                    <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" />
+                    <TextField required label="Fuldt navn" value={editUser.full_name || ""} onChange={e => setEditUser({ ...editUser, full_name: e.target.value })} fullWidth size="small" />
                     <FormControl fullWidth size="small">
                       <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                       <Select
