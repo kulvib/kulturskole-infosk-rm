@@ -101,7 +101,7 @@ export default function UserAdministration() {
   const [showEditDownloadButton, setShowEditDownloadButton] = useState(false);
   const [editDownloadCountdown, setEditDownloadCountdown] = useState(10);
 
-  // Popup-hold state for redigering
+  // Popup-hold state for redigering (kun hvis der ER genereret kodeord og gemt)
   const [holdEditDialogOpen, setHoldEditDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -135,6 +135,7 @@ export default function UserAdministration() {
       .finally(() => setLoadingSchools(false));
   }, []);
 
+  // Download timer for ny bruger
   useEffect(() => {
     let timer;
     if (showDownloadButton && downloadCountdown > 0) {
@@ -147,6 +148,7 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showDownloadButton, downloadCountdown]);
 
+  // Download timer for redigering
   useEffect(() => {
     let timer;
     if (showEditDownloadButton && editDownloadCountdown > 0) {
@@ -162,7 +164,7 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showEditDownloadButton, editDownloadCountdown]);
 
-  // Generer kodeord funktion - kun password, ingen download-knap
+  // Generer kodeord funktion
   const handleGeneratePassword = (forEdit = false) => {
     const password = generateSecurePassword();
     if (forEdit) {
@@ -290,22 +292,28 @@ Kodeord: ${info.password}
               ? { ...res.data, role: res.data.role === "admin" ? "administrator" : res.data.role }
               : u)
           : []);
-        // Hold dialog åben til download er færdig
-        setHoldEditDialogOpen(true);
         setUserError("");
         showSnackbar("Bruger opdateret!", "success");
+        // Logik for vinduelukning/hold
         const schoolName =
           role === "bruger" && school_id
             ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
             : "";
-        setEditUserDownloadInfo({
-          full_name,
-          username,
-          password,
-          schoolName,
-        });
-        setShowEditDownloadButton(true);
-        setEditDownloadCountdown(10);
+        if (password) {
+          // Hold dialogen åben, vis download/v videre
+          setEditUserDownloadInfo({
+            full_name,
+            username,
+            password,
+            schoolName,
+          });
+          setShowEditDownloadButton(true);
+          setEditDownloadCountdown(10);
+          setHoldEditDialogOpen(true);
+        } else {
+          // Luk dialogen straks
+          setUserDialogOpen(false);
+        }
       })
       .catch(e => {
         setUserError(e.response?.data?.detail || e.message || "Fejl ved opdatering");
@@ -468,7 +476,6 @@ Kodeord: ${info.password}
                 </Button>
               </Grid>
               <Grid item xs={12} md={4}>
-                {/* Kodeord feltet - ingen "*" men stadig required */}
                 <TextField
                   label="Kodeord"
                   value={newUser.password}
@@ -740,8 +747,8 @@ Kodeord: ${info.password}
                       fullWidth
                       size="small"
                     />
-                    {/* Download/videre knapper - kun hvis der ER genereret et kodeord */}
-                    {editUser.password && (
+                    {/* Download/videre knapper - kun efter GEM og hvis der ER genereret et kodeord */}
+                    {holdEditDialogOpen && editUser.password && (
                       <Grid container spacing={2}>
                         <Grid item xs={12} sm={6}>
                           {showEditDownloadButton && editUserDownloadInfo ? (
@@ -784,7 +791,7 @@ Kodeord: ${info.password}
                 {userError && <Typography color="error" sx={{ mt: 2 }}>{userError}</Typography>}
               </DialogContent>
               <DialogActions>
-                {!editUser?.password && (
+                {(!holdEditDialogOpen || !editUser?.password) && (
                   <>
                     <Button onClick={() => setUserDialogOpen(false)}>Annuller</Button>
                     <Button variant="contained" onClick={handleEditUser}>Gem ændringer</Button>
