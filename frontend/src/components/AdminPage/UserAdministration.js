@@ -25,7 +25,6 @@ import {
   FormControl,
   InputLabel,
   TextField,
-  InputAdornment,
   Grid,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -43,13 +42,14 @@ function generateSecurePassword() {
   const digits = "0123456789";
   const specials = "!@#$%&*";
   let password = "";
+  // Ensure 1 of each type
   password += lower[Math.floor(Math.random() * lower.length)];
   password += upper[Math.floor(Math.random() * upper.length)];
   password += digits[Math.floor(Math.random() * digits.length)];
   for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) {
     password += specials[Math.floor(Math.random() * specials.length)];
   }
-  // Fill to length 12
+  // Fill remaining length
   const all = lower + upper + digits + specials;
   for (let i = password.length; i < 12; i++) {
     password += all[Math.floor(Math.random() * all.length)];
@@ -68,7 +68,7 @@ export default function UserAdministration() {
     username: "",
     password: "",
     full_name: "",
-    role: "bruger",
+    role: "",
     is_active: true,
     school_id: "",
     remarks: "",
@@ -152,7 +152,7 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showEditDownloadButton, editDownloadCountdown]);
 
-  // Generer kodeord funktion – nu kun på knaptryk
+  // Generer kodeord funktion – kun på knaptryk
   const handleGeneratePassword = (forEdit = false) => {
     const password = generateSecurePassword();
     if (forEdit) {
@@ -216,6 +216,11 @@ Kodeord: ${info.password}
       showSnackbar("Fuldt navn skal udfyldes", "error");
       return;
     }
+    if (!role) {
+      setUserError("Vælg rolle");
+      showSnackbar("Vælg rolle", "error");
+      return;
+    }
     if (role === "bruger" && !school_id) {
       setUserError("Bruger skal tilknyttes en skole");
       showSnackbar("Bruger skal tilknyttes en skole", "error");
@@ -234,7 +239,7 @@ Kodeord: ${info.password}
     })
       .then(res => {
         setUsers(Array.isArray(users) ? [...users, res.data] : [res.data]);
-        setNewUser({ username: "", password: "", full_name: "", role: "bruger", is_active: true, school_id: "", remarks: "" });
+        setNewUser({ username: "", password: "", full_name: "", role: "", is_active: true, school_id: "", remarks: "" });
         showSnackbar("Bruger oprettet!", "success");
         setShowDownloadButton(false);
         setNewUserDownloadInfo(null);
@@ -293,6 +298,11 @@ Kodeord: ${info.password}
     if (!full_name) {
       setUserError("Fuldt navn skal udfyldes");
       showSnackbar("Fuldt navn skal udfyldes", "error");
+      return;
+    }
+    if (!role) {
+      setUserError("Vælg rolle");
+      showSnackbar("Vælg rolle", "error");
       return;
     }
     axios.patch(`${API_URL}/api/users/${id}`, {
@@ -422,6 +432,7 @@ Kodeord: ${info.password}
                     label="Rolle"
                     onChange={e => setNewUser({ ...newUser, role: e.target.value, school_id: "" })}
                   >
+                    <MenuItem value="">Vælg rolle...</MenuItem>
                     <MenuItem value="administrator">Administrator</MenuItem>
                     <MenuItem value="bruger">Bruger</MenuItem>
                   </Select>
@@ -614,9 +625,15 @@ Kodeord: ${info.password}
               </Table>
             </TableContainer>
             {/* Rediger bruger dialog */}
-            <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)}>
+            <Dialog
+              open={userDialogOpen}
+              onClose={() => setUserDialogOpen(false)}
+              maxWidth="sm"
+              fullWidth
+              sx={{ "& .MuiDialog-paper": { width: "110%" } }} // 10% bredere
+            >
               <DialogTitle>Rediger bruger</DialogTitle>
-              <DialogContent>
+              <DialogContent sx={{ width: "110%" }}>
                 {editUser && (
                   <Stack gap={2} sx={{ mt: 1 }}>
                     <TextField
@@ -638,7 +655,7 @@ Kodeord: ${info.password}
                       <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                       <Select
                         labelId="edit-rolle-label"
-                        value={editUser.role === "admin" ? "administrator" : "bruger"}
+                        value={editUser.role === "admin" ? "administrator" : editUser.role}
                         label="Rolle"
                         disabled={editUser.role === "admin"}
                         onChange={e => {
@@ -650,6 +667,7 @@ Kodeord: ${info.password}
                           }));
                         }}
                       >
+                        <MenuItem value="">Vælg rolle...</MenuItem>
                         <MenuItem value="administrator">Administrator</MenuItem>
                         <MenuItem value="bruger">Bruger</MenuItem>
                       </Select>
@@ -741,47 +759,4 @@ Kodeord: ${info.password}
               Administrator-brugere kan ikke slettes.
             </Typography>
           )}
-          {deleteUserStep === 1 && userToDelete?.role !== "admin" && (
-            <Typography sx={{ mb: 2 }}>
-              Er du sikker på at du vil slette denne bruger?
-            </Typography>
-          )}
-          {deleteUserStep === 2 && userToDelete?.role !== "admin" && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              Tryk <b>Slet endeligt</b> for at bekræfte.
-            </Typography>
-          )}
-          {deleteUserError && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              {deleteUserError}
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDeleteUserDialog}>Annuller</Button>
-          {userToDelete?.role !== "admin" && (
-            deleteUserStep === 1 ? (
-              <Button color="warning" variant="contained" onClick={handleFirstDeleteUserConfirm}>
-                Bekræft sletning
-              </Button>
-            ) : (
-              <Button color="error" variant="contained" onClick={handleFinalDeleteUser}>
-                Slet endeligt
-              </Button>
-            )
-          )}
-        </DialogActions>
-      </Dialog>
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3400}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
-          {snackbar.message}
-        </MuiAlert>
-      </Snackbar>
-    </Box>
-  );
-}
+          {deleteUserStep === 1 && userToDelete?.role
