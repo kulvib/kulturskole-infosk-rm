@@ -45,7 +45,6 @@ export default function UserAdministration() {
   const [newUser, setNewUser] = useState({
     username: "",
     password: "",
-    password2: "",
     full_name: "",
     role: "bruger",
     is_active: true,
@@ -62,9 +61,7 @@ export default function UserAdministration() {
   const [deleteUserStep, setDeleteUserStep] = useState(1);
 
   const [showPassword, setShowPassword] = useState(false);
-  const [showPassword2, setShowPassword2] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
-  const [showEditPassword2, setShowEditPassword2] = useState(false);
 
   const [userSort, setUserSort] = useState({ key: "username", direction: "asc" });
   const [userSearch, setUserSearch] = useState("");
@@ -76,10 +73,15 @@ export default function UserAdministration() {
   const showSnackbar = (message, severity = "success") => setSnackbar({ open: true, message, severity });
   const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
 
-  // Download user info state
+  // Download user info state for new user
   const [newUserDownloadInfo, setNewUserDownloadInfo] = useState(null); // {full_name, username, password, schoolName}
   const [showDownloadButton, setShowDownloadButton] = useState(false);
   const [downloadCountdown, setDownloadCountdown] = useState(10);
+
+  // Download user info state for edit dialog
+  const [editUserDownloadInfo, setEditUserDownloadInfo] = useState(null);
+  const [showEditDownloadButton, setShowEditDownloadButton] = useState(false);
+  const [editDownloadCountdown, setEditDownloadCountdown] = useState(10);
 
   useEffect(() => {
     setLoadingUsers(true);
@@ -108,14 +110,32 @@ export default function UserAdministration() {
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
   // Generer kodeord funktion
-  const generatePassword = () => {
+  const generatePassword = (forEdit = false) => {
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let password = "";
     for (let i = 0; i < 12; i++) {
       password += charset[Math.floor(Math.random() * charset.length)];
     }
-    setNewUser({ ...newUser, password, password2: password });
-    showSnackbar("Kodeord genereret!", "info");
+    if (forEdit) {
+      setEditUser(editUser => ({ ...editUser, password }));
+      // Show download button for edit user dialog
+      // Find skole-navn
+      const schoolName = editUser?.role === "bruger"
+        ? (getAlphaSchools().find(s => s.id === editUser.school_id)?.name ?? "")
+        : "";
+      setEditUserDownloadInfo({
+        full_name: editUser.full_name,
+        username: editUser.username,
+        password,
+        schoolName,
+      });
+      setShowEditDownloadButton(true);
+      setEditDownloadCountdown(10);
+      showSnackbar("Kodeord genereret!", "info");
+    } else {
+      setNewUser({ ...newUser, password });
+      showSnackbar("Kodeord genereret!", "info");
+    }
   };
 
   // Download brugerinfo funktion
@@ -135,7 +155,7 @@ Kodeord: ${info.password}
     setTimeout(() => document.body.removeChild(link), 100);
   };
 
-  // Download-knap timer
+  // Download-knap timer for ny bruger
   useEffect(() => {
     let timer;
     if (showDownloadButton && downloadCountdown > 0) {
@@ -148,12 +168,25 @@ Kodeord: ${info.password}
     return () => clearTimeout(timer);
   }, [showDownloadButton, downloadCountdown]);
 
+  // Download-knap timer for rediger bruger
+  useEffect(() => {
+    let timer;
+    if (showEditDownloadButton && editDownloadCountdown > 0) {
+      timer = setTimeout(() => setEditDownloadCountdown(editDownloadCountdown - 1), 1000);
+    } else if (editDownloadCountdown === 0) {
+      setShowEditDownloadButton(false);
+      setEditUserDownloadInfo(null);
+      setEditDownloadCountdown(10);
+    }
+    return () => clearTimeout(timer);
+  }, [showEditDownloadButton, editDownloadCountdown]);
+
   const handleAddUser = () => {
     setUserError("");
-    const { username, password, password2, full_name, role, is_active, school_id, remarks } = newUser;
-    if (!username || !password || !password2) {
-      setUserError("Brugernavn og begge kodeord skal udfyldes");
-      showSnackbar("Brugernavn og begge kodeord skal udfyldes", "error");
+    const { username, password, full_name, role, is_active, school_id, remarks } = newUser;
+    if (!username || !password) {
+      setUserError("Brugernavn og kodeord skal udfyldes");
+      showSnackbar("Brugernavn og kodeord skal udfyldes", "error");
       return;
     }
     if (!full_name) {
@@ -164,11 +197,6 @@ Kodeord: ${info.password}
     if (!passwordRegex.test(password)) {
       setUserError("Kodeordet skal være mindst 8 tegn langt og indeholde både store og små bogstaver samt tal.");
       showSnackbar("Kodeordet skal være mindst 8 tegn langt og indeholde både store og små bogstaver samt tal.", "error");
-      return;
-    }
-    if (password !== password2) {
-      setUserError("Kodeordene matcher ikke");
-      showSnackbar("Kodeordene matcher ikke", "error");
       return;
     }
     if (role === "bruger" && !school_id) {
@@ -189,7 +217,7 @@ Kodeord: ${info.password}
     })
       .then(res => {
         setUsers(Array.isArray(users) ? [...users, res.data] : [res.data]);
-        setNewUser({ username: "", password: "", password2: "", full_name: "", role: "bruger", is_active: true, school_id: "", remarks: "" });
+        setNewUser({ username: "", password: "", full_name: "", role: "bruger", is_active: true, school_id: "", remarks: "" });
         showSnackbar("Bruger oprettet!", "success");
         // Find skole-navn
         const schoolName = role === "bruger"
@@ -243,14 +271,17 @@ Kodeord: ${info.password}
   };
 
   const openEditUserDialog = (user) => {
-    setEditUser({ ...user, password: "", password2: "" });
+    setEditUser({ ...user, password: "" });
     setUserDialogOpen(true);
     setUserError("");
+    setShowEditDownloadButton(false);
+    setEditUserDownloadInfo(null);
+    setEditDownloadCountdown(10);
   };
 
   const handleEditUser = () => {
     if (!editUser) return;
-    const { id, role, is_active, password, password2, full_name, remarks } = editUser;
+    const { id, role, is_active, password, full_name, school_id, remarks } = editUser;
     if (!full_name) {
       setUserError("Fuldt navn skal udfyldes");
       showSnackbar("Fuldt navn skal udfyldes", "error");
@@ -261,16 +292,12 @@ Kodeord: ${info.password}
       showSnackbar("Kodeordet skal være mindst 8 tegn langt og indeholde både store og små bogstaver samt tal.", "error");
       return;
     }
-    if (password && password !== password2) {
-      setUserError("Kodeordene matcher ikke");
-      showSnackbar("Kodeordene matcher ikke", "error");
-      return;
-    }
     axios.patch(`${API_URL}/api/users/${id}`, {
       role: role === "administrator" ? "admin" : "bruger",
       is_active,
       password: password ? password : undefined,
       full_name,
+      school_id: role === "bruger" ? school_id : undefined,
       remarks,
     }, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
@@ -280,6 +307,9 @@ Kodeord: ${info.password}
         setUserDialogOpen(false);
         setEditUser(null);
         showSnackbar("Bruger opdateret!", "success");
+        setShowEditDownloadButton(false);
+        setEditUserDownloadInfo(null);
+        setEditDownloadCountdown(10);
       })
       .catch(e => {
         setUserError(e.response?.data?.detail || e.message || "Fejl ved opdatering");
@@ -346,6 +376,7 @@ Kodeord: ${info.password}
     }));
   };
 
+  // Brugeroprettelse layout
   return (
     <Box sx={{}}>
       <Paper sx={{ mb: 4, p: 3 }}>
@@ -358,8 +389,8 @@ Kodeord: ${info.password}
               Opret, redigér og slet brugere (kræver admin-rettigheder)
             </Typography>
             <Grid container spacing={2} sx={{ mb: 1 }}>
-              {/* Række 1: brugernavn, fuldt navn */}
-              <Grid item xs={12} md={6}>
+              {/* Første linje: brugernavn, fuldt navn, rolle */}
+              <Grid item xs={12} md={4}>
                 <TextField
                   required
                   label="Brugernavn"
@@ -369,7 +400,7 @@ Kodeord: ${info.password}
                   fullWidth
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid item xs={12} md={4}>
                 <TextField
                   required
                   label="Fuldt navn"
@@ -379,8 +410,34 @@ Kodeord: ${info.password}
                   fullWidth
                 />
               </Grid>
-              {/* Række 2: kodeord, gentag kodeord */}
-              <Grid item xs={12} md={6}>
+              <Grid item xs={12} md={4}>
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="rolle-label">Rolle</InputLabel>
+                  <Select
+                    labelId="rolle-label"
+                    value={newUser.role}
+                    label="Rolle"
+                    onChange={e => setNewUser({ ...newUser, role: e.target.value, school_id: "" })}
+                  >
+                    <MenuItem value="administrator">Administrator</MenuItem>
+                    <MenuItem value="bruger">Bruger</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              {/* Anden linje: generer kodeord, kodeord, skole */}
+              <Grid item xs={12} md={4} sx={{ display: "flex", alignItems: "center" }}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => generatePassword(false)}
+                  startIcon={<FileDownloadIcon />}
+                  sx={{ mr: 2 }}
+                >
+                  Generer kodeord
+                </Button>
+                {/* tomt for spacing på desktop */}
+              </Grid>
+              <Grid item xs={12} md={4}>
                 <TextField
                   required
                   label="Kodeord"
@@ -401,64 +458,13 @@ Kodeord: ${info.password}
                         >
                           {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                         </IconButton>
-                        <Tooltip title="Generér kodeord">
-                          <IconButton
-                            onClick={generatePassword}
-                            edge="end"
-                            size="small"
-                            sx={{ ml: 1 }}
-                          >
-                            <FileDownloadIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
                       </InputAdornment>
                     )
                   }}
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  required
-                  label="Gentag kodeord"
-                  type={showPassword2 ? "text" : "password"}
-                  value={newUser.password2}
-                  onChange={e => setNewUser({ ...newUser, password2: e.target.value })}
-                  size="small"
-                  fullWidth
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          onClick={() => setShowPassword2((show) => !show)}
-                          edge="end"
-                          tabIndex={-1}
-                          size="small"
-                          sx={{ fontSize: 18 }}
-                        >
-                          {showPassword2 ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                        </IconButton>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              </Grid>
-              {/* Række 3: rolle, skole, bemærkninger */}
               <Grid item xs={12} md={4}>
-                <FormControl size="small" fullWidth>
-                  <InputLabel id="rolle-label">Rolle</InputLabel>
-                  <Select
-                    labelId="rolle-label"
-                    value={newUser.role}
-                    label="Rolle"
-                    onChange={e => setNewUser({ ...newUser, role: e.target.value, school_id: "" })}
-                  >
-                    <MenuItem value="administrator">Administrator</MenuItem>
-                    <MenuItem value="bruger">Bruger</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              {newUser.role === "bruger" && (
-                <Grid item xs={12} md={4}>
+                {newUser.role === "bruger" && (
                   <FormControl size="small" fullWidth>
                     <InputLabel id="skole-label">Skole</InputLabel>
                     <Select
@@ -472,9 +478,10 @@ Kodeord: ${info.password}
                       ))}
                     </Select>
                   </FormControl>
-                </Grid>
-              )}
-              <Grid item xs={12} md={newUser.role === "bruger" ? 4 : 8}>
+                )}
+              </Grid>
+              {/* Tredje linje: Bemærkninger */}
+              <Grid item xs={12} md={12}>
                 <TextField
                   label="Bemærkninger"
                   value={newUser.remarks || ""}
@@ -624,12 +631,19 @@ Kodeord: ${info.password}
                 </TableBody>
               </Table>
             </TableContainer>
+            {/* Rediger bruger dialog */}
             <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)}>
               <DialogTitle>Rediger bruger</DialogTitle>
               <DialogContent>
                 {editUser && (
                   <Stack gap={2} sx={{ mt: 1 }}>
-                    <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" />
+                    <TextField
+                      label="Brugernavn"
+                      value={editUser.username}
+                      disabled
+                      fullWidth
+                      size="small"
+                    />
                     <TextField
                       required
                       label="Fuldt navn"
@@ -645,12 +659,27 @@ Kodeord: ${info.password}
                         value={editUser.role === "admin" ? "administrator" : "bruger"}
                         label="Rolle"
                         disabled={editUser.role === "admin"}
-                        onChange={e => setEditUser({ ...editUser, role: e.target.value })}
+                        onChange={e => setEditUser({ ...editUser, role: e.target.value, school_id: "" })}
                       >
                         <MenuItem value="administrator">Administrator</MenuItem>
                         <MenuItem value="bruger">Bruger</MenuItem>
                       </Select>
                     </FormControl>
+                    {editUser.role === "bruger" && (
+                      <FormControl fullWidth size="small">
+                        <InputLabel id="edit-skole-label">Skole</InputLabel>
+                        <Select
+                          labelId="edit-skole-label"
+                          value={editUser.school_id || ""}
+                          label="Skole"
+                          onChange={e => setEditUser({ ...editUser, school_id: e.target.value })}
+                        >
+                          {getAlphaSchools().map(school => (
+                            <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )}
                     <FormControl fullWidth size="small">
                       <InputLabel id="edit-status-label">Status</InputLabel>
                       <Select
@@ -673,55 +702,52 @@ Kodeord: ${info.password}
                       minRows={1}
                       maxRows={3}
                     />
-                    {editUser.role !== "admin" && (
-                      <>
-                        <TextField
-                          label="Nyt kodeord"
-                          type={showEditPassword ? "text" : "password"}
-                          value={editUser.password || ""}
-                          onChange={e => setEditUser({ ...editUser, password: e.target.value })}
-                          fullWidth
-                          size="small"
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <IconButton
-                                  onClick={() => setShowEditPassword((show) => !show)}
-                                  edge="end"
-                                  tabIndex={-1}
-                                  size="small"
-                                  sx={{ fontSize: 18 }}
-                                >
-                                  {showEditPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                                </IconButton>
-                              </InputAdornment>
-                            )
-                          }}
-                        />
-                        <TextField
-                          label="Gentag nyt kodeord"
-                          type={showEditPassword2 ? "text" : "password"}
-                          value={editUser.password2 || ""}
-                          onChange={e => setEditUser({ ...editUser, password2: e.target.value })}
-                          fullWidth
-                          size="small"
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <IconButton
-                                  onClick={() => setShowEditPassword2((show) => !show)}
-                                  edge="end"
-                                  tabIndex={-1}
-                                  size="small"
-                                  sx={{ fontSize: 18 }}
-                                >
-                                  {showEditPassword2 ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                                </IconButton>
-                              </InputAdornment>
-                            )
-                          }}
-                        />
-                      </>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      onClick={() => generatePassword(true)}
+                      startIcon={<FileDownloadIcon />}
+                    >
+                      Generer kodeord
+                    </Button>
+                    <TextField
+                      label="Kodeord"
+                      type={showEditPassword ? "text" : "password"}
+                      value={editUser.password || ""}
+                      onChange={e => setEditUser({ ...editUser, password: e.target.value })}
+                      fullWidth
+                      size="small"
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              onClick={() => setShowEditPassword((show) => !show)}
+                              edge="end"
+                              tabIndex={-1}
+                              size="small"
+                              sx={{ fontSize: 18 }}
+                            >
+                              {showEditPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                            </IconButton>
+                          </InputAdornment>
+                        )
+                      }}
+                    />
+                    {/* Download-knap for genereret kodeord når man redigerer bruger */}
+                    {showEditDownloadButton && editUserDownloadInfo && (
+                      <Stack direction="row" alignItems="center" gap={2} sx={{ mt: 1 }}>
+                        <Button
+                          variant="outlined"
+                          color="primary"
+                          onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
+                          startIcon={<FileDownloadIcon />}
+                        >
+                          Download brugerinfo ({editDownloadCountdown})
+                        </Button>
+                        <Typography variant="body2" color="text.secondary">
+                          Download forsvinder om {editDownloadCountdown} sek.
+                        </Typography>
+                      </Stack>
                     )}
                   </Stack>
                 )}
