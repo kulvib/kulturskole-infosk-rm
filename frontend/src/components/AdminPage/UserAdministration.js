@@ -34,6 +34,7 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
@@ -75,6 +76,11 @@ export default function UserAdministration() {
   const showSnackbar = (message, severity = "success") => setSnackbar({ open: true, message, severity });
   const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
 
+  // Download user info state
+  const [newUserDownloadInfo, setNewUserDownloadInfo] = useState(null); // {full_name, username, password, schoolName}
+  const [showDownloadButton, setShowDownloadButton] = useState(false);
+  const [downloadCountdown, setDownloadCountdown] = useState(10);
+
   useEffect(() => {
     setLoadingUsers(true);
     axios.get(`${API_URL}/api/users/`, {
@@ -100,6 +106,47 @@ export default function UserAdministration() {
   }, []);
 
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+  // Generer kodeord funktion
+  const generatePassword = () => {
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let password = "";
+    for (let i = 0; i < 12; i++) {
+      password += charset[Math.floor(Math.random() * charset.length)];
+    }
+    setNewUser({ ...newUser, password, password2: password });
+    showSnackbar("Kodeord genereret!", "info");
+  };
+
+  // Download brugerinfo funktion
+  const triggerDownloadUserInfo = (info) => {
+    const fileName = info.full_name.trim().replace(/\s+/g, "_") + ".txt";
+    const content = `Fulde navn: ${info.full_name}
+Skole: ${info.schoolName}
+Brugernavn: ${info.username}
+Kodeord: ${info.password}
+`;
+    const blob = new Blob([content], { type: "text/plain" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => document.body.removeChild(link), 100);
+  };
+
+  // Download-knap timer
+  useEffect(() => {
+    let timer;
+    if (showDownloadButton && downloadCountdown > 0) {
+      timer = setTimeout(() => setDownloadCountdown(downloadCountdown - 1), 1000);
+    } else if (downloadCountdown === 0) {
+      setShowDownloadButton(false);
+      setNewUserDownloadInfo(null);
+      setDownloadCountdown(10);
+    }
+    return () => clearTimeout(timer);
+  }, [showDownloadButton, downloadCountdown]);
 
   const handleAddUser = () => {
     setUserError("");
@@ -144,6 +191,18 @@ export default function UserAdministration() {
         setUsers(Array.isArray(users) ? [...users, res.data] : [res.data]);
         setNewUser({ username: "", password: "", password2: "", full_name: "", role: "bruger", is_active: true, school_id: "", remarks: "" });
         showSnackbar("Bruger oprettet!", "success");
+        // Find skole-navn
+        const schoolName = role === "bruger"
+          ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
+          : "";
+        setNewUserDownloadInfo({
+          full_name,
+          username,
+          password,
+          schoolName,
+        });
+        setShowDownloadButton(true);
+        setDownloadCountdown(10);
       })
       .catch(e => {
         setUserError(e.response?.data?.detail || e.message || "Fejl ved oprettelse");
@@ -342,6 +401,16 @@ export default function UserAdministration() {
                         >
                           {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                         </IconButton>
+                        <Tooltip title="Generér kodeord">
+                          <IconButton
+                            onClick={generatePassword}
+                            edge="end"
+                            size="small"
+                            sx={{ ml: 1 }}
+                          >
+                            <FileDownloadIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </InputAdornment>
                     )
                   }}
@@ -433,6 +502,22 @@ export default function UserAdministration() {
                 />
               </Box>
             </Stack>
+            {/* Download-knap vises efter oprettelse i 10 sek med countdown */}
+            {showDownloadButton && newUserDownloadInfo && (
+              <Stack direction="row" alignItems="center" gap={2} sx={{ mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => triggerDownloadUserInfo(newUserDownloadInfo)}
+                  startIcon={<FileDownloadIcon />}
+                >
+                  Download brugerinfo ({downloadCountdown})
+                </Button>
+                <Typography variant="body2" color="text.secondary">
+                  Download forsvinder om {downloadCountdown} sek.
+                </Typography>
+              </Stack>
+            )}
             {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
             <TableContainer>
               <Table size="small">
