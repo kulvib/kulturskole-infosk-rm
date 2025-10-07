@@ -101,3 +101,8 @@ app.include_router(livestream.router, prefix="/api")
 @app.get("/")
 def read_root():
     return {"message": "Kulturskole Infoskaerm Backend is running"}
+
+# --- PING ENDPOINT ---
+@app.get("/ping")
+def ping():
+    return {"message": "pong"}
