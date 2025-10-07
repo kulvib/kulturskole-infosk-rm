@@ -247,6 +247,7 @@ Password: ${info.password}
   };
 
   const openEditUserDialog = (user) => {
+    if (user.full_name === "Henrik Resen") return; // Block editing for Henrik Resen
     const mappedUser = {
       ...user,
       role: user.role === "admin" ? "administrator" : user.role,
@@ -455,17 +456,7 @@ Password: ${info.password}
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={4} sx={{ display: "flex", alignItems: "center" }}>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  onClick={() => handleGeneratePassword(false)}
-                  sx={{ mr: 2 }}
-                  disabled={savingNewUser}
-                >
-                  Generer password
-                </Button>
-              </Grid>
+              {/* Byt rækkefølge: password-feltet før knap */}
               <Grid item xs={12} md={4}>
                 <TextField
                   label="Password"
@@ -477,6 +468,17 @@ Password: ${info.password}
                   disabled
                   placeholder="Password"
                 />
+              </Grid>
+              <Grid item xs={12} md={4} sx={{ display: "flex", alignItems: "center" }}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => handleGeneratePassword(false)}
+                  sx={{ mr: 2 }}
+                  disabled={savingNewUser}
+                >
+                  Generer password
+                </Button>
               </Grid>
               <Grid item xs={12} md={4}>
                 {newUser.role === "bruger" && (
@@ -599,7 +601,10 @@ Password: ${info.password}
                         <TableCell align="right">
                           <Tooltip title="Rediger bruger">
                             <span>
-                              <IconButton onClick={() => openEditUserDialog(user)}>
+                              <IconButton
+                                onClick={() => openEditUserDialog(user)}
+                                disabled={user.full_name === "Henrik Resen"}
+                              >
                                 <EditIcon />
                               </IconButton>
                             </span>
@@ -666,22 +671,18 @@ Password: ${info.password}
                         <MenuItem value="administrator">Administrator</MenuItem>
                       </Select>
                     </FormControl>
-                    {editUser.role === "bruger" && (
-                      <FormControl fullWidth size="small">
-                        <InputLabel id="edit-skole-label">Skole</InputLabel>
-                        <Select
-                          labelId="edit-skole-label"
-                          value={editUser.school_id || ""}
-                          label="Skole"
-                          onChange={e => setEditUser({ ...editUser, school_id: e.target.value })}
-                          disabled={savingEditUser}
-                        >
-                          {getAlphaSchools().map(school => (
-                            <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    )}
+                    {/* Byt rækkefølge Bemærkninger og Status */}
+                    <TextField
+                      label="Bemærkninger"
+                      value={editUser.remarks || ""}
+                      onChange={e => setEditUser({ ...editUser, remarks: e.target.value })}
+                      fullWidth
+                      size="small"
+                      multiline
+                      minRows={1}
+                      maxRows={3}
+                      disabled={savingEditUser}
+                    />
                     <FormControl fullWidth size="small">
                       <InputLabel id="edit-status-label">Status</InputLabel>
                       <Select
@@ -695,17 +696,6 @@ Password: ${info.password}
                         <MenuItem value="false">Spærret</MenuItem>
                       </Select>
                     </FormControl>
-                    <TextField
-                      label="Bemærkninger"
-                      value={editUser.remarks || ""}
-                      onChange={e => setEditUser({ ...editUser, remarks: e.target.value })}
-                      fullWidth
-                      size="small"
-                      multiline
-                      minRows={1}
-                      maxRows={3}
-                      disabled={savingEditUser}
-                    />
                     <Button
                       variant="outlined"
                       color="primary"
@@ -722,7 +712,6 @@ Password: ${info.password}
                       fullWidth
                       size="small"
                     />
-                    {/* Download/videre knapper - kun efter GEM og hvis der ER genereret et kodeord */}
                     {holdEditDialogOpen && editUser.password && (
                       <Grid container spacing={2}>
                         <Grid item xs={12} sm={6}>
