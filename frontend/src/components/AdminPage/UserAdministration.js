@@ -35,6 +35,7 @@ import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
+// Secure password generator
 function generateSecurePassword() {
   const lower = "abcdefghijklmnopqrstuvwxyz";
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -47,10 +48,12 @@ function generateSecurePassword() {
   for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) {
     password += specials[Math.floor(Math.random() * specials.length)];
   }
+  // Fill to length 12
   const all = lower + upper + digits + specials;
   for (let i = password.length; i < 12; i++) {
     password += all[Math.floor(Math.random() * all.length)];
   }
+  // Shuffle
   return password
     .split("")
     .sort(() => Math.random() - 0.5)
@@ -102,7 +105,6 @@ export default function UserAdministration() {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
-        // Map "admin" to "administrator" for dropdown
         setUsers(
           Array.isArray(res.data)
             ? res.data.map(u => ({
@@ -157,7 +159,6 @@ export default function UserAdministration() {
     if (forEdit) {
       setEditUser(editUser => {
         const updated = { ...editUser, password };
-        // Prepare download info
         const schoolName =
           updated.role === "bruger" && updated.school_id
             ? (getAlphaSchools().find(s => s.id === updated.school_id)?.name ?? "")
@@ -259,6 +260,39 @@ Kodeord: ${info.password}
       });
   };
 
+  const handleOpenDeleteUserDialog = (user) => {
+    setUserToDelete(user);
+    setDeleteUserDialogOpen(true);
+    setDeleteUserError("");
+    setDeleteUserStep(1);
+  };
+  const handleFirstDeleteUserConfirm = () => setDeleteUserStep(2);
+
+  const handleFinalDeleteUser = () => {
+    if (!userToDelete || userToDelete.role === "administrator") return;
+    axios.delete(`${API_URL}/api/users/${userToDelete.id}`, {
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
+    })
+      .then(() => {
+        setUsers(Array.isArray(users) ? users.filter(u => u.id !== userToDelete.id) : []);
+        setDeleteUserDialogOpen(false);
+        setUserToDelete(null);
+        setDeleteUserStep(1);
+        showSnackbar("Bruger slettet!", "success");
+      })
+      .catch(e => {
+        setDeleteUserError("Kunne ikke slette bruger: " + (e.response?.data?.detail || ""));
+        showSnackbar("Fejl ved sletning af bruger", "error");
+      });
+  };
+  // FIX: Define this handler!
+  const handleCloseDeleteUserDialog = () => {
+    setDeleteUserDialogOpen(false);
+    setUserToDelete(null);
+    setDeleteUserError("");
+    setDeleteUserStep(1);
+  };
+
   const openEditUserDialog = (user) => {
     // Map "admin" to "administrator"
     const mappedUser = {
@@ -301,7 +335,6 @@ Kodeord: ${info.password}
         setUserDialogOpen(false);
         setEditUser(null);
         showSnackbar("Bruger opdateret!", "success");
-        // Download info skal vises
         const schoolName =
           role === "bruger" && school_id
             ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
@@ -616,7 +649,7 @@ Kodeord: ${info.password}
             {/* Rediger bruger dialog */}
             <Dialog
               open={userDialogOpen}
-              onClose={() => setUserDialogOpen(false)}
+              onClose={handleCloseDeleteUserDialog}
               maxWidth="sm"
               fullWidth
               sx={{ '& .MuiDialog-paper': { width: '110%' } }}
