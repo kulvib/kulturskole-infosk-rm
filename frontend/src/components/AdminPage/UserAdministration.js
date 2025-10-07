@@ -101,6 +101,10 @@ export default function UserAdministration() {
   const [showEditDownloadButton, setShowEditDownloadButton] = useState(false);
   const [editDownloadCountdown, setEditDownloadCountdown] = useState(10);
 
+  // Loading indicators
+  const [savingNewUser, setSavingNewUser] = useState(false);
+  const [savingEditUser, setSavingEditUser] = useState(false);
+
   // Popup-hold state for redigering (kun hvis der ER genereret kodeord og gemt)
   const [holdEditDialogOpen, setHoldEditDialogOpen] = useState(false);
 
@@ -196,24 +200,29 @@ Kodeord: ${info.password}
   // Opret ny bruger
   const handleAddUser = () => {
     setUserError("");
+    setSavingNewUser(true);
     const { username, password, full_name, role, is_active, school_id, remarks } = newUser;
     if (!username || !password) {
       setUserError("Brugernavn og kodeord skal udfyldes");
+      setSavingNewUser(false);
       showSnackbar("Brugernavn og kodeord skal udfyldes", "error");
       return;
     }
     if (!full_name) {
       setUserError("Fuldt navn skal udfyldes");
+      setSavingNewUser(false);
       showSnackbar("Fuldt navn skal udfyldes", "error");
       return;
     }
     if (!role) {
       setUserError("Rolle skal vælges");
+      setSavingNewUser(false);
       showSnackbar("Rolle skal vælges", "error");
       return;
     }
     if (role === "bruger" && !school_id) {
       setUserError("Bruger skal tilknyttes en skole");
+      setSavingNewUser(false);
       showSnackbar("Bruger skal tilknyttes en skole", "error");
       return;
     }
@@ -254,7 +263,7 @@ Kodeord: ${info.password}
       .catch(e => {
         setUserError(e.response?.data?.detail || e.message || "Fejl ved oprettelse");
         showSnackbar("Fejl ved oprettelse af bruger", "error");
-      });
+      }).finally(() => setSavingNewUser(false));
   };
 
   // Rediger bruger
@@ -275,9 +284,11 @@ Kodeord: ${info.password}
 
   const handleEditUser = () => {
     if (!editUser) return;
+    setSavingEditUser(true);
     const { id, role, is_active, password, full_name, school_id, remarks, username } = editUser;
     if (!full_name) {
       setUserError("Fuldt navn skal udfyldes");
+      setSavingEditUser(false);
       showSnackbar("Fuldt navn skal udfyldes", "error");
       return;
     }
@@ -323,7 +334,7 @@ Kodeord: ${info.password}
       .catch(e => {
         setUserError(e.response?.data?.detail || e.message || "Fejl ved opdatering");
         showSnackbar("Fejl ved opdatering af bruger", "error");
-      });
+      }).finally(() => setSavingEditUser(false));
   };
 
   // Slet bruger dialog
@@ -477,12 +488,12 @@ Kodeord: ${info.password}
                   color="primary"
                   onClick={() => handleGeneratePassword(false)}
                   sx={{ mr: 2 }}
+                  disabled={savingNewUser}
                 >
                   Generer kodeord
                 </Button>
               </Grid>
               <Grid item xs={12} md={4}>
-                {/* Kodeord feltet - ingen "*" men stadig required */}
                 <TextField
                   label="Kodeord"
                   value={newUser.password}
@@ -527,8 +538,8 @@ Kodeord: ${info.password}
             </Grid>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, mt: 2 }}>
               <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                <Button variant="contained" onClick={handleAddUser}>
-                  Opret bruger
+                <Button variant="contained" onClick={handleAddUser} disabled={savingNewUser}>
+                  {savingNewUser ? <CircularProgress size={24} color="inherit" /> : "Opret bruger"}
                 </Button>
                 {showDownloadButton && newUserDownloadInfo && (
                   <Button
@@ -698,6 +709,7 @@ Kodeord: ${info.password}
                             school_id: value === "bruger" ? prev.school_id : ""
                           }));
                         }}
+                        disabled={savingEditUser}
                       >
                         <MenuItem value="administrator">Administrator</MenuItem>
                         <MenuItem value="bruger">Bruger</MenuItem>
@@ -711,6 +723,7 @@ Kodeord: ${info.password}
                           value={editUser.school_id || ""}
                           label="Skole"
                           onChange={e => setEditUser({ ...editUser, school_id: e.target.value })}
+                          disabled={savingEditUser}
                         >
                           {getAlphaSchools().map(school => (
                             <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
@@ -725,6 +738,7 @@ Kodeord: ${info.password}
                         value={editUser.is_active ? "true" : "false"}
                         label="Status"
                         onChange={e => setEditUser({ ...editUser, is_active: e.target.value === "true" })}
+                        disabled={savingEditUser}
                       >
                         <MenuItem value="true">Aktiv</MenuItem>
                         <MenuItem value="false">Spærret</MenuItem>
@@ -739,11 +753,13 @@ Kodeord: ${info.password}
                       multiline
                       minRows={1}
                       maxRows={3}
+                      disabled={savingEditUser}
                     />
                     <Button
                       variant="outlined"
                       color="primary"
                       onClick={() => handleGeneratePassword(true)}
+                      disabled={savingEditUser}
                     >
                       Generer kodeord
                     </Button>
@@ -786,6 +802,9 @@ Kodeord: ${info.password}
                             fullWidth
                             onClick={() => {
                               setHoldEditDialogOpen(false);
+                              setShowEditDownloadButton(false);
+                              setEditUserDownloadInfo(null);
+                              setEditDownloadCountdown(10);
                               setUserDialogOpen(false);
                             }}
                           >
@@ -801,8 +820,10 @@ Kodeord: ${info.password}
               <DialogActions>
                 {(!holdEditDialogOpen || !editUser?.password) && (
                   <>
-                    <Button onClick={() => setUserDialogOpen(false)}>Annuller</Button>
-                    <Button variant="contained" onClick={handleEditUser}>Gem ændringer</Button>
+                    <Button onClick={() => setUserDialogOpen(false)} disabled={savingEditUser}>Annuller</Button>
+                    <Button variant="contained" onClick={handleEditUser} disabled={savingEditUser}>
+                      {savingEditUser ? <CircularProgress size={24} color="inherit" /> : "Gem ændringer"}
+                    </Button>
                   </>
                 )}
               </DialogActions>
