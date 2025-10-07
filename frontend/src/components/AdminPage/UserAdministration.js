@@ -346,9 +346,11 @@ Kodeord: ${info.password}
     setDeleteUserStep(1);
   };
 
+  // Skole sortering
   const getAlphaSchools = () =>
     schools.slice().sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
 
+  // Sortering og søgning af brugere
   const getSortedUsers = () => {
     let arr = users.filter(u => {
       const schoolName = u.school_id
@@ -738,33 +740,51 @@ Kodeord: ${info.password}
                       fullWidth
                       size="small"
                     />
-                    {showEditDownloadButton && editUserDownloadInfo && (
-                      <Stack direction="row" spacing={2}>
-                        <Button
-                          variant="outlined"
-                          color="primary"
-                          onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
-                        >
-                          Download brugerinfo ({editDownloadCountdown})
-                        </Button>
-                        <Button
-                          variant="contained"
-                          color="secondary"
-                          onClick={() => {
-                            setHoldEditDialogOpen(false);
-                            setUserDialogOpen(false);
-                          }}
-                        >
-                          Videre
-                        </Button>
-                      </Stack>
+                    {/* Download/videre knapper - kun hvis der ER genereret et kodeord */}
+                    {editUser.password && (
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          {showEditDownloadButton && editUserDownloadInfo ? (
+                            <Button
+                              variant="outlined"
+                              color="primary"
+                              fullWidth
+                              onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
+                            >
+                              Download brugerinfo ({editDownloadCountdown})
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outlined"
+                              color="primary"
+                              fullWidth
+                              disabled
+                            >
+                              Download brugerinfo
+                            </Button>
+                          )}
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            fullWidth
+                            onClick={() => {
+                              setHoldEditDialogOpen(false);
+                              setUserDialogOpen(false);
+                            }}
+                          >
+                            Videre
+                          </Button>
+                        </Grid>
+                      </Grid>
                     )}
                   </Stack>
                 )}
                 {userError && <Typography color="error" sx={{ mt: 2 }}>{userError}</Typography>}
               </DialogContent>
               <DialogActions>
-                {!showEditDownloadButton && (
+                {!editUser?.password && (
                   <>
                     <Button onClick={() => setUserDialogOpen(false)}>Annuller</Button>
                     <Button variant="contained" onClick={handleEditUser}>Gem ændringer</Button>
