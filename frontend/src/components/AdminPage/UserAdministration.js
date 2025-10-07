@@ -35,7 +35,6 @@ import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
-// Secure password generator
 function generateSecurePassword() {
   const lower = "abcdefghijklmnopqrstuvwxyz";
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -164,10 +163,10 @@ export default function UserAdministration() {
     const password = generateSecurePassword();
     if (forEdit) {
       setEditUser(editUser => ({ ...editUser, password }));
-      showSnackbar("Kodeord genereret!", "info");
+      showSnackbar("Password genereret!", "info");
     } else {
       setNewUser(prev => ({ ...prev, password }));
-      showSnackbar("Kodeord genereret!", "info");
+      showSnackbar("Password genereret!", "info");
     }
   };
 
@@ -176,7 +175,7 @@ export default function UserAdministration() {
     const content = `Fulde navn: ${info.full_name}
 Skole: ${info.schoolName}
 Brugernavn: ${info.username}
-Kodeord: ${info.password}
+Password: ${info.password}
 `;
     const blob = new Blob([content], { type: "text/plain" });
     const link = document.createElement("a");
@@ -195,8 +194,8 @@ Kodeord: ${info.password}
 
     let missing = [];
     if (!username) missing.push("Brugernavn");
-    if (!password) missing.push("Kodeord");
-    if (!full_name) missing.push("Fuldt navn");
+    if (!password) missing.push("Password");
+    if (!full_name) missing.push("Fulde navn");
     if (!role) missing.push("Rolle");
     if (role === "bruger" && !school_id) missing.push("Skole");
 
@@ -266,9 +265,9 @@ Kodeord: ${info.password}
     setSavingEditUser(true);
     const { id, role, is_active, password, full_name, school_id, remarks, username } = editUser;
     if (!full_name) {
-      setUserError("Fuldt navn skal udfyldes");
+      setUserError("Fulde navn skal udfyldes");
       setSavingEditUser(false);
-      showSnackbar("Fuldt navn skal udfyldes", "error");
+      showSnackbar("Fulde navn skal udfyldes", "error");
       return;
     }
     axios.patch(`${API_URL}/api/users/${id}`, {
@@ -412,9 +411,7 @@ Kodeord: ${info.password}
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Brugeradministration
             </Typography>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              Opret, redigér og slet brugere (kræver admin-rettigheder)
-            </Typography>
+            {/* Fjernet teksten "Opret, redigér og slet brugere (kræver admin-rettigheder)" */}
             <Grid container spacing={2} sx={{ mb: 1 }}>
               <Grid item xs={12} md={4}>
                 <TextField
@@ -429,14 +426,13 @@ Kodeord: ${info.password}
               <Grid item xs={12} md={4}>
                 <TextField
                   required
-                  label="Fuldt navn"
+                  label="Fulde navn"
                   value={newUser.full_name}
                   onChange={e => setNewUser({ ...newUser, full_name: e.target.value })}
                   size="small"
                   fullWidth
                 />
               </Grid>
-              {/* Rolle dropdown - uden "Vælg rolle..." */}
               <Grid item xs={12} md={4}>
                 <FormControl size="small" fullWidth required>
                   <InputLabel id="rolle-label">Rolle</InputLabel>
@@ -460,19 +456,19 @@ Kodeord: ${info.password}
                   sx={{ mr: 2 }}
                   disabled={savingNewUser}
                 >
-                  Generer kodeord
+                  Generer password
                 </Button>
               </Grid>
               <Grid item xs={12} md={4}>
                 <TextField
-                  label="Kodeord"
+                  label="Password"
                   value={newUser.password}
                   required
                   type="text"
                   size="small"
                   fullWidth
                   disabled
-                  placeholder="Kodeord"
+                  placeholder="Password"
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -543,7 +539,7 @@ Kodeord: ${info.password}
                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("fullname")}>
-                      Fuldt navn
+                      Fulde navn
                       {userSort.key === "fullname" &&
                         (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
@@ -632,7 +628,7 @@ Kodeord: ${info.password}
                 {editUser && (
                   <Stack gap={2} sx={{ mt: 1 }}>
                     <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" />
-                    <TextField required label="Fuldt navn" value={editUser.full_name || ""} onChange={e => setEditUser({ ...editUser, full_name: e.target.value })} fullWidth size="small" />
+                    <TextField required label="Fulde navn" value={editUser.full_name || ""} onChange={e => setEditUser({ ...editUser, full_name: e.target.value })} fullWidth size="small" />
                     <FormControl fullWidth size="small">
                       <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                       <Select
@@ -699,10 +695,10 @@ Kodeord: ${info.password}
                       onClick={() => handleGeneratePassword(true)}
                       disabled={savingEditUser}
                     >
-                      Generer kodeord
+                      Generer password
                     </Button>
                     <TextField
-                      label="Kodeord"
+                      label="Password"
                       type="text"
                       value={editUser.password || ""}
                       disabled
