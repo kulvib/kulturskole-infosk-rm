@@ -53,12 +53,11 @@ export default function LoginPage() {
       if (data && data.access_token) {
         setStatus("Login gennemført. Omdirigerer...");
 
-        // Her: Byg brugerobjektet til AuthContext
+        // Byg brugerobjektet til AuthContext
         let userObj;
         if (data.user) {
           userObj = data.user;
         } else {
-          // Hvis backend kun returnerer token, brug input
           userObj = { username, fullName: username };
         }
 
@@ -127,23 +126,13 @@ export default function LoginPage() {
         <Typography
           variant="h5"
           sx={{
-            mb: 0.5,
+            mb: 4,
             fontWeight: 700,
             fontSize: { xs: "1.23rem", sm: "1.5rem" },
             letterSpacing: 0.08,
           }}
         >
           Infoskærm administration
-        </Typography>
-        <Typography
-          variant="h6"
-          sx={{
-            mb: 4,
-            fontWeight: 500,
-            fontSize: { xs: "1.07rem", sm: "1.17rem" },
-          }}
-        >
-          infoskærm administration
         </Typography>
         <Box
           component="form"
