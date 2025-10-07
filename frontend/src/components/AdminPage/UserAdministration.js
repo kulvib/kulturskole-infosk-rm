@@ -101,6 +101,9 @@ export default function UserAdministration() {
   const [showEditDownloadButton, setShowEditDownloadButton] = useState(false);
   const [editDownloadCountdown, setEditDownloadCountdown] = useState(10);
 
+  // Popup-hold state for redigering
+  const [holdEditDialogOpen, setHoldEditDialogOpen] = useState(false);
+
   useEffect(() => {
     setLoadingUsers(true);
     axios.get(`${API_URL}/api/users/`, {
@@ -136,7 +139,7 @@ export default function UserAdministration() {
     let timer;
     if (showDownloadButton && downloadCountdown > 0) {
       timer = setTimeout(() => setDownloadCountdown(downloadCountdown - 1), 1000);
-    } else if (downloadCountdown === 0) {
+    } else if (showDownloadButton && downloadCountdown === 0) {
       setShowDownloadButton(false);
       setNewUserDownloadInfo(null);
       setDownloadCountdown(10);
@@ -147,11 +150,14 @@ export default function UserAdministration() {
   useEffect(() => {
     let timer;
     if (showEditDownloadButton && editDownloadCountdown > 0) {
+      setHoldEditDialogOpen(true);
       timer = setTimeout(() => setEditDownloadCountdown(editDownloadCountdown - 1), 1000);
-    } else if (editDownloadCountdown === 0) {
+    } else if (showEditDownloadButton && editDownloadCountdown === 0) {
       setShowEditDownloadButton(false);
       setEditUserDownloadInfo(null);
       setEditDownloadCountdown(10);
+      setHoldEditDialogOpen(false);
+      setUserDialogOpen(false);
     }
     return () => clearTimeout(timer);
   }, [showEditDownloadButton, editDownloadCountdown]);
@@ -253,6 +259,7 @@ Kodeord: ${info.password}
     };
     setEditUser(mappedUser);
     setUserDialogOpen(true);
+    setHoldEditDialogOpen(false);
     setUserError("");
     setShowEditDownloadButton(false);
     setEditUserDownloadInfo(null);
@@ -283,10 +290,10 @@ Kodeord: ${info.password}
               ? { ...res.data, role: res.data.role === "admin" ? "administrator" : res.data.role }
               : u)
           : []);
-        setUserDialogOpen(false);
-        setEditUser(null);
+        // Hold dialog åben til download er færdig
+        setHoldEditDialogOpen(true);
+        setUserError("");
         showSnackbar("Bruger opdateret!", "success");
-        // -- Download-knap logik --
         const schoolName =
           role === "bruger" && school_id
             ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
@@ -339,11 +346,9 @@ Kodeord: ${info.password}
     setDeleteUserStep(1);
   };
 
-  // Skole sortering
   const getAlphaSchools = () =>
     schools.slice().sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
 
-  // Sortering og søgning af brugere
   const getSortedUsers = () => {
     let arr = users.filter(u => {
       const schoolName = u.school_id
@@ -636,7 +641,7 @@ Kodeord: ${info.password}
             </TableContainer>
             {/* Rediger bruger dialog */}
             <Dialog
-              open={userDialogOpen}
+              open={userDialogOpen || holdEditDialogOpen}
               onClose={handleCloseDeleteUserDialog}
               maxWidth="sm"
               fullWidth
@@ -665,9 +670,8 @@ Kodeord: ${info.password}
                       <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                       <Select
                         labelId="edit-rolle-label"
-                        value={editUser.role}
+                        value={editUser.role || ""}
                         label="Rolle"
-                        disabled={editUser.role === "administrator"}
                         onChange={e => {
                           const value = e.target.value;
                           setEditUser(prev => ({
@@ -734,21 +738,37 @@ Kodeord: ${info.password}
                       fullWidth
                       size="small"
                     />
+                    {showEditDownloadButton && editUserDownloadInfo && (
+                      <Stack direction="row" spacing={2}>
+                        <Button
+                          variant="outlined"
+                          color="primary"
+                          onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
+                        >
+                          Download brugerinfo ({editDownloadCountdown})
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="secondary"
+                          onClick={() => {
+                            setHoldEditDialogOpen(false);
+                            setUserDialogOpen(false);
+                          }}
+                        >
+                          Videre
+                        </Button>
+                      </Stack>
+                    )}
                   </Stack>
                 )}
                 {userError && <Typography color="error" sx={{ mt: 2 }}>{userError}</Typography>}
               </DialogContent>
               <DialogActions>
-                <Button onClick={() => setUserDialogOpen(false)}>Annuller</Button>
-                <Button variant="contained" onClick={handleEditUser}>Gem ændringer</Button>
-                {showEditDownloadButton && editUserDownloadInfo && (
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
-                  >
-                    Download brugerinfo ({editDownloadCountdown})
-                  </Button>
+                {!showEditDownloadButton && (
+                  <>
+                    <Button onClick={() => setUserDialogOpen(false)}>Annuller</Button>
+                    <Button variant="contained" onClick={handleEditUser}>Gem ændringer</Button>
+                  </>
                 )}
               </DialogActions>
             </Dialog>
