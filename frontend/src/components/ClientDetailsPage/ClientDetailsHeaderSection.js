@@ -104,7 +104,7 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
 // ChromeStatusIcon med badge og 2s puls (animeret hvis browser kører)
 function ChromeStatusIcon({ status, color, isMobile = false }) {
   let fallbackColor = "grey.400";
-  let text = status || "Ukendt";
+  let text = status || "ukendt";
   let dotColor = color || fallbackColor;
   let animate = false;
 
@@ -112,15 +112,15 @@ function ChromeStatusIcon({ status, color, isMobile = false }) {
     const s = status.toLowerCase();
     if (s === "running") {
       dotColor = "#43a047";
-      text = "Åben";
+      text = "åben";
       animate = true;
     } else if (s === "stopped" || s === "closed") {
       dotColor = "#e53935";
-      text = "Lukket";
+      text = "lukket";
       animate = false;
     } else if (s === "unknown") {
       dotColor = "grey.400";
-      text = "Ukendt";
+      text = "ukendt";
       animate = false;
     } else if (s.includes("kører")) {
       dotColor = "#43a047";
@@ -133,7 +133,53 @@ function ChromeStatusIcon({ status, color, isMobile = false }) {
     }
   }
 
-  return <StatusBadge color={dotColor} text={text} animate={animate} isMobile={isMobile} />;
+  // Teksttypen og størrelse som i ClientDetailsInfoSection:
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+      <Typography
+        variant="body2"
+        sx={{
+          fontWeight: 400,
+          textTransform: "none",
+          fontSize: isMobile ? 12 : undefined,
+          mr: 1,
+        }}
+      >
+        {text}
+      </Typography>
+      <Box
+        sx={{
+          width: isMobile ? 8 : 10,
+          height: isMobile ? 8 : 10,
+          borderRadius: "50%",
+          bgcolor: dotColor,
+          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+          border: "1px solid #ddd",
+          animation: animate ? "pulsate 2s infinite" : "none"
+        }}
+      />
+      {animate && (
+        <style>
+          {`
+            @keyframes pulsate {
+              0% {
+                transform: scale(1);
+                opacity: 1;
+              }
+              50% {
+                transform: scale(1.25);
+                opacity: 0.5;
+              }
+              100% {
+                transform: scale(1);
+                opacity: 1;
+              }
+            }
+          `}
+        </style>
+      )}
+    </Box>
+  );
 }
 
 export default function ClientDetailsHeaderSection({
@@ -346,15 +392,13 @@ export default function ClientDetailsHeaderSection({
                       </Box>
                     </TableCell>
                   </TableRow>
-                  {/* Kiosk browser status bagefter */}
+                  {/* Kiosk browser status: teksten først, derefter ikon, og samme teksttype og størrelse som status badge i ClientDetailsInfoSection */}
                   <TableRow sx={{ height: isMobile ? 32 : 40 }}>
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
                       Kiosk browser status:
                     </TableCell>
                     <TableCell sx={valueCellStyle}>
-                      <Box sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", lineHeight: isMobile ? "32px" : "40px" }}>
-                        <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                      </Box>
+                      <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                     </TableCell>
                   </TableRow>
                 </TableBody>
