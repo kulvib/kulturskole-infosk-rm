@@ -430,8 +430,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               </Typography>
               <Box
                 sx={{
-                  width: 14,
-                  height: 14,
+                  width: isMobile ? 8 : 10,
+                  height: isMobile ? 8 : 10,
                   borderRadius: "50%",
                   bgcolor: manifestReady ? "#43a047" : "#e53935",
                   border: "1px solid #ddd",
