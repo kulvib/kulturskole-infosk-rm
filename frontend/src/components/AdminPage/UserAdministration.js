@@ -207,6 +207,11 @@ Kodeord: ${info.password}
       showSnackbar("Fuldt navn skal udfyldes", "error");
       return;
     }
+    if (!role) {
+      setUserError("Rolle skal vælges");
+      showSnackbar("Rolle skal vælges", "error");
+      return;
+    }
     if (role === "bruger" && !school_id) {
       setUserError("Bruger skal tilknyttes en skole");
       showSnackbar("Bruger skal tilknyttes en skole", "error");
@@ -450,12 +455,13 @@ Kodeord: ${info.password}
                 />
               </Grid>
               <Grid item xs={12} md={4}>
-                <FormControl size="small" fullWidth>
+                <FormControl size="small" fullWidth required>
                   <InputLabel id="rolle-label">Rolle</InputLabel>
                   <Select
                     labelId="rolle-label"
                     value={newUser.role}
                     label="Rolle"
+                    required
                     onChange={e => setNewUser({ ...newUser, role: e.target.value, school_id: "" })}
                   >
                     <MenuItem value="">Vælg rolle...</MenuItem>
@@ -476,6 +482,7 @@ Kodeord: ${info.password}
                 </Button>
               </Grid>
               <Grid item xs={12} md={4}>
+                {/* Kodeord feltet - ingen "*" men stadig required */}
                 <TextField
                   label="Kodeord"
                   value={newUser.password}
@@ -484,6 +491,7 @@ Kodeord: ${info.password}
                   size="small"
                   fullWidth
                   disabled
+                  placeholder="Kodeord"
                 />
               </Grid>
               <Grid item xs={12} md={4}>
