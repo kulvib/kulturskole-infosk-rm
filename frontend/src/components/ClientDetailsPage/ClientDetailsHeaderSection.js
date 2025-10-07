@@ -65,14 +65,14 @@ function StatusBadge({ color, text, animate = false, isMobile = false, showText 
   );
 }
 
-// Kiosk status badge med tekst og bounce KUN hvis farven er grøn (#43a047)
+// Kiosk status badge med tekst og bounce for ALLE statuser
 function ChromeStatusBadge({ status, color, isMobile = false }) {
   let fallbackColor = "grey.400";
   let text = status || "ukendt";
   let dotColor = color || fallbackColor;
 
-  // Bounce KUN hvis farven er grøn
-  const animate = dotColor?.toLowerCase() === "#43a047";
+  // Bounce for alle statuser
+  const animate = true;
 
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
@@ -82,7 +82,7 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
           fontWeight: 400,
           textTransform: "none",
           fontSize: isMobile ? 12 : undefined,
-          mr: 1,
+          mr: 1, // Samme afstand som i referencefilen
         }}
       >
         {text}
