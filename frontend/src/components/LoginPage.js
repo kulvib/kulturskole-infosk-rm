@@ -133,7 +133,7 @@ export default function LoginPage() {
             letterSpacing: 0.08,
           }}
         >
-          Kulturskolen Viborg
+          Infoskærm administration
         </Typography>
         <Typography
           variant="h6"
