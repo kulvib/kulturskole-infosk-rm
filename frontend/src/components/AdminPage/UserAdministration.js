@@ -35,6 +35,7 @@ import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
+// Secure password generator
 function generateSecurePassword() {
   const lower = "abcdefghijklmnopqrstuvwxyz";
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -312,6 +313,7 @@ Password: ${info.password}
       }).finally(() => setSavingEditUser(false));
   };
 
+  // Slet bruger dialog
   const handleOpenDeleteUserDialog = (user) => {
     setUserToDelete(user);
     setDeleteUserDialogOpen(true);
@@ -320,8 +322,13 @@ Password: ${info.password}
   };
   const handleFirstDeleteUserConfirm = () => setDeleteUserStep(2);
 
+  // Kun slet administrator hvis spærret
+  const canDeleteAdmin = userToDelete?.role === "administrator" && userToDelete?.is_active === false;
+
   const handleFinalDeleteUser = () => {
-    if (!userToDelete || userToDelete.role === "administrator") return;
+    if (!userToDelete) return;
+    // Bloker sletning af admin hvis aktiv
+    if (userToDelete.role === "administrator" && userToDelete.is_active) return;
     axios.delete(`${API_URL}/api/users/${userToDelete.id}`, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
@@ -411,7 +418,6 @@ Password: ${info.password}
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Brugeradministration
             </Typography>
-            {/* Fjernet teksten "Opret, redigér og slet brugere (kræver admin-rettigheder)" */}
             <Grid container spacing={2} sx={{ mb: 1 }}>
               <Grid item xs={12} md={4}>
                 <TextField
@@ -433,6 +439,7 @@ Password: ${info.password}
                   fullWidth
                 />
               </Grid>
+              {/* Rolle dropdown - "Bruger" først */}
               <Grid item xs={12} md={4}>
                 <FormControl size="small" fullWidth required>
                   <InputLabel id="rolle-label">Rolle</InputLabel>
@@ -443,8 +450,8 @@ Password: ${info.password}
                     required
                     onChange={e => setNewUser({ ...newUser, role: e.target.value, school_id: "" })}
                   >
-                    <MenuItem value="administrator">Administrator</MenuItem>
                     <MenuItem value="bruger">Bruger</MenuItem>
+                    <MenuItem value="administrator">Administrator</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -597,12 +604,22 @@ Password: ${info.password}
                               </IconButton>
                             </span>
                           </Tooltip>
-                          <Tooltip title={user.role === "administrator" ? "Administrator kan ikke slettes" : "Slet bruger"}>
+                          <Tooltip
+                            title={
+                              user.role === "administrator"
+                                ? user.is_active
+                                  ? "Administrator kan kun slettes hvis status er Spærret"
+                                  : "Slet administrator"
+                                : "Slet bruger"
+                            }
+                          >
                             <span>
                               <IconButton
                                 color="error"
                                 onClick={() => handleOpenDeleteUserDialog(user)}
-                                disabled={user.role === "administrator"}
+                                disabled={
+                                  user.role === "administrator" && user.is_active
+                                }
                               >
                                 <DeleteIcon />
                               </IconButton>
@@ -645,8 +662,8 @@ Password: ${info.password}
                         }}
                         disabled={savingEditUser}
                       >
-                        <MenuItem value="administrator">Administrator</MenuItem>
                         <MenuItem value="bruger">Bruger</MenuItem>
+                        <MenuItem value="administrator">Administrator</MenuItem>
                       </Select>
                     </FormControl>
                     {editUser.role === "bruger" && (
@@ -774,20 +791,26 @@ Password: ${info.password}
             Advarsel: Du er ved at slette brugeren <b>{userToDelete?.username}</b>.<br />
             Denne handling kan <b>ikke fortrydes!</b>
           </Typography>
-          {userToDelete?.role === "administrator" && (
+          {userToDelete?.role === "administrator" && userToDelete?.is_active && (
             <Typography color="error" sx={{ mb: 2 }}>
-              Administrator-brugere kan ikke slettes.
+              Administrator-brugere kan kun slettes hvis status er Spærret.
             </Typography>
           )}
-          {deleteUserStep === 1 && userToDelete?.role !== "administrator" && (
-            <Typography sx={{ mb: 2 }}>
-              Er du sikker på at du vil slette denne bruger?
-            </Typography>
-          )}
-          {deleteUserStep === 2 && userToDelete?.role !== "administrator" && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              Tryk <b>Slet endeligt</b> for at bekræfte.
-            </Typography>
+          {userToDelete && (
+            userToDelete.role !== "administrator" || canDeleteAdmin ? (
+              <>
+                {deleteUserStep === 1 && (
+                  <Typography sx={{ mb: 2 }}>
+                    Er du sikker på at du vil slette denne bruger?
+                  </Typography>
+                )}
+                {deleteUserStep === 2 && (
+                  <Typography color="error" sx={{ mb: 2 }}>
+                    Tryk <b>Slet endeligt</b> for at bekræfte.
+                  </Typography>
+                )}
+              </>
+            ) : null
           )}
           {deleteUserError && (
             <Typography color="error" sx={{ mb: 2 }}>
@@ -797,7 +820,7 @@ Password: ${info.password}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDeleteUserDialog}>Annuller</Button>
-          {userToDelete?.role !== "administrator" && (
+          {(userToDelete && (userToDelete.role !== "administrator" || canDeleteAdmin)) && (
             deleteUserStep === 1 ? (
               <Button color="warning" variant="contained" onClick={handleFirstDeleteUserConfirm}>
                 Bekræft sletning
