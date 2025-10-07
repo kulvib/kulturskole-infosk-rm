@@ -25,6 +25,7 @@ import {
   FormControl,
   InputLabel,
   TextField,
+  InputAdornment,
   Grid,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -42,14 +43,13 @@ function generateSecurePassword() {
   const digits = "0123456789";
   const specials = "!@#$%&*";
   let password = "";
-  // Ensure 1 of each type
   password += lower[Math.floor(Math.random() * lower.length)];
   password += upper[Math.floor(Math.random() * upper.length)];
   password += digits[Math.floor(Math.random() * digits.length)];
   for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) {
     password += specials[Math.floor(Math.random() * specials.length)];
   }
-  // Fill remaining length
+  // Fill to length 12
   const all = lower + upper + digits + specials;
   for (let i = password.length; i < 12; i++) {
     password += all[Math.floor(Math.random() * all.length)];
@@ -68,7 +68,7 @@ export default function UserAdministration() {
     username: "",
     password: "",
     full_name: "",
-    role: "",
+    role: "bruger",
     is_active: true,
     school_id: "",
     remarks: "",
@@ -152,36 +152,14 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showEditDownloadButton, editDownloadCountdown]);
 
-  // Generer kodeord funktion – kun på knaptryk
+  // Generer kodeord funktion – nu kun på knaptryk
   const handleGeneratePassword = (forEdit = false) => {
     const password = generateSecurePassword();
     if (forEdit) {
       setEditUser(editUser => ({ ...editUser, password }));
-      const schoolName = (editUser?.role === "bruger" && editUser?.school_id)
-        ? (getAlphaSchools().find(s => s.id === editUser.school_id)?.name ?? "")
-        : "";
-      setEditUserDownloadInfo({
-        full_name: editUser.full_name,
-        username: editUser.username,
-        password,
-        schoolName,
-      });
-      setShowEditDownloadButton(true);
-      setEditDownloadCountdown(10);
       showSnackbar("Kodeord genereret!", "info");
     } else {
       setNewUser(prev => ({ ...prev, password }));
-      const schoolName = (newUser?.role === "bruger" && newUser?.school_id)
-        ? (getAlphaSchools().find(s => s.id === newUser.school_id)?.name ?? "")
-        : "";
-      setNewUserDownloadInfo({
-        full_name: newUser.full_name,
-        username: newUser.username,
-        password,
-        schoolName,
-      });
-      setShowDownloadButton(true);
-      setDownloadCountdown(10);
       showSnackbar("Kodeord genereret!", "info");
     }
   };
@@ -216,11 +194,6 @@ Kodeord: ${info.password}
       showSnackbar("Fuldt navn skal udfyldes", "error");
       return;
     }
-    if (!role) {
-      setUserError("Vælg rolle");
-      showSnackbar("Vælg rolle", "error");
-      return;
-    }
     if (role === "bruger" && !school_id) {
       setUserError("Bruger skal tilknyttes en skole");
       showSnackbar("Bruger skal tilknyttes en skole", "error");
@@ -239,10 +212,18 @@ Kodeord: ${info.password}
     })
       .then(res => {
         setUsers(Array.isArray(users) ? [...users, res.data] : [res.data]);
-        setNewUser({ username: "", password: "", full_name: "", role: "", is_active: true, school_id: "", remarks: "" });
+        setNewUser({ username: "", password: "", full_name: "", role: "bruger", is_active: true, school_id: "", remarks: "" });
         showSnackbar("Bruger oprettet!", "success");
-        setShowDownloadButton(false);
-        setNewUserDownloadInfo(null);
+        const schoolName = role === "bruger"
+          ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
+          : "";
+        setNewUserDownloadInfo({
+          full_name,
+          username,
+          password,
+          schoolName,
+        });
+        setShowDownloadButton(true);
         setDownloadCountdown(10);
       })
       .catch(e => {
@@ -300,11 +281,6 @@ Kodeord: ${info.password}
       showSnackbar("Fuldt navn skal udfyldes", "error");
       return;
     }
-    if (!role) {
-      setUserError("Vælg rolle");
-      showSnackbar("Vælg rolle", "error");
-      return;
-    }
     axios.patch(`${API_URL}/api/users/${id}`, {
       role: role === "administrator" ? "admin" : "bruger",
       is_active,
@@ -320,8 +296,16 @@ Kodeord: ${info.password}
         setUserDialogOpen(false);
         setEditUser(null);
         showSnackbar("Bruger opdateret!", "success");
-        setShowEditDownloadButton(false);
-        setEditUserDownloadInfo(null);
+        const schoolName = role === "bruger"
+          ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
+          : "";
+        setEditUserDownloadInfo({
+          full_name,
+          username: editUser.username,
+          password,
+          schoolName,
+        });
+        setShowEditDownloadButton(true);
         setEditDownloadCountdown(10);
       })
       .catch(e => {
@@ -630,10 +614,10 @@ Kodeord: ${info.password}
               onClose={() => setUserDialogOpen(false)}
               maxWidth="sm"
               fullWidth
-              sx={{ "& .MuiDialog-paper": { width: "110%" } }} // 10% bredere
+              sx={{ '& .MuiDialog-paper': { width: '110%' } }} // Make dialog 10% wider
             >
               <DialogTitle>Rediger bruger</DialogTitle>
-              <DialogContent sx={{ width: "110%" }}>
+              <DialogContent>
                 {editUser && (
                   <Stack gap={2} sx={{ mt: 1 }}>
                     <TextField
@@ -655,7 +639,7 @@ Kodeord: ${info.password}
                       <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                       <Select
                         labelId="edit-rolle-label"
-                        value={editUser.role === "admin" ? "administrator" : editUser.role}
+                        value={editUser.role === "admin" ? "administrator" : "bruger"}
                         label="Rolle"
                         disabled={editUser.role === "admin"}
                         onChange={e => {
@@ -740,6 +724,16 @@ Kodeord: ${info.password}
               <DialogActions>
                 <Button onClick={() => setUserDialogOpen(false)}>Annuller</Button>
                 <Button variant="contained" onClick={handleEditUser}>Gem ændringer</Button>
+                {/* Download after save */}
+                {showEditDownloadButton && editUserDownloadInfo && (
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
+                  >
+                    Download brugerinfo ({editDownloadCountdown})
+                  </Button>
+                )}
               </DialogActions>
             </Dialog>
           </Box>
@@ -759,4 +753,47 @@ Kodeord: ${info.password}
               Administrator-brugere kan ikke slettes.
             </Typography>
           )}
-          {deleteUserStep === 1 && userToDelete?.role
+          {deleteUserStep === 1 && userToDelete?.role !== "admin" && (
+            <Typography sx={{ mb: 2 }}>
+              Er du sikker på at du vil slette denne bruger?
+            </Typography>
+          )}
+          {deleteUserStep === 2 && userToDelete?.role !== "admin" && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              Tryk <b>Slet endeligt</b> for at bekræfte.
+            </Typography>
+          )}
+          {deleteUserError && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              {deleteUserError}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteUserDialog}>Annuller</Button>
+          {userToDelete?.role !== "admin" && (
+            deleteUserStep === 1 ? (
+              <Button color="warning" variant="contained" onClick={handleFirstDeleteUserConfirm}>
+                Bekræft sletning
+              </Button>
+            ) : (
+              <Button color="error" variant="contained" onClick={handleFinalDeleteUser}>
+                Slet endeligt
+              </Button>
+            )
+          )}
+        </DialogActions>
+      </Dialog>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3400}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
+    </Box>
+  );
+}
