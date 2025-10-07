@@ -250,7 +250,7 @@ Password: ${info.password}
     if (user.full_name === "Henrik Resen") return; // Block editing for Henrik Resen
     const mappedUser = {
       ...user,
-      role: user.role === "admin" ? "administrator" : user.role,
+      role: user.role === "admin" ? "bruger" : user.role, // Sikrer "bruger" eller "administrator"
       password: "",
     };
     setEditUser(mappedUser);
@@ -671,6 +671,23 @@ Password: ${info.password}
                         <MenuItem value="administrator">Administrator</MenuItem>
                       </Select>
                     </FormControl>
+                    {/* Skole-feltet - vises hvis "bruger" */}
+                    {editUser.role === "bruger" && (
+                      <FormControl fullWidth size="small">
+                        <InputLabel id="edit-skole-label">Skole</InputLabel>
+                        <Select
+                          labelId="edit-skole-label"
+                          value={editUser.school_id || ""}
+                          label="Skole"
+                          onChange={e => setEditUser({ ...editUser, school_id: e.target.value })}
+                          disabled={savingEditUser}
+                        >
+                          {getAlphaSchools().map(school => (
+                            <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )}
                     {/* Byt rækkefølge Bemærkninger og Status */}
                     <TextField
                       label="Bemærkninger"
