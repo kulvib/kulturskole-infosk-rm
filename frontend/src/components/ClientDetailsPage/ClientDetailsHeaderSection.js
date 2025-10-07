@@ -344,6 +344,12 @@ export default function ClientDetailsHeaderSection({
                           sx={inputStyle}
                           disabled={savingLocality}
                           inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleLocalitySave();
+                            }
+                          }}
                         />
                         <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
                         <Button
@@ -377,6 +383,12 @@ export default function ClientDetailsHeaderSection({
                           sx={kioskInputStyle}
                           disabled={savingKioskUrl}
                           inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleKioskUrlSave();
+                            }
+                          }}
                         />
                         <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
                         <Button
