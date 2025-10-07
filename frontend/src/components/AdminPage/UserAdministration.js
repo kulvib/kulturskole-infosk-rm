@@ -91,10 +91,12 @@ export default function UserAdministration() {
   const showSnackbar = (message, severity = "success") => setSnackbar({ open: true, message, severity });
   const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
 
+  // Download knap state for ny user
   const [newUserDownloadInfo, setNewUserDownloadInfo] = useState(null);
   const [showDownloadButton, setShowDownloadButton] = useState(false);
   const [downloadCountdown, setDownloadCountdown] = useState(10);
 
+  // Download knap state for redigering
   const [editUserDownloadInfo, setEditUserDownloadInfo] = useState(null);
   const [showEditDownloadButton, setShowEditDownloadButton] = useState(false);
   const [editDownloadCountdown, setEditDownloadCountdown] = useState(10);
@@ -154,47 +156,19 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showEditDownloadButton, editDownloadCountdown]);
 
+  // Generer kodeord funktion - kun password, ingen download-knap
   const handleGeneratePassword = (forEdit = false) => {
     const password = generateSecurePassword();
     if (forEdit) {
-      setEditUser(editUser => {
-        const updated = { ...editUser, password };
-        const schoolName =
-          updated.role === "bruger" && updated.school_id
-            ? (getAlphaSchools().find(s => s.id === updated.school_id)?.name ?? "")
-            : "";
-        setEditUserDownloadInfo({
-          full_name: updated.full_name,
-          username: updated.username,
-          password,
-          schoolName,
-        });
-        setShowEditDownloadButton(true);
-        setEditDownloadCountdown(10);
-        showSnackbar("Kodeord genereret!", "info");
-        return updated;
-      });
+      setEditUser(editUser => ({ ...editUser, password }));
+      showSnackbar("Kodeord genereret!", "info");
     } else {
-      setNewUser(prev => {
-        const updated = { ...prev, password };
-        const schoolName =
-          updated.role === "bruger" && updated.school_id
-            ? (getAlphaSchools().find(s => s.id === updated.school_id)?.name ?? "")
-            : "";
-        setNewUserDownloadInfo({
-          full_name: updated.full_name,
-          username: updated.username,
-          password,
-          schoolName,
-        });
-        setShowDownloadButton(true);
-        setDownloadCountdown(10);
-        showSnackbar("Kodeord genereret!", "info");
-        return updated;
-      });
+      setNewUser(prev => ({ ...prev, password }));
+      showSnackbar("Kodeord genereret!", "info");
     }
   };
 
+  // Download brugerinfo funktion
   const triggerDownloadUserInfo = (info) => {
     const fileName = info.full_name.trim().replace(/\s+/g, "_") + ".txt";
     const content = `Fulde navn: ${info.full_name}
@@ -211,6 +185,7 @@ Kodeord: ${info.password}
     setTimeout(() => document.body.removeChild(link), 100);
   };
 
+  // Opret ny bruger
   const handleAddUser = () => {
     setUserError("");
     const { username, password, full_name, role, is_active, school_id, remarks } = newUser;
@@ -250,8 +225,17 @@ Kodeord: ${info.password}
         }]);
         setNewUser({ username: "", password: "", full_name: "", role: "", is_active: true, school_id: "", remarks: "" });
         showSnackbar("Bruger oprettet!", "success");
-        setShowDownloadButton(false);
-        setNewUserDownloadInfo(null);
+        // -- Download-knap logik --
+        const schoolName = role === "bruger"
+          ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
+          : "";
+        setNewUserDownloadInfo({
+          full_name,
+          username,
+          password,
+          schoolName,
+        });
+        setShowDownloadButton(true);
         setDownloadCountdown(10);
       })
       .catch(e => {
@@ -260,41 +244,8 @@ Kodeord: ${info.password}
       });
   };
 
-  const handleOpenDeleteUserDialog = (user) => {
-    setUserToDelete(user);
-    setDeleteUserDialogOpen(true);
-    setDeleteUserError("");
-    setDeleteUserStep(1);
-  };
-  const handleFirstDeleteUserConfirm = () => setDeleteUserStep(2);
-
-  const handleFinalDeleteUser = () => {
-    if (!userToDelete || userToDelete.role === "administrator") return;
-    axios.delete(`${API_URL}/api/users/${userToDelete.id}`, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
-    })
-      .then(() => {
-        setUsers(Array.isArray(users) ? users.filter(u => u.id !== userToDelete.id) : []);
-        setDeleteUserDialogOpen(false);
-        setUserToDelete(null);
-        setDeleteUserStep(1);
-        showSnackbar("Bruger slettet!", "success");
-      })
-      .catch(e => {
-        setDeleteUserError("Kunne ikke slette bruger: " + (e.response?.data?.detail || ""));
-        showSnackbar("Fejl ved sletning af bruger", "error");
-      });
-  };
-  // FIX: Define this handler!
-  const handleCloseDeleteUserDialog = () => {
-    setDeleteUserDialogOpen(false);
-    setUserToDelete(null);
-    setDeleteUserError("");
-    setDeleteUserStep(1);
-  };
-
+  // Rediger bruger
   const openEditUserDialog = (user) => {
-    // Map "admin" to "administrator"
     const mappedUser = {
       ...user,
       role: user.role === "admin" ? "administrator" : user.role,
@@ -335,6 +286,7 @@ Kodeord: ${info.password}
         setUserDialogOpen(false);
         setEditUser(null);
         showSnackbar("Bruger opdateret!", "success");
+        // -- Download-knap logik --
         const schoolName =
           role === "bruger" && school_id
             ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
@@ -354,9 +306,44 @@ Kodeord: ${info.password}
       });
   };
 
+  // Slet bruger dialog
+  const handleOpenDeleteUserDialog = (user) => {
+    setUserToDelete(user);
+    setDeleteUserDialogOpen(true);
+    setDeleteUserError("");
+    setDeleteUserStep(1);
+  };
+  const handleFirstDeleteUserConfirm = () => setDeleteUserStep(2);
+
+  const handleFinalDeleteUser = () => {
+    if (!userToDelete || userToDelete.role === "administrator") return;
+    axios.delete(`${API_URL}/api/users/${userToDelete.id}`, {
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
+    })
+      .then(() => {
+        setUsers(Array.isArray(users) ? users.filter(u => u.id !== userToDelete.id) : []);
+        setDeleteUserDialogOpen(false);
+        setUserToDelete(null);
+        setDeleteUserStep(1);
+        showSnackbar("Bruger slettet!", "success");
+      })
+      .catch(e => {
+        setDeleteUserError("Kunne ikke slette bruger: " + (e.response?.data?.detail || ""));
+        showSnackbar("Fejl ved sletning af bruger", "error");
+      });
+  };
+  const handleCloseDeleteUserDialog = () => {
+    setDeleteUserDialogOpen(false);
+    setUserToDelete(null);
+    setDeleteUserError("");
+    setDeleteUserStep(1);
+  };
+
+  // Skole sortering
   const getAlphaSchools = () =>
     schools.slice().sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
 
+  // Sortering og søgning af brugere
   const getSortedUsers = () => {
     let arr = users.filter(u => {
       const schoolName = u.school_id
@@ -413,6 +400,7 @@ Kodeord: ${info.password}
     }));
   };
 
+  // Render
   return (
     <Box sx={{}}>
       <Paper sx={{ mb: 4, p: 3 }}>
@@ -746,15 +734,6 @@ Kodeord: ${info.password}
                       fullWidth
                       size="small"
                     />
-                    {showEditDownloadButton && editUserDownloadInfo && (
-                      <Button
-                        variant="outlined"
-                        color="primary"
-                        onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
-                      >
-                        Download brugerinfo ({editDownloadCountdown})
-                      </Button>
-                    )}
                   </Stack>
                 )}
                 {userError && <Typography color="error" sx={{ mt: 2 }}>{userError}</Typography>}
@@ -762,6 +741,15 @@ Kodeord: ${info.password}
               <DialogActions>
                 <Button onClick={() => setUserDialogOpen(false)}>Annuller</Button>
                 <Button variant="contained" onClick={handleEditUser}>Gem ændringer</Button>
+                {showEditDownloadButton && editUserDownloadInfo && (
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
+                  >
+                    Download brugerinfo ({editDownloadCountdown})
+                  </Button>
+                )}
               </DialogActions>
             </Dialog>
           </Box>
