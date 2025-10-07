@@ -466,14 +466,15 @@ Kodeord: ${info.password}
                 </Button>
               </Grid>
               <Grid item xs={12} md={4}>
+                {/* Kodeord feltet - ingen "*" men stadig required */}
                 <TextField
-                  required
                   label="Kodeord"
-                  type="text"
                   value={newUser.password}
-                  disabled
+                  required
+                  type="text"
                   size="small"
                   fullWidth
+                  disabled
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -681,7 +682,6 @@ Kodeord: ${info.password}
                           }));
                         }}
                       >
-                        <MenuItem value="">Vælg rolle...</MenuItem>
                         <MenuItem value="administrator">Administrator</MenuItem>
                         <MenuItem value="bruger">Bruger</MenuItem>
                       </Select>
