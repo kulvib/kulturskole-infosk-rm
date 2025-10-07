@@ -23,7 +23,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
 // StatusBadge med 2s puls animation hvis animate=true
-function StatusBadge({ color, text, animate = false, isMobile = false }) {
+function StatusBadge({ color, text, animate = false, isMobile = false, showText = true }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
       <Box sx={{
@@ -33,12 +33,14 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
         bgcolor: color,
         boxShadow: "0 0 2px rgba(0,0,0,0.12)",
         border: "1px solid #ddd",
-        mr: 1,
+        mr: showText ? 1 : 0,
         animation: animate ? "pulsate 2s infinite" : "none"
       }} />
-      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : undefined }}>
-        {text}
-      </Typography>
+      {showText && (
+        <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : undefined }}>
+          {text}
+        </Typography>
+      )}
       {animate && (
         <style>
           {`
@@ -59,6 +61,57 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           `}
         </style>
       )}
+    </Box>
+  );
+}
+
+// Kiosk status badge med tekst og bounce
+function ChromeStatusBadge({ status, color, isMobile = false }) {
+  let fallbackColor = "grey.400";
+  let text = status || "ukendt";
+  let dotColor = color || fallbackColor;
+  let animate = false;
+
+  if (!color && typeof status === "string") {
+    const s = status.toLowerCase();
+    if (s === "running") {
+      dotColor = "#43a047";
+      text = "åben";
+      animate = true;
+    } else if (s === "stopped" || s === "closed") {
+      dotColor = "#e53935";
+      text = "lukket";
+      animate = false;
+    } else if (s === "unknown") {
+      dotColor = "grey.400";
+      text = "ukendt";
+      animate = false;
+    } else if (s.includes("kører")) {
+      dotColor = "#43a047";
+      text = status;
+      animate = true;
+    } else if (s.includes("lukket")) {
+      dotColor = "#e53935";
+      text = status;
+      animate = false;
+    }
+  }
+
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+      {/* Tekst først, badge bagefter */}
+      <Typography
+        variant="body2"
+        sx={{
+          fontWeight: 400,
+          textTransform: "none",
+          fontSize: isMobile ? 12 : undefined,
+          mr: 1,
+        }}
+      >
+        {text}
+      </Typography>
+      <StatusBadge color={dotColor} animate={animate} isMobile={isMobile} showText={false} />
     </Box>
   );
 }
@@ -98,87 +151,6 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
         </Button>
       </span>
     </Tooltip>
-  );
-}
-
-// ChromeStatusIcon med badge og 2s puls (animeret hvis browser kører)
-function ChromeStatusIcon({ status, color, isMobile = false }) {
-  let fallbackColor = "grey.400";
-  let text = status || "ukendt";
-  let dotColor = color || fallbackColor;
-  let animate = false;
-
-  if (!color && typeof status === "string") {
-    const s = status.toLowerCase();
-    if (s === "running") {
-      dotColor = "#43a047";
-      text = "åben";
-      animate = true;
-    } else if (s === "stopped" || s === "closed") {
-      dotColor = "#e53935";
-      text = "lukket";
-      animate = false;
-    } else if (s === "unknown") {
-      dotColor = "grey.400";
-      text = "ukendt";
-      animate = false;
-    } else if (s.includes("kører")) {
-      dotColor = "#43a047";
-      text = status;
-      animate = true;
-    } else if (s.includes("lukket")) {
-      dotColor = "#e53935";
-      text = status;
-      animate = false;
-    }
-  }
-
-  // Teksttypen og størrelse som i ClientDetailsInfoSection:
-  return (
-    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 400,
-          textTransform: "none",
-          fontSize: isMobile ? 12 : undefined,
-          mr: 1,
-        }}
-      >
-        {text}
-      </Typography>
-      <Box
-        sx={{
-          width: isMobile ? 8 : 10,
-          height: isMobile ? 8 : 10,
-          borderRadius: "50%",
-          bgcolor: dotColor,
-          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-          border: "1px solid #ddd",
-          animation: animate ? "pulsate 2s infinite" : "none"
-        }}
-      />
-      {animate && (
-        <style>
-          {`
-            @keyframes pulsate {
-              0% {
-                transform: scale(1);
-                opacity: 1;
-              }
-              50% {
-                transform: scale(1.25);
-                opacity: 0.5;
-              }
-              100% {
-                transform: scale(1);
-                opacity: 1;
-              }
-            }
-          `}
-        </style>
-      )}
-    </Box>
   );
 }
 
@@ -404,13 +376,13 @@ export default function ClientDetailsHeaderSection({
                       </Box>
                     </TableCell>
                   </TableRow>
-                  {/* Kiosk browser status: teksten først, derefter ikon, og samme teksttype og størrelse som status badge i ClientDetailsInfoSection */}
+                  {/* Kiosk browser status: teksten først, derefter badge med bounce animation */}
                   <TableRow sx={{ height: isMobile ? 32 : 40 }}>
                     <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
                       Kiosk browser status:
                     </TableCell>
                     <TableCell sx={valueCellStyle}>
-                      <ChromeStatusIcon status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+                      <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                     </TableCell>
                   </TableRow>
                 </TableBody>
