@@ -134,133 +134,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     setBuffering(false);
   }
 
-  // --- MODIFICERET LOGIK! Afspil først når der er mindst to segmenter, og vis næstsidste segment ---
-  useEffect(() => {
-    if (!clientId) return;
-    const video = videoRef.current;
-    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
-
-    let hls;
-    let manifestChecked = false;
-    let stopPolling = false;
-    let pollInterval;
-
-    const startPlayback = async () => {
-      setError("");
-      setManifestReady(true);
-      setLastLive(new Date());
-
-      // Hent manifest og tæl segmenter
-      const manifestResp = await fetch(hlsUrl + "?cachebust=" + Date.now());
-      const manifestText = await manifestResp.text();
-      const manifestLines = manifestText.split('\n');
-      // Segment lines er dem som ikke starter med "#"
-      const segmentLines = manifestLines.filter(l => l && !l.startsWith('#'));
-      if (segmentLines.length < 2) {
-        setError("Venter på flere segmenter …");
-        setManifestReady(false);
-        return;
-      }
-      // Find næstsidste segment
-      const segmentCount = segmentLines.length;
-      const targetSegmentIndex = segmentCount - 2;
-
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = hlsUrl;
-        video.play();
-      } else if (Hls.isSupported()) {
-        hls = new Hls();
-        hlsRef.current = hls;
-        hls.loadSource(hlsUrl);
-        hls.attachMedia(video);
-
-        // Sæt startPosition til næstsidste segment
-        hls.startPosition = targetSegmentIndex;
-
-        hls.on(Hls.Events.ERROR, (event, data) => {
-          if (data.fatal) {
-            setError("Streamen blev afbrudt. Prøver igen ...");
-            setManifestReady(false);
-            cleanup();
-          }
-        });
-
-        hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
-          if (data && data.frag && typeof data.frag.sn === "number") {
-            setCurrentSegment(data.frag.sn);
-          }
-        });
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          // Forsøg at seek til næstsidste segment hvis muligt (ekstra sikkerhed)
-          if (hls.levels && hls.levels[0] && hls.levels[0].details && hls.levels[0].details.fragments) {
-            const fragments = hls.levels[0].details.fragments;
-            if (fragments.length >= 2) {
-              // Beregn tiden for næstsidste segment og seek
-              const targetFrag = fragments[fragments.length - 2];
-              if (targetFrag && typeof targetFrag.start === "number") {
-                video.currentTime = targetFrag.start;
-              }
-            }
-          }
-        });
-      }
-      video.muted = true;
-      video.autoplay = true;
-      video.playsInline = true;
-    };
-
-    const cleanup = () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-      if (videoRef.current) {
-        videoRef.current.removeAttribute("src");
-        videoRef.current.load();
-      }
-    };
-
-    const poll = async () => {
-      try {
-        const resp = await fetch(hlsUrl, { method: "HEAD" });
-        if (resp.ok) {
-          setLastFetched(new Date());
-          if (!manifestChecked) {
-            manifestChecked = true;
-            setError("");
-            setManifestReady(true);
-            await startPlayback();
-          }
-        } else {
-          throw new Error("404");
-        }
-      } catch (e) {
-        if (manifestChecked) {
-          setError("Streamen blev afbrudt eller forsvandt. Prøver igen ...");
-          setManifestReady(false);
-          cleanup();
-        } else {
-          setError("Kan ikke finde klientstream endnu.");
-        }
-        manifestChecked = false;
-      }
-    };
-
-    poll();
-    pollInterval = setInterval(() => {
-      if (stopPolling) return;
-      poll();
-    }, manifestReady ? 5000 : 250);
-
-    return () => {
-      stopPolling = true;
-      clearInterval(pollInterval);
-      cleanup();
-    };
-  }, [clientId, refreshKey]);
-
-  // Resten er uændret
   useEffect(() => {
     if (!clientId) return;
     let ignore = false;
@@ -289,6 +162,97 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
     maybeResetSegments();
     return () => { ignore = true; };
+  }, [clientId, refreshKey]);
+
+  useEffect(() => {
+    if (!clientId) return;
+    const video = videoRef.current;
+    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
+
+    let hls;
+    let manifestChecked = false;
+    let stopPolling = false;
+    let pollInterval;
+
+    const startPlayback = () => {
+      setError("");
+      setManifestReady(true);
+      setLastLive(new Date());
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = hlsUrl;
+      } else if (Hls.isSupported()) {
+        hls = new Hls();
+        hlsRef.current = hls;
+        hls.loadSource(hlsUrl);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            setError("Streamen blev afbrudt. Prøver igen ...");
+            setManifestReady(false);
+            cleanup();
+          }
+        });
+
+        hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
+          if (data && data.frag && typeof data.frag.sn === "number") {
+            setCurrentSegment(data.frag.sn);
+          }
+        });
+      }
+      video.muted = true;
+      video.autoplay = true;
+      video.playsInline = true;
+    };
+
+    const cleanup = () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.removeAttribute("src");
+        videoRef.current.load();
+      }
+    };
+
+    const poll = async () => {
+      try {
+        const resp = await fetch(hlsUrl, { method: "HEAD" });
+        if (resp.ok) {
+          setLastFetched(new Date());
+          if (!manifestChecked) {
+            manifestChecked = true;
+            setError("");
+            setManifestReady(true);
+            startPlayback();
+          }
+        } else {
+          throw new Error("404");
+        }
+      } catch (e) {
+        if (manifestChecked) {
+          setError("Streamen blev afbrudt eller forsvandt. Prøver igen ...");
+          setManifestReady(false);
+          cleanup();
+        } else {
+          setError("Kan ikke finde klientstream endnu.");
+        }
+        manifestChecked = false;
+      }
+    };
+
+    poll();
+    pollInterval = setInterval(() => {
+      if (stopPolling) return;
+      poll();
+    }, manifestReady ? 5000 : 250);
+
+    return () => {
+      stopPolling = true;
+      clearInterval(pollInterval);
+      cleanup();
+    };
   }, [clientId, refreshKey]);
 
   useEffect(() => {
