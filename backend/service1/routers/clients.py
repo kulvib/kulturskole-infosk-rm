@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import select, delete
 from typing import List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from db import get_session
-from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction
+from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction, School
 from auth import get_current_user
 import os
 import glob
@@ -297,7 +297,26 @@ async def update_kiosk_url(
     session.refresh(client)
     return client
 
-# Godkend klient
+# Helper: Hent alle datoer for et skoleår
+def get_school_year_dates(season_start):
+    dates = []
+    # August-december
+    for month in range(8, 13):
+        for day in range(1, 32):
+            try:
+                dates.append(date(season_start, month, day))
+            except ValueError:
+                continue
+    # Januar-juli
+    for month in range(1, 8):
+        for day in range(1, 32):
+            try:
+                dates.append(date(season_start + 1, month, day))
+            except ValueError:
+                continue
+    return dates
+
+# Godkend klient + Opret alle kalenderdage som "on" med skolens tider
 @router.post("/clients/{id}/approve", response_model=Client)
 async def approve_client(
     id: int,
@@ -320,6 +339,41 @@ async def approve_client(
     session.add(client)
     session.commit()
     session.refresh(client)
+
+    # --- Opret CalendarMarking med skolens tider ---
+    school = None
+    if client.school_id:
+        school = session.get(School, client.school_id)
+    today = date.today()
+    if today.month >= 8:
+        season_start = today.year
+    else:
+        season_start = today.year - 1
+
+    school_year_dates = get_school_year_dates(season_start)
+    markings = {}
+
+    # Brug skolens tider hvis de findes, ellers fallback
+    def_wd_on = getattr(school, "weekday_on", "09:00") if school else "09:00"
+    def_wd_off = getattr(school, "weekday_off", "22:30") if school else "22:30"
+    def_we_on = getattr(school, "weekend_on", "08:00") if school else "08:00"
+    def_we_off = getattr(school, "weekend_off", "18:00") if school else "18:00"
+
+    for d in school_year_dates:
+        weekday = d.weekday()
+        if weekday < 5:
+            markings[d.isoformat()] = {"status": "on", "onTime": def_wd_on, "offTime": def_wd_off}
+        else:
+            markings[d.isoformat()] = {"status": "on", "onTime": def_we_on, "offTime": def_we_off}
+
+    existing = session.exec(
+        select(CalendarMarking)
+        .where(CalendarMarking.season == season_start, CalendarMarking.client_id == client.id)
+    ).first()
+    if not existing:
+        session.add(CalendarMarking(season=season_start, client_id=client.id, markings=markings))
+        session.commit()
+
     return client
 
 # Heartbeat fra klient
