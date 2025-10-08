@@ -27,6 +27,9 @@ import {
   TextField,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import SaveIcon from "@mui/icons-material/Save";
+import CancelIcon from "@mui/icons-material/Cancel";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import axios from "axios";
@@ -56,6 +59,11 @@ export default function SchoolAdministration() {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const showSnackbar = (message, severity = "success") => setSnackbar({ open: true, message, severity });
   const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
+
+  // Inline edit state
+  const [editSchoolId, setEditSchoolId] = useState(null);
+  const [editSchoolName, setEditSchoolName] = useState("");
+  const [editSchoolError, setEditSchoolError] = useState("");
 
   useEffect(() => {
     setLoadingSchools(true);
@@ -194,6 +202,47 @@ export default function SchoolAdministration() {
     schools.slice().sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
 
   const inputSx = { minWidth: 180, my: 0 };
+
+  // Inline edit handlers
+  const handleEditSchool = (school) => {
+    setEditSchoolId(school.id);
+    setEditSchoolName(school.name);
+    setEditSchoolError("");
+  };
+
+  const handleCancelEditSchool = () => {
+    setEditSchoolId(null);
+    setEditSchoolName("");
+    setEditSchoolError("");
+  };
+
+  const handleChangeEditSchoolName = (e) => {
+    setEditSchoolName(e.target.value);
+    setEditSchoolError("");
+  };
+
+  const handleSaveEditSchool = (school) => {
+    const trimmedName = editSchoolName.trim();
+    if (!trimmedName) {
+      setEditSchoolError("Navnet kan ikke være tomt");
+      return;
+    }
+    if (schools.some(s => s.name === trimmedName && s.id !== school.id)) {
+      setEditSchoolError("Skolenavnet findes allerede");
+      return;
+    }
+    axios.patch(`${API_URL}/api/schools/${school.id}/`, { name: trimmedName }, {
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
+    })
+      .then(res => {
+        setSchools(schools.map(s => s.id === school.id ? res.data : s));
+        showSnackbar("Skolenavn opdateret!", "success");
+        handleCancelEditSchool();
+      })
+      .catch(e => {
+        setEditSchoolError(e.response?.data?.detail || "Fejl ved opdatering");
+      });
+  };
 
   return (
     <Box sx={{}}>
@@ -350,20 +399,64 @@ export default function SchoolAdministration() {
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 700 }}>Skole</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Rediger</TableCell>
                     <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {getSortedSchools().length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={2} align="center" sx={{ color: "#888" }}>
+                      <TableCell colSpan={3} align="center" sx={{ color: "#888" }}>
                         Ingen skoler oprettet endnu
                       </TableCell>
                     </TableRow>
                   ) : (
                     getSortedSchools().map((school) => (
                       <TableRow key={school.id ?? school.name} hover>
-                        <TableCell>{school.name}</TableCell>
+                        <TableCell>
+                          {editSchoolId === school.id ? (
+                            <TextField
+                              value={editSchoolName}
+                              onChange={handleChangeEditSchoolName}
+                              size="small"
+                              error={!!editSchoolError}
+                              helperText={editSchoolError}
+                              sx={{ minWidth: 120 }}
+                              autoFocus
+                              onKeyDown={e => {
+                                if (e.key === "Enter") handleSaveEditSchool(school);
+                                if (e.key === "Escape") handleCancelEditSchool();
+                              }}
+                            />
+                          ) : (
+                            school.name
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editSchoolId === school.id ? (
+                            <>
+                              <Tooltip title="Gem">
+                                <IconButton color="primary" onClick={() => handleSaveEditSchool(school)}>
+                                  <SaveIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Annuller">
+                                <IconButton color="inherit" onClick={handleCancelEditSchool}>
+                                  <CancelIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          ) : (
+                            <Tooltip title="Rediger navn">
+                              <IconButton
+                                color="primary"
+                                onClick={() => handleEditSchool(school)}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </TableCell>
                         <TableCell align="right">
                           <Tooltip title="Slet skole">
                             <span>
@@ -387,6 +480,8 @@ export default function SchoolAdministration() {
           </Box>
         </Stack>
       </Paper>
+
+      {/* ... resten af din Dialog og Snackbar som før ... */}
 
       <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog} maxWidth="md" fullWidth>
         <DialogTitle>
