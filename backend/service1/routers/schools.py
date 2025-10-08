@@ -28,23 +28,18 @@ def delete_school(school_id: int, session=Depends(get_session)):
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
-    # Hent alle klienter til skolen
     clients = session.exec(select(Client).where(Client.school_id == school_id)).all()
     for client in clients:
-        # Slet alle calendar-markinger for denne klient
         markings = session.exec(
             select(CalendarMarking).where(CalendarMarking.client_id == client.id)
         ).all()
         for marking in markings:
             session.delete(marking)
-        # Slet klienten
         session.delete(client)
-    # Slet skolen
     session.delete(school)
     session.commit()
     return
 
-# NYT ENDPOINT: Opdater tider for en skole
 @router.patch("/schools/{school_id}/times", response_model=School)
 def update_school_times(
     school_id: int,
@@ -79,3 +74,22 @@ def get_school_times(school_id: int, session=Depends(get_session)):
         "weekday": {"onTime": school.weekday_on, "offTime": school.weekday_off},
         "weekend": {"onTime": school.weekend_on, "offTime": school.weekend_off},
     }
+
+# NYT ENDPOINT: Rediger skolens navn
+@router.patch("/schools/{school_id}/", response_model=School)
+def update_school_name(
+    school_id: int,
+    name: str = Body(...),
+    session=Depends(get_session)
+):
+    school = session.get(School, school_id)
+    if not school:
+        raise HTTPException(status_code=404, detail="Skole ikke fundet")
+    existing = session.exec(select(School).where(School.name == name)).first()
+    if existing and existing.id != school_id:
+        raise HTTPException(status_code=400, detail="Skolenavnet findes allerede")
+    school.name = name
+    session.add(school)
+    session.commit()
+    session.refresh(school)
+    return school
