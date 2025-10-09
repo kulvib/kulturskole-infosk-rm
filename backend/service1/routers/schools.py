@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import select
 from db import get_session
 from models import School, Client, CalendarMarking
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -75,16 +76,20 @@ def get_school_times(school_id: int, session=Depends(get_session)):
         "weekend": {"onTime": school.weekend_on, "offTime": school.weekend_off},
     }
 
-# NYT ENDPOINT: Rediger skolens navn
+# PATCH: Rediger skolens navn (rettet version med Pydantic model)
+class SchoolNameUpdate(BaseModel):
+    name: str
+
 @router.patch("/schools/{school_id}/", response_model=School)
 def update_school_name(
     school_id: int,
-    name: str = Body(...),
+    update: SchoolNameUpdate,
     session=Depends(get_session)
 ):
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
+    name = update.name
     existing = session.exec(select(School).where(School.name == name)).first()
     if existing and existing.id != school_id:
         raise HTTPException(status_code=400, detail="Skolenavnet findes allerede")
