@@ -25,6 +25,10 @@ import {
   FormControl,
   InputLabel,
   TextField,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
@@ -244,6 +248,14 @@ export default function SchoolAdministration() {
       });
   };
 
+  // Grid rendering helpers
+  const schoolsPerRow = 4;
+  const sortedSchools = getSortedSchools();
+  const schoolRows = [];
+  for (let i = 0; i < sortedSchools.length; i += schoolsPerRow) {
+    schoolRows.push(sortedSchools.slice(i, i + schoolsPerRow));
+  }
+
   return (
     <Box sx={{}}>
       <Paper sx={{ mb: 4, p: 3 }}>
@@ -394,89 +406,83 @@ export default function SchoolAdministration() {
                 {deleteError}
               </Typography>
             )}
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>Skole</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Rediger</TableCell>
-                    <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {getSortedSchools().length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} align="center" sx={{ color: "#888" }}>
-                        Ingen skoler oprettet endnu
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    getSortedSchools().map((school) => (
-                      <TableRow key={school.id ?? school.name} hover>
-                        <TableCell>
-                          {editSchoolId === school.id ? (
-                            <TextField
-                              value={editSchoolName}
-                              onChange={handleChangeEditSchoolName}
-                              size="small"
-                              error={!!editSchoolError}
-                              helperText={editSchoolError}
-                              sx={{ minWidth: 120 }}
-                              autoFocus
-                              onKeyDown={e => {
-                                if (e.key === "Enter") handleSaveEditSchool(school);
-                                if (e.key === "Escape") handleCancelEditSchool();
-                              }}
-                            />
-                          ) : (
-                            school.name
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {editSchoolId === school.id ? (
-                            <>
-                              <Tooltip title="Gem">
-                                <IconButton color="primary" onClick={() => handleSaveEditSchool(school)}>
-                                  <SaveIcon />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Annuller">
-                                <IconButton color="inherit" onClick={handleCancelEditSchool}>
-                                  <CancelIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </>
-                          ) : (
-                            <Tooltip title="Rediger navn">
-                              <IconButton
-                                color="primary"
-                                onClick={() => handleEditSchool(school)}
-                              >
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </TableCell>
-                        <TableCell align="right">
-                          <Tooltip title="Slet skole">
-                            <span>
-                              <IconButton
-                                edge="end"
-                                aria-label="slet"
-                                color="error"
-                                onClick={() => handleOpenDeleteDialog(school)}
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+
+            {/* GRID WITH 4 SCHOOLS PER ROW */}
+            {schoolRows.length === 0 ? (
+              <Typography align="center" sx={{ color: "#888", mt: 2 }}>
+                Ingen skoler oprettet endnu
+              </Typography>
+            ) : (
+              <Box sx={{ mt: 2 }}>
+                {schoolRows.map((row, rowIdx) => (
+                  <Grid container spacing={2} sx={{ mb: 2 }} key={rowIdx}>
+                    {row.map((school) => (
+                      <Grid item xs={12} sm={6} md={3} key={school.id ?? school.name}>
+                        <Card variant="outlined" sx={{ height: "100%" }}>
+                          <CardContent>
+                            {editSchoolId === school.id ? (
+                              <TextField
+                                value={editSchoolName}
+                                onChange={handleChangeEditSchoolName}
+                                size="small"
+                                error={!!editSchoolError}
+                                helperText={editSchoolError}
+                                sx={{ minWidth: 120 }}
+                                autoFocus
+                                onKeyDown={e => {
+                                  if (e.key === "Enter") handleSaveEditSchool(school);
+                                  if (e.key === "Escape") handleCancelEditSchool();
+                                }}
+                              />
+                            ) : (
+                              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                {school.name}
+                              </Typography>
+                            )}
+                          </CardContent>
+                          <CardActions sx={{ justifyContent: "flex-end" }}>
+                            {editSchoolId === school.id ? (
+                              <>
+                                <Tooltip title="Gem">
+                                  <IconButton color="primary" onClick={() => handleSaveEditSchool(school)}>
+                                    <SaveIcon />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Annuller">
+                                  <IconButton color="inherit" onClick={handleCancelEditSchool}>
+                                    <CancelIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            ) : (
+                              <>
+                                <Tooltip title="Rediger navn">
+                                  <IconButton color="primary" onClick={() => handleEditSchool(school)}>
+                                    <EditIcon />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Slet skole">
+                                  <span>
+                                    <IconButton
+                                      edge="end"
+                                      aria-label="slet"
+                                      color="error"
+                                      onClick={() => handleOpenDeleteDialog(school)}
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </span>
+                                </Tooltip>
+                              </>
+                            )}
+                          </CardActions>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                ))}
+              </Box>
+            )}
           </Box>
         </Stack>
       </Paper>
