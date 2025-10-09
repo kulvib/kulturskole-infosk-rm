@@ -3,12 +3,6 @@ import {
   Box,
   Typography,
   Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   IconButton,
   Button,
   Tooltip,
@@ -506,26 +500,16 @@ export default function SchoolAdministration() {
           ) : (
             <>
               {Array.isArray(clientsToDelete) && clientsToDelete.length > 0 ? (
-                <TableContainer sx={{ mb: 2 }}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell><b>Klient ID</b></TableCell>
-                        <TableCell><b>Lokation</b></TableCell>
-                        <TableCell><b>Skole</b></TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {clientsToDelete.map(client => (
-                        <TableRow key={client.id}>
-                          <TableCell>{client.id}</TableCell>
-                          <TableCell>{client.locality || client.name || "-"}</TableCell>
-                          <TableCell>{schoolToDelete?.name}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Tilknyttede klienter:</Typography>
+                  {clientsToDelete.map(client => (
+                    <Box key={client.id} sx={{ mb: 0.5, ml: 2 }}>
+                      <Typography variant="body2">
+                        Klient ID: {client.id} – Lokation: {client.locality || client.name || "-"}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
               ) : (
                 <Typography sx={{ mb: 2 }}>Ingen klienter er tilknyttet denne skole.</Typography>
               )}
