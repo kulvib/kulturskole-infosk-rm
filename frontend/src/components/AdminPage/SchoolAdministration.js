@@ -429,30 +429,30 @@ export default function SchoolAdministration() {
                                 }}
                               />
                             ) : (
-                              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                              <Typography variant="subtitle1" sx={{ fontWeight: "normal" }}>
                                 {school.name}
                               </Typography>
                             )}
                           </CardContent>
-                          <CardActions sx={{ justifyContent: "flex-end" }}>
+                          <CardActions sx={{ justifyContent: "flex-end", gap: 0.5, pr: 1 }}>
                             {editSchoolId === school.id ? (
                               <>
                                 <Tooltip title="Gem">
-                                  <IconButton color="primary" onClick={() => handleSaveEditSchool(school)}>
-                                    <SaveIcon />
+                                  <IconButton color="primary" onClick={() => handleSaveEditSchool(school)} size="small">
+                                    <SaveIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
                                 <Tooltip title="Annuller">
-                                  <IconButton color="inherit" onClick={handleCancelEditSchool}>
-                                    <CancelIcon />
+                                  <IconButton color="inherit" onClick={handleCancelEditSchool} size="small">
+                                    <CancelIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
                               </>
                             ) : (
                               <>
                                 <Tooltip title="Rediger navn">
-                                  <IconButton color="primary" onClick={() => handleEditSchool(school)}>
-                                    <EditIcon />
+                                  <IconButton color="primary" onClick={() => handleEditSchool(school)} size="small">
+                                    <EditIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
                                 <Tooltip title="Slet skole">
@@ -462,8 +462,9 @@ export default function SchoolAdministration() {
                                       aria-label="slet"
                                       color="error"
                                       onClick={() => handleOpenDeleteDialog(school)}
+                                      size="small"
                                     >
-                                      <DeleteIcon />
+                                      <DeleteIcon fontSize="small" />
                                     </IconButton>
                                   </span>
                                 </Tooltip>
