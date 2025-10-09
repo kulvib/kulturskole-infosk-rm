@@ -22,11 +22,10 @@ import {
   Grid,
   Card,
   CardContent,
-  CardActions,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import SaveIcon from "@mui/icons-material/Save";
+import CheckIcon from "@mui/icons-material/Check";
 import CancelIcon from "@mui/icons-material/Cancel";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
@@ -440,7 +439,7 @@ export default function SchoolAdministration() {
                                   <>
                                     <Tooltip title="Gem">
                                       <IconButton color="primary" onClick={() => handleSaveEditSchool(school)} size="small" sx={{ m: 0, p: "2px" }}>
-                                        <SaveIcon fontSize="small" />
+                                        <CheckIcon fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Annuller">
@@ -475,7 +474,6 @@ export default function SchoolAdministration() {
                               </Box>
                             </Box>
                           </CardContent>
-                          {/* ingen CardActions - alt er på samme linje */}
                         </Card>
                       </Grid>
                     ))}
