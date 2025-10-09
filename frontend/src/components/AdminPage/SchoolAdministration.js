@@ -413,64 +413,69 @@ export default function SchoolAdministration() {
                     {row.map((school) => (
                       <Grid item xs={12} sm={6} md={3} key={school.id ?? school.name}>
                         <Card variant="outlined" sx={{ height: "100%" }}>
-                          <CardContent>
-                            {editSchoolId === school.id ? (
-                              <TextField
-                                value={editSchoolName}
-                                onChange={handleChangeEditSchoolName}
-                                size="small"
-                                error={!!editSchoolError}
-                                helperText={editSchoolError}
-                                sx={{ minWidth: 120 }}
-                                autoFocus
-                                onKeyDown={e => {
-                                  if (e.key === "Enter") handleSaveEditSchool(school);
-                                  if (e.key === "Escape") handleCancelEditSchool();
-                                }}
-                              />
-                            ) : (
-                              <Typography variant="subtitle1" sx={{ fontWeight: "normal" }}>
-                                {school.name}
-                              </Typography>
-                            )}
+                          <CardContent sx={{ pb: 1 }}>
+                            {/* Skolens navn og rediger/slet-ikoner på samme linje */}
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              {editSchoolId === school.id ? (
+                                <TextField
+                                  value={editSchoolName}
+                                  onChange={handleChangeEditSchoolName}
+                                  size="small"
+                                  error={!!editSchoolError}
+                                  helperText={editSchoolError}
+                                  sx={{ minWidth: 120, flex: 1 }}
+                                  autoFocus
+                                  onKeyDown={e => {
+                                    if (e.key === "Enter") handleSaveEditSchool(school);
+                                    if (e.key === "Escape") handleCancelEditSchool();
+                                  }}
+                                />
+                              ) : (
+                                <Typography variant="subtitle1" sx={{ fontWeight: "normal", flex: 1 }}>
+                                  {school.name}
+                                </Typography>
+                              )}
+                              <Box sx={{ display: "flex", alignItems: "center", ml: 1 }}>
+                                {editSchoolId === school.id ? (
+                                  <>
+                                    <Tooltip title="Gem">
+                                      <IconButton color="primary" onClick={() => handleSaveEditSchool(school)} size="small" sx={{ m: 0, p: "2px" }}>
+                                        <SaveIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Annuller">
+                                      <IconButton color="inherit" onClick={handleCancelEditSchool} size="small" sx={{ m: 0, p: "2px", ml: 0.5 }}>
+                                        <CancelIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Tooltip title="Rediger navn">
+                                      <IconButton color="primary" onClick={() => handleEditSchool(school)} size="small" sx={{ m: 0, p: "2px" }}>
+                                        <EditIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Slet skole">
+                                      <span>
+                                        <IconButton
+                                          edge="end"
+                                          aria-label="slet"
+                                          color="error"
+                                          onClick={() => handleOpenDeleteDialog(school)}
+                                          size="small"
+                                          sx={{ m: 0, p: "2px", ml: 0.3 }}
+                                        >
+                                          <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                  </>
+                                )}
+                              </Box>
+                            </Box>
                           </CardContent>
-                          <CardActions sx={{ justifyContent: "flex-end", gap: 0.5, pr: 1 }}>
-                            {editSchoolId === school.id ? (
-                              <>
-                                <Tooltip title="Gem">
-                                  <IconButton color="primary" onClick={() => handleSaveEditSchool(school)} size="small">
-                                    <SaveIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Annuller">
-                                  <IconButton color="inherit" onClick={handleCancelEditSchool} size="small">
-                                    <CancelIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              </>
-                            ) : (
-                              <>
-                                <Tooltip title="Rediger navn">
-                                  <IconButton color="primary" onClick={() => handleEditSchool(school)} size="small">
-                                    <EditIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Slet skole">
-                                  <span>
-                                    <IconButton
-                                      edge="end"
-                                      aria-label="slet"
-                                      color="error"
-                                      onClick={() => handleOpenDeleteDialog(school)}
-                                      size="small"
-                                    >
-                                      <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                  </span>
-                                </Tooltip>
-                              </>
-                            )}
-                          </CardActions>
+                          {/* ingen CardActions - alt er på samme linje */}
                         </Card>
                       </Grid>
                     ))}
