@@ -30,7 +30,8 @@ class User(SQLModel, table=True):
     is_active: bool = True
     school_id: Optional[int] = Field(default=None, foreign_key="school.id")
     full_name: Optional[str] = None
-    remarks: Optional[str] = None  # <-- NYT FELT
+    remarks: Optional[str] = None
+    email: str  # <-- NYT FELT, obligatorisk!
 
 class ClientBase(SQLModel):
     name: str
