@@ -35,6 +35,9 @@ import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
+// Simple email regex for validation
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // Secure password generator
 function generateSecurePassword() {
   const lower = "abcdefghijklmnopqrstuvwxyz";
@@ -69,6 +72,8 @@ export default function UserAdministration() {
     is_active: true,
     school_id: "",
     remarks: "",
+    email: "",
+    confirmEmail: "",
   });
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
@@ -177,6 +182,7 @@ export default function UserAdministration() {
 Skole: ${info.schoolName}
 Brugernavn: ${info.username}
 Password: ${info.password}
+Email: ${info.email || ""}
 `;
     const blob = new Blob([content], { type: "text/plain" });
     const link = document.createElement("a");
@@ -187,18 +193,36 @@ Password: ${info.password}
     setTimeout(() => document.body.removeChild(link), 100);
   };
 
-  // Opret ny bruger med samlet advarsel
+  // Opret ny bruger med samlet advarsel og email validering
   const handleAddUser = () => {
     setUserError("");
     setSavingNewUser(true);
-    const { username, password, full_name, role, is_active, school_id, remarks } = newUser;
+    const { username, password, full_name, role, is_active, school_id, remarks, email, confirmEmail } = newUser;
 
     let missing = [];
     if (!username) missing.push("Brugernavn");
     if (!password) missing.push("Password");
     if (!full_name) missing.push("Fulde navn");
     if (!role) missing.push("Rolle");
+    if (!email) missing.push("Email");
+    if (!confirmEmail) missing.push("Bekræft email");
     if (role === "bruger" && !school_id) missing.push("Skole");
+
+    // Email match check
+    if (email && confirmEmail && email !== confirmEmail) {
+      setUserError("Email adresserne matcher ikke!");
+      setSavingNewUser(false);
+      showSnackbar("Email adresserne matcher ikke!", "error");
+      return;
+    }
+
+    // Email format check
+    if (email && !emailRegex.test(email)) {
+      setUserError("Ugyldig emailadresse!");
+      setSavingNewUser(false);
+      showSnackbar("Ugyldig emailadresse!", "error");
+      return;
+    }
 
     if (missing.length > 0) {
       setUserError(missing.join(", ") + " skal udfyldes");
@@ -215,6 +239,7 @@ Password: ${info.password}
       is_active,
       school_id: role === "bruger" ? school_id : undefined,
       remarks,
+      email,
     }, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
@@ -226,7 +251,17 @@ Password: ${info.password}
           ...res.data,
           role: res.data.role === "admin" ? "administrator" : res.data.role
         }]);
-        setNewUser({ username: "", password: "", full_name: "", role: "", is_active: true, school_id: "", remarks: "" });
+        setNewUser({ 
+          username: "", 
+          password: "", 
+          full_name: "", 
+          role: "", 
+          is_active: true, 
+          school_id: "", 
+          remarks: "", 
+          email: "", 
+          confirmEmail: "" 
+        });
         showSnackbar("Bruger oprettet!", "success");
         const schoolName = role === "bruger"
           ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
@@ -236,6 +271,7 @@ Password: ${info.password}
           username,
           password,
           schoolName,
+          email,
         });
         setShowDownloadButton(true);
         setDownloadCountdown(10);
@@ -300,6 +336,7 @@ Password: ${info.password}
             username,
             password,
             schoolName,
+            email: editUser.email,
           });
           setShowEditDownloadButton(true);
           setEditDownloadCountdown(10);
@@ -365,6 +402,7 @@ Password: ${info.password}
         search === "" ||
         (u.username && u.username.toLowerCase().includes(search)) ||
         (u.full_name && u.full_name.toLowerCase().includes(search)) ||
+        (u.email && u.email.toLowerCase().includes(search)) ||
         (u.role === "administrator" ? "administrator" : "bruger").includes(search) ||
         schoolName.toLowerCase().includes(search) ||
         (u.remarks && u.remarks.toLowerCase().includes(search))
@@ -393,6 +431,10 @@ Password: ${info.password}
           bVal = b.school_id
             ? (getAlphaSchools().find(s => s.id === b.school_id)?.name ?? "")
             : "";
+          break;
+        case "email":
+          aVal = a.email || "";
+          bVal = b.email || "";
           break;
         default:
           aVal = a.username || "";
@@ -438,6 +480,33 @@ Password: ${info.password}
                   onChange={e => setNewUser({ ...newUser, full_name: e.target.value })}
                   size="small"
                   fullWidth
+                />
+              </Grid>
+              {/* EMAIL FELTER */}
+              <Grid item xs={12} md={4}>
+                <TextField
+                  required
+                  label="Email"
+                  type="email"
+                  value={newUser.email}
+                  onChange={e => setNewUser({ ...newUser, email: e.target.value })}
+                  size="small"
+                  fullWidth
+                  error={!!(newUser.email && !emailRegex.test(newUser.email))}
+                  helperText={newUser.email && !emailRegex.test(newUser.email) ? "Ugyldig emailadresse" : ""}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  required
+                  label="Bekræft email"
+                  type="email"
+                  value={newUser.confirmEmail}
+                  onChange={e => setNewUser({ ...newUser, confirmEmail: e.target.value })}
+                  size="small"
+                  fullWidth
+                  error={!!(newUser.confirmEmail && newUser.email !== newUser.confirmEmail)}
+                  helperText={newUser.confirmEmail && newUser.email !== newUser.confirmEmail ? "Email adresserne matcher ikke" : ""}
                 />
               </Grid>
               {/* Rolle dropdown - "Bruger" først */}
@@ -532,7 +601,7 @@ Password: ${info.password}
                   value={userSearch}
                   onChange={e => setUserSearch(e.target.value)}
                   sx={{ minWidth: 120 }}
-                  placeholder="Søg bruger, navn, rolle, skole, bemærkninger..."
+                  placeholder="Søg bruger, navn, rolle, email, skole, bemærkninger..."
                 />
               </Box>
             </Stack>
@@ -550,6 +619,13 @@ Password: ${info.password}
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("fullname")}>
                       Fulde navn
                       {userSort.key === "fullname" &&
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                         : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
+                    {/* EMAIL KOLONNE */}
+                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("email")}>
+                      Email
+                      {userSort.key === "email" &&
                         (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
@@ -573,13 +649,13 @@ Password: ${info.password}
                 <TableBody>
                   {loadingUsers ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
+                      <TableCell colSpan={9} align="center">
                         <CircularProgress size={24} />
                       </TableCell>
                     </TableRow>
                   ) : getSortedUsers().length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ color: "#888" }}>
+                      <TableCell colSpan={9} align="center" sx={{ color: "#888" }}>
                         Ingen brugere oprettet endnu
                       </TableCell>
                     </TableRow>
@@ -588,6 +664,7 @@ Password: ${info.password}
                       <TableRow key={user.id} hover>
                         <TableCell>{user.username}</TableCell>
                         <TableCell>{user.full_name || ""}</TableCell>
+                        <TableCell>{user.email || ""}</TableCell>
                         <TableCell>{user.role === "administrator" ? "administrator" : "bruger"}</TableCell>
                         <TableCell>
                           {user.school_id
@@ -651,6 +728,13 @@ Password: ${info.password}
                   <Stack gap={2} sx={{ mt: 1 }}>
                     <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" />
                     <TextField required label="Fulde navn" value={editUser.full_name || ""} onChange={e => setEditUser({ ...editUser, full_name: e.target.value })} fullWidth size="small" />
+                    <TextField
+                      label="Email"
+                      value={editUser.email || ""}
+                      fullWidth
+                      size="small"
+                      disabled
+                    />
                     <FormControl fullWidth size="small">
                       <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                       <Select
