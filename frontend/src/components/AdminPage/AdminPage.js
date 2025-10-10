@@ -7,7 +7,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("school");
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 4 }}>
+    <Box sx={{ maxWidth: 1400, mx: "auto", mt: 4 }}>
       <Paper sx={{ p: 2, mb: 3, textAlign: "center" }}>
         <ButtonGroup variant="contained">
           <Button
