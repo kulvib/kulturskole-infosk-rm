@@ -14,16 +14,18 @@ class UserCreate(BaseModel):
     role: str = "elev"
     is_active: bool = True
     school_id: Optional[int] = None
-    full_name: Optional[str] = None  # <-- tilføjet
-    remarks: Optional[str] = None    # <-- NYT felt!
+    full_name: Optional[str] = None
+    remarks: Optional[str] = None
+    email: str  # <-- NYT felt, obligatorisk!
 
 class UserUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None
     school_id: Optional[int] = None
-    full_name: Optional[str] = None  # <-- tilføjet
-    remarks: Optional[str] = None    # <-- NYT felt!
+    full_name: Optional[str] = None
+    remarks: Optional[str] = None
+    email: Optional[str] = None  # <-- NYT felt!
 
 # GET /api/users/ -- Hent alle brugere (kun admin)
 @router.get("/users/", response_model=List[User])
@@ -53,8 +55,9 @@ def create_user(
         role=user.role,
         is_active=user.is_active,
         school_id=user.school_id,
-        full_name=user.full_name,  # <-- tilføjet
-        remarks=user.remarks       # <-- NYT felt!
+        full_name=user.full_name,
+        remarks=user.remarks,
+        email=user.email                # <-- NYT felt!
     )
     session.add(user_obj)
     session.commit()
@@ -85,9 +88,11 @@ def update_user(
     if user_update.school_id is not None:
         user.school_id = user_update.school_id
     if user_update.full_name is not None:
-        user.full_name = user_update.full_name  # <-- tilføjet
+        user.full_name = user_update.full_name
     if user_update.remarks is not None:
-        user.remarks = user_update.remarks      # <-- NYT felt!
+        user.remarks = user_update.remarks
+    if user_update.email is not None:
+        user.email = user_update.email          # <-- NYT felt!
     session.add(user)
     session.commit()
     session.refresh(user)
