@@ -75,6 +75,8 @@ export default function UserAdministration() {
   });
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
+  const [editUserEmailError, setEditUserEmailError] = useState("");
+  const [editUserConfirmEmail, setEditUserConfirmEmail] = useState(""); // For confirm in edit
   const [loadingUsers, setLoadingUsers] = useState(false);
 
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
@@ -284,10 +286,12 @@ Email: ${info.email || ""}
     if (user.full_name === "Henrik Resen") return; // Block editing for Henrik Resen
     const mappedUser = {
       ...user,
-      role: user.role === "admin" ? "bruger" : user.role, // Sikrer "bruger" eller "administrator"
+      role: user.role === "admin" ? "bruger" : user.role,
       password: "",
     };
     setEditUser(mappedUser);
+    setEditUserConfirmEmail(mappedUser.email || "");
+    setEditUserEmailError("");
     setUserDialogOpen(true);
     setHoldEditDialogOpen(false);
     setUserError("");
@@ -299,7 +303,24 @@ Email: ${info.email || ""}
   const handleEditUser = () => {
     if (!editUser) return;
     setSavingEditUser(true);
-    const { id, role, is_active, password, full_name, school_id, remarks, username } = editUser;
+    const { id, role, is_active, password, full_name, school_id, remarks, username, email } = editUser;
+
+    // Email format check
+    if (!email || !emailRegex.test(email)) {
+      setEditUserEmailError("Ugyldig emailadresse!");
+      setSavingEditUser(false);
+      showSnackbar("Ugyldig emailadresse!", "error");
+      return;
+    }
+
+    // Email match check
+    if (email !== editUserConfirmEmail) {
+      setEditUserEmailError("Email adresserne matcher ikke!");
+      setSavingEditUser(false);
+      showSnackbar("Email adresserne matcher ikke!", "error");
+      return;
+    }
+
     if (!full_name) {
       setUserError("Fulde navn skal udfyldes");
       setSavingEditUser(false);
@@ -313,6 +334,7 @@ Email: ${info.email || ""}
       full_name,
       school_id: role === "bruger" ? school_id : undefined,
       remarks,
+      email,
     }, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
@@ -323,6 +345,7 @@ Email: ${info.email || ""}
               : u)
           : []);
         setUserError("");
+        setEditUserEmailError("");
         showSnackbar("Bruger opdateret!", "success");
         const schoolName =
           role === "bruger" && school_id
@@ -334,7 +357,7 @@ Email: ${info.email || ""}
             username,
             password,
             schoolName,
-            email: editUser.email,
+            email,
           });
           setShowEditDownloadButton(true);
           setEditDownloadCountdown(10);
@@ -725,36 +748,110 @@ Email: ${info.email || ""}
               <DialogContent>
                 {editUser && (
                   <Stack gap={2} sx={{ mt: 1 }}>
-                    <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" />
-                    <TextField required label="Fulde navn" value={editUser.full_name || ""} onChange={e => setEditUser({ ...editUser, full_name: e.target.value })} fullWidth size="small" />
+                    {/* Linje 1 */}
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          label="Brugernavn"
+                          value={editUser.username}
+                          disabled
+                          fullWidth
+                          size="small"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          required
+                          label="Fulde navn"
+                          value={editUser.full_name || ""}
+                          onChange={e => setEditUser({ ...editUser, full_name: e.target.value })}
+                          fullWidth
+                          size="small"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={4}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel id="edit-rolle-label">Rolle</InputLabel>
+                          <Select
+                            labelId="edit-rolle-label"
+                            value={editUser.role || ""}
+                            label="Rolle"
+                            onChange={e => {
+                              const value = e.target.value;
+                              setEditUser(prev => ({
+                                ...prev,
+                                role: value,
+                                school_id: value === "bruger" ? prev.school_id : ""
+                              }));
+                            }}
+                            disabled={savingEditUser}
+                          >
+                            <MenuItem value="bruger">Bruger</MenuItem>
+                            <MenuItem value="administrator">Administrator</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      {/* Linje 2 */}
+                      <Grid item xs={12} md={3}>
+                        <TextField
+                          required
+                          label="Email"
+                          type="email"
+                          value={editUser.email || ""}
+                          onChange={e => setEditUser({ ...editUser, email: e.target.value })}
+                          fullWidth
+                          size="small"
+                          error={!!(editUser.email && !emailRegex.test(editUser.email))}
+                          helperText={editUser.email && !emailRegex.test(editUser.email) ? "Ugyldig emailadresse" : ""}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={3}>
+                        <TextField
+                          required
+                          label="Bekræft email"
+                          type="email"
+                          value={editUserConfirmEmail || ""}
+                          onChange={e => setEditUserConfirmEmail(e.target.value)}
+                          fullWidth
+                          size="small"
+                          error={!!(editUser.email && editUser.email !== editUserConfirmEmail)}
+                          helperText={editUser.email && editUser.email !== editUserConfirmEmail ? "Email adresserne matcher ikke" : ""}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={3}>
+                        <TextField
+                          label="Password"
+                          type="text"
+                          value={editUser.password || ""}
+                          disabled
+                          fullWidth
+                          size="small"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={3}>
+                        <Button
+                          variant="outlined"
+                          color="primary"
+                          onClick={() => handleGeneratePassword(true)}
+                          disabled={savingEditUser}
+                          fullWidth
+                        >
+                          Generer password
+                        </Button>
+                      </Grid>
+                    </Grid>
+                    {/* Linje 3 */}
                     <TextField
-                      label="Email"
-                      value={editUser.email || ""}
+                      label="Bemærkninger"
+                      value={editUser.remarks || ""}
+                      onChange={e => setEditUser({ ...editUser, remarks: e.target.value })}
                       fullWidth
                       size="small"
-                      disabled
+                      multiline
+                      minRows={1}
+                      maxRows={3}
+                      disabled={savingEditUser}
                     />
-                    <FormControl fullWidth size="small">
-                      <InputLabel id="edit-rolle-label">Rolle</InputLabel>
-                      <Select
-                        labelId="edit-rolle-label"
-                        value={editUser.role || ""}
-                        label="Rolle"
-                        onChange={e => {
-                          const value = e.target.value;
-                          setEditUser(prev => ({
-                            ...prev,
-                            role: value,
-                            school_id: value === "bruger" ? prev.school_id : ""
-                          }));
-                        }}
-                        disabled={savingEditUser}
-                      >
-                        <MenuItem value="bruger">Bruger</MenuItem>
-                        <MenuItem value="administrator">Administrator</MenuItem>
-                      </Select>
-                    </FormControl>
-                    {/* Skole-feltet - vises hvis "bruger" */}
                     {editUser.role === "bruger" && (
                       <FormControl fullWidth size="small">
                         <InputLabel id="edit-skole-label">Skole</InputLabel>
@@ -771,18 +868,6 @@ Email: ${info.email || ""}
                         </Select>
                       </FormControl>
                     )}
-                    {/* Byt rækkefølge Bemærkninger og Status */}
-                    <TextField
-                      label="Bemærkninger"
-                      value={editUser.remarks || ""}
-                      onChange={e => setEditUser({ ...editUser, remarks: e.target.value })}
-                      fullWidth
-                      size="small"
-                      multiline
-                      minRows={1}
-                      maxRows={3}
-                      disabled={savingEditUser}
-                    />
                     <FormControl fullWidth size="small">
                       <InputLabel id="edit-status-label">Status</InputLabel>
                       <Select
@@ -796,22 +881,6 @@ Email: ${info.email || ""}
                         <MenuItem value="false">Spærret</MenuItem>
                       </Select>
                     </FormControl>
-                    <Button
-                      variant="outlined"
-                      color="primary"
-                      onClick={() => handleGeneratePassword(true)}
-                      disabled={savingEditUser}
-                    >
-                      Generer password
-                    </Button>
-                    <TextField
-                      label="Password"
-                      type="text"
-                      value={editUser.password || ""}
-                      disabled
-                      fullWidth
-                      size="small"
-                    />
                     {holdEditDialogOpen && editUser.password && (
                       <Grid container spacing={2}>
                         <Grid item xs={12} sm={6}>
@@ -855,7 +924,7 @@ Email: ${info.email || ""}
                     )}
                   </Stack>
                 )}
-                {userError && <Typography color="error" sx={{ mt: 2 }}>{userError}</Typography>}
+                {(userError || editUserEmailError) && <Typography color="error" sx={{ mt: 2 }}>{userError || editUserEmailError}</Typography>}
               </DialogContent>
               <DialogActions>
                 {(!holdEditDialogOpen || !editUser?.password) && (
