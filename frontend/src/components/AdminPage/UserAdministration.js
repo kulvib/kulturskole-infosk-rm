@@ -34,8 +34,6 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
-
-// Simple email regex for validation
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Secure password generator
@@ -251,16 +249,16 @@ Email: ${info.email || ""}
           ...res.data,
           role: res.data.role === "admin" ? "administrator" : res.data.role
         }]);
-        setNewUser({ 
-          username: "", 
-          password: "", 
-          full_name: "", 
-          role: "", 
-          is_active: true, 
-          school_id: "", 
-          remarks: "", 
-          email: "", 
-          confirmEmail: "" 
+        setNewUser({
+          username: "",
+          password: "",
+          full_name: "",
+          role: "",
+          is_active: true,
+          school_id: "",
+          remarks: "",
+          email: "",
+          confirmEmail: ""
         });
         showSnackbar("Bruger oprettet!", "success");
         const schoolName = role === "bruger"
@@ -462,6 +460,7 @@ Email: ${info.email || ""}
               Brugeradministration
             </Typography>
             <Grid container spacing={2} sx={{ mb: 1 }}>
+              {/* Linje 1 */}
               <Grid item xs={12} md={4}>
                 <TextField
                   required
@@ -482,34 +481,6 @@ Email: ${info.email || ""}
                   fullWidth
                 />
               </Grid>
-              {/* EMAIL FELTER */}
-              <Grid item xs={12} md={4}>
-                <TextField
-                  required
-                  label="Email"
-                  type="email"
-                  value={newUser.email}
-                  onChange={e => setNewUser({ ...newUser, email: e.target.value })}
-                  size="small"
-                  fullWidth
-                  error={!!(newUser.email && !emailRegex.test(newUser.email))}
-                  helperText={newUser.email && !emailRegex.test(newUser.email) ? "Ugyldig emailadresse" : ""}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  required
-                  label="Bekræft email"
-                  type="email"
-                  value={newUser.confirmEmail}
-                  onChange={e => setNewUser({ ...newUser, confirmEmail: e.target.value })}
-                  size="small"
-                  fullWidth
-                  error={!!(newUser.confirmEmail && newUser.email !== newUser.confirmEmail)}
-                  helperText={newUser.confirmEmail && newUser.email !== newUser.confirmEmail ? "Email adresserne matcher ikke" : ""}
-                />
-              </Grid>
-              {/* Rolle dropdown - "Bruger" først */}
               <Grid item xs={12} md={4}>
                 <FormControl size="small" fullWidth required>
                   <InputLabel id="rolle-label">Rolle</InputLabel>
@@ -525,8 +496,34 @@ Email: ${info.email || ""}
                   </Select>
                 </FormControl>
               </Grid>
-              {/* Byt rækkefølge: password-feltet før knap */}
-              <Grid item xs={12} md={4}>
+              {/* Linje 2 */}
+              <Grid item xs={12} md={3}>
+                <TextField
+                  required
+                  label="Email"
+                  type="email"
+                  value={newUser.email}
+                  onChange={e => setNewUser({ ...newUser, email: e.target.value })}
+                  size="small"
+                  fullWidth
+                  error={!!(newUser.email && !emailRegex.test(newUser.email))}
+                  helperText={newUser.email && !emailRegex.test(newUser.email) ? "Ugyldig emailadresse" : ""}
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  required
+                  label="Bekræft email"
+                  type="email"
+                  value={newUser.confirmEmail}
+                  onChange={e => setNewUser({ ...newUser, confirmEmail: e.target.value })}
+                  size="small"
+                  fullWidth
+                  error={!!(newUser.confirmEmail && newUser.email !== newUser.confirmEmail)}
+                  helperText={newUser.confirmEmail && newUser.email !== newUser.confirmEmail ? "Email adresserne matcher ikke" : ""}
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
                 <TextField
                   label="Password"
                   value={newUser.password}
@@ -538,19 +535,33 @@ Email: ${info.email || ""}
                   placeholder="Password"
                 />
               </Grid>
-              <Grid item xs={12} md={4} sx={{ display: "flex", alignItems: "center" }}>
+              <Grid item xs={12} md={3} sx={{ display: "flex", alignItems: "center" }}>
                 <Button
                   variant="outlined"
                   color="primary"
                   onClick={() => handleGeneratePassword(false)}
                   sx={{ mr: 2 }}
                   disabled={savingNewUser}
+                  fullWidth
                 >
                   Generer password
                 </Button>
               </Grid>
-              <Grid item xs={12} md={4}>
-                {newUser.role === "bruger" && (
+              {/* Linje 3 */}
+              <Grid item xs={12}>
+                <TextField
+                  label="Bemærkninger"
+                  value={newUser.remarks || ""}
+                  onChange={e => setNewUser({ ...newUser, remarks: e.target.value })}
+                  size="small"
+                  fullWidth
+                  multiline
+                  minRows={1}
+                  maxRows={3}
+                />
+              </Grid>
+              {newUser.role === "bruger" && (
+                <Grid item xs={12}>
                   <FormControl size="small" fullWidth>
                     <InputLabel id="skole-label">Skole</InputLabel>
                     <Select
@@ -564,20 +575,8 @@ Email: ${info.email || ""}
                       ))}
                     </Select>
                   </FormControl>
-                )}
-              </Grid>
-              <Grid item xs={12} md={12}>
-                <TextField
-                  label="Bemærkninger"
-                  value={newUser.remarks || ""}
-                  onChange={e => setNewUser({ ...newUser, remarks: e.target.value })}
-                  size="small"
-                  fullWidth
-                  multiline
-                  minRows={1}
-                  maxRows={3}
-                />
-              </Grid>
+                </Grid>
+              )}
             </Grid>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, mt: 2 }}>
               <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
