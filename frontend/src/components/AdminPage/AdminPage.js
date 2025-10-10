@@ -7,7 +7,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("school");
 
   return (
-    <Box sx={{ maxWidth: 1400, mx: "auto", mt: 4 }}>
+    <Box sx={{ maxWidth: 1500, mx: "auto", mt: 4 }}>
       <Paper sx={{ p: 2, mb: 3, textAlign: "center" }}>
         <ButtonGroup variant="contained">
           <Button
@@ -15,7 +15,7 @@ export default function AdminPage() {
             color={activeTab === "school" ? "primary" : "inherit"}
             sx={{
               fontWeight: activeTab === "school" ? 700 : 400,
-              borderRight: "2px solid #e0e0e0", // Adskil knapper visuelt
+              borderRight: "2px solid #e0e0e0",
               minWidth: 170
             }}
           >
