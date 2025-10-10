@@ -36,7 +36,6 @@ import axios from "axios";
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Secure password generator
 function generateSecurePassword() {
   const lower = "abcdefghijklmnopqrstuvwxyz";
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -53,10 +52,7 @@ function generateSecurePassword() {
   for (let i = password.length; i < 12; i++) {
     password += all[Math.floor(Math.random() * all.length)];
   }
-  return password
-    .split("")
-    .sort(() => Math.random() - 0.5)
-    .join("");
+  return password.split("").sort(() => Math.random() - 0.5).join("");
 }
 
 export default function UserAdministration() {
@@ -193,7 +189,6 @@ Email: ${info.email || ""}
     setTimeout(() => document.body.removeChild(link), 100);
   };
 
-  // Opret ny bruger med samlet advarsel og email validering
   const handleAddUser = () => {
     setUserError("");
     setSavingNewUser(true);
@@ -208,7 +203,6 @@ Email: ${info.email || ""}
     if (!confirmEmail) missing.push("Bekræft email");
     if (role === "bruger" && !school_id) missing.push("Skole");
 
-    // Email match check
     if (email && confirmEmail && email !== confirmEmail) {
       setUserError("Email adresserne matcher ikke!");
       setSavingNewUser(false);
@@ -216,7 +210,6 @@ Email: ${info.email || ""}
       return;
     }
 
-    // Email format check
     if (email && !emailRegex.test(email)) {
       setUserError("Ugyldig emailadresse!");
       setSavingNewUser(false);
@@ -620,8 +613,7 @@ Email: ${info.email || ""}
                 />
               </Box>
             </Stack>
-            {userError && <Typography color="error" sx={{ mb: 2 }}>{userError}</Typography>}
-            {/* Tabel */}
+            {userError && <Typography color="error" sx={{ mb: 2 }}>{typeof userError === "object" ? JSON.stringify(userError) : userError}</Typography>}
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -629,32 +621,27 @@ Email: ${info.email || ""}
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("username")}>
                       Brugernavn
                       {userSort.key === "username" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                         : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} /> : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("fullname")}>
                       Fulde navn
                       {userSort.key === "fullname" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                         : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} /> : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("email")}>
                       Email
                       {userSort.key === "email" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                         : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} /> : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("role")}>
                       Rolle
                       {userSort.key === "role" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                         : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} /> : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("school")}>
                       Skole
                       {userSort.key === "school" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                         : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} /> : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Bemærkninger</TableCell>
@@ -741,7 +728,7 @@ Email: ${info.email || ""}
               <DialogContent>
                 {editUser && (
                   <Stack gap={2} sx={{ mt: 1 }}>
-                    {/* Linje 1: Brugernavn */}
+                    {/* 1. Brugernavn */}
                     <TextField
                       label="Brugernavn"
                       value={editUser.username}
@@ -749,7 +736,7 @@ Email: ${info.email || ""}
                       fullWidth
                       size="small"
                     />
-                    {/* Linje 2: Fulde navn */}
+                    {/* 2. Fulde navn */}
                     <TextField
                       required
                       label="Fulde navn"
@@ -758,7 +745,7 @@ Email: ${info.email || ""}
                       fullWidth
                       size="small"
                     />
-                    {/* Linje 3: Email, Bekræft email */}
+                    {/* 3. Email + Bekræft email */}
                     <Grid container spacing={2}>
                       <Grid item xs={12} md={6}>
                         <TextField
@@ -787,7 +774,7 @@ Email: ${info.email || ""}
                         />
                       </Grid>
                     </Grid>
-                    {/* Linje 4: Rolle */}
+                    {/* 4. Rolle */}
                     <FormControl fullWidth size="small">
                       <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                       <Select
@@ -808,7 +795,7 @@ Email: ${info.email || ""}
                         <MenuItem value="administrator">Administrator</MenuItem>
                       </Select>
                     </FormControl>
-                    {/* Linje 5: Skole */}
+                    {/* 5. Skole */}
                     {editUser.role === "bruger" && (
                       <FormControl fullWidth size="small">
                         <InputLabel id="edit-skole-label">Skole</InputLabel>
@@ -825,7 +812,7 @@ Email: ${info.email || ""}
                         </Select>
                       </FormControl>
                     )}
-                    {/* Linje 6: Status */}
+                    {/* 6. Status */}
                     <FormControl fullWidth size="small">
                       <InputLabel id="edit-status-label">Status</InputLabel>
                       <Select
@@ -839,7 +826,7 @@ Email: ${info.email || ""}
                         <MenuItem value="false">Spærret</MenuItem>
                       </Select>
                     </FormControl>
-                    {/* Linje 7: Bemærkninger */}
+                    {/* 7. Bemærkninger */}
                     <TextField
                       label="Bemærkninger"
                       value={editUser.remarks || ""}
@@ -851,7 +838,7 @@ Email: ${info.email || ""}
                       maxRows={3}
                       disabled={savingEditUser}
                     />
-                    {/* Linje 8: Password + knap */}
+                    {/* 8. Password + knap */}
                     <Grid container spacing={2}>
                       <Grid item xs={12} md={6}>
                         <TextField
