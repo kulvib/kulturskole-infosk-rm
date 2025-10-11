@@ -88,7 +88,7 @@ export default function Dashboard() {
     ? `${user.full_name || user.username} - ${getRoleText(user.role)}`
     : "";
 
-  // E-mail fra backend
+  // Email fra backend, og fallback hvis mangler
   const userEmail = user?.email || "";
 
   // --- Mobil optimering: Luk drawer ved navigation, swipe, klik udenfor ---
@@ -199,7 +199,7 @@ export default function Dashboard() {
         position="fixed"
         sx={{
           zIndex: (theme) => theme.zIndex.drawer + 1,
-          background: theme.palette.primary.main,
+          background: "#1976d2", // match din blå farve!
           color: "#fff",
           boxShadow: 2,
           height: { xs: 48, md: 64 },
@@ -211,87 +211,93 @@ export default function Dashboard() {
         <Toolbar
           sx={{
             display: "flex",
-            justifyContent: "space-between",
+            justifyContent: "flex-end",
             minHeight: { xs: 48, md: 64 },
             px: { xs: 1, md: 2 },
           }}
         >
-          {(isMobile || isTablet) && (
-            <IconButton
-              color="inherit"
-              aria-label="Åbn menu"
-              edge="start"
-              onClick={handleDrawerToggle}
-              sx={{ mr: 1 }}
-              size="large"
-            >
-              <MenuIcon sx={{ fontSize: { xs: 26, sm: 32 } }} />
-            </IconButton>
-          )}
-          <Typography
-            variant="h6"
-            noWrap
-            sx={{
-              fontWeight: 700,
-              fontSize: { xs: "1rem", md: "1.25rem" },
-              textOverflow: "ellipsis",
-              overflow: "hidden",
-              whiteSpace: "nowrap",
-              maxWidth: { xs: "55vw", sm: "65vw", md: "unset" },
-              ml: { xs: (isMobile || isTablet) ? 0 : 1 }
-            }}
-          >
-            {title}
-          </Typography>
-          {/* Ny brugerinfo + logout i øverste højre hjørne */}
+          {/* Øverste højre hjørne */}
           <Box
             sx={{
               display: { xs: "none", sm: "flex" },
               alignItems: "center",
               gap: 2,
-              background: theme.palette.primary.main,
-              px: 2,
-              py: 1,
-              borderRadius: 2,
+              width: "100%",
+              maxWidth: 500,
+              justifyContent: "flex-end",
+              background: "transparent",
             }}
           >
             {user ? (
-              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", mr: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 400, color: "#fff", textAlign: "right", lineHeight: 1.2 }}>
-                  {userDisplayName}
-                </Typography>
-                <Typography variant="body2" sx={{ color: "#e3f2fd", textAlign: "right", fontSize: "0.97rem", fontWeight: 400, mt: 0.2 }}>
-                  {userEmail}
-                </Typography>
+              <Box sx={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                width: "100%",
+                justifyContent: "flex-end"
+              }}>
+                <Box sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  flexGrow: 1,
+                  mr: 2,
+                }}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      fontWeight: 400,
+                      color: "#fff",
+                      textAlign: "center",
+                      lineHeight: 1.2,
+                      fontSize: "1.07rem"
+                    }}
+                  >
+                    {userDisplayName}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: "#e3f2fd",
+                      textAlign: "center",
+                      fontSize: "0.98rem",
+                      fontWeight: 400,
+                      mt: 0.2,
+                      letterSpacing: 0.5
+                    }}
+                  >
+                    {userEmail}
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  color="inherit"
+                  startIcon={<LogoutIcon sx={{ fontSize: 20 }} />}
+                  onClick={handleLogout}
+                  sx={{
+                    borderColor: "#fff",
+                    color: "#fff",
+                    fontWeight: 400,
+                    minWidth: 110,
+                    fontSize: "1rem",
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: 1.5,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    "&:hover": {
+                      borderColor: "#fff",
+                      backgroundColor: "rgba(255,255,255,0.08)",
+                    },
+                  }}
+                >
+                  LOG UD
+                </Button>
               </Box>
             ) : (
               <Skeleton variant="text" width={120} sx={{ bgcolor: "grey.700" }} />
             )}
-            <Button
-              variant="outlined"
-              color="inherit"
-              startIcon={<LogoutIcon sx={{ fontSize: 20 }} />}
-              onClick={handleLogout}
-              sx={{
-                borderColor: "#fff",
-                color: "#fff",
-                fontWeight: 400,
-                minWidth: 110,
-                fontSize: "1rem",
-                px: 2,
-                py: 0.5,
-                borderRadius: 1.5,
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                "&:hover": {
-                  borderColor: "#fff",
-                  backgroundColor: "rgba(255,255,255,0.08)",
-                },
-              }}
-            >
-              LOG UD
-            </Button>
           </Box>
           {/* På XS vis kun logout-knap */}
           <Box sx={{ display: { xs: "flex", sm: "none" }, alignItems: "center" }}>
