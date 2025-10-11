@@ -60,7 +60,8 @@ def login_for_access_token(
         "role": getattr(user, "role", "admin"),
         "full_name": user.full_name,
         "remarks": user.remarks,
-        "school_id": user.school_id  # <-- tilføj denne linje!
+        "school_id": user.school_id,
+        "email": user.email          # <-- TILFØJET HER!
     }
     return {
         "access_token": access_token,
