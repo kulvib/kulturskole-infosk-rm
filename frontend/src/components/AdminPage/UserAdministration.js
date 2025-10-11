@@ -36,6 +36,7 @@ import axios from "axios";
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// ----------- Helper functions ----------- //
 function generateSecurePassword() {
   const lower = "abcdefghijklmnopqrstuvwxyz";
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -72,16 +73,19 @@ Password: ${info.password}
   setTimeout(() => document.body.removeChild(link), 100);
 }
 
+// ----------- Main Component ----------- //
 export default function UserAdministration() {
+  // ----------- State ----------- //
   const [users, setUsers] = useState([]);
   const [schools, setSchools] = useState([]);
   const [userError, setUserError] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingSchools, setLoadingSchools] = useState(false);
+
   const [userSort, setUserSort] = useState({ key: "username", direction: "asc" });
   const [userSearch, setUserSearch] = useState("");
 
-  // New user state
+  // --- New user state
   const [newUser, setNewUser] = useState({
     username: "",
     password: "",
@@ -98,7 +102,7 @@ export default function UserAdministration() {
   const [downloadCountdown, setDownloadCountdown] = useState(10);
   const [savingNewUser, setSavingNewUser] = useState(false);
 
-  // Edit user state
+  // --- Edit user state
   const [editUser, setEditUser] = useState(null);
   const [editUserEmailError, setEditUserEmailError] = useState("");
   const [editUserConfirmEmail, setEditUserConfirmEmail] = useState("");
@@ -109,19 +113,20 @@ export default function UserAdministration() {
   const [editDownloadCountdown, setEditDownloadCountdown] = useState(10);
   const [savingEditUser, setSavingEditUser] = useState(false);
 
-  // Delete user state
+  // --- Delete user state
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [deleteUserError, setDeleteUserError] = useState("");
   const [deleteUserStep, setDeleteUserStep] = useState(1);
 
-  // Snackbar
+  // --- Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const showSnackbar = (message, severity = "success") =>
     setSnackbar({ open: true, message, severity });
   const handleCloseSnackbar = () =>
     setSnackbar({ open: false, message: "", severity: "success" });
 
+  // ----------- Effects ----------- //
   useEffect(() => {
     setLoadingUsers(true);
     axios.get(`${API_URL}/api/users/`, {
@@ -177,7 +182,8 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showEditDownloadButton, editDownloadCountdown]);
 
-  // Password generator
+  // ----------- Handlers ----------- //
+  // --- Password generator ---
   const handleGeneratePassword = (forEdit = false) => {
     const password = generateSecurePassword();
     if (forEdit) {
@@ -189,7 +195,7 @@ export default function UserAdministration() {
     }
   };
 
-  // New User
+  // --- New User ---
   const handleAddUser = () => {
     setUserError("");
     setSavingNewUser(true);
@@ -274,7 +280,7 @@ export default function UserAdministration() {
       }).finally(() => setSavingNewUser(false));
   };
 
-  // Edit User
+  // --- Edit User ---
   const openEditUserDialog = (user) => {
     if (user.full_name === "Henrik Resen") return;
     setEditUser({
@@ -359,7 +365,7 @@ export default function UserAdministration() {
       }).finally(() => setSavingEditUser(false));
   };
 
-  // Delete User
+  // --- Delete User ---
   const handleOpenDeleteUserDialog = (user) => {
     setUserToDelete(user);
     setDeleteUserDialogOpen(true);
@@ -393,6 +399,7 @@ export default function UserAdministration() {
     setDeleteUserStep(1);
   };
 
+  // --- Sorting, filtering ---
   const getAlphaSchools = () =>
     schools.slice().sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
 
@@ -438,6 +445,7 @@ export default function UserAdministration() {
     }));
   };
 
+  // ----------- Render ----------- //
   return (
     <Box>
       <Paper sx={{ mb: 4, p: 3 }}>
@@ -446,6 +454,7 @@ export default function UserAdministration() {
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Brugeradministration
             </Typography>
+            {/* Opret bruger-formular */}
             <Grid container spacing={2} sx={{ mb: 1 }}>
               <Grid item xs={12} md={4}>
                 <TextField required label="Brugernavn" value={newUser.username}
@@ -472,10 +481,7 @@ export default function UserAdministration() {
               </Grid>
               <Grid item xs={12} md={3}>
                 <TextField required label="Email" type="email" value={newUser.email}
-                  onChange={e => {
-                    console.log('OPRET BRUGER email:', e.target.value);
-                    setNewUser({ ...newUser, email: e.target.value });
-                  }} size="small" fullWidth
+                  onChange={e => setNewUser({ ...newUser, email: e.target.value })} size="small" fullWidth
                   error={!!(newUser.email && !emailRegex.test(newUser.email))}
                   helperText={newUser.email && !emailRegex.test(newUser.email) ? "Ugyldig emailadresse" : ""} />
               </Grid>
@@ -544,10 +550,110 @@ export default function UserAdministration() {
             <TableContainer>
               <Table size="small">
                 <TableHead>
-                  {/* ... som før ... */}
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("username")}>
+                      Brugernavn
+                      {userSort.key === "username" &&
+                        (userSort.direction === "asc"
+                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("fullname")}>
+                      Fulde navn
+                      {userSort.key === "fullname" &&
+                        (userSort.direction === "asc"
+                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("email")}>
+                      Email
+                      {userSort.key === "email" &&
+                        (userSort.direction === "asc"
+                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("role")}>
+                      Rolle
+                      {userSort.key === "role" &&
+                        (userSort.direction === "asc"
+                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("school")}>
+                      Skole
+                      {userSort.key === "school" &&
+                        (userSort.direction === "asc"
+                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Bemærkninger</TableCell>
+                    <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
+                  </TableRow>
                 </TableHead>
                 <TableBody>
-                  {/* ... som før ... */}
+                  {loadingUsers ? (
+                    <TableRow>
+                      <TableCell colSpan={9} align="center">
+                        <CircularProgress size={24} />
+                      </TableCell>
+                    </TableRow>
+                  ) : getSortedUsers().length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} align="center" sx={{ color: "#888" }}>
+                        Ingen brugere oprettet endnu
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    getSortedUsers().map(user => (
+                      <TableRow key={user.id} hover>
+                        <TableCell>{user.username}</TableCell>
+                        <TableCell>{user.full_name || ""}</TableCell>
+                        <TableCell>{user.email || ""}</TableCell>
+                        <TableCell>{user.role === "administrator" ? "administrator" : "bruger"}</TableCell>
+                        <TableCell>
+                          {user.school_id
+                            ? (schools.find(s => s.id === user.school_id)?.name ?? user.school_id)
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {user.is_active ? "Aktiv" : "Spærret"}
+                        </TableCell>
+                        <TableCell>{user.remarks || ""}</TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Rediger bruger">
+                            <span>
+                              <IconButton
+                                onClick={() => openEditUserDialog(user)}
+                                disabled={user.full_name === "Henrik Resen"}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip
+                            title={
+                              user.role === "administrator"
+                                ? user.is_active
+                                  ? "Administrator kan kun slettes hvis status er Spærret"
+                                  : "Slet administrator"
+                                : "Slet bruger"
+                            }
+                          >
+                            <span>
+                              <IconButton
+                                color="error"
+                                onClick={() => handleOpenDeleteUserDialog(user)}
+                                disabled={user.role === "administrator" && user.is_active}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -563,15 +669,14 @@ export default function UserAdministration() {
               <DialogContent>
                 {editUser && (
                   <Stack gap={2} sx={{ mt: 1 }}>
-                    {/* ... øvrige felter ... */}
+                    <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" />
+                    <TextField required label="Fulde navn" value={editUser.full_name || ""}
+                      onChange={e => setEditUser({ ...editUser, full_name: e.target.value })} fullWidth size="small" />
                     <Grid container spacing={2}>
                       <Grid item xs={12} md={6}>
                         <TextField required label="Email" type="email"
                           value={editUser.email || ""}
-                          onChange={e => {
-                            console.log('REDIGER BRUGER email:', e.target.value);
-                            setEditUser({ ...editUser, email: e.target.value });
-                          }}
+                          onChange={e => setEditUser({ ...editUser, email: e.target.value })}
                           fullWidth size="small"
                           error={!!(editUser.email && !emailRegex.test(editUser.email))}
                           helperText={editUser.email && !emailRegex.test(editUser.email) ? "Ugyldig emailadresse" : ""}
@@ -587,7 +692,98 @@ export default function UserAdministration() {
                         />
                       </Grid>
                     </Grid>
-                    {/* ... øvrige felter ... */}
+                    <FormControl fullWidth size="small">
+                      <InputLabel id="edit-rolle-label">Rolle</InputLabel>
+                      <Select
+                        labelId="edit-rolle-label"
+                        value={editUser.role || ""}
+                        label="Rolle"
+                        onChange={e => {
+                          const value = e.target.value;
+                          setEditUser(prev => ({
+                            ...prev,
+                            role: value,
+                            school_id: value === "bruger" ? prev.school_id : ""
+                          }));
+                        }}
+                        disabled={savingEditUser}
+                      >
+                        <MenuItem value="bruger">Bruger</MenuItem>
+                        <MenuItem value="administrator">Administrator</MenuItem>
+                      </Select>
+                    </FormControl>
+                    {editUser.role === "bruger" && (
+                      <FormControl fullWidth size="small">
+                        <InputLabel id="edit-skole-label">Skole</InputLabel>
+                        <Select
+                          labelId="edit-skole-label"
+                          value={editUser.school_id || ""}
+                          label="Skole"
+                          onChange={e => setEditUser({ ...editUser, school_id: e.target.value })}
+                          disabled={savingEditUser}
+                        >
+                          {getAlphaSchools().map(school => (
+                            <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )}
+                    <FormControl fullWidth size="small">
+                      <InputLabel id="edit-status-label">Status</InputLabel>
+                      <Select
+                        labelId="edit-status-label"
+                        value={editUser.is_active ? "true" : "false"}
+                        label="Status"
+                        onChange={e => setEditUser({ ...editUser, is_active: e.target.value === "true" })}
+                        disabled={savingEditUser}
+                      >
+                        <MenuItem value="true">Aktiv</MenuItem>
+                        <MenuItem value="false">Spærret</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField label="Bemærkninger" value={editUser.remarks || ""}
+                      onChange={e => setEditUser({ ...editUser, remarks: e.target.value })}
+                      fullWidth size="small" multiline minRows={1} maxRows={3} disabled={savingEditUser} />
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <TextField label="Password" type="text" value={editUser.password || ""}
+                          disabled fullWidth size="small" />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Button variant="outlined" color="primary"
+                          onClick={() => handleGeneratePassword(true)} disabled={savingEditUser} fullWidth>
+                          Generer password
+                        </Button>
+                      </Grid>
+                    </Grid>
+                    {holdEditDialogOpen && editUser.password && (
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          {showEditDownloadButton && editUserDownloadInfo ? (
+                            <Button variant="outlined" color="primary" fullWidth
+                              onClick={() => downloadUserInfo(editUserDownloadInfo)}>
+                              Download brugerinfo ({editDownloadCountdown})
+                            </Button>
+                          ) : (
+                            <Button variant="outlined" color="primary" fullWidth disabled>
+                              Download brugerinfo
+                            </Button>
+                          )}
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Button variant="contained" color="primary" fullWidth
+                            onClick={() => {
+                              setHoldEditDialogOpen(false);
+                              setShowEditDownloadButton(false);
+                              setEditUserDownloadInfo(null);
+                              setEditDownloadCountdown(10);
+                              setUserDialogOpen(false);
+                            }}>
+                            Videre
+                          </Button>
+                        </Grid>
+                      </Grid>
+                    )}
                   </Stack>
                 )}
                 {(userError || editUserEmailError) &&
@@ -595,12 +791,82 @@ export default function UserAdministration() {
                     {userError || editUserEmailError}
                   </Typography>}
               </DialogContent>
-              {/* ... øvrige dialog actions ... */}
+              <DialogActions>
+                {(!holdEditDialogOpen || !editUser?.password) && (
+                  <>
+                    <Button onClick={() => setUserDialogOpen(false)} disabled={savingEditUser}>Annuller</Button>
+                    <Button variant="contained" onClick={handleEditUser} disabled={savingEditUser}>
+                      {savingEditUser ? <CircularProgress size={24} color="inherit" /> : "Gem ændringer"}
+                    </Button>
+                  </>
+                )}
+              </DialogActions>
             </Dialog>
           </Box>
         </Stack>
       </Paper>
-      {/* ... Slet dialog og snackbar ... */}
+      {/* Slet bruger dialog */}
+      <Dialog open={deleteUserDialogOpen} onClose={handleCloseDeleteUserDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Slet bruger: {userToDelete?.username}
+        </DialogTitle>
+        <DialogContent>
+          <Typography color="error" gutterBottom sx={{ mb: 2 }}>
+            Advarsel: Du er ved at slette brugeren <b>{userToDelete?.username}</b>.<br />
+            Denne handling kan <b>ikke fortrydes!</b>
+          </Typography>
+          {userToDelete?.role === "administrator" && userToDelete?.is_active && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              Administrator-brugere kan kun slettes hvis status er Spærret.
+            </Typography>
+          )}
+          {userToDelete && (
+            userToDelete.role !== "administrator" || canDeleteAdmin ? (
+              <>
+                {deleteUserStep === 1 && (
+                  <Typography sx={{ mb: 2 }}>
+                    Er du sikker på at du vil slette denne bruger?
+                  </Typography>
+                )}
+                {deleteUserStep === 2 && (
+                  <Typography color="error" sx={{ mb: 2 }}>
+                    Tryk <b>Slet endeligt</b> for at bekræfte.
+                  </Typography>
+                )}
+              </>
+            ) : null
+          )}
+          {deleteUserError && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              {deleteUserError}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteUserDialog}>Annuller</Button>
+          {(userToDelete && (userToDelete.role !== "administrator" || canDeleteAdmin)) && (
+            deleteUserStep === 1 ? (
+              <Button color="warning" variant="contained" onClick={handleFirstDeleteUserConfirm}>
+                Bekræft sletning
+              </Button>
+            ) : (
+              <Button color="error" variant="contained" onClick={handleFinalDeleteUser}>
+                Slet endeligt
+              </Button>
+            )
+          )}
+        </DialogActions>
+      </Dialog>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3400}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
     </Box>
   );
 }
