@@ -58,6 +58,25 @@ function generateSecurePassword() {
     .join("");
 }
 
+// RETTET DOWNLOAD-FORMAT!
+const triggerDownloadUserInfo = (info) => {
+  const fileName = info.full_name.trim().replace(/\s+/g, "_") + ".txt";
+  const content = `Fulde navn: ${info.full_name}
+Skole: ${info.schoolName}
+Email: ${info.email || ""}
+----------------
+Brugernavn: ${info.username}
+Password: ${info.password}
+`;
+  const blob = new Blob([content], { type: "text/plain" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => document.body.removeChild(link), 100);
+};
+
 export default function UserAdministration() {
   const [users, setUsers] = useState([]);
   const [userError, setUserError] = useState("");
@@ -173,23 +192,6 @@ export default function UserAdministration() {
       setNewUser(prev => ({ ...prev, password }));
       showSnackbar("Password genereret!", "info");
     }
-  };
-
-  const triggerDownloadUserInfo = (info) => {
-    const fileName = info.full_name.trim().replace(/\s+/g, "_") + ".txt";
-    const content = `Fulde navn: ${info.full_name}
-Skole: ${info.schoolName}
-Brugernavn: ${info.username}
-Password: ${info.password}
-Email: ${info.email || ""}
-`;
-    const blob = new Blob([content], { type: "text/plain" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    setTimeout(() => document.body.removeChild(link), 100);
   };
 
   const handleAddUser = () => {
