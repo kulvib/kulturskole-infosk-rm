@@ -24,6 +24,7 @@ import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import EmailIcon from "@mui/icons-material/Email";
 import { useAuth } from "../auth/authcontext";
 import axios from "axios";
 
@@ -35,19 +36,63 @@ function getRoleText(role) {
   return role || "";
 }
 
+function UserInfoBar({ user, onLogout }) {
+  if (!user) return null;
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        gap: 2,
+        background: "#1976d2",
+        color: "#fff",
+        px: 2,
+        py: 1,
+        borderRadius: 1,
+        mt: 1,
+        mb: 2,
+      }}
+    >
+      <Box>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          {user.full_name || user.username} - {getRoleText(user.role)}
+        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          <EmailIcon sx={{ fontSize: 16, opacity: 0.85 }} />
+          <Typography variant="body2" sx={{ mt: 0, opacity: 0.85 }}>
+            {user.email}
+          </Typography>
+        </Box>
+      </Box>
+      <LogoutButton
+        variant="outlined"
+        color="inherit"
+        sx={{
+          borderColor: "#fff",
+          color: "#fff",
+          "&:hover": { borderColor: "#fff", background: "#1565c0" },
+          fontWeight: 500,
+        }}
+      >
+        LOG UD
+      </LogoutButton>
+    </Box>
+  );
+}
+
 export default function Dashboard() {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // <600px
-  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md")); // 600-899px
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
   const [schoolName, setSchoolName] = useState("");
 
-  // Responsiv drawerWidth
   const drawerWidth = isMobile ? 160 : isTablet ? 190 : 230;
 
-  // Dynamisk menu: "Administration" kun for admin
   const menuItems = [
     { text: "Forside", path: "/", match: "/", icon: <HomeIcon /> },
     { text: "Klienter", path: "/clients", match: "/clients", icon: <PeopleIcon /> },
@@ -57,7 +102,6 @@ export default function Dashboard() {
       : []),
   ];
 
-  // Hent school name hvis bruger
   useEffect(() => {
     if (user && user.role === "bruger" && user.school_id) {
       axios
@@ -75,27 +119,19 @@ export default function Dashboard() {
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
-  // TITEL afhænger af rolle
   let title = "Infoskærm administration";
   if (user?.role === "bruger" && schoolName) {
     title = `${schoolName} - infoskærm administration`;
   }
 
-  // Fuldt navn + rolle (fx "Kulturskole Viborg - Administrator")
   const userDisplay = user
     ? `${user.full_name || user.username} - ${getRoleText(user.role)}`
     : "";
 
-  // --- Mobil optimering: Luk drawer ved navigation, swipe, klik udenfor ---
   useEffect(() => {
     if (mobileOpen && (isMobile || isTablet)) setMobileOpen(false);
-    // eslint-disable-next-line
   }, [location.pathname]); // Luk drawer ved navigation på mobil/tablet
 
-  // --- Mobil/tablet optimering: swipe gesture for at åbne/lukke drawer (kun på touch enheder) ---
-  // Kan evt. tilføjes med SwipeableDrawer fra MUI, men her holder vi os til Drawer for at matche desktop-udseende.
-
-  // --- MENU DRAWER ---
   const drawer = (
     <Box sx={{ minHeight: "100vh", bgcolor: { xs: "#f8fdff", md: "inherit" } }}>
       <Toolbar />
@@ -299,6 +335,10 @@ export default function Dashboard() {
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 48, md: 64 } }} />
+        {/* UserInfoBar vises på desktop og tablet, skjules på XS */}
+        <Box sx={{ display: { xs: "none", sm: "block" } }}>
+          <UserInfoBar user={user} onLogout={() => {/* din logout funktion */}} />
+        </Box>
         <Outlet />
       </Box>
     </Box>
