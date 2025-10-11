@@ -185,7 +185,7 @@ export default function ClientDetailsHeaderSection({
   };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", mt: isMobile ? 1 : 3 }}>
+    <Box sx={{ maxWidth: 1500, mx: "auto", mt: isMobile ? 1 : 3 }}>
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", mb: 1, gap: isMobile ? 1 : 0 }}>
         <Button
           variant="outlined"
