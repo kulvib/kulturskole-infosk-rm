@@ -52,7 +52,10 @@ function generateSecurePassword() {
   for (let i = password.length; i < 12; i++) {
     password += all[Math.floor(Math.random() * all.length)];
   }
-  return password.split("").sort(() => Math.random() - 0.5).join("");
+  return password
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
 }
 
 export default function UserAdministration() {
@@ -862,6 +865,48 @@ Email: ${info.email || ""}
                         </Button>
                       </Grid>
                     </Grid>
+                    {/* Download og videre-knapper */}
+                    {holdEditDialogOpen && editUser.password && (
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          {showEditDownloadButton && editUserDownloadInfo ? (
+                            <Button
+                              variant="outlined"
+                              color="primary"
+                              fullWidth
+                              onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
+                            >
+                              Download brugerinfo ({editDownloadCountdown})
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outlined"
+                              color="primary"
+                              fullWidth
+                              disabled
+                            >
+                              Download brugerinfo
+                            </Button>
+                          )}
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            fullWidth
+                            onClick={() => {
+                              setHoldEditDialogOpen(false);
+                              setShowEditDownloadButton(false);
+                              setEditUserDownloadInfo(null);
+                              setEditDownloadCountdown(10);
+                              setUserDialogOpen(false);
+                            }}
+                          >
+                            Videre
+                          </Button>
+                        </Grid>
+                      </Grid>
+                    )}
                   </Stack>
                 )}
                 {(userError || editUserEmailError) && <Typography color="error" sx={{ mt: 2 }}>{userError || editUserEmailError}</Typography>}
