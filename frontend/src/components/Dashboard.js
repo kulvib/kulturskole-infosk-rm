@@ -38,8 +38,8 @@ function getRoleText(role) {
 
 export default function Dashboard() {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // <600px
-  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md")); // 600-899px
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -83,19 +83,19 @@ export default function Dashboard() {
     title = `${schoolName} - infoskærm administration`;
   }
 
-  // Navn og rolle (fx "Henrik Resen - Administrator"), e-mail
+  // Navn og rolle (fx "Henrik Resen - Administrator")
   const userDisplayName = user
     ? `${user.full_name || user.username} - ${getRoleText(user.role)}`
     : "";
 
-  // E-mail (brug evt. username hvis email mangler)
-  const userEmail = user?.email || user?.username || "";
+  // E-mail fra backend
+  const userEmail = user?.email || "";
 
   // --- Mobil optimering: Luk drawer ved navigation, swipe, klik udenfor ---
   useEffect(() => {
     if (mobileOpen && (isMobile || isTablet)) setMobileOpen(false);
     // eslint-disable-next-line
-  }, [location.pathname]); // Luk drawer ved navigation på mobil/tablet
+  }, [location.pathname]);
 
   // --- MENU DRAWER ---
   const drawer = (
