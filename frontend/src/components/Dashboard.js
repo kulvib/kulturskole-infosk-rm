@@ -82,11 +82,6 @@ export default function Dashboard() {
     title = `${schoolName} - infoskærm administration`;
   }
 
-  // Fuldt navn + rolle (fx "Kulturskole Viborg - Administrator")
-  const userDisplay = user
-    ? `${user.full_name || user.username}${user.role ? " - " + getRoleText(user.role) : ""}`
-    : "";
-
   // --- Mobil optimering: Luk drawer ved navigation, swipe, klik udenfor ---
   useEffect(() => {
     if (mobileOpen && (isMobile || isTablet)) setMobileOpen(false);
@@ -182,6 +177,90 @@ export default function Dashboard() {
     </Box>
   );
 
+  // --- HØJRE HJØRNE: Brugerinfo + logout med visning afhængig af rolle ---
+  let userInfoBox = null;
+  if (user) {
+    if (user.role === "bruger") {
+      userInfoBox = (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography
+            sx={{
+              color: "white",
+              fontWeight: 400,
+              fontSize: 16,
+              mr: 2,
+              textAlign: "right",
+            }}
+          >
+            {user.full_name || user.username}
+            {user.email ? (
+              <>
+                <br />
+                <span style={{ fontSize: 13, opacity: 0.85 }}>{user.email}</span>
+              </>
+            ) : null}
+          </Typography>
+          <Button
+            variant="outlined"
+            color="inherit"
+            startIcon={<LogoutIcon />}
+            onClick={logoutUser}
+            sx={{
+              borderColor: "white",
+              color: "white",
+              fontWeight: "normal",
+              fontSize: 16,
+              px: 2,
+              py: 0.5,
+              '&:hover': { borderColor: "#90caf9", background: "#1565c0" },
+            }}
+          >
+            LOG UD
+          </Button>
+        </Box>
+      );
+    } else {
+      userInfoBox = (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography
+            sx={{
+              color: "white",
+              fontWeight: 400,
+              fontSize: 16,
+              mr: 2,
+              textAlign: "right",
+            }}
+          >
+            {(user.full_name || user.username) + " - " + getRoleText(user.role)}
+            {user.email ? (
+              <>
+                <br />
+                <span style={{ fontSize: 13, opacity: 0.85 }}>{user.email}</span>
+              </>
+            ) : null}
+          </Typography>
+          <Button
+            variant="outlined"
+            color="inherit"
+            startIcon={<LogoutIcon />}
+            onClick={logoutUser}
+            sx={{
+              borderColor: "white",
+              color: "white",
+              fontWeight: "normal",
+              fontSize: 16,
+              px: 2,
+              py: 0.5,
+              '&:hover': { borderColor: "#90caf9", background: "#1565c0" },
+            }}
+          >
+            LOG UD
+          </Button>
+        </Box>
+      );
+    }
+  }
+
   return (
     <Box sx={{ display: "flex" }}>
       <CssBaseline />
@@ -233,46 +312,7 @@ export default function Dashboard() {
           >
             {title}
           </Typography>
-          {/* HØJRE HJØRNE: Brugerinfo + logout med rettet funktion */}
-          {user && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <Typography
-                sx={{
-                  color: "white",
-                  fontWeight: 400,
-                  fontSize: 16,
-                  mr: 2,
-                  textAlign: "right",
-                }}
-              >
-                {userDisplay}
-                {user.email ? (
-                  <>
-                    <br />
-                    <span style={{ fontSize: 13, opacity: 0.85 }}>{user.email}</span>
-                  </>
-                ) : null}
-              </Typography>
-              <Button
-                variant="outlined"
-                color="inherit"
-                startIcon={<LogoutIcon />}
-                onClick={logoutUser}
-                sx={{
-                  borderColor: "white",
-                  color: "white",
-                  fontWeight: "normal",
-                  fontSize: 16,
-                  px: 2,
-                  py: 0.5,
-                  '&:hover': { borderColor: "#90caf9", background: "#1565c0" },
-                }}
-              >
-                LOG UD
-              </Button>
-            </Box>
-          )}
-          {!user && (
+          {userInfoBox || (
             <Skeleton variant="text" width={80} sx={{ bgcolor: "grey.700" }} />
           )}
         </Toolbar>
