@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, Link, useLocation } from "react-router-dom";
 import {
   Box,
   Drawer,
@@ -38,12 +38,11 @@ function getRoleText(role) {
 
 export default function Dashboard() {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // <600px
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md")); // 600-899px
   const location = useLocation();
-  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logoutUser } = useAuth();
+  const { user, logout } = useAuth();
   const [schoolName, setSchoolName] = useState("");
 
   // Responsiv drawerWidth
@@ -83,19 +82,16 @@ export default function Dashboard() {
     title = `${schoolName} - infoskærm administration`;
   }
 
-  // Navn og rolle (fx "Henrik Resen - Administrator")
-  const userDisplayName = user
-    ? `${user.full_name || user.username} - ${getRoleText(user.role)}`
+  // Fuldt navn + rolle (fx "Kulturskole Viborg - Administrator")
+  const userDisplay = user
+    ? `${user.full_name || user.username}${user.role ? " - " + getRoleText(user.role) : ""}`
     : "";
-
-  // E-mail fra backend
-  const userEmail = user?.email || "";
 
   // --- Mobil optimering: Luk drawer ved navigation, swipe, klik udenfor ---
   useEffect(() => {
     if (mobileOpen && (isMobile || isTablet)) setMobileOpen(false);
     // eslint-disable-next-line
-  }, [location.pathname]);
+  }, [location.pathname]); // Luk drawer ved navigation på mobil/tablet
 
   // --- MENU DRAWER ---
   const drawer = (
@@ -186,12 +182,6 @@ export default function Dashboard() {
     </Box>
   );
 
-  // --- Log ud handler ---
-  const handleLogout = () => {
-    logoutUser();
-    navigate("/login", { replace: true });
-  };
-
   return (
     <Box sx={{ display: "flex" }}>
       <CssBaseline />
@@ -199,10 +189,10 @@ export default function Dashboard() {
         position="fixed"
         sx={{
           zIndex: (theme) => theme.zIndex.drawer + 1,
-          background: "#1976d2",
+          background: theme.palette.primary.main,
           color: "#fff",
           boxShadow: 2,
-          height: { xs: 56, md: 64 },
+          height: { xs: 48, md: 64 },
           display: "flex",
           justifyContent: "center",
         }}
@@ -210,89 +200,81 @@ export default function Dashboard() {
       >
         <Toolbar
           sx={{
-            minHeight: { xs: 56, md: 64 },
-            px: { xs: 2, md: 3 },
-            background: "#1976d2",
             display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 0,
+            justifyContent: "space-between",
+            minHeight: { xs: 48, md: 64 },
+            px: { xs: 1, md: 2 },
           }}
         >
-          <Box
+          {(isMobile || isTablet) && (
+            <IconButton
+              color="inherit"
+              aria-label="Åbn menu"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 1 }}
+              size="large"
+            >
+              <MenuIcon sx={{ fontSize: { xs: 26, sm: 32 } }} />
+            </IconButton>
+          )}
+          <Typography
+            variant="h6"
+            noWrap
             sx={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              width: "100%",
-              maxWidth: 600,
-              justifyContent: "center",
+              fontWeight: 700,
+              fontSize: { xs: "1rem", md: "1.25rem" },
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              maxWidth: { xs: "55vw", sm: "65vw", md: "unset" },
+              ml: { xs: (isMobile || isTablet) ? 0 : 1 }
             }}
           >
-            {/* Centereret navn/rolle + email */}
-            <Box sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              flexGrow: 1,
-              mr: 2,
-              minWidth: 250,
-            }}>
+            {title}
+          </Typography>
+          {/* HØJRE HJØRNE: Brugerinfo + logout som i Kulturspor-dashboard */}
+          {user && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
               <Typography
-                variant="subtitle1"
                 sx={{
-                  fontWeight: 500,
-                  color: "#fff",
-                  textAlign: "center",
-                  fontSize: "1.13rem",
-                  letterSpacing: 0.1,
-                }}
-              >
-                {userDisplayName}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "#e3f2fd",
-                  textAlign: "center",
-                  fontSize: "1.03rem",
+                  color: "white",
                   fontWeight: 400,
-                  mt: 0.3,
-                  letterSpacing: 0.5,
+                  fontSize: 16,
+                  mr: 2,
+                  textAlign: "right",
                 }}
               >
-                {userEmail}
+                {userDisplay}
+                {user.email ? (
+                  <>
+                    <br />
+                    <span style={{ fontSize: 13, opacity: 0.85 }}>{user.email}</span>
+                  </>
+                ) : null}
               </Typography>
+              <Button
+                variant="outlined"
+                color="inherit"
+                startIcon={<LogoutIcon />}
+                onClick={logout}
+                sx={{
+                  borderColor: "white",
+                  color: "white",
+                  fontWeight: "normal",
+                  fontSize: 16,
+                  px: 2,
+                  py: 0.5,
+                  '&:hover': { borderColor: "#90caf9", background: "#1565c0" },
+                }}
+              >
+                LOG UD
+              </Button>
             </Box>
-            <Button
-              variant="outlined"
-              color="inherit"
-              startIcon={<LogoutIcon sx={{ fontSize: 20 }} />}
-              onClick={handleLogout}
-              sx={{
-                borderColor: "#fff",
-                color: "#fff",
-                fontWeight: 400,
-                minWidth: 110,
-                fontSize: "1rem",
-                px: 2,
-                py: 0.5,
-                borderRadius: 1.5,
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                height: 42,
-                "&:hover": {
-                  borderColor: "#fff",
-                  backgroundColor: "rgba(255,255,255,0.08)",
-                },
-              }}
-            >
-              LOG UD
-            </Button>
-          </Box>
+          )}
+          {!user && (
+            <Skeleton variant="text" width={80} sx={{ bgcolor: "grey.700" }} />
+          )}
         </Toolbar>
       </AppBar>
 
@@ -341,7 +323,7 @@ export default function Dashboard() {
           background: "#f6f9fb",
         }}
       >
-        <Toolbar sx={{ minHeight: { xs: 56, md: 64 } }} />
+        <Toolbar sx={{ minHeight: { xs: 48, md: 64 } }} />
         <Outlet />
       </Box>
     </Box>
