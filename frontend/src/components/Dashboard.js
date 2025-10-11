@@ -199,10 +199,10 @@ export default function Dashboard() {
         position="fixed"
         sx={{
           zIndex: (theme) => theme.zIndex.drawer + 1,
-          background: theme.palette.primary.main,
+          background: "#1976d2",
           color: "#fff",
           boxShadow: 2,
-          height: { xs: 48, md: 64 },
+          height: { xs: 56, md: 64 },
           display: "flex",
           justifyContent: "center",
         }}
@@ -210,63 +210,62 @@ export default function Dashboard() {
       >
         <Toolbar
           sx={{
+            minHeight: { xs: 56, md: 64 },
+            px: { xs: 2, md: 3 },
+            background: "#1976d2",
             display: "flex",
-            justifyContent: "space-between",
-            minHeight: { xs: 48, md: 64 },
-            px: { xs: 1, md: 2 },
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 0,
           }}
         >
-          {(isMobile || isTablet) && (
-            <IconButton
-              color="inherit"
-              aria-label="Åbn menu"
-              edge="start"
-              onClick={handleDrawerToggle}
-              sx={{ mr: 1 }}
-              size="large"
-            >
-              <MenuIcon sx={{ fontSize: { xs: 26, sm: 32 } }} />
-            </IconButton>
-          )}
-          <Typography
-            variant="h6"
-            noWrap
-            sx={{
-              fontWeight: 700,
-              fontSize: { xs: "1rem", md: "1.25rem" },
-              textOverflow: "ellipsis",
-              overflow: "hidden",
-              whiteSpace: "nowrap",
-              maxWidth: { xs: "55vw", sm: "65vw", md: "unset" },
-              ml: { xs: (isMobile || isTablet) ? 0 : 1 }
-            }}
-          >
-            {title}
-          </Typography>
-          {/* Ny brugerinfo + logout i øverste højre hjørne */}
           <Box
             sx={{
-              display: { xs: "none", sm: "flex" },
+              display: "flex",
+              flexDirection: "row",
               alignItems: "center",
-              gap: 2,
-              background: theme.palette.primary.main,
-              px: 2,
-              py: 1,
-              borderRadius: 2,
+              width: "100%",
+              maxWidth: 600,
+              justifyContent: "center",
             }}
           >
-            {user ? (
-              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", mr: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 400, color: "#fff", textAlign: "right", lineHeight: 1.2 }}>
-                  {userDisplayName}
-                </Typography>
-                <Typography variant="body2" sx={{ color: "#e3f2fd", textAlign: "right", fontSize: "0.97rem", fontWeight: 400, mt: 0.2 }}>
-                  {userEmail}
-                </Typography>
-              </Box>
-            ) : (
-              <Skeleton variant="text" width={120} sx={{ bgcolor: "grey.700" }} />
-            )}
+            {/* Centereret navn/rolle + email */}
+            <Box sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              flexGrow: 1,
+              mr: 2,
+              minWidth: 250,
+            }}>
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  fontWeight: 500,
+                  color: "#fff",
+                  textAlign: "center",
+                  fontSize: "1.13rem",
+                  letterSpacing: 0.1,
+                }}
+              >
+                {userDisplayName}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "#e3f2fd",
+                  textAlign: "center",
+                  fontSize: "1.03rem",
+                  fontWeight: 400,
+                  mt: 0.3,
+                  letterSpacing: 0.5,
+                }}
+              >
+                {userEmail}
+              </Typography>
+            </Box>
             <Button
               variant="outlined"
               color="inherit"
@@ -284,31 +283,7 @@ export default function Dashboard() {
                 display: "flex",
                 alignItems: "center",
                 gap: 1,
-                "&:hover": {
-                  borderColor: "#fff",
-                  backgroundColor: "rgba(255,255,255,0.08)",
-                },
-              }}
-            >
-              LOG UD
-            </Button>
-          </Box>
-          {/* På XS vis kun logout-knap */}
-          <Box sx={{ display: { xs: "flex", sm: "none" }, alignItems: "center" }}>
-            <Button
-              variant="outlined"
-              color="inherit"
-              startIcon={<LogoutIcon />}
-              onClick={handleLogout}
-              sx={{
-                borderColor: "#fff",
-                color: "#fff",
-                fontWeight: 400,
-                fontSize: "1rem",
-                borderRadius: 1.5,
-                minWidth: 44,
-                px: 1,
-                py: 0.5,
+                height: 42,
                 "&:hover": {
                   borderColor: "#fff",
                   backgroundColor: "rgba(255,255,255,0.08)",
@@ -366,7 +341,7 @@ export default function Dashboard() {
           background: "#f6f9fb",
         }}
       >
-        <Toolbar sx={{ minHeight: { xs: 48, md: 64 } }} />
+        <Toolbar sx={{ minHeight: { xs: 56, md: 64 } }} />
         <Outlet />
       </Box>
     </Box>
