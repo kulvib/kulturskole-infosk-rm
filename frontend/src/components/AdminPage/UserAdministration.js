@@ -456,15 +456,16 @@ export default function UserAdministration() {
             </Typography>
             {/* Opret bruger-formular */}
             <Grid container spacing={2} sx={{ mb: 1 }}>
-              <Grid item xs={12} md={4}>
+              {/* Linje 1 */}
+              <Grid item xs={12} md={3}>
                 <TextField required label="Brugernavn" value={newUser.username}
                   onChange={e => setNewUser({ ...newUser, username: e.target.value })} size="small" fullWidth />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={3}>
                 <TextField required label="Fulde navn" value={newUser.full_name}
                   onChange={e => setNewUser({ ...newUser, full_name: e.target.value })} size="small" fullWidth />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={3}>
                 <FormControl size="small" fullWidth required>
                   <InputLabel id="rolle-label">Rolle</InputLabel>
                   <Select
@@ -479,6 +480,26 @@ export default function UserAdministration() {
                   </Select>
                 </FormControl>
               </Grid>
+              <Grid item xs={12} md={3}>
+                {newUser.role === "bruger" ? (
+                  <FormControl size="small" fullWidth>
+                    <InputLabel id="skole-label">Skole</InputLabel>
+                    <Select
+                      labelId="skole-label"
+                      value={newUser.school_id}
+                      label="Skole"
+                      onChange={e => setNewUser({ ...newUser, school_id: e.target.value })}
+                    >
+                      {getAlphaSchools().map(school => (
+                        <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                ) : (
+                  <Box />
+                )}
+              </Grid>
+              {/* Linje 2 */}
               <Grid item xs={12} md={3}>
                 <TextField required label="Email" type="email" value={newUser.email}
                   onChange={e => setNewUser({ ...newUser, email: e.target.value })} size="small" fullWidth
@@ -502,28 +523,12 @@ export default function UserAdministration() {
                   Generer password
                 </Button>
               </Grid>
+              {/* Linje 3 */}
               <Grid item xs={12}>
                 <TextField label="Bemærkninger" value={newUser.remarks || ""}
                   onChange={e => setNewUser({ ...newUser, remarks: e.target.value })} size="small"
                   fullWidth multiline minRows={1} maxRows={3} />
               </Grid>
-              {newUser.role === "bruger" && (
-                <Grid item xs={12}>
-                  <FormControl size="small" fullWidth>
-                    <InputLabel id="skole-label">Skole</InputLabel>
-                    <Select
-                      labelId="skole-label"
-                      value={newUser.school_id}
-                      label="Skole"
-                      onChange={e => setNewUser({ ...newUser, school_id: e.target.value })}
-                    >
-                      {getAlphaSchools().map(school => (
-                        <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-              )}
             </Grid>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, mt: 2 }}>
               <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
