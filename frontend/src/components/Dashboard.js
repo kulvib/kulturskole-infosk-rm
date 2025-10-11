@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Outlet, Link, useLocation } from "react-router-dom";
-import LogoutButton from "./LogoutButton";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Drawer,
@@ -18,6 +17,7 @@ import {
   CssBaseline,
   Skeleton,
   Slide,
+  Button,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import HomeIcon from "@mui/icons-material/Home";
@@ -41,8 +41,9 @@ export default function Dashboard() {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // <600px
   const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md")); // 600-899px
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, logoutUser } = useAuth();
   const [schoolName, setSchoolName] = useState("");
 
   // Responsiv drawerWidth
@@ -185,6 +186,12 @@ export default function Dashboard() {
     </Box>
   );
 
+  // --- Log ud handler ---
+  const handleLogout = () => {
+    logoutUser();
+    navigate("/login", { replace: true });
+  };
+
   return (
     <Box sx={{ display: "flex" }}>
       <CssBaseline />
@@ -260,9 +267,11 @@ export default function Dashboard() {
             ) : (
               <Skeleton variant="text" width={120} sx={{ bgcolor: "grey.700" }} />
             )}
-            <LogoutButton
-              color="inherit"
+            <Button
               variant="outlined"
+              color="inherit"
+              startIcon={<LogoutIcon sx={{ fontSize: 20 }} />}
+              onClick={handleLogout}
               sx={{
                 borderColor: "#fff",
                 color: "#fff",
@@ -274,16 +283,40 @@ export default function Dashboard() {
                 borderRadius: 1.5,
                 display: "flex",
                 alignItems: "center",
-                gap: 1
+                gap: 1,
+                "&:hover": {
+                  borderColor: "#fff",
+                  backgroundColor: "rgba(255,255,255,0.08)",
+                },
               }}
-              startIcon={<LogoutIcon sx={{ fontSize: 20 }} />}
             >
               LOG UD
-            </LogoutButton>
+            </Button>
           </Box>
           {/* På XS vis kun logout-knap */}
           <Box sx={{ display: { xs: "flex", sm: "none" }, alignItems: "center" }}>
-            <LogoutButton color="inherit" />
+            <Button
+              variant="outlined"
+              color="inherit"
+              startIcon={<LogoutIcon />}
+              onClick={handleLogout}
+              sx={{
+                borderColor: "#fff",
+                color: "#fff",
+                fontWeight: 400,
+                fontSize: "1rem",
+                borderRadius: 1.5,
+                minWidth: 44,
+                px: 1,
+                py: 0.5,
+                "&:hover": {
+                  borderColor: "#fff",
+                  backgroundColor: "rgba(255,255,255,0.08)",
+                },
+              }}
+            >
+              LOG UD
+            </Button>
           </Box>
         </Toolbar>
       </AppBar>
