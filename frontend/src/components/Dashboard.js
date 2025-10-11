@@ -83,7 +83,7 @@ export default function Dashboard() {
     title = `${schoolName} - infoskærm administration`;
   }
 
-  // Fuldt navn + rolle (fx "Kulturskole Viborg - Administrator")
+  // Navn og rolle (fx "Henrik Resen - Administrator"), e-mail
   const userDisplayName = user
     ? `${user.full_name || user.username} - ${getRoleText(user.role)}`
     : "";
@@ -257,10 +257,10 @@ export default function Dashboard() {
           >
             {user ? (
               <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", mr: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 400, color: "#fff", textAlign: "right" }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 400, color: "#fff", textAlign: "right", lineHeight: 1.2 }}>
                   {userDisplayName}
                 </Typography>
-                <Typography variant="body2" sx={{ color: "#e3f2fd", textAlign: "right", fontSize: "0.95rem", fontWeight: 400 }}>
+                <Typography variant="body2" sx={{ color: "#e3f2fd", textAlign: "right", fontSize: "0.97rem", fontWeight: 400, mt: 0.2 }}>
                   {userEmail}
                 </Typography>
               </Box>
