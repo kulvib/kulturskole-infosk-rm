@@ -592,7 +592,7 @@ export default function CalendarPage() {
   // ----------- RENDER -----------
   return (
     <Box sx={{
-      maxWidth: 1200,
+      maxWidth: 1500,
       mx: "auto",
       mt: { xs: 1, sm: 4 },
       fontFamily: "inherit",
