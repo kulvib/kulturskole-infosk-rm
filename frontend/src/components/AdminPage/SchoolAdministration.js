@@ -32,9 +32,6 @@ import axios from "axios";
 
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 
-// Højde for input og kort
-const CARD_HEIGHT = 40;
-
 export default function SchoolAdministration() {
   const [schools, setSchools] = useState([]);
   const [selectedSchool, setSelectedSchool] = useState("");
@@ -59,6 +56,7 @@ export default function SchoolAdministration() {
   const showSnackbar = (message, severity = "success") => setSnackbar({ open: true, message, severity });
   const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
 
+  // Inline edit state
   const [editSchoolId, setEditSchoolId] = useState(null);
   const [editSchoolName, setEditSchoolName] = useState("");
   const [editSchoolError, setEditSchoolError] = useState("");
@@ -199,7 +197,7 @@ export default function SchoolAdministration() {
   const getAlphaSchools = () =>
     schools.slice().sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
 
-  const inputSx = { minWidth: 180, my: 0, height: CARD_HEIGHT };
+  const inputSx = { minWidth: 180, my: 0 };
 
   // Inline edit handlers
   const handleEditSchool = (school) => {
@@ -240,17 +238,6 @@ export default function SchoolAdministration() {
       .catch(e => {
         setEditSchoolError(e.response?.data?.detail || "Fejl ved opdatering");
       });
-  };
-
-  // Responsive grid parameters
-  // xs: 12 (1 pr række), sm: 4 (3 pr række), md: 2.4 (5 pr række)
-  // MUI's Grid accepterer kun integer 'xs', så vi bruger item widths i procent via sx
-  const cardSx = {
-    height: CARD_HEIGHT,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    boxSizing: "border-box"
   };
 
   return (
@@ -344,7 +331,7 @@ export default function SchoolAdministration() {
               <Button
                 variant="contained"
                 size="large"
-                sx={{ minWidth: 140, height: CARD_HEIGHT, alignSelf: "flex-end" }}
+                sx={{ minWidth: 140, height: 40, alignSelf: "flex-end" }}
                 onClick={handleSaveTimes}
                 disabled={!selectedSchool}
               >
@@ -372,7 +359,7 @@ export default function SchoolAdministration() {
                 sx={inputSx}
                 fullWidth
               />
-              <Button variant="contained" sx={{ height: CARD_HEIGHT, minWidth: 140 }} onClick={handleAddSchool}>
+              <Button variant="contained" sx={{ height: 40, minWidth: 140 }} onClick={handleAddSchool}>
                 Tilføj skole
               </Button>
               <TextField
@@ -380,7 +367,7 @@ export default function SchoolAdministration() {
                 size="small"
                 value={schoolSearch}
                 onChange={e => setSchoolSearch(e.target.value)}
-                sx={{ minWidth: 120, height: CARD_HEIGHT }}
+                sx={{ minWidth: 120 }}
                 placeholder="Søg skole..."
               />
               <Tooltip title={`Sortér alfabetisk ${schoolSort.direction === "asc" ? "(A-Å)" : "(Å-A)"}`}>
@@ -391,7 +378,7 @@ export default function SchoolAdministration() {
                       direction: prev.direction === "asc" ? "desc" : "asc",
                     }))
                   }
-                  sx={{ ml: 1, height: CARD_HEIGHT }}
+                  sx={{ ml: 1 }}
                   aria-label="Sortér"
                 >
                   {schoolSort.direction === "asc" ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
@@ -415,13 +402,13 @@ export default function SchoolAdministration() {
                   <Grid
                     item
                     xs={12}      // 1 pr række på mobil
-                    sm={4}       // 3 pr række på tablet
-                    md={2.4}     // 5 pr række på desktop (MUI tillader decimal for md)
+                    sm={6}       // 2 pr række på tablet
+                    md={2.4}     // 5 pr række på desktop
                     key={school.id ?? school.name}
                   >
-                    <Card variant="outlined" sx={{ ...cardSx }}>
-                      <CardContent sx={{ pb: 1, pt: 1, width: "100%", display: "flex", alignItems: "center", minHeight: CARD_HEIGHT, height: CARD_HEIGHT }}>
-                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                    <Card variant="outlined" sx={{ height: "100%" }}>
+                      <CardContent sx={{ pb: 1 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           {editSchoolId === school.id ? (
                             <TextField
                               value={editSchoolName}
@@ -429,7 +416,7 @@ export default function SchoolAdministration() {
                               size="small"
                               error={!!editSchoolError}
                               helperText={editSchoolError}
-                              sx={{ minWidth: 120, flex: 1, height: CARD_HEIGHT }}
+                              sx={{ minWidth: 120, flex: 1 }}
                               autoFocus
                               onKeyDown={e => {
                                 if (e.key === "Enter") handleSaveEditSchool(school);
@@ -443,14 +430,14 @@ export default function SchoolAdministration() {
                           <Box sx={{ display: "flex", alignItems: "center", ml: 1 }}>
                             {editSchoolId === school.id ? (
                               <Tooltip title="Gem">
-                                <IconButton color="primary" onClick={() => handleSaveEditSchool(school)} size="small" sx={{ m: 0, p: "2px", height: CARD_HEIGHT }}>
+                                <IconButton color="primary" onClick={() => handleSaveEditSchool(school)} size="small" sx={{ m: 0, p: "2px" }}>
                                   <CheckIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
                             ) : (
                               <>
                                 <Tooltip title="Rediger navn">
-                                  <IconButton color="primary" onClick={() => handleEditSchool(school)} size="small" sx={{ m: 0, p: "2px", height: CARD_HEIGHT }}>
+                                  <IconButton color="primary" onClick={() => handleEditSchool(school)} size="small" sx={{ m: 0, p: "2px" }}>
                                     <EditIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
@@ -462,7 +449,7 @@ export default function SchoolAdministration() {
                                       color="error"
                                       onClick={() => handleOpenDeleteDialog(school)}
                                       size="small"
-                                      sx={{ m: 0, p: "2px", ml: 0.3, height: CARD_HEIGHT }}
+                                      sx={{ m: 0, p: "2px", ml: 0.3 }}
                                     >
                                       <DeleteIcon fontSize="small" />
                                     </IconButton>
