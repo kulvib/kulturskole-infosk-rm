@@ -24,7 +24,7 @@ import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-import EmailIcon from "@mui/icons-material/Email";
+import LogoutIcon from "@mui/icons-material/Logout";
 import { useAuth } from "../auth/authcontext";
 import axios from "axios";
 
@@ -36,63 +36,19 @@ function getRoleText(role) {
   return role || "";
 }
 
-function UserInfoBar({ user, onLogout }) {
-  if (!user) return null;
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "flex-end",
-        gap: 2,
-        background: "#1976d2",
-        color: "#fff",
-        px: 2,
-        py: 1,
-        borderRadius: 1,
-        mt: 1,
-        mb: 2,
-      }}
-    >
-      <Box>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-          {user.full_name || user.username} - {getRoleText(user.role)}
-        </Typography>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          <EmailIcon sx={{ fontSize: 16, opacity: 0.85 }} />
-          <Typography variant="body2" sx={{ mt: 0, opacity: 0.85 }}>
-            {user.email}
-          </Typography>
-        </Box>
-      </Box>
-      <LogoutButton
-        variant="outlined"
-        color="inherit"
-        sx={{
-          borderColor: "#fff",
-          color: "#fff",
-          "&:hover": { borderColor: "#fff", background: "#1565c0" },
-          fontWeight: 500,
-        }}
-      >
-        LOG UD
-      </LogoutButton>
-    </Box>
-  );
-}
-
 export default function Dashboard() {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // <600px
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md")); // 600-899px
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
   const [schoolName, setSchoolName] = useState("");
 
+  // Responsiv drawerWidth
   const drawerWidth = isMobile ? 160 : isTablet ? 190 : 230;
 
+  // Dynamisk menu: "Administration" kun for admin
   const menuItems = [
     { text: "Forside", path: "/", match: "/", icon: <HomeIcon /> },
     { text: "Klienter", path: "/clients", match: "/clients", icon: <PeopleIcon /> },
@@ -102,6 +58,7 @@ export default function Dashboard() {
       : []),
   ];
 
+  // Hent school name hvis bruger
   useEffect(() => {
     if (user && user.role === "bruger" && user.school_id) {
       axios
@@ -119,19 +76,27 @@ export default function Dashboard() {
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
+  // TITEL afhænger af rolle
   let title = "Infoskærm administration";
   if (user?.role === "bruger" && schoolName) {
     title = `${schoolName} - infoskærm administration`;
   }
 
-  const userDisplay = user
+  // Fuldt navn + rolle (fx "Kulturskole Viborg - Administrator")
+  const userDisplayName = user
     ? `${user.full_name || user.username} - ${getRoleText(user.role)}`
     : "";
 
+  // E-mail (brug evt. username hvis email mangler)
+  const userEmail = user?.email || user?.username || "";
+
+  // --- Mobil optimering: Luk drawer ved navigation, swipe, klik udenfor ---
   useEffect(() => {
     if (mobileOpen && (isMobile || isTablet)) setMobileOpen(false);
+    // eslint-disable-next-line
   }, [location.pathname]); // Luk drawer ved navigation på mobil/tablet
 
+  // --- MENU DRAWER ---
   const drawer = (
     <Box sx={{ minHeight: "100vh", bgcolor: { xs: "#f8fdff", md: "inherit" } }}>
       <Toolbar />
@@ -271,16 +236,51 @@ export default function Dashboard() {
           >
             {title}
           </Typography>
-          {/* Skjul brugerinfo på helt små skærme */}
-          <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center", gap: 1 }}>
+          {/* Ny brugerinfo + logout i øverste højre hjørne */}
+          <Box
+            sx={{
+              display: { xs: "none", sm: "flex" },
+              alignItems: "center",
+              gap: 2,
+              background: theme.palette.primary.main,
+              px: 2,
+              py: 1,
+              borderRadius: 2,
+            }}
+          >
             {user ? (
-              <Typography variant="subtitle2" sx={{ color: "#fff", opacity: 0.8, mr: 2, fontSize: { sm: "0.93rem", md: "1rem" } }}>
-                {userDisplay}
-              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", mr: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#fff", textAlign: "right" }}>
+                  {userDisplayName}
+                </Typography>
+                <Typography variant="body2" sx={{ color: "#e3f2fd", textAlign: "right", fontSize: "0.95rem" }}>
+                  {userEmail}
+                </Typography>
+              </Box>
             ) : (
-              <Skeleton variant="text" width={80} sx={{ bgcolor: "grey.700" }} />
+              <Skeleton variant="text" width={120} sx={{ bgcolor: "grey.700" }} />
             )}
-            <LogoutButton color="inherit" />
+            <LogoutButton
+              color="inherit"
+              variant="outlined"
+              sx={{
+                borderColor: "#fff",
+                color: "#fff",
+                "&:hover": { background: "#1565c0", borderColor: "#fff" },
+                minWidth: 110,
+                fontWeight: 700,
+                fontSize: "1rem",
+                px: 2,
+                py: 0.5,
+                borderRadius: 1.5,
+                display: "flex",
+                alignItems: "center",
+                gap: 1
+              }}
+              startIcon={<LogoutIcon sx={{ fontSize: 20 }} />}
+            >
+              LOG UD
+            </LogoutButton>
           </Box>
           {/* På XS vis kun logout-knap */}
           <Box sx={{ display: { xs: "flex", sm: "none" }, alignItems: "center" }}>
@@ -335,10 +335,6 @@ export default function Dashboard() {
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 48, md: 64 } }} />
-        {/* UserInfoBar vises på desktop og tablet, skjules på XS */}
-        <Box sx={{ display: { xs: "none", sm: "block" } }}>
-          <UserInfoBar user={user} onLogout={() => {/* din logout funktion */}} />
-        </Box>
         <Outlet />
       </Box>
     </Box>
