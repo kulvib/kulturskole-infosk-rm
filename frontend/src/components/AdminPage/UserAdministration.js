@@ -58,7 +58,7 @@ function generateSecurePassword() {
     .join("");
 }
 
-// RETTET DOWNLOAD-FORMAT!
+// Download-filen med ønsket rækkefølge og format!
 const triggerDownloadUserInfo = (info) => {
   const fileName = info.full_name.trim().replace(/\s+/g, "_") + ".txt";
   const content = `Fulde navn: ${info.full_name}
