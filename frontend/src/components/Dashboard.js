@@ -42,7 +42,7 @@ export default function Dashboard() {
   const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md")); // 600-899px
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logoutUser } = useAuth();
   const [schoolName, setSchoolName] = useState("");
 
   // Responsiv drawerWidth
@@ -233,7 +233,7 @@ export default function Dashboard() {
           >
             {title}
           </Typography>
-          {/* HØJRE HJØRNE: Brugerinfo + logout som i Kulturspor-dashboard */}
+          {/* HØJRE HJØRNE: Brugerinfo + logout med rettet funktion */}
           {user && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
               <Typography
@@ -257,7 +257,7 @@ export default function Dashboard() {
                 variant="outlined"
                 color="inherit"
                 startIcon={<LogoutIcon />}
-                onClick={logout}
+                onClick={logoutUser}
                 sx={{
                   borderColor: "white",
                   color: "white",
