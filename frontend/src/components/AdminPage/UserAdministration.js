@@ -36,15 +36,15 @@ import axios from "axios";
 const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// ----------- Helper functions ----------- //
 function generateSecurePassword() {
   const lower = "abcdefghijklmnopqrstuvwxyz";
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const digits = "0123456789";
   const specials = "!@#$%&*";
-  let password = "";
-  password += lower[Math.floor(Math.random() * lower.length)];
-  password += upper[Math.floor(Math.random() * upper.length)];
-  password += digits[Math.floor(Math.random() * digits.length)];
+  let password = lower[Math.floor(Math.random() * lower.length)]
+    + upper[Math.floor(Math.random() * upper.length)]
+    + digits[Math.floor(Math.random() * digits.length)];
   for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) {
     password += specials[Math.floor(Math.random() * specials.length)];
   }
@@ -52,14 +52,10 @@ function generateSecurePassword() {
   for (let i = password.length; i < 12; i++) {
     password += all[Math.floor(Math.random() * all.length)];
   }
-  return password
-    .split("")
-    .sort(() => Math.random() - 0.5)
-    .join("");
+  return password.split("").sort(() => Math.random() - 0.5).join("");
 }
 
-// Download-filen med ønsket rækkefølge og format!
-const triggerDownloadUserInfo = (info) => {
+function downloadUserInfo(info) {
   const fileName = info.full_name.trim().replace(/\s+/g, "_") + ".txt";
   const content = `Fulde navn: ${info.full_name}
 Skole: ${info.schoolName}
@@ -75,11 +71,21 @@ Password: ${info.password}
   document.body.appendChild(link);
   link.click();
   setTimeout(() => document.body.removeChild(link), 100);
-};
+}
 
+// ----------- Main Component ----------- //
 export default function UserAdministration() {
+  // ----------- State ----------- //
   const [users, setUsers] = useState([]);
+  const [schools, setSchools] = useState([]);
   const [userError, setUserError] = useState("");
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingSchools, setLoadingSchools] = useState(false);
+
+  const [userSort, setUserSort] = useState({ key: "username", direction: "asc" });
+  const [userSearch, setUserSearch] = useState("");
+
+  // --- New user state
   const [newUser, setNewUser] = useState({
     username: "",
     password: "",
@@ -91,59 +97,52 @@ export default function UserAdministration() {
     email: "",
     confirmEmail: "",
   });
-  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [newUserDownloadInfo, setNewUserDownloadInfo] = useState(null);
+  const [showDownloadButton, setShowDownloadButton] = useState(false);
+  const [downloadCountdown, setDownloadCountdown] = useState(10);
+  const [savingNewUser, setSavingNewUser] = useState(false);
+
+  // --- Edit user state
   const [editUser, setEditUser] = useState(null);
   const [editUserEmailError, setEditUserEmailError] = useState("");
   const [editUserConfirmEmail, setEditUserConfirmEmail] = useState("");
-  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [holdEditDialogOpen, setHoldEditDialogOpen] = useState(false);
+  const [editUserDownloadInfo, setEditUserDownloadInfo] = useState(null);
+  const [showEditDownloadButton, setShowEditDownloadButton] = useState(false);
+  const [editDownloadCountdown, setEditDownloadCountdown] = useState(10);
+  const [savingEditUser, setSavingEditUser] = useState(false);
 
+  // --- Delete user state
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [deleteUserError, setDeleteUserError] = useState("");
   const [deleteUserStep, setDeleteUserStep] = useState(1);
 
-  const [userSort, setUserSort] = useState({ key: "username", direction: "asc" });
-  const [userSearch, setUserSearch] = useState("");
-
-  const [schools, setSchools] = useState([]);
-  const [loadingSchools, setLoadingSchools] = useState(false);
-
+  // --- Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const showSnackbar = (message, severity = "success") => setSnackbar({ open: true, message, severity });
-  const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
+  const showSnackbar = (message, severity = "success") =>
+    setSnackbar({ open: true, message, severity });
+  const handleCloseSnackbar = () =>
+    setSnackbar({ open: false, message: "", severity: "success" });
 
-  const [newUserDownloadInfo, setNewUserDownloadInfo] = useState(null);
-  const [showDownloadButton, setShowDownloadButton] = useState(false);
-  const [downloadCountdown, setDownloadCountdown] = useState(10);
-
-  const [editUserDownloadInfo, setEditUserDownloadInfo] = useState(null);
-  const [showEditDownloadButton, setShowEditDownloadButton] = useState(false);
-  const [editDownloadCountdown, setEditDownloadCountdown] = useState(10);
-
-  const [savingNewUser, setSavingNewUser] = useState(false);
-  const [savingEditUser, setSavingEditUser] = useState(false);
-
-  const [holdEditDialogOpen, setHoldEditDialogOpen] = useState(false);
-
+  // ----------- Effects ----------- //
   useEffect(() => {
     setLoadingUsers(true);
     axios.get(`${API_URL}/api/users/`, {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
-      .then(res => {
-        setUsers(
-          Array.isArray(res.data)
-            ? res.data.map(u => ({
-                ...u,
-                role: u.role === "admin" ? "administrator" : u.role,
-              }))
-            : []
-        );
-      })
+      .then(res => setUsers(Array.isArray(res.data)
+        ? res.data.map(u => ({
+            ...u,
+            role: u.role === "admin" ? "administrator" : u.role,
+          })) : []
+      ))
       .catch(() => {
         setUsers([]);
         setUserError("Kunne ikke hente brugere (kun admin kan se listen)");
-      }).finally(() => setLoadingUsers(false));
+      })
+      .finally(() => setLoadingUsers(false));
   }, []);
 
   useEffect(() => {
@@ -159,7 +158,7 @@ export default function UserAdministration() {
   useEffect(() => {
     let timer;
     if (showDownloadButton && downloadCountdown > 0) {
-      timer = setTimeout(() => setDownloadCountdown(downloadCountdown - 1), 1000);
+      timer = setTimeout(() => setDownloadCountdown(val => val - 1), 1000);
     } else if (showDownloadButton && downloadCountdown === 0) {
       setShowDownloadButton(false);
       setNewUserDownloadInfo(null);
@@ -172,7 +171,7 @@ export default function UserAdministration() {
     let timer;
     if (showEditDownloadButton && editDownloadCountdown > 0) {
       setHoldEditDialogOpen(true);
-      timer = setTimeout(() => setEditDownloadCountdown(editDownloadCountdown - 1), 1000);
+      timer = setTimeout(() => setEditDownloadCountdown(val => val - 1), 1000);
     } else if (showEditDownloadButton && editDownloadCountdown === 0) {
       setShowEditDownloadButton(false);
       setEditUserDownloadInfo(null);
@@ -183,6 +182,8 @@ export default function UserAdministration() {
     return () => clearTimeout(timer);
   }, [showEditDownloadButton, editDownloadCountdown]);
 
+  // ----------- Handlers ----------- //
+  // --- Password generator ---
   const handleGeneratePassword = (forEdit = false) => {
     const password = generateSecurePassword();
     if (forEdit) {
@@ -194,6 +195,7 @@ export default function UserAdministration() {
     }
   };
 
+  // --- New User ---
   const handleAddUser = () => {
     setUserError("");
     setSavingNewUser(true);
@@ -214,14 +216,12 @@ export default function UserAdministration() {
       showSnackbar("Email adresserne matcher ikke!", "error");
       return;
     }
-
     if (email && !emailRegex.test(email)) {
       setUserError("Ugyldig emailadresse!");
       setSavingNewUser(false);
       showSnackbar("Ugyldig emailadresse!", "error");
       return;
     }
-
     if (missing.length > 0) {
       setUserError(missing.join(", ") + " skal udfyldes");
       setSavingNewUser(false);
@@ -262,7 +262,7 @@ export default function UserAdministration() {
         });
         showSnackbar("Bruger oprettet!", "success");
         const schoolName = role === "bruger"
-          ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
+          ? (schools.find(s => s.id === school_id)?.name ?? "")
           : "";
         setNewUserDownloadInfo({
           full_name,
@@ -280,15 +280,15 @@ export default function UserAdministration() {
       }).finally(() => setSavingNewUser(false));
   };
 
+  // --- Edit User ---
   const openEditUserDialog = (user) => {
     if (user.full_name === "Henrik Resen") return;
-    const mappedUser = {
+    setEditUser({
       ...user,
       role: user.role === "admin" ? "bruger" : user.role,
       password: "",
-    };
-    setEditUser(mappedUser);
-    setEditUserConfirmEmail(mappedUser.email || "");
+    });
+    setEditUserConfirmEmail(user.email || "");
     setEditUserEmailError("");
     setUserDialogOpen(true);
     setHoldEditDialogOpen(false);
@@ -309,14 +309,12 @@ export default function UserAdministration() {
       showSnackbar("Ugyldig emailadresse!", "error");
       return;
     }
-
     if (email !== editUserConfirmEmail) {
       setEditUserEmailError("Email adresserne matcher ikke!");
       setSavingEditUser(false);
       showSnackbar("Email adresserne matcher ikke!", "error");
       return;
     }
-
     if (!full_name) {
       setUserError("Fulde navn skal udfyldes");
       setSavingEditUser(false);
@@ -335,18 +333,17 @@ export default function UserAdministration() {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(res => {
-        setUsers(Array.isArray(users)
-          ? users.map(u => u.id === res.data.id
-              ? { ...res.data, role: res.data.role === "admin" ? "administrator" : res.data.role }
-              : u)
-          : []);
+        setUsers(users.map(u =>
+          u.id === res.data.id
+            ? { ...res.data, role: res.data.role === "admin" ? "administrator" : res.data.role }
+            : u
+        ));
         setUserError("");
         setEditUserEmailError("");
         showSnackbar("Bruger opdateret!", "success");
-        const schoolName =
-          role === "bruger" && school_id
-            ? (getAlphaSchools().find(s => s.id === school_id)?.name ?? "")
-            : "";
+        const schoolName = role === "bruger" && school_id
+          ? (schools.find(s => s.id === school_id)?.name ?? "")
+          : "";
         if (password) {
           setEditUserDownloadInfo({
             full_name,
@@ -368,6 +365,7 @@ export default function UserAdministration() {
       }).finally(() => setSavingEditUser(false));
   };
 
+  // --- Delete User ---
   const handleOpenDeleteUserDialog = (user) => {
     setUserToDelete(user);
     setDeleteUserDialogOpen(true);
@@ -375,9 +373,7 @@ export default function UserAdministration() {
     setDeleteUserStep(1);
   };
   const handleFirstDeleteUserConfirm = () => setDeleteUserStep(2);
-
   const canDeleteAdmin = userToDelete?.role === "administrator" && userToDelete?.is_active === false;
-
   const handleFinalDeleteUser = () => {
     if (!userToDelete) return;
     if (userToDelete.role === "administrator" && userToDelete.is_active) return;
@@ -385,7 +381,7 @@ export default function UserAdministration() {
       headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
       .then(() => {
-        setUsers(Array.isArray(users) ? users.filter(u => u.id !== userToDelete.id) : []);
+        setUsers(users.filter(u => u.id !== userToDelete.id));
         setDeleteUserDialogOpen(false);
         setUserToDelete(null);
         setDeleteUserStep(1);
@@ -403,13 +399,14 @@ export default function UserAdministration() {
     setDeleteUserStep(1);
   };
 
+  // --- Sorting, filtering ---
   const getAlphaSchools = () =>
     schools.slice().sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
 
   const getSortedUsers = () => {
     let arr = users.filter(u => {
       const schoolName = u.school_id
-        ? (getAlphaSchools().find(s => s.id === u.school_id)?.name ?? "")
+        ? (schools.find(s => s.id === u.school_id)?.name ?? "")
         : "";
       const search = userSearch.trim().toLowerCase();
       return (
@@ -426,33 +423,14 @@ export default function UserAdministration() {
     arr.sort((a, b) => {
       let aVal, bVal;
       switch (userSort.key) {
-        case "username":
-          aVal = a.username || "";
-          bVal = b.username || "";
-          break;
-        case "fullname":
-          aVal = a.full_name || "";
-          bVal = b.full_name || "";
-          break;
-        case "role":
-          aVal = a.role === "administrator" ? "administrator" : "bruger";
-          bVal = b.role === "administrator" ? "administrator" : "bruger";
-          break;
-        case "school":
-          aVal = a.school_id
-            ? (getAlphaSchools().find(s => s.id === a.school_id)?.name ?? "")
-            : "";
-          bVal = b.school_id
-            ? (getAlphaSchools().find(s => s.id === b.school_id)?.name ?? "")
-            : "";
-          break;
-        case "email":
-          aVal = a.email || "";
-          bVal = b.email || "";
-          break;
-        default:
-          aVal = a.username || "";
-          bVal = b.username || "";
+        case "username": aVal = a.username || ""; bVal = b.username || ""; break;
+        case "fullname": aVal = a.full_name || ""; bVal = b.full_name || ""; break;
+        case "role": aVal = a.role === "administrator" ? "administrator" : "bruger";
+          bVal = b.role === "administrator" ? "administrator" : "bruger"; break;
+        case "school": aVal = a.school_id ? (schools.find(s => s.id === a.school_id)?.name ?? "") : "";
+          bVal = b.school_id ? (schools.find(s => s.id === b.school_id)?.name ?? "") : ""; break;
+        case "email": aVal = a.email || ""; bVal = b.email || ""; break;
+        default: aVal = a.username || ""; bVal = b.username || "";
       }
       const cmp = (aVal || "").localeCompare(bVal || "", 'da', { sensitivity: 'base' });
       return userSort.direction === "asc" ? cmp : -cmp;
@@ -467,35 +445,24 @@ export default function UserAdministration() {
     }));
   };
 
+  // ----------- Render ----------- //
   return (
-    <Box sx={{}}>
+    <Box>
       <Paper sx={{ mb: 4, p: 3 }}>
         <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-end">
           <Box sx={{ flex: 2, minWidth: 340 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
               Brugeradministration
             </Typography>
-            {/* Oprettelsesformular */}
+            {/* Opret bruger-formular */}
             <Grid container spacing={2} sx={{ mb: 1 }}>
               <Grid item xs={12} md={4}>
-                <TextField
-                  required
-                  label="Brugernavn"
-                  value={newUser.username}
-                  onChange={e => setNewUser({ ...newUser, username: e.target.value })}
-                  size="small"
-                  fullWidth
-                />
+                <TextField required label="Brugernavn" value={newUser.username}
+                  onChange={e => setNewUser({ ...newUser, username: e.target.value })} size="small" fullWidth />
               </Grid>
               <Grid item xs={12} md={4}>
-                <TextField
-                  required
-                  label="Fulde navn"
-                  value={newUser.full_name}
-                  onChange={e => setNewUser({ ...newUser, full_name: e.target.value })}
-                  size="small"
-                  fullWidth
-                />
+                <TextField required label="Fulde navn" value={newUser.full_name}
+                  onChange={e => setNewUser({ ...newUser, full_name: e.target.value })} size="small" fullWidth />
               </Grid>
               <Grid item xs={12} md={4}>
                 <FormControl size="small" fullWidth required>
@@ -513,66 +480,32 @@ export default function UserAdministration() {
                 </FormControl>
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField
-                  required
-                  label="Email"
-                  type="email"
-                  value={newUser.email}
-                  onChange={e => setNewUser({ ...newUser, email: e.target.value })}
-                  size="small"
-                  fullWidth
+                <TextField required label="Email" type="email" value={newUser.email}
+                  onChange={e => setNewUser({ ...newUser, email: e.target.value })} size="small" fullWidth
                   error={!!(newUser.email && !emailRegex.test(newUser.email))}
-                  helperText={newUser.email && !emailRegex.test(newUser.email) ? "Ugyldig emailadresse" : ""}
-                />
+                  helperText={newUser.email && !emailRegex.test(newUser.email) ? "Ugyldig emailadresse" : ""} />
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField
-                  required
-                  label="Bekræft email"
-                  type="email"
-                  value={newUser.confirmEmail}
-                  onChange={e => setNewUser({ ...newUser, confirmEmail: e.target.value })}
-                  size="small"
-                  fullWidth
+                <TextField required label="Bekræft email" type="email" value={newUser.confirmEmail}
+                  onChange={e => setNewUser({ ...newUser, confirmEmail: e.target.value })} size="small" fullWidth
                   error={!!(newUser.confirmEmail && newUser.email !== newUser.confirmEmail)}
-                  helperText={newUser.confirmEmail && newUser.email !== newUser.confirmEmail ? "Email adresserne matcher ikke" : ""}
-                />
+                  helperText={newUser.confirmEmail && newUser.email !== newUser.confirmEmail ? "Email adresserne matcher ikke" : ""} />
               </Grid>
               <Grid item xs={12} md={3}>
-                <TextField
-                  label="Password"
-                  value={newUser.password}
-                  required
-                  type="text"
-                  size="small"
-                  fullWidth
-                  disabled
-                  placeholder="Password"
-                />
+                <TextField label="Password" value={newUser.password} required type="text"
+                  size="small" fullWidth disabled placeholder="Password" />
               </Grid>
               <Grid item xs={12} md={3} sx={{ display: "flex", alignItems: "center" }}>
-                <Button
-                  variant="outlined"
-                  color="primary"
+                <Button variant="outlined" color="primary"
                   onClick={() => handleGeneratePassword(false)}
-                  sx={{ mr: 2 }}
-                  disabled={savingNewUser}
-                  fullWidth
-                >
+                  sx={{ mr: 2 }} disabled={savingNewUser} fullWidth>
                   Generer password
                 </Button>
               </Grid>
               <Grid item xs={12}>
-                <TextField
-                  label="Bemærkninger"
-                  value={newUser.remarks || ""}
-                  onChange={e => setNewUser({ ...newUser, remarks: e.target.value })}
-                  size="small"
-                  fullWidth
-                  multiline
-                  minRows={1}
-                  maxRows={3}
-                />
+                <TextField label="Bemærkninger" value={newUser.remarks || ""}
+                  onChange={e => setNewUser({ ...newUser, remarks: e.target.value })} size="small"
+                  fullWidth multiline minRows={1} maxRows={3} />
               </Grid>
               {newUser.role === "bruger" && (
                 <Grid item xs={12}>
@@ -598,27 +531,22 @@ export default function UserAdministration() {
                   {savingNewUser ? <CircularProgress size={24} color="inherit" /> : "Opret bruger"}
                 </Button>
                 {showDownloadButton && newUserDownloadInfo && (
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={() => triggerDownloadUserInfo(newUserDownloadInfo)}
-                  >
+                  <Button variant="outlined" color="primary"
+                    onClick={() => downloadUserInfo(newUserDownloadInfo)}>
                     Download brugerinfo ({downloadCountdown})
                   </Button>
                 )}
               </Box>
               <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                <TextField
-                  label="Søg"
-                  size="small"
-                  value={userSearch}
-                  onChange={e => setUserSearch(e.target.value)}
-                  sx={{ minWidth: 120 }}
-                  placeholder="Søg bruger, navn, rolle, email, skole, bemærkninger..."
-                />
+                <TextField label="Søg" size="small" value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)} sx={{ minWidth: 120 }}
+                  placeholder="Søg bruger, navn, rolle, email, skole, bemærkninger..." />
               </Box>
             </Stack>
-            {userError && <Typography color="error" sx={{ mb: 2 }}>{typeof userError === "object" ? JSON.stringify(userError) : userError}</Typography>}
+            {userError && <Typography color="error" sx={{ mb: 2 }}>
+              {typeof userError === "object" ? JSON.stringify(userError) : userError}
+            </Typography>}
+            {/* Brugertabel */}
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -626,27 +554,37 @@ export default function UserAdministration() {
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("username")}>
                       Brugernavn
                       {userSort.key === "username" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} /> : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                        (userSort.direction === "asc"
+                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("fullname")}>
                       Fulde navn
                       {userSort.key === "fullname" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} /> : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                        (userSort.direction === "asc"
+                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("email")}>
                       Email
                       {userSort.key === "email" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} /> : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                        (userSort.direction === "asc"
+                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("role")}>
                       Rolle
                       {userSort.key === "role" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} /> : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                        (userSort.direction === "asc"
+                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("school")}>
                       Skole
                       {userSort.key === "school" &&
-                        (userSort.direction === "asc" ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} /> : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
+                        (userSort.direction === "asc"
+                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Bemærkninger</TableCell>
@@ -675,7 +613,7 @@ export default function UserAdministration() {
                         <TableCell>{user.role === "administrator" ? "administrator" : "bruger"}</TableCell>
                         <TableCell>
                           {user.school_id
-                            ? (getAlphaSchools().find(s => s.id === user.school_id)?.name ?? user.school_id)
+                            ? (schools.find(s => s.id === user.school_id)?.name ?? user.school_id)
                             : "-"}
                         </TableCell>
                         <TableCell>
@@ -706,9 +644,7 @@ export default function UserAdministration() {
                               <IconButton
                                 color="error"
                                 onClick={() => handleOpenDeleteUserDialog(user)}
-                                disabled={
-                                  user.role === "administrator" && user.is_active
-                                }
+                                disabled={user.role === "administrator" && user.is_active}
                               >
                                 <DeleteIcon />
                               </IconButton>
@@ -733,53 +669,29 @@ export default function UserAdministration() {
               <DialogContent>
                 {editUser && (
                   <Stack gap={2} sx={{ mt: 1 }}>
-                    {/* 1. Brugernavn */}
-                    <TextField
-                      label="Brugernavn"
-                      value={editUser.username}
-                      disabled
-                      fullWidth
-                      size="small"
-                    />
-                    {/* 2. Fulde navn */}
-                    <TextField
-                      required
-                      label="Fulde navn"
-                      value={editUser.full_name || ""}
-                      onChange={e => setEditUser({ ...editUser, full_name: e.target.value })}
-                      fullWidth
-                      size="small"
-                    />
-                    {/* 3. Email + Bekræft email */}
+                    <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" />
+                    <TextField required label="Fulde navn" value={editUser.full_name || ""}
+                      onChange={e => setEditUser({ ...editUser, full_name: e.target.value })} fullWidth size="small" />
                     <Grid container spacing={2}>
                       <Grid item xs={12} md={6}>
-                        <TextField
-                          required
-                          label="Email"
-                          type="email"
+                        <TextField required label="Email" type="email"
                           value={editUser.email || ""}
                           onChange={e => setEditUser({ ...editUser, email: e.target.value })}
-                          fullWidth
-                          size="small"
+                          fullWidth size="small"
                           error={!!(editUser.email && !emailRegex.test(editUser.email))}
                           helperText={editUser.email && !emailRegex.test(editUser.email) ? "Ugyldig emailadresse" : ""}
                         />
                       </Grid>
                       <Grid item xs={12} md={6}>
-                        <TextField
-                          required
-                          label="Bekræft email"
-                          type="email"
+                        <TextField required label="Bekræft email" type="email"
                           value={editUserConfirmEmail || ""}
                           onChange={e => setEditUserConfirmEmail(e.target.value)}
-                          fullWidth
-                          size="small"
+                          fullWidth size="small"
                           error={!!(editUser.email && editUser.email !== editUserConfirmEmail)}
                           helperText={editUser.email && editUser.email !== editUserConfirmEmail ? "Email adresserne matcher ikke" : ""}
                         />
                       </Grid>
                     </Grid>
-                    {/* 4. Rolle */}
                     <FormControl fullWidth size="small">
                       <InputLabel id="edit-rolle-label">Rolle</InputLabel>
                       <Select
@@ -800,7 +712,6 @@ export default function UserAdministration() {
                         <MenuItem value="administrator">Administrator</MenuItem>
                       </Select>
                     </FormControl>
-                    {/* 5. Skole */}
                     {editUser.role === "bruger" && (
                       <FormControl fullWidth size="small">
                         <InputLabel id="edit-skole-label">Skole</InputLabel>
@@ -817,7 +728,6 @@ export default function UserAdministration() {
                         </Select>
                       </FormControl>
                     )}
-                    {/* 6. Status */}
                     <FormControl fullWidth size="small">
                       <InputLabel id="edit-status-label">Status</InputLabel>
                       <Select
@@ -831,79 +741,44 @@ export default function UserAdministration() {
                         <MenuItem value="false">Spærret</MenuItem>
                       </Select>
                     </FormControl>
-                    {/* 7. Bemærkninger */}
-                    <TextField
-                      label="Bemærkninger"
-                      value={editUser.remarks || ""}
+                    <TextField label="Bemærkninger" value={editUser.remarks || ""}
                       onChange={e => setEditUser({ ...editUser, remarks: e.target.value })}
-                      fullWidth
-                      size="small"
-                      multiline
-                      minRows={1}
-                      maxRows={3}
-                      disabled={savingEditUser}
-                    />
-                    {/* 8. Password + knap */}
+                      fullWidth size="small" multiline minRows={1} maxRows={3} disabled={savingEditUser} />
                     <Grid container spacing={2}>
                       <Grid item xs={12} md={6}>
-                        <TextField
-                          label="Password"
-                          type="text"
-                          value={editUser.password || ""}
-                          disabled
-                          fullWidth
-                          size="small"
-                        />
+                        <TextField label="Password" type="text" value={editUser.password || ""}
+                          disabled fullWidth size="small" />
                       </Grid>
                       <Grid item xs={12} md={6}>
-                        <Button
-                          variant="outlined"
-                          color="primary"
-                          onClick={() => handleGeneratePassword(true)}
-                          disabled={savingEditUser}
-                          fullWidth
-                        >
+                        <Button variant="outlined" color="primary"
+                          onClick={() => handleGeneratePassword(true)} disabled={savingEditUser} fullWidth>
                           Generer password
                         </Button>
                       </Grid>
                     </Grid>
-                    {/* Download og videre-knapper */}
                     {holdEditDialogOpen && editUser.password && (
                       <Grid container spacing={2}>
                         <Grid item xs={12} sm={6}>
                           {showEditDownloadButton && editUserDownloadInfo ? (
-                            <Button
-                              variant="outlined"
-                              color="primary"
-                              fullWidth
-                              onClick={() => triggerDownloadUserInfo(editUserDownloadInfo)}
-                            >
+                            <Button variant="outlined" color="primary" fullWidth
+                              onClick={() => downloadUserInfo(editUserDownloadInfo)}>
                               Download brugerinfo ({editDownloadCountdown})
                             </Button>
                           ) : (
-                            <Button
-                              variant="outlined"
-                              color="primary"
-                              fullWidth
-                              disabled
-                            >
+                            <Button variant="outlined" color="primary" fullWidth disabled>
                               Download brugerinfo
                             </Button>
                           )}
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                          <Button
-                            variant="contained"
-                            color="primary"
-                            fullWidth
+                          <Button variant="contained" color="primary" fullWidth
                             onClick={() => {
                               setHoldEditDialogOpen(false);
                               setShowEditDownloadButton(false);
                               setEditUserDownloadInfo(null);
                               setEditDownloadCountdown(10);
                               setUserDialogOpen(false);
-                            }}
-                          >
+                            }}>
                             Videre
                           </Button>
                         </Grid>
@@ -911,7 +786,10 @@ export default function UserAdministration() {
                     )}
                   </Stack>
                 )}
-                {(userError || editUserEmailError) && <Typography color="error" sx={{ mt: 2 }}>{userError || editUserEmailError}</Typography>}
+                {(userError || editUserEmailError) &&
+                  <Typography color="error" sx={{ mt: 2 }}>
+                    {userError || editUserEmailError}
+                  </Typography>}
               </DialogContent>
               <DialogActions>
                 {(!holdEditDialogOpen || !editUser?.password) && (
