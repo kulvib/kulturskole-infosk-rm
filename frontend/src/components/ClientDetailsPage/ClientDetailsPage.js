@@ -141,7 +141,7 @@ export default function ClientDetailsPage({
   }
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", mt: 3 }}>
+    <Box sx={{ maxWidth: 1500, mx: "auto", mt: 3 }}>
       <ClientDetailsHeaderSection
         client={client}
         locality={locality}
