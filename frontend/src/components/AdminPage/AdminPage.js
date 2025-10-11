@@ -1,52 +1,39 @@
 import React, { useState } from "react";
 import SchoolAdministration from "./SchoolAdministration";
 import UserAdministration from "./UserAdministration";
-import { Box, Button, ButtonGroup, Paper } from "@mui/material";
+import { Box, Tabs, Tab, Paper } from "@mui/material";
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState("school");
+  const [tabIndex, setTabIndex] = useState(0);
+
+  const handleTabChange = (event, newValue) => setTabIndex(newValue);
 
   return (
     <Box sx={{ maxWidth: 1500, mx: "auto", mt: 4 }}>
-      <Paper sx={{ p: 2, mb: 3, textAlign: "center" }}>
-        <ButtonGroup variant="contained">
-          <Button
-            onClick={() => setActiveTab("school")}
-            color={activeTab === "school" ? "primary" : "inherit"}
-            sx={{
-              fontWeight: activeTab === "school" ? 700 : 400,
-              borderRight: "2px solid #e0e0e0",
-              minWidth: 170
-            }}
-          >
-            Skoleadministration
-          </Button>
-          <Button
-            onClick={() => setActiveTab("user")}
-            color={activeTab === "user" ? "primary" : "inherit"}
-            sx={{
-              fontWeight: activeTab === "user" ? 700 : 400,
-              minWidth: 170
-            }}
-          >
-            Brugeradministration
-          </Button>
-        </ButtonGroup>
+      <Paper sx={{ mb: 2 }}>
+        <Tabs
+          value={tabIndex}
+          onChange={handleTabChange}
+          indicatorColor="primary"
+          textColor="primary"
+          variant="fullWidth"
+        >
+          <Tab label="Skoleadministration" />
+          <Tab label="Brugeradministration" />
+        </Tabs>
       </Paper>
-
-      {/* Lille afstand mellem faner og indhold */}
-      <Box sx={{ mb: 2 }} />
-
-      {activeTab === "school" && (
-        <Box sx={{ mb: 4 }}>
-          <SchoolAdministration />
-        </Box>
-      )}
-      {activeTab === "user" && (
-        <Box sx={{ mb: 4 }}>
-          <UserAdministration />
-        </Box>
-      )}
+      <Box>
+        {tabIndex === 0 && (
+          <Box sx={{ mb: 4 }}>
+            <SchoolAdministration />
+          </Box>
+        )}
+        {tabIndex === 1 && (
+          <Box sx={{ mb: 4 }}>
+            <UserAdministration />
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }
