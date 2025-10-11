@@ -3,7 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Button, useTheme, useMediaQuery } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
 
-export default function LogoutButton({ color = "secondary" }) {
+export default function LogoutButton({
+  color = "secondary",
+  variant = "outlined",
+  startIcon = <LogoutIcon />,
+  children = "LOG UD",
+  ...props
+}) {
   const { logoutUser } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -16,33 +22,30 @@ export default function LogoutButton({ color = "secondary" }) {
 
   return (
     <Button
-      variant="outlined"
+      variant={variant}
       color={color}
-      startIcon={<LogoutIcon />}
+      startIcon={startIcon}
       onClick={handleLogout}
       sx={{
         ml: { xs: 0.7, sm: 2 },
         px: { xs: 1.25, sm: 2.5 },
-        minWidth: { xs: 0, sm: 64 },
-        fontSize: { xs: "0.97rem", sm: "1rem" },
+        minWidth: 110,
+        fontSize: { xs: "1rem", sm: "1.03rem" },
         borderColor: "#fff",
         color: "#fff",
+        fontWeight: 700,
         lineHeight: 1.15,
         height: { xs: 36, sm: 40 },
-        ...(isMobile && {
-          fontSize: "0.97rem",
-          minWidth: 0,
-          px: 1.25,
-          ml: 0.7,
-        }),
+        borderRadius: 1.5,
+        letterSpacing: 0.5,
         "&:hover": {
           borderColor: "#fff",
           backgroundColor: "rgba(255,255,255,0.08)",
         },
       }}
+      {...props}
     >
-      <span style={{ display: isMobile ? "none" : "inline" }}>Log ud</span>
-      {isMobile && <LogoutIcon sx={{ ml: 0, mr: 0 }} />}
+      {children}
     </Button>
   );
 }
