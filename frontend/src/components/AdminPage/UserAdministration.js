@@ -102,10 +102,10 @@ export default function UserAdministration() {
   const [downloadCountdown, setDownloadCountdown] = useState(10);
   const [savingNewUser, setSavingNewUser] = useState(false);
 
-  // --- Edit user state
+  // --- Edit user state (email fields isolated)
   const [editUser, setEditUser] = useState(null);
-  const [editUserEmailError, setEditUserEmailError] = useState("");
   const [editUserConfirmEmail, setEditUserConfirmEmail] = useState("");
+  const [editUserEmailError, setEditUserEmailError] = useState("");
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [holdEditDialogOpen, setHoldEditDialogOpen] = useState(false);
   const [editUserDownloadInfo, setEditUserDownloadInfo] = useState(null);
