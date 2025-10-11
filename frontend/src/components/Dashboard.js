@@ -250,10 +250,10 @@ export default function Dashboard() {
           >
             {user ? (
               <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", mr: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#fff", textAlign: "right" }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 400, color: "#fff", textAlign: "right" }}>
                   {userDisplayName}
                 </Typography>
-                <Typography variant="body2" sx={{ color: "#e3f2fd", textAlign: "right", fontSize: "0.95rem" }}>
+                <Typography variant="body2" sx={{ color: "#e3f2fd", textAlign: "right", fontSize: "0.95rem", fontWeight: 400 }}>
                   {userEmail}
                 </Typography>
               </Box>
@@ -266,9 +266,8 @@ export default function Dashboard() {
               sx={{
                 borderColor: "#fff",
                 color: "#fff",
-                "&:hover": { background: "#1565c0", borderColor: "#fff" },
+                fontWeight: 400,
                 minWidth: 110,
-                fontWeight: 700,
                 fontSize: "1rem",
                 px: 2,
                 py: 0.5,
