@@ -129,7 +129,7 @@ export default function ClientDetailsHeaderSection({
   liveChromeColor,
   refreshing,
   handleRefresh,
-  kioskBrowserData = {}, // til evt. ekstra data
+  kioskBrowserData = {}, // ekstra data til browseren, hvis du har det
 }) {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -148,7 +148,6 @@ export default function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
-  // Renders kiosk browser data (object) as key/value lines
   function renderKioskBrowserData(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
@@ -207,7 +206,7 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
           <Card elevation={3} sx={{ borderRadius: 2, height: "100%" }}>
             <CardContent>
-              {/* Linje 1: Klientnavn */}
+              {/* Klientnavn */}
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography variant="body2" fontWeight={600} sx={{ minWidth: 120 }}>
                   Klientnavn:
@@ -216,7 +215,7 @@ export default function ClientDetailsHeaderSection({
                   {client.name}
                 </Typography>
               </Box>
-              {/* Linje 2: Klient ID */}
+              {/* Klient ID */}
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography variant="body2" fontWeight={600} sx={{ minWidth: 120 }}>
                   Klient ID:
@@ -225,7 +224,7 @@ export default function ClientDetailsHeaderSection({
                   {client.id}
                 </Typography>
               </Box>
-              {/* Linje 3: Skole */}
+              {/* Skole */}
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography variant="body2" fontWeight={600} sx={{ minWidth: 120 }}>
                   Skole:
@@ -234,7 +233,7 @@ export default function ClientDetailsHeaderSection({
                   {client.school}
                 </Typography>
               </Box>
-              {/* Linje 4: Lokation indtastningsfelt, kopiikon, gem knap */}
+              {/* Lokation indtastningsfelt, kopiikon, gem knap */}
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography variant="body2" fontWeight={600} sx={{ minWidth: 120 }}>
                   Lokation:
@@ -274,13 +273,13 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
           <Card elevation={3} sx={{ borderRadius: 2, height: "100%" }}>
             <CardContent>
-              {/* Linje 1: Kiosk URL label */}
+              {/* Kiosk URL label */}
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography variant="body2" fontWeight={600} sx={{ minWidth: 120 }}>
                   Kiosk URL:
                 </Typography>
               </Box>
-              {/* Linje 2: Kiosk URL indtastningsfelt, kopiikon, gem-knap */}
+              {/* Kiosk URL indtastningsfelt, kopiikon, gem-knap */}
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Box sx={{ display: "flex", alignItems: "center", flex: 1, gap: 1 }}>
                   <TextField
@@ -310,16 +309,17 @@ export default function ClientDetailsHeaderSection({
                   Husk at gemme din ændring!
                 </Typography>
               )}
-              {/* Linje 3: Kiosk browser status label + badge */}
+              {/* Kiosk browser status label */}
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography variant="body2" fontWeight={600} sx={{ minWidth: 120 }}>
                   Kiosk browser status:
                 </Typography>
-                <Box sx={{ ml: 1 }}>
-                  <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                </Box>
               </Box>
-              {/* Linje 4: Data fra kiosk browser data */}
+              {/* Selve browser status (badge/tekst) */}
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+              </Box>
+              {/* Ekstra browser data, hvis du har det */}
               <Box sx={{ mt: 2 }}>
                 {renderKioskBrowserData(kioskBrowserData)}
               </Box>
