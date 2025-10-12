@@ -7,13 +7,8 @@ import {
   Button,
   CircularProgress,
   Tooltip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableRow,
   TextField,
-  useMediaQuery
+  useMediaQuery,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -70,10 +65,7 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
   let fallbackColor = "grey.400";
   let text = status || "ukendt";
   let dotColor = color || fallbackColor;
-
-  // Bounce for alle statuser
   const animate = true;
-
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
       <Typography
@@ -82,7 +74,7 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
           fontWeight: 400,
           textTransform: "none",
           fontSize: isMobile ? 12 : undefined,
-          mr: 1, // Samme afstand som i referencefilen
+          mr: 1,
         }}
       >
         {text}
@@ -145,48 +137,42 @@ export default function ClientDetailsHeaderSection({
   liveChromeStatus,
   liveChromeColor,
   refreshing,
-  handleRefresh
+  handleRefresh,
 }) {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth(); // Hent bruger fra authcontext
 
+  // Styles
   const inputStyle = {
-    width: isMobile ? "100%" : 300,
+    width: isMobile ? "100%" : 180,
     height: 32,
     "& .MuiInputBase-input": {
       fontSize: isMobile ? "0.90rem" : "0.95rem",
       height: isMobile ? "30px" : "32px",
       boxSizing: "border-box",
-      padding: isMobile ? "6px 10px" : "8px 14px"
+      padding: isMobile ? "6px 10px" : "8px 14px",
     },
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
   const kioskInputStyle = {
-    width: isMobile ? "100%" : 550,
+    width: isMobile ? "100%" : 230,
     height: 32,
     "& .MuiInputBase-input": {
       fontSize: isMobile ? "0.90rem" : "0.95rem",
       height: isMobile ? "30px" : "32px",
       boxSizing: "border-box",
-      padding: isMobile ? "6px 10px" : "8px 14px"
+      padding: isMobile ? "6px 10px" : "8px 14px",
     },
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
-  const valueCellStyle = {
-    border: 0,
-    pl: 0,
-    py: 0,
-    verticalAlign: "middle",
-    height: isMobile ? 32 : 40,
-    fontSize: isMobile ? 13 : 14,
-  };
-
+  // Papers layout
   return (
     <Box sx={{ maxWidth: 1500, mx: "auto", mt: isMobile ? 1 : 3 }}>
-      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", mb: 1, gap: isMobile ? 1 : 0 }}>
+      {/* Top bar med navigation og refresh */}
+      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", mb: 2, gap: isMobile ? 1 : 0 }}>
         <Button
           variant="outlined"
           startIcon={<ArrowBackIcon sx={{ fontSize: isMobile ? 19 : undefined }} />}
@@ -215,7 +201,7 @@ export default function ClientDetailsHeaderSection({
                 minWidth: 0,
                 mr: isMobile ? 0 : 1,
                 px: isMobile ? 1.2 : 2,
-                fontSize: isMobile ? "0.93rem" : undefined
+                fontSize: isMobile ? "0.93rem" : undefined,
               }}
             >
               {refreshing ? "Opdaterer..." : "Opdater"}
@@ -223,150 +209,134 @@ export default function ClientDetailsHeaderSection({
           </span>
         </Tooltip>
       </Box>
-      <Card elevation={2} sx={{ borderRadius: isMobile ? 1.5 : 2, mb: 2 }}>
-        <CardContent sx={{ px: isMobile ? 1 : undefined, py: isMobile ? 1.5 : undefined }}>
-          <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 700,
-                lineHeight: 1.2,
-                letterSpacing: 0.5,
-                fontSize: isMobile ? "1rem" : { xs: "1rem", sm: "1.15rem", md: "1.25rem" },
-              }}
-            >
-              {client.name}
+      {/* Papers */}
+      <Box sx={{
+        display: "flex",
+        flexDirection: isMobile ? "column" : "row",
+        gap: isMobile ? 2 : 4,
+        width: "100%",
+      }}>
+        {/* Paper 1: Klient info */}
+        <Card elevation={3} sx={{
+          flex: 1,
+          minWidth: isMobile ? "100%" : 320,
+          maxWidth: isMobile ? "100%" : 420,
+          borderRadius: 2,
+          mb: isMobile ? 2 : 0,
+        }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom fontWeight={700}>
+              Klient Info
             </Typography>
-          </Box>
-          <Box mt={isMobile ? 1 : 2}>
-            <TableContainer>
-              <Table size="small" aria-label="client-details">
-                <TableBody>
-                  {/* Kun vis Klient ID hvis bruger er admin */}
-                  {user?.role === "admin" && (
-                    <TableRow sx={{ height: isMobile ? 32 : 40 }}>
-                      <TableCell
-                        sx={{
-                          border: 0,
-                          fontWeight: 600,
-                          whiteSpace: "nowrap",
-                          pr: 0.5,
-                          py: 0,
-                          verticalAlign: "middle",
-                          height: isMobile ? 32 : 40,
-                          fontSize: isMobile ? 13 : 14,
-                        }}
-                      >
-                        Klient ID:
-                      </TableCell>
-                      <TableCell sx={valueCellStyle}>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: "text.primary",
-                            fontWeight: 700,
-                            fontSize: isMobile ? "0.86rem" : "0.9rem",
-                            display: "inline",
-                          }}
-                        >
-                          {client.id}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  <TableRow sx={{ height: isMobile ? 32 : 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
-                      Lokation:
-                    </TableCell>
-                    <TableCell sx={valueCellStyle}>
-                      <Box sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        lineHeight: isMobile ? "32px" : "40px",
-                        gap: isMobile ? "4px" : "8px"
-                      }}>
-                        <TextField
-                          size="small"
-                          value={locality}
-                          onChange={handleLocalityChange}
-                          sx={inputStyle}
-                          disabled={savingLocality}
-                          inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
-                          onKeyDown={e => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleLocalitySave();
-                            }
-                          }}
-                        />
-                        <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={handleLocalitySave}
-                          disabled={savingLocality}
-                          sx={{ minWidth: isMobile ? 34 : 44, maxWidth: isMobile ? 34 : 44, fontSize: isMobile ? "0.81rem" : undefined, height: isMobile ? 28 : 32 }}
-                        >
-                          {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
-                        </Button>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                  {/* Kiosk URL først */}
-                  <TableRow sx={{ height: isMobile ? 32 : 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
-                      Kiosk URL:
-                    </TableCell>
-                    <TableCell sx={valueCellStyle}>
-                      <Box sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        lineHeight: isMobile ? "32px" : "40px",
-                        gap: isMobile ? "4px" : "8px"
-                      }}>
-                        <TextField
-                          size="small"
-                          value={kioskUrl}
-                          onChange={handleKioskUrlChange}
-                          sx={kioskInputStyle}
-                          disabled={savingKioskUrl}
-                          inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
-                          onKeyDown={e => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleKioskUrlSave();
-                            }
-                          }}
-                        />
-                        <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="primary"
-                          onClick={handleKioskUrlSave}
-                          disabled={savingKioskUrl}
-                          sx={{ minWidth: isMobile ? 34 : 44, maxWidth: isMobile ? 34 : 44, fontSize: isMobile ? "0.81rem" : undefined, height: isMobile ? 28 : 32 }}
-                        >
-                          {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
-                        </Button>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                  {/* Kiosk browser status: teksten først, derefter badge med bounce animation */}
-                  <TableRow sx={{ height: isMobile ? 32 : 40 }}>
-                    <TableCell sx={{ border: 0, fontWeight: 600, whiteSpace: "nowrap", pr: 0.5, py: 0, verticalAlign: "middle", height: isMobile ? 32 : 40, fontSize: isMobile ? 13 : 14 }}>
-                      Kiosk browser status:
-                    </TableCell>
-                    <TableCell sx={valueCellStyle}>
-                      <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-        </CardContent>
-      </Card>
+            <Box sx={{ mt: 2 }}>
+              {/* Klient ID kun for admin */}
+              {user?.role === "admin" && (
+                <>
+                  <Typography variant="body2" fontWeight={600} gutterBottom>
+                    Klient ID:
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    {client.id}
+                  </Typography>
+                </>
+              )}
+              <Typography variant="body2" fontWeight={600} gutterBottom>
+                Skole:
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                {client.school || client.name}
+              </Typography>
+              <Typography variant="body2" fontWeight={600} gutterBottom>
+                Lokation:
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 0.5 }}>
+                <TextField
+                  size="small"
+                  value={locality}
+                  onChange={handleLocalityChange}
+                  sx={inputStyle}
+                  disabled={savingLocality}
+                  inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      handleLocalitySave();
+                    }
+                  }}
+                  error={!!localityDirty}
+                />
+                <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleLocalitySave}
+                  disabled={savingLocality}
+                  sx={{ minWidth: 56 }}
+                >
+                  {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                </Button>
+              </Box>
+              {localityDirty && (
+                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
+                  Husk at gemme din ændring!
+                </Typography>
+              )}
+            </Box>
+          </CardContent>
+        </Card>
+        {/* Paper 2: Kiosk info */}
+        <Card elevation={3} sx={{
+          flex: 1,
+          minWidth: isMobile ? "100%" : 320,
+          maxWidth: isMobile ? "100%" : 420,
+          borderRadius: 2,
+        }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom fontWeight={700}>
+              Kiosk Info
+            </Typography>
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" fontWeight={600} gutterBottom>
+                Kiosk URL:
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 0.5, mb: 2 }}>
+                <TextField
+                  size="small"
+                  value={kioskUrl}
+                  onChange={handleKioskUrlChange}
+                  sx={kioskInputStyle}
+                  disabled={savingKioskUrl}
+                  inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      handleKioskUrlSave();
+                    }
+                  }}
+                  error={!!kioskUrlDirty}
+                />
+                <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleKioskUrlSave}
+                  disabled={savingKioskUrl}
+                  sx={{ minWidth: 56 }}
+                >
+                  {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                </Button>
+              </Box>
+              {kioskUrlDirty && (
+                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
+                  Husk at gemme din ændring!
+                </Typography>
+              )}
+              <Typography variant="body2" fontWeight={600} gutterBottom>
+                Kiosk browser status:
+              </Typography>
+              <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+            </Box>
+          </CardContent>
+        </Card>
+      </Box>
     </Box>
   );
 }
