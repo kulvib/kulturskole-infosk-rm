@@ -8,7 +8,7 @@ import HomePage from "./components/HomePage";
 import NotFound from "./components/NotFound";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import AdminRoute from "./auth/AdminRoute";
-import CalendarPage from "./components/CalendarPage";
+import CalendarPage from "./components/CalendarPage/CalendarPage";
 import AdminPage from "./components/AdminPage/AdminPage";
 import RemoteDesktop from "./components/RemoteDesktop";
 // import LivestreamTest from "./components/LivestreamTest"; // FJERNET
