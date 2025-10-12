@@ -192,9 +192,9 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
             />
             {selectedSchool
               ? (
-                // Kun vis lokation/navn
+                // Kun vis lokation/navn, fontWeight: 400 (normal)
                 <Typography variant="body2" sx={{
-                  fontWeight: 700,
+                  fontWeight: 400,
                   fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
                   lineHeight: 1.18
                 }}>
@@ -205,17 +205,16 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
                 // Skole øverst, lokation nederst
                 <Box>
                   <Typography variant="body2" sx={{
-                    fontSize: { xs: "0.98rem", sm: "0.94rem", md: "0.88rem" },
-                    color: "#666",
-                    lineHeight: 1.12,
-                    fontWeight: 700
+                    fontWeight: 700,
+                    fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
+                    lineHeight: 1.18
                   }}>
                     {getSchoolName(schools, client)}
                   </Typography>
                   <Typography variant="body2" sx={{
                     fontWeight: 400,
-                    fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
-                    lineHeight: 1.18
+                    fontSize: { xs: "0.98rem", sm: "0.94rem", md: "0.88rem" },
+                    lineHeight: 1.12
                   }}>
                     {client.locality || client.name || "Ingen lokalitet"}
                   </Typography>
