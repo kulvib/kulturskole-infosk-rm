@@ -1074,8 +1074,19 @@ function MonthCalendar({
                   onMouseDown={e => handleMouseDown(e, dateString)}
                   onMouseEnter={e => handleMouseEnter(e, dateString)}
                 >
+                  {/* Loading spinner følger cirklens kant, centreres og matches diameter */}
                   {isLoading ? (
-                    <CircularProgress size={18} sx={{ position: "absolute", top: 10, left: 10, zIndex: 1201 }} />
+                    <CircularProgress
+                      size={34}
+                      sx={{
+                        position: "absolute",
+                        top: 1,
+                        left: 1,
+                        zIndex: 1201,
+                        color: "#1976d2",
+                        background: "transparent",
+                      }}
+                    />
                   ) : (
                     day
                   )}
