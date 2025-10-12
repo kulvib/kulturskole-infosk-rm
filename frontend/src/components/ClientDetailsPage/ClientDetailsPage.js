@@ -12,6 +12,7 @@ import {
   openTerminal,
   openRemoteDesktop,
   getClient,
+  getSchools,
 } from "../../api";
 
 export default function ClientDetailsPage({
@@ -22,7 +23,7 @@ export default function ClientDetailsPage({
   calendarLoading,
   streamKey,
   onRestartStream,
-  showSnackbar // <- brug denne til lokale beskeder
+  showSnackbar
 }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -41,12 +42,16 @@ export default function ClientDetailsPage({
   const [uptime, setUptime] = useState(client?.uptime || null);
 
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
-
-  const [loadingStartLivestream, setLoadingStartLivestream] = useState(false);
-  const [loadingStopLivestream, setLoadingStopLivestream] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
 
-  // Poll for pending_chrome_action og opdater pendingLivestream state
+  // NYT: State til skoler
+  const [schools, setSchools] = useState([]);
+
+  // Hent skoler fra backend ved mount
+  useEffect(() => {
+    getSchools().then(setSchools).catch(() => setSchools([]));
+  }, []);
+
   useEffect(() => {
     let interval;
     if (client?.id) {
@@ -80,7 +85,6 @@ export default function ClientDetailsPage({
     }
   }, [client]);
 
-  // Brug showSnackbar (prop fra wrapper) til lokale beskeder
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -127,14 +131,12 @@ export default function ClientDetailsPage({
   const handleOpenTerminal = () => openTerminal(client.id);
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
-  // --- HER STARTER STREAMET AUTOMATISK ---
   useEffect(() => {
     if (client?.id) {
       clientAction(client.id, "livestream_start").catch(() => {});
     }
     // eslint-disable-next-line
   }, [client?.id]);
-  // --- SLUT AUTOMATISK START ---
 
   if (!client) {
     return null;
@@ -146,6 +148,7 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <ClientDetailsHeaderSection
             client={client}
+            schools={schools}
             locality={locality}
             localityDirty={localityDirty}
             savingLocality={savingLocality}
