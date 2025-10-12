@@ -188,7 +188,6 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({ clients,
               inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
               disabled={disabled}
             />
-            {/* Her vises Lokation og Skole på to linjer */}
             <Box>
               <Typography variant="body2" sx={{
                 fontWeight: 700,
@@ -936,7 +935,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
       minWidth: 0,
       background: "#f9fafc",
       p: { xs: 0.5, sm: 1 },
-      userSelect: "none" // <-- Deaktiver tekstmarkering på hele kalenderkortet!
+      userSelect: "none"
     }}>
       <CardContent sx={{ p: { xs: 1, sm: 2 } }}>
         <Typography variant="h6" sx={{
@@ -945,16 +944,22 @@ const MonthCalendar = React.memo(function MonthCalendar({
         }}>
           {name} {year}
         </Typography>
-        {/* Uge-dage header (ingen "Uge"-overskrift!) */}
+        {/* Ugedage-header: første række i grid, 8 kolonner, venstre tom */}
         <Box sx={{
           display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          columnGap: "0.08rem", rowGap: "0.5rem", mb: 0.5
+          gridTemplateColumns: "repeat(8, 1fr)",
+          columnGap: "0.08rem",
+          rowGap: "0.5rem",
+          mb: 0.5
         }}>
+          <Box /> {/* tom kolonne for ugenummer */}
           {weekdayNames.map(wd => (
             <Typography key={wd} variant="caption" sx={{
-              fontWeight: 700, color: "#555", textAlign: "center",
-              fontSize: { xs: "0.82rem", sm: "0.90rem" }, letterSpacing: "0.03em"
+              fontWeight: 700,
+              color: "#555",
+              textAlign: "center",
+              fontSize: { xs: "0.82rem", sm: "0.90rem" },
+              letterSpacing: "0.03em"
             }}>
               {wd}
             </Typography>
@@ -972,13 +977,13 @@ const MonthCalendar = React.memo(function MonthCalendar({
                 gridTemplateColumns: "repeat(8, 1fr)",
                 columnGap: "0.08rem"
               }}>
-              {/* Ugenummer - sort, normal, mindre font, ingen cirkel */}
+              {/* Ugenummer - ingen overskrift, mindre font */}
               <Box sx={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: 400,
-                fontSize: { xs: "0.80rem", sm: "0.88rem" },
+                fontSize: { xs: "0.65rem", sm: "0.75rem" }, // 2 fontstørrelser mindre end dagene
                 color: "#222",
                 background: "transparent",
                 minWidth: 0,
@@ -1009,7 +1014,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
                         height: circleSize,
                         cursor: clientId ? "pointer" : "default",
                         opacity: clientId ? 1 : 0.55,
-                        userSelect: "none" // <-- Deaktiver tekstmarkering på dag-celler!
+                        userSelect: "none"
                       }}
                       onMouseDown={e => handleMouseDown(e, dateString)}
                       onMouseEnter={e => handleMouseEnter(e, dateString)}
@@ -1053,7 +1058,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
                           fontSize: "1.15rem",
                           zIndex: 2,
                           boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                          userSelect: "none" // <-- Deaktiver tekstmarkering på selve tallet!
+                          userSelect: "none"
                         }}
                       >
                         {day}
