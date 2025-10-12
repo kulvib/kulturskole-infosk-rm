@@ -157,7 +157,7 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
           gridTemplateColumns: {
             xs: "1fr",
             sm: "1fr 1fr",
-            md: "repeat(5, 1fr)" // Desktop = 5 klienter pr. række
+            md: "repeat(5, 1fr)"
           },
           gap: 1,
         }}
@@ -235,7 +235,6 @@ export default function CalendarPage() {
 
   const seasons = getSeasons();
 
-  // Find indeværende sæson (til ikon-logik)
   const currentSeasonStartYear = useMemo(() => {
     const now = new Date();
     if (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)) {
@@ -270,7 +269,6 @@ export default function CalendarPage() {
     fetchClients();
   }, [fetchClients]);
 
-  // -------- Differentierede rettigheder og klientfiltrering --------
   const filteredClients = useMemo(() => {
     if (user?.role === "bruger" && user?.school_id) {
       return clients.filter(
@@ -573,8 +571,6 @@ export default function CalendarPage() {
           }
         }
       } catch (e) {
-        setSnackbar({ open: true, message: e.message || "Kunne ikke gemme!", severity: "error" });
-      } finally {
         setSavingCalendar(false);
       }
     }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]
@@ -600,7 +596,6 @@ export default function CalendarPage() {
     [schools]
   );
 
-  // ----------- RENDER -----------
   return (
     <Box sx={{
       maxWidth: 1500,
@@ -823,7 +818,6 @@ export default function CalendarPage() {
           alignItems: "center",
           gap: 1
         }}>
-          {/* Fade ikon med mouseover: "Ikke indeværende sæson" */}
           <Fade in={selectedSeason !== currentSeasonStartYear} timeout={600} unmountOnExit>
             <Box>
               <Tooltip title="Ikke indeværende sæson" arrow>
@@ -863,9 +857,8 @@ export default function CalendarPage() {
             sm: "1fr 1fr",
             md: "repeat(4, 1fr)"
           },
-          // Kalender grid: horisontal afstand 2px mindre, vertikal 3px større
-          columnGap: "0.08rem", // tidligere ca. 0.18rem
-          rowGap: "0.5rem", // tidligere ca. 0.31rem, nu 3px større
+          columnGap: "0.08rem",
+          rowGap: "0.5rem",
         }}
       >
         {!activeClient && (
@@ -915,7 +908,7 @@ export default function CalendarPage() {
   );
 }
 
-// MonthCalendar - indlejret for komplethed!
+// MonthCalendar
 function MonthCalendar({
   name,
   month,
@@ -1001,8 +994,8 @@ function MonthCalendar({
         <Box sx={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          columnGap: "0.08rem", // horisontal afstand 2px mindre
-          rowGap: "0.5rem",     // vertikal afstand 3px større
+          columnGap: "0.08rem",
+          rowGap: "0.5rem",
           mb: 0.5
         }}>
           {weekdayNames.map(wd => (
@@ -1020,8 +1013,8 @@ function MonthCalendar({
         <Box sx={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          columnGap: "0.08rem", // horisontal afstand 2px mindre
-          rowGap: "0.5rem",     // vertikal afstand 3px større
+          columnGap: "0.08rem",
+          rowGap: "0.5rem",
         }}>
           {cells.map((day, idx) => {
             if (!day) return <Box key={idx + "-empty"} />;
@@ -1033,7 +1026,7 @@ function MonthCalendar({
             const isLoading =
               loadingDialogDate === dateString && loadingDialogClient === clientId;
 
-            // Øg cirkelstørrelse med 2px (width/height)
+            // Cirklen 1px større, tallet 1px mindre
             return (
               <Box key={idx}
                 sx={{
@@ -1041,16 +1034,16 @@ function MonthCalendar({
                 }}>
                 <Box
                   sx={{
-                    width: { xs: 28, sm: 25 },  // +2px fra tidligere 26/23
-                    height: { xs: 28, sm: 25 }, // +2px fra tidligere 26/23
+                    width: { xs: 30, sm: 27 },
+                    height: { xs: 30, sm: 27 },
                     borderRadius: "50%",
                     background: bg,
                     border: "1px solid #eee",
                     color: "#0a275c",
                     fontWeight: 500,
-                    fontSize: { xs: "1rem", sm: "0.95rem" },
+                    fontSize: { xs: "0.93rem", sm: "0.88rem" },
                     textAlign: "center",
-                    lineHeight: { xs: "28px", sm: "25px" }, // +2px
+                    lineHeight: { xs: "30px", sm: "27px" },
                     boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
                     cursor: clientId ? "pointer" : "default",
                     transition: "background 0.2s",
@@ -1068,7 +1061,7 @@ function MonthCalendar({
                   onMouseEnter={e => handleMouseEnter(e, dateString)}
                 >
                   {isLoading ? (
-                    <CircularProgress size={18} sx={{ position: "absolute", top: 3, left: 3, zIndex: 1201 }} />
+                    <CircularProgress size={18} sx={{ position: "absolute", top: 6, left: 6, zIndex: 1201 }} />
                   ) : (
                     day
                   )}
