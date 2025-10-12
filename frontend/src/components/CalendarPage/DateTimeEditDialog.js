@@ -248,7 +248,7 @@ export default function DateTimeEditDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="xs"
       fullWidth
     >
       <DialogTitle sx={{ pb: 0 }}>
