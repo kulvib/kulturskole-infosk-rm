@@ -75,24 +75,6 @@ const formatDate = (year, month, day) =>
 const stripTimeFromDateKey = key => key.split("T")[0];
 const deepEqual = (obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2);
 
-// -------- UGENUMMER-BEREGNING --------
-function getWeekNumber(date) {
-  // DK-style: Ugen starter mandag, 4-4-regel (ISO 8601)
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  return weekNo;
-}
-
-function mapRawDays(rawDays) {
-  const mapped = {};
-  Object.keys(rawDays).forEach(key => {
-    mapped[stripTimeFromDateKey(key)] = rawDays[key];
-  });
-  return mapped;
-}
-
 function getSchoolName(schools, client) {
   const schoolId = client.schoolId || client.school_id;
   return schools.find(s => String(s.id) === String(schoolId))?.name || "Ukendt skole";
@@ -188,9 +170,14 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({ clients,
               inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
               disabled={disabled}
             />
-            <Typography variant="body2" noWrap sx={{ fontSize: { xs: "0.98rem", sm: "0.98rem", md: "0.875rem" } }}>
-              {(client.locality || client.name || "Ingen lokalitet") + " – " + getSchoolName(schools, client)}
-            </Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {client.locality || client.name}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "#888" }}>
+                {getSchoolName(schools, client)}
+              </Typography>
+            </Box>
           </Box>
         ))}
       </Box>
@@ -557,7 +544,7 @@ export default function CalendarPage() {
 
   // ----------- RENDER -----------
   return (
-    <Box sx={{ maxWidth: 1500, mx: "auto", mt: { xs: 1, sm: 4 }, fontFamily: "inherit", px: { xs: 0.5, sm: 2 } }}>
+    <Box sx={{ maxWidth: 1500, mx: "auto", mt: { xs: 1, sm: 4 }, fontFamily: "inherit", px: { xs: 0.5, sm: 2 }, userSelect: "none" }}>
       <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-end' }, mb: 2 }}>
         <Tooltip title="Opdater klienter">
           <span>
@@ -592,12 +579,27 @@ export default function CalendarPage() {
                 value={selectedSchool}
                 displayEmpty
                 onChange={e => setSelectedSchool(e.target.value)}
-                sx={{ minWidth: 140, width: { xs: "100%", sm: 180 } }}
+                sx={{ minWidth: 180, width: { xs: "100%", sm: 220 } }}
               >
-                <MenuItem value="">Alle skoler</MenuItem>
+                <MenuItem value="">
+                  <Box sx={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Alle skoler</Typography>
+                  </Box>
+                </MenuItem>
                 <MenuItem disabled>--------</MenuItem>
                 {sortedSchools.map(school => (
-                  <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                  <MenuItem key={school.id} value={school.id}>
+                    <Box sx={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {school.locality ? school.locality : school.name}
+                      </Typography>
+                      {school.locality && (
+                        <Typography variant="caption" sx={{ color: "#888" }}>
+                          {school.name}
+                        </Typography>
+                      )}
+                    </Box>
+                  </MenuItem>
                 ))}
               </Select>
             </Box>
@@ -679,104 +681,6 @@ export default function CalendarPage() {
           </Box>
         )}
       </Paper>
-      <Box sx={{
-        display: "flex",
-        alignItems: { xs: "stretch", sm: "center" },
-        mb: 3,
-        flexDirection: { xs: "column", sm: "row" },
-        gap: { xs: 1.5, sm: 0 },
-        width: "100%",
-      }}>
-        <Box sx={{
-          display: "flex", alignItems: "center", gap: 2, flex: 1,
-          justifyContent: { xs: "center", sm: "flex-start" }
-        }}>
-          <Typography variant="h6" sx={{ mr: 1, fontWeight: 700, fontSize: { xs: "1rem", sm: "1.15rem" } }}>
-            Markering:
-          </Typography>
-          <Button
-            variant={markMode === "on" ? "contained" : "outlined"}
-            color="success"
-            size="medium"
-            disabled={isDisabled}
-            sx={{ fontWeight: markMode === "on" ? 700 : 400, minWidth: 90 }}
-            onClick={() => setMarkMode("on")}
-          >
-            TÆNDT
-          </Button>
-          <Button
-            variant={markMode === "off" ? "contained" : "outlined"}
-            color="error"
-            size="medium"
-            disabled={isDisabled}
-            sx={{ fontWeight: markMode === "off" ? 700 : 400, minWidth: 90 }}
-            onClick={() => setMarkMode("off")}
-          >
-            SLUKKET
-          </Button>
-        </Box>
-        <Box sx={{
-          flex: 1, display: "flex", justifyContent: { xs: "center", sm: "center" }, mb: { xs: 1, sm: 0 }
-        }}>
-          <Button
-            variant="outlined"
-            color="primary"
-            size="medium"
-            sx={{
-              minWidth: 120,
-              fontWeight: 700,
-              width: { xs: "100%", sm: 120 }
-            }}
-            onClick={() => setCalendarDialogOpen(true)}
-            disabled={isDisabled}
-          >
-            Vis liste
-          </Button>
-        </Box>
-        <Box sx={{
-          flex: 1,
-          display: "flex",
-          justifyContent: { xs: "center", sm: "flex-end" },
-          alignItems: "center",
-          gap: 1
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            {selectedSeason !== currentSeasonStartYear && (
-              <Tooltip title="Ikke indeværende sæson" arrow>
-                <WarningAmberIcon
-                  color="warning"
-                  sx={{
-                    mr: 0.5,
-                    transition: "opacity 0.7s",
-                    opacity: fadeIn ? 1 : 0.2
-                  }}
-                />
-              </Tooltip>
-            )}
-          </Box>
-          <Typography variant="h6" sx={{
-            fontWeight: 700,
-            color: "#0a275c",
-            mr: 2,
-            fontSize: { xs: "1rem", sm: "1.15rem" }
-          }}>
-            Vælg sæson:
-          </Typography>
-          <Select
-            size="small"
-            value={selectedSeason}
-            onChange={e => setSelectedSeason(Number(e.target.value))}
-            sx={{ minWidth: 100, width: { xs: 100, sm: 120 } }}
-            disabled={isDisabled}
-          >
-            {seasons.map(season => (
-              <MenuItem key={season.value} value={season.value}>
-                {season.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </Box>
-      </Box>
       <Box
         sx={{
           display: "grid",
@@ -787,6 +691,7 @@ export default function CalendarPage() {
           },
           columnGap: "0.08rem",
           rowGap: "0.5rem",
+          userSelect: "none"
         }}
       >
         {!activeClient && (
@@ -796,7 +701,7 @@ export default function CalendarPage() {
         )}
         {activeClient && !loadingMarkedDays &&
           schoolYearMonths.map(({ name, month, year }) => (
-            <MemoizedMonthCalendar
+            <MonthCalendar
               key={name + year}
               name={name}
               month={month}
@@ -835,8 +740,8 @@ export default function CalendarPage() {
   );
 }
 
-// MonthCalendar med native browser tooltip på dagene!
-const MonthCalendar = React.memo(function MonthCalendar({
+// MonthCalendar med userSelect: "none" og ugenummer mindre font
+function MonthCalendar({
   name,
   month,
   year,
@@ -921,12 +826,13 @@ const MonthCalendar = React.memo(function MonthCalendar({
       boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
       minWidth: 0,
       background: "#f9fafc",
-      p: { xs: 0.5, sm: 1 }
+      p: { xs: 0.5, sm: 1 },
+      userSelect: "none"
     }}>
-      <CardContent sx={{ p: { xs: 1, sm: 2 } }}>
+      <CardContent sx={{ p: { xs: 1, sm: 2 }, userSelect: "none" }}>
         <Typography variant="h6" sx={{
           color: "#0a275c", fontWeight: 700, textAlign: "center",
-          fontSize: { xs: "1rem", sm: "1.08rem" }, mb: 1
+          fontSize: { xs: "1rem", sm: "1.08rem" }, mb: 1, userSelect: "none"
         }}>
           {name} {year}
         </Typography>
@@ -934,12 +840,12 @@ const MonthCalendar = React.memo(function MonthCalendar({
         <Box sx={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          columnGap: "0.08rem", rowGap: "0.5rem", mb: 0.5
+          columnGap: "0.08rem", rowGap: "0.5rem", mb: 0.5, userSelect: "none"
         }}>
           {weekdayNames.map(wd => (
             <Typography key={wd} variant="caption" sx={{
               fontWeight: 700, color: "#555", textAlign: "center",
-              fontSize: { xs: "0.82rem", sm: "0.90rem" }, letterSpacing: "0.03em"
+              fontSize: { xs: "0.82rem", sm: "0.90rem" }, letterSpacing: "0.03em", userSelect: "none"
             }}>
               {wd}
             </Typography>
@@ -948,14 +854,15 @@ const MonthCalendar = React.memo(function MonthCalendar({
         <Box sx={{
           display: "grid",
           gridTemplateRows: `repeat(${weekRows.length}, 1fr)`,
-          rowGap: "0.5rem"
+          rowGap: "0.5rem", userSelect: "none"
         }}>
           {weekRows.map((row, rowIdx) => (
             <Box key={rowIdx}
               sx={{
                 display: "grid",
                 gridTemplateColumns: "repeat(8, 1fr)",
-                columnGap: "0.08rem"
+                columnGap: "0.08rem",
+                userSelect: "none"
               }}>
               {/* Ugenummer - sort, normal, mindre font, ingen cirkel */}
               <Box sx={{
@@ -963,17 +870,18 @@ const MonthCalendar = React.memo(function MonthCalendar({
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: 400,
-                fontSize: { xs: "0.80rem", sm: "0.88rem" },
+                fontSize: { xs: "0.70rem", sm: "0.76rem" }, // To størrelser mindre end dagene
                 color: "#222",
                 background: "transparent",
                 minWidth: 0,
-                mr: { xs: 0, sm: 0 }
+                mr: { xs: 0, sm: 0 },
+                userSelect: "none"
               }}>
                 {row.weekNum}
               </Box>
               {/* Dage */}
               {row.weekDays.map((day, idx) => {
-                if (!day) return <Box key={idx + "-empty"} />;
+                if (!day) return <Box key={idx + "-empty"} sx={{ userSelect: "none" }} />;
                 const dateString = formatDate(year, month, day);
                 const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
                 let bg = "#fff";
@@ -985,7 +893,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
                   <Box key={idx}
                     sx={{
                       display: "flex", justifyContent: "center", alignItems: "center",
-                      p: 0.2, position: "relative"
+                      p: 0.2, position: "relative", userSelect: "none"
                     }}>
                     <Box
                       sx={{
@@ -993,7 +901,8 @@ const MonthCalendar = React.memo(function MonthCalendar({
                         width: circleSize,
                         height: circleSize,
                         cursor: clientId ? "pointer" : "default",
-                        opacity: clientId ? 1 : 0.55
+                        opacity: clientId ? 1 : 0.55,
+                        userSelect: "none"
                       }}
                       onMouseDown={e => handleMouseDown(e, dateString)}
                       onMouseEnter={e => handleMouseEnter(e, dateString)}
@@ -1014,7 +923,8 @@ const MonthCalendar = React.memo(function MonthCalendar({
                             left: 0,
                             zIndex: 1,
                             color: "#1976d2",
-                            background: "transparent"
+                            background: "transparent",
+                            userSelect: "none"
                           }}
                         />
                       )}
@@ -1037,6 +947,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
                           fontSize: "1.15rem",
                           zIndex: 2,
                           boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                          userSelect: "none"
                         }}
                       >
                         {day}
@@ -1051,6 +962,4 @@ const MonthCalendar = React.memo(function MonthCalendar({
       </CardContent>
     </Card>
   );
-});
-
-const MemoizedMonthCalendar = MonthCalendar;
+}
