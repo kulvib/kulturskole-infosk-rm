@@ -7,24 +7,43 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes } from "../api";
-import DateTimeEditDialog from "./CalendarPage/DateTimeEditDialog";
-import ClientCalendarDialog from "./CalendarPage/ClientCalendarDialog";
-import { useAuth } from "../auth/authcontext";
+import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes } from "../../api";
+import DateTimeEditDialog from "./DateTimeEditDialog";
+import ClientCalendarDialog from "./ClientCalendarDialog";
+import { useAuth } from "../../auth/authcontext";
 
-// --------- Constants & Utility Functions ---------
+// --------- Hjælpe-hook: Hent ALLE skoletider for alle skoler ---------
+function useAllSchoolTimes(schools) {
+  const [schoolTimesMap, setSchoolTimesMap] = useState({});
+  useEffect(() => {
+    if (!schools || schools.length === 0) return;
+    let isCurrent = true;
+    Promise.all(
+      schools.map(s =>
+        getSchoolTimes(s.id)
+          .then(times => ({ id: s.id, times }))
+          .catch(() => ({ id: s.id, times: null }))
+      )
+    ).then(results => {
+      if (!isCurrent) return;
+      const map = {};
+      results.forEach(({ id, times }) => {
+        map[id] = times;
+      });
+      setSchoolTimesMap(map);
+    });
+    return () => { isCurrent = false; };
+  }, [schools]);
+  return schoolTimesMap;
+}
+
 const monthNames = [
   "August", "September", "Oktober", "November", "December",
   "Januar", "Februar", "Marts", "April", "Maj", "Juni", "Juli"
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
-const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
-const formatDate = (year, month, day) =>
-  `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-const stripTimeFromDateKey = key => key.split("T")[0];
-const deepEqual = (obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2);
-
+// -------- Utility Functions --------
 function getSeasons() {
   const now = new Date();
   let seasonStartYear = now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)
@@ -50,12 +69,20 @@ function getSchoolYearMonths(seasonStart) {
     })),
   ];
 }
+const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
+const formatDate = (year, month, day) =>
+  `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+const stripTimeFromDateKey = key => key.split("T")[0];
+const deepEqual = (obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2);
+
 function getWeekNumber(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return weekNo;
 }
+
 function mapRawDays(rawDays) {
   const mapped = {};
   Object.keys(rawDays).forEach(key => {
@@ -63,70 +90,10 @@ function mapRawDays(rawDays) {
   });
   return mapped;
 }
+
 function getSchoolName(schools, client) {
   const schoolId = client.schoolId || client.school_id;
   return schools.find(s => String(s.id) === String(schoolId))?.name || "Ukendt skole";
-}
-
-// --------- Custom Hooks ---------
-function useAllSchoolTimes(schools) {
-  const [schoolTimesMap, setSchoolTimesMap] = useState({});
-  useEffect(() => {
-    if (!schools || schools.length === 0) return;
-    let isCurrent = true;
-    Promise.all(
-      schools.map(s =>
-        getSchoolTimes(s.id)
-          .then(times => ({ id: s.id, times }))
-          .catch(() => ({ id: s.id, times: null }))
-      )
-    ).then(results => {
-      if (!isCurrent) return;
-      const map = {};
-      results.forEach(({ id, times }) => {
-        map[id] = times;
-      });
-      setSchoolTimesMap(map);
-    });
-    return () => { isCurrent = false; };
-  }, [schools]);
-  return schoolTimesMap;
-}
-
-// --------- Styles ---------
-const clientBoxSx = {
-  display: "flex",
-  alignItems: "center",
-  px: { xs: 0.5, sm: 1 },
-  py: { xs: 0.5, sm: 0.5 },
-  borderRadius: 1,
-  cursor: "pointer",
-  fontSize: { xs: "0.96rem", sm: "0.96rem", md: "0.875rem" }
-};
-const calendarCardSx = {
-  borderRadius: "14px",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-  minWidth: 0,
-  background: "#f9fafc",
-  p: { xs: 0.5, sm: 1 },
-  userSelect: "none"
-};
-
-// ----------- markedDaysReducer --------
-function markedDaysReducer(state, action) {
-  switch (action.type) {
-    case "set": return { ...state, [action.clientId]: action.days };
-    case "updateDay":
-      return {
-        ...state,
-        [action.clientId]: {
-          ...(state[action.clientId] || {}),
-          [action.date]: action.dayData,
-        }
-      };
-    case "reset": return {};
-    default: return state;
-  }
 }
 
 // -------- Hjælpekomponent: Klientvælger --------
@@ -196,9 +163,15 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
           <Box
             key={client.id}
             sx={{
-              ...clientBoxSx,
+              display: "flex",
+              alignItems: "center",
+              px: { xs: 0.5, sm: 1 },
+              py: { xs: 0.5, sm: 0.5 },
               background: selected.includes(client.id) ? "#f0f4ff" : "transparent",
-              ":hover": { background: disabled ? "transparent" : "#f3f6fa" }
+              borderRadius: 1,
+              cursor: disabled ? "not-allowed" : "pointer",
+              ":hover": { background: disabled ? "transparent" : "#f3f6fa" },
+              fontSize: { xs: "0.96rem", sm: "0.96rem", md: "0.875rem" }
             }}
             onClick={() => {
               if (disabled) return;
@@ -257,6 +230,26 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
     </Box>
   );
 });
+
+// ----------- markedDaysReducer --------
+function markedDaysReducer(state, action) {
+  switch (action.type) {
+    case "set":
+      return { ...state, [action.clientId]: action.days };
+    case "updateDay":
+      return {
+        ...state,
+        [action.clientId]: {
+          ...(state[action.clientId] || {}),
+          [action.date]: action.dayData,
+        }
+      };
+    case "reset":
+      return {};
+    default:
+      return state;
+  }
+}
 
 // ----------- MAIN COMPONENT START -----------
 export default function CalendarPage() {
@@ -342,7 +335,6 @@ export default function CalendarPage() {
     }
   }, [user, filteredClients]);
 
-  // ----------- markedDays state via useReducer -----------
   const [markedDays, dispatchMarkedDays] = useReducer(markedDaysReducer, {});
 
   useEffect(() => {
@@ -403,7 +395,6 @@ export default function CalendarPage() {
     return (day === 0 || day === 6) ? times?.weekend || fallback.weekend : times?.weekday || fallback.weekday;
   }
 
-  // ----------- MARKERING AF DATOER LOGIK START -----------
   const handleDayClick = useCallback((clientIds, dateString, mode, markedDaysState) => {
     clientIds.forEach(cid => {
       dispatchMarkedDays({
@@ -430,8 +421,6 @@ export default function CalendarPage() {
       setLoadingDialogClient(null);
     }, 1100);
   }, []);
-
-  // ----------- MARKERING AF DATOER LOGIK SLUT ------------
 
   const handleSaveSingleClient = async (clientId) => {
     if (!clientId) return;
@@ -577,7 +566,7 @@ export default function CalendarPage() {
             });
           }
         }
-        setSavingCalendar(false); // <-- Spinner stopper
+        setSavingCalendar(false);
       } catch (e) {
         setSavingCalendar(false);
       }
@@ -689,7 +678,6 @@ export default function CalendarPage() {
             <CircularProgress />
           </Box>
         )}
-        {/* Pass selectedSchool as prop */}
         <ClientSelectorInline
           clients={filteredClients}
           selected={selectedClients}
@@ -975,7 +963,14 @@ const MonthCalendar = React.memo(function MonthCalendar({
   };
 
   return (
-    <Card sx={calendarCardSx}>
+    <Card sx={{
+      borderRadius: "14px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+      minWidth: 0,
+      background: "#f9fafc",
+      p: { xs: 0.5, sm: 1 },
+      userSelect: "none"
+    }}>
       <CardContent sx={{ p: { xs: 1, sm: 2 } }}>
         <Typography variant="h6" sx={{
           color: "#0a275c", fontWeight: 700, textAlign: "center",
