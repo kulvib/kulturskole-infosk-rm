@@ -115,7 +115,7 @@ export default function ClientDetailsHeaderSection({
   liveChromeColor,
   refreshing,
   handleRefresh,
-  kioskBrowserData = {}, // ekstra data til browseren, hvis du har det
+  kioskBrowserData = {},
 }) {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -208,6 +208,9 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18, mb: isMobile ? 0.5 : 1 }}>
+                Klient info
+              </Typography>
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography sx={labelStyle}>Klientnavn:</Typography>
                 <Typography sx={valueStyle}>{client.name}</Typography>
@@ -259,6 +262,9 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18, mb: isMobile ? 0.5 : 1 }}>
+                Kiosk info
+              </Typography>
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography sx={labelStyle}>Kiosk URL:</Typography>
               </Box>
@@ -297,7 +303,6 @@ export default function ClientDetailsHeaderSection({
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
               </Box>
-              {/* Ekstra browser data, hvis du har det */}
               <Box sx={{ mt: 1 }}>
                 {renderKioskBrowserData(kioskBrowserData)}
               </Box>
