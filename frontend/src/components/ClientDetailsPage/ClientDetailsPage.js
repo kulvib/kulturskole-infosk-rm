@@ -22,9 +22,8 @@ export default function ClientDetailsPage({
   calendarLoading,
   streamKey,
   onRestartStream,
-  showSnackbar // brug denne til lokale beskeder
+  showSnackbar // <- brug denne til lokale beskeder
 }) {
-  // --- States ---
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
   const [savingLocality, setSavingLocality] = useState(false);
@@ -47,7 +46,7 @@ export default function ClientDetailsPage({
   const [loadingStopLivestream, setLoadingStopLivestream] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
 
-  // --- Poll for status ---
+  // Poll for pending_chrome_action og opdater pendingLivestream state
   useEffect(() => {
     let interval;
     if (client?.id) {
@@ -81,7 +80,7 @@ export default function ClientDetailsPage({
     }
   }, [client]);
 
-  // --- Handlers ---
+  // Brug showSnackbar (prop fra wrapper) til lokale beskeder
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -128,36 +127,41 @@ export default function ClientDetailsPage({
   const handleOpenTerminal = () => openTerminal(client.id);
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
-  // --- Automatiseret livestream start ---
+  // --- HER STARTER STREAMET AUTOMATISK ---
   useEffect(() => {
     if (client?.id) {
       clientAction(client.id, "livestream_start").catch(() => {});
     }
     // eslint-disable-next-line
   }, [client?.id]);
+  // --- SLUT AUTOMATISK START ---
 
-  if (!client) return null;
+  if (!client) {
+    return null;
+  }
 
   return (
     <Box sx={{ maxWidth: 1500, mx: "auto", mt: 3 }}>
-      <ClientDetailsHeaderSection
-        client={client}
-        locality={locality}
-        localityDirty={localityDirty}
-        savingLocality={savingLocality}
-        handleLocalityChange={handleLocalityChange}
-        handleLocalitySave={handleLocalitySave}
-        kioskUrl={kioskUrl}
-        kioskUrlDirty={kioskUrlDirty}
-        savingKioskUrl={savingKioskUrl}
-        handleKioskUrlChange={handleKioskUrlChange}
-        handleKioskUrlSave={handleKioskUrlSave}
-        liveChromeStatus={liveChromeStatus}
-        liveChromeColor={liveChromeColor}
-        refreshing={refreshing}
-        handleRefresh={handleRefresh}
-      />
       <Grid container spacing={2}>
+        <Grid item xs={12}>
+          <ClientDetailsHeaderSection
+            client={client}
+            locality={locality}
+            localityDirty={localityDirty}
+            savingLocality={savingLocality}
+            handleLocalityChange={handleLocalityChange}
+            handleLocalitySave={handleLocalitySave}
+            kioskUrl={kioskUrl}
+            kioskUrlDirty={kioskUrlDirty}
+            savingKioskUrl={savingKioskUrl}
+            handleKioskUrlChange={handleKioskUrlChange}
+            handleKioskUrlSave={handleKioskUrlSave}
+            liveChromeStatus={liveChromeStatus}
+            liveChromeColor={liveChromeColor}
+            refreshing={refreshing}
+            handleRefresh={handleRefresh}
+          />
+        </Grid>
         <Grid item xs={12}>
           <ClientDetailsLivestreamSection
             clientId={client?.id}
