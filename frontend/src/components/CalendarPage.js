@@ -188,9 +188,23 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({ clients,
               inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
               disabled={disabled}
             />
-            <Typography variant="body2" noWrap sx={{ fontSize: { xs: "0.98rem", sm: "0.98rem", md: "0.875rem" } }}>
-              {(client.locality || client.name || "Ingen lokalitet") + " – " + getSchoolName(schools, client)}
-            </Typography>
+            {/* Her vises Lokation og Skole på to linjer */}
+            <Box>
+              <Typography variant="body2" sx={{
+                fontWeight: 700,
+                fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
+                lineHeight: 1.18
+              }}>
+                {client.locality || client.name || "Ingen lokalitet"}
+              </Typography>
+              <Typography variant="body2" sx={{
+                fontSize: { xs: "0.98rem", sm: "0.94rem", md: "0.88rem" },
+                color: "#666",
+                lineHeight: 1.12
+              }}>
+                {getSchoolName(schools, client)}
+              </Typography>
+            </Box>
           </Box>
         ))}
       </Box>
@@ -921,7 +935,8 @@ const MonthCalendar = React.memo(function MonthCalendar({
       boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
       minWidth: 0,
       background: "#f9fafc",
-      p: { xs: 0.5, sm: 1 }
+      p: { xs: 0.5, sm: 1 },
+      userSelect: "none" // <-- Deaktiver tekstmarkering på hele kalenderkortet!
     }}>
       <CardContent sx={{ p: { xs: 1, sm: 2 } }}>
         <Typography variant="h6" sx={{
@@ -993,7 +1008,8 @@ const MonthCalendar = React.memo(function MonthCalendar({
                         width: circleSize,
                         height: circleSize,
                         cursor: clientId ? "pointer" : "default",
-                        opacity: clientId ? 1 : 0.55
+                        opacity: clientId ? 1 : 0.55,
+                        userSelect: "none" // <-- Deaktiver tekstmarkering på dag-celler!
                       }}
                       onMouseDown={e => handleMouseDown(e, dateString)}
                       onMouseEnter={e => handleMouseEnter(e, dateString)}
@@ -1037,6 +1053,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
                           fontSize: "1.15rem",
                           zIndex: 2,
                           boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                          userSelect: "none" // <-- Deaktiver tekstmarkering på selve tallet!
                         }}
                       >
                         {day}
