@@ -557,7 +557,7 @@ export default function CalendarPage() {
 
   // ----------- RENDER -----------
   return (
-    <Box sx={{ maxWidth: 1500, mx: "auto", mt: { xs: 1, sm: 4 }, fontFamily: "inherit", px: { xs: 0.5, sm: 2 }, userSelect: "none" }}>
+    <Box sx={{ maxWidth: 1500, mx: "auto", mt: { xs: 1, sm: 4 }, fontFamily: "inherit", px: { xs: 0.5, sm: 2 } }}>
       <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-end' }, mb: 2 }}>
         <Tooltip title="Opdater klienter">
           <span>
@@ -835,7 +835,7 @@ export default function CalendarPage() {
   );
 }
 
-// MonthCalendar med optimeringer og userSelect: "none" på dagene!
+// MonthCalendar med native browser tooltip på dagene!
 const MonthCalendar = React.memo(function MonthCalendar({
   name,
   month,
@@ -921,14 +921,12 @@ const MonthCalendar = React.memo(function MonthCalendar({
       boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
       minWidth: 0,
       background: "#f9fafc",
-      p: { xs: 0.5, sm: 1 },
-      userSelect: "none"
+      p: { xs: 0.5, sm: 1 }
     }}>
-      <CardContent sx={{ p: { xs: 1, sm: 2 }, userSelect: "none" }}>
+      <CardContent sx={{ p: { xs: 1, sm: 2 } }}>
         <Typography variant="h6" sx={{
           color: "#0a275c", fontWeight: 700, textAlign: "center",
-          fontSize: { xs: "1rem", sm: "1.08rem" }, mb: 1,
-          userSelect: "none"
+          fontSize: { xs: "1rem", sm: "1.08rem" }, mb: 1
         }}>
           {name} {year}
         </Typography>
@@ -936,14 +934,12 @@ const MonthCalendar = React.memo(function MonthCalendar({
         <Box sx={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          columnGap: "0.08rem", rowGap: "0.5rem", mb: 0.5,
-          userSelect: "none"
+          columnGap: "0.08rem", rowGap: "0.5rem", mb: 0.5
         }}>
           {weekdayNames.map(wd => (
             <Typography key={wd} variant="caption" sx={{
               fontWeight: 700, color: "#555", textAlign: "center",
-              fontSize: { xs: "0.82rem", sm: "0.90rem" }, letterSpacing: "0.03em",
-              userSelect: "none"
+              fontSize: { xs: "0.82rem", sm: "0.90rem" }, letterSpacing: "0.03em"
             }}>
               {wd}
             </Typography>
@@ -952,16 +948,14 @@ const MonthCalendar = React.memo(function MonthCalendar({
         <Box sx={{
           display: "grid",
           gridTemplateRows: `repeat(${weekRows.length}, 1fr)`,
-          rowGap: "0.5rem",
-          userSelect: "none"
+          rowGap: "0.5rem"
         }}>
           {weekRows.map((row, rowIdx) => (
             <Box key={rowIdx}
               sx={{
                 display: "grid",
                 gridTemplateColumns: "repeat(8, 1fr)",
-                columnGap: "0.08rem",
-                userSelect: "none"
+                columnGap: "0.08rem"
               }}>
               {/* Ugenummer - sort, normal, mindre font, ingen cirkel */}
               <Box sx={{
@@ -973,14 +967,13 @@ const MonthCalendar = React.memo(function MonthCalendar({
                 color: "#222",
                 background: "transparent",
                 minWidth: 0,
-                mr: { xs: 0, sm: 0 },
-                userSelect: "none"
+                mr: { xs: 0, sm: 0 }
               }}>
                 {row.weekNum}
               </Box>
               {/* Dage */}
               {row.weekDays.map((day, idx) => {
-                if (!day) return <Box key={idx + "-empty"} sx={{ userSelect: "none" }} />;
+                if (!day) return <Box key={idx + "-empty"} />;
                 const dateString = formatDate(year, month, day);
                 const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
                 let bg = "#fff";
@@ -992,8 +985,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
                   <Box key={idx}
                     sx={{
                       display: "flex", justifyContent: "center", alignItems: "center",
-                      p: 0.2, position: "relative",
-                      userSelect: "none"
+                      p: 0.2, position: "relative"
                     }}>
                     <Box
                       sx={{
@@ -1001,11 +993,17 @@ const MonthCalendar = React.memo(function MonthCalendar({
                         width: circleSize,
                         height: circleSize,
                         cursor: clientId ? "pointer" : "default",
-                        opacity: clientId ? 1 : 0.55,
-                        userSelect: "none"
+                        opacity: clientId ? 1 : 0.55
                       }}
                       onMouseDown={e => handleMouseDown(e, dateString)}
                       onMouseEnter={e => handleMouseEnter(e, dateString)}
+                      title={
+                        cellStatus === "on"
+                          ? "Tændt (shift+klik for tid)"
+                          : cellStatus === "off"
+                            ? "Slukket"
+                            : ""
+                      }
                     >
                       {isLoading && (
                         <CircularProgress
@@ -1016,8 +1014,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
                             left: 0,
                             zIndex: 1,
                             color: "#1976d2",
-                            background: "transparent",
-                            userSelect: "none"
+                            background: "transparent"
                           }}
                         />
                       )}
@@ -1040,7 +1037,6 @@ const MonthCalendar = React.memo(function MonthCalendar({
                           fontSize: "1.15rem",
                           zIndex: 2,
                           boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                          userSelect: "none"
                         }}
                       >
                         {day}
