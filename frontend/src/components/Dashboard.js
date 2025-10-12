@@ -11,13 +11,13 @@ import {
   Typography,
   AppBar,
   IconButton,
-  Divider,
-  useTheme,
-  useMediaQuery,
   CssBaseline,
   Skeleton,
   Slide,
   Button,
+  Divider,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import HomeIcon from "@mui/icons-material/Home";
@@ -38,17 +38,15 @@ function getRoleText(role) {
 
 export default function Dashboard() {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm")); // <600px
-  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md")); // 600-899px
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logoutUser } = useAuth();
   const [schoolName, setSchoolName] = useState("");
 
-  // Responsiv drawerWidth
   const drawerWidth = isMobile ? 160 : isTablet ? 190 : 230;
 
-  // Dynamisk menu: "Administration" kun for admin
   const menuItems = [
     { text: "Forside", path: "/", match: "/", icon: <HomeIcon /> },
     { text: "Klienter", path: "/clients", match: "/clients", icon: <PeopleIcon /> },
@@ -58,7 +56,6 @@ export default function Dashboard() {
       : []),
   ];
 
-  // Hent school name hvis bruger
   useEffect(() => {
     if (user && user.role === "bruger" && user.school_id) {
       axios
@@ -76,19 +73,15 @@ export default function Dashboard() {
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
-  // TITEL afhænger af rolle
-  let title = "Infoskærm administration";
-  if (user?.role === "bruger" && schoolName) {
-    title = `${schoolName} - infoskærm administration`;
-  }
+  const title =
+    user?.role === "bruger" && schoolName
+      ? `${schoolName} - infoskærm administration`
+      : "Infoskærm administration";
 
-  // --- Mobil optimering: Luk drawer ved navigation, swipe, klik udenfor ---
   useEffect(() => {
     if (mobileOpen && (isMobile || isTablet)) setMobileOpen(false);
-    // eslint-disable-next-line
-  }, [location.pathname]); // Luk drawer ved navigation på mobil/tablet
+  }, [location.pathname, mobileOpen, isMobile, isTablet]);
 
-  // --- MENU DRAWER ---
   const drawer = (
     <Box sx={{ minHeight: "100vh", bgcolor: { xs: "#f8fdff", md: "inherit" } }}>
       <Toolbar />
@@ -177,89 +170,48 @@ export default function Dashboard() {
     </Box>
   );
 
-  // --- HØJRE HJØRNE: Brugerinfo + logout med visning afhængig af rolle ---
-  let userInfoBox = null;
-  if (user) {
-    if (user.role === "bruger") {
-      userInfoBox = (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography
-            sx={{
-              color: "white",
-              fontWeight: 400,
-              fontSize: 16,
-              mr: 2,
-              textAlign: "right",
-            }}
-          >
-            {user.full_name || user.username}
-            {user.email ? (
-              <>
-                <br />
-                <span style={{ fontSize: 13, opacity: 0.85 }}>{user.email}</span>
-              </>
-            ) : null}
-          </Typography>
-          <Button
-            variant="outlined"
-            color="inherit"
-            startIcon={<LogoutIcon />}
-            onClick={logoutUser}
-            sx={{
-              borderColor: "white",
-              color: "white",
-              fontWeight: "normal",
-              fontSize: 16,
-              px: 2,
-              py: 0.5,
-              '&:hover': { borderColor: "#90caf9", background: "#1565c0" },
-            }}
-          >
-            LOG UD
-          </Button>
-        </Box>
-      );
-    } else {
-      userInfoBox = (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography
-            sx={{
-              color: "white",
-              fontWeight: 400,
-              fontSize: 16,
-              mr: 2,
-              textAlign: "right",
-            }}
-          >
-            {(user.full_name || user.username) + " - " + getRoleText(user.role)}
-            {user.email ? (
-              <>
-                <br />
-                <span style={{ fontSize: 13, opacity: 0.85 }}>{user.email}</span>
-              </>
-            ) : null}
-          </Typography>
-          <Button
-            variant="outlined"
-            color="inherit"
-            startIcon={<LogoutIcon />}
-            onClick={logoutUser}
-            sx={{
-              borderColor: "white",
-              color: "white",
-              fontWeight: "normal",
-              fontSize: 16,
-              px: 2,
-              py: 0.5,
-              '&:hover': { borderColor: "#90caf9", background: "#1565c0" },
-            }}
-          >
-            LOG UD
-          </Button>
-        </Box>
-      );
-    }
-  }
+  // Samlet brugerinfo - begge roller
+  const userInfoBox = user ? (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+      <Typography
+        sx={{
+          color: "white",
+          fontWeight: 400,
+          fontSize: 16,
+          mr: 2,
+          textAlign: "right",
+        }}
+      >
+        {(user.full_name || user.username) +
+          (user.role === "admin" ? ` - ${getRoleText(user.role)}` : "")}
+        {user.email ? (
+          <>
+            <br />
+            <span style={{ fontSize: 13, opacity: 0.85 }}>{user.email}</span>
+          </>
+        ) : null}
+      </Typography>
+      <Button
+        variant="outlined"
+        color="inherit"
+        startIcon={<LogoutIcon />}
+        onClick={logoutUser}
+        sx={{
+          borderColor: "white",
+          color: "white",
+          fontWeight: "normal",
+          fontSize: 16,
+          px: 2,
+          py: 0.5,
+          '&:hover': { borderColor: "#90caf9", background: "#1565c0" },
+        }}
+      >
+        LOG UD
+      </Button>
+    </Box>
+  ) : (
+    <Skeleton variant="text" width={80} sx={{ bgcolor: "grey.700" }} />
+  );
 
   return (
     <Box sx={{ display: "flex" }}>
@@ -312,9 +264,7 @@ export default function Dashboard() {
           >
             {title}
           </Typography>
-          {userInfoBox || (
-            <Skeleton variant="text" width={80} sx={{ bgcolor: "grey.700" }} />
-          )}
+          {userInfoBox}
         </Toolbar>
       </AppBar>
 
