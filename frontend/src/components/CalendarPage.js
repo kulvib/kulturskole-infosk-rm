@@ -71,7 +71,7 @@ const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
 const formatDate = (year, month, day) =>
   `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 const stripTimeFromDateKey = key => key.split("T")[0];
-const deepEqual = (obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2);
+const deepEqual = (obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2;
 
 // -------- UGENUMMER-BEREGNING --------
 function getWeekNumber(date) {
@@ -262,7 +262,6 @@ export default function CalendarPage() {
   }, [token]);
   useEffect(() => { fetchClients(); }, [fetchClients]);
 
-  // -------- Differentierede rettigheder og klientfiltrering --------
   const filteredClients = useMemo(() => {
     if (user?.role === "bruger" && user?.school_id) {
       return clients.filter(c => String(c.schoolId || c.school_id) === String(user.school_id));
@@ -799,7 +798,7 @@ export default function CalendarPage() {
   );
 }
 
-// MonthCalendar med pixel-perfect loader og ugenumre
+// MonthCalendar med pixel-perfect loader og ugenumre og klikbare datoer
 function MonthCalendar({
   name,
   month,
@@ -840,8 +839,15 @@ function MonthCalendar({
     weekStartIdx += 7;
   }
 
-  const circleSizeXs = 36;
-  const circleSizeSm = 33;
+  const circleSize = 36;
+  const innerCircleSize = 32;
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleUp = () => setIsDragging(false);
+    window.addEventListener("mouseup", handleUp);
+    return () => window.removeEventListener("mouseup", handleUp);
+  }, [isDragging]);
 
   const handleMouseDown = (e, dateString) => {
     if (e.shiftKey && e.button === 0) {
@@ -868,13 +874,6 @@ function MonthCalendar({
       onDayClick([clientId], dateString, markMode, markedDays);
     }
   };
-
-  useEffect(() => {
-    if (!isDragging) return;
-    const handleUp = () => setIsDragging(false);
-    window.addEventListener("mouseup", handleUp);
-    return () => window.removeEventListener("mouseup", handleUp);
-  }, [isDragging]);
 
   return (
     <Card sx={{
@@ -932,7 +931,7 @@ function MonthCalendar({
                 color: "#1976d2",
                 background: "#f3f6fa",
                 borderRadius: "10px",
-                height: { xs: 36, sm: 33 },
+                height: circleSize,
                 minWidth: 44
               }}>
                 {row.weekNum}
@@ -953,11 +952,20 @@ function MonthCalendar({
                       display: "flex", justifyContent: "center", alignItems: "center",
                       p: 0.2, position: "relative"
                     }}>
-                    <Box sx={{ position: "relative", width: 36, height: 36 }}>
-                      {/* Loader spinner: pixel-perfect rundt om cirklen */}
+                    <Box
+                      sx={{
+                        position: "relative",
+                        width: circleSize,
+                        height: circleSize,
+                        cursor: clientId ? "pointer" : "default",
+                        opacity: clientId ? 1 : 0.55
+                      }}
+                      onMouseDown={e => handleMouseDown(e, dateString)}
+                      onMouseEnter={e => handleMouseEnter(e, dateString)}
+                    >
                       {isLoading && (
                         <CircularProgress
-                          size={36}
+                          size={circleSize}
                           sx={{
                             position: "absolute",
                             top: 0,
@@ -974,8 +982,8 @@ function MonthCalendar({
                           position: "absolute",
                           top: 2,
                           left: 2,
-                          width: 32,
-                          height: 32,
+                          width: innerCircleSize,
+                          height: innerCircleSize,
                           borderRadius: "50%",
                           background: bg,
                           border: "1px solid #eee",
@@ -987,7 +995,6 @@ function MonthCalendar({
                           fontSize: "1.15rem",
                           zIndex: 2,
                           boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                          pointerEvents: "none"
                         }}
                       >
                         {day}
