@@ -248,24 +248,25 @@ export default function DateTimeEditDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="xs"
+      maxWidth="md"
       fullWidth
     >
-      <DialogTitle sx={{ pb: 2, pt: 1 }}>
+      <DialogTitle sx={{ pb: 0 }}>
         <Box sx={{ display: "flex", alignItems: "center", position: "relative" }}>
           <span style={{ margin: "0 auto" }}>
             {date ? `Rediger tid for ${formatFullDate(date)}` : "Rediger tid"}
           </span>
         </Box>
       </DialogTitle>
-      <DialogContent sx={{ pt: 2, px: 3 }}>
+      <DialogContent>
+        {/* Afstand fra overskriften til felterne er nu mt: 2 */}
         <Box sx={{ mt: 2 }}>
           {loading ? (
             <Box sx={{ minHeight: 80, display: "flex", alignItems: "center" }}>
               <CircularProgress sx={{ mr: 2 }} /> Henter tider...
             </Box>
           ) : (
-            <Box sx={{ display: "flex", gap: 3 }}>
+            <Box sx={{ display: "flex", gap: 2 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography
                   variant="subtitle2"
@@ -286,7 +287,7 @@ export default function DateTimeEditDialog({
                     min: EARLIEST,
                     max: onTimeMax,
                     step: 300,
-                    title: "Angiv her hvornår klienten tænder",
+                    title: "Angiv her hvornår klienten tænder", // Mouseover tekst
                   }}
                 />
               </Box>
@@ -310,7 +311,7 @@ export default function DateTimeEditDialog({
                     min: offTimeMin,
                     max: LATEST,
                     step: 300,
-                    title: "Angiv her hvornår klienten slukker",
+                    title: "Angiv her hvornår klienten slukker", // Mouseover tekst
                   }}
                 />
               </Box>
@@ -318,7 +319,7 @@ export default function DateTimeEditDialog({
           )}
         </Box>
       </DialogContent>
-      <DialogActions sx={{ pb: 2, pt: 1 }}>
+      <DialogActions>
         <Button onClick={onClose} color="inherit" disabled={saving || loading}>
           Annullér
         </Button>
