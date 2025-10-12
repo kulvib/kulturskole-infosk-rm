@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, {
+  useState, useEffect, useMemo, useCallback, useRef, useReducer
+} from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper,
   Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack
@@ -71,7 +73,6 @@ const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
 const formatDate = (year, month, day) =>
   `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 const stripTimeFromDateKey = key => key.split("T")[0];
-// FIX: Manglende parantes!
 const deepEqual = (obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2);
 
 // -------- UGENUMMER-BEREGNING --------
@@ -98,7 +99,7 @@ function getSchoolName(schools, client) {
 }
 
 // -------- Hjælpekomponent: Klientvælger --------
-function ClientSelectorInline({ clients, selected, onChange, schools, disabled }) {
+const ClientSelectorInline = React.memo(function ClientSelectorInline({ clients, selected, onChange, schools, disabled }) {
   const [search, setSearch] = useState("");
   const sortedClients = useMemo(() => [...clients].sort((a, b) =>
     ((a.locality || a.name || "").toLowerCase())
@@ -195,6 +196,26 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
       </Box>
     </Box>
   );
+});
+
+// ----------- markedDaysReducer --------
+function markedDaysReducer(state, action) {
+  switch (action.type) {
+    case "set":
+      return { ...state, [action.clientId]: action.days };
+    case "updateDay":
+      return {
+        ...state,
+        [action.clientId]: {
+          ...(state[action.clientId] || {}),
+          [action.date]: action.dayData,
+        }
+      };
+    case "reset":
+      return {};
+    default:
+      return state;
+  }
 }
 
 // ----------- MAIN COMPONENT START -----------
@@ -209,7 +230,6 @@ export default function CalendarPage() {
   const [activeClient, setActiveClient] = useState(null);
   const [loadingClients, setLoadingClients] = useState(false);
   const [markMode, setMarkMode] = useState("on");
-  const [markedDays, setMarkedDays] = useState({});
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editDialogDate, setEditDialogDate] = useState(null);
   const [editDialogClient, setEditDialogClient] = useState(null);
@@ -282,25 +302,30 @@ export default function CalendarPage() {
     }
   }, [user, filteredClients]);
 
+  // ----------- markedDays state via useReducer -----------
+  const [markedDays, dispatchMarkedDays] = useReducer(markedDaysReducer, {});
+
   useEffect(() => {
     if (!activeClient) return;
-    setMarkedDays(prev => ({ ...prev, [activeClient]: undefined }));
+    dispatchMarkedDays({ type: "set", clientId: activeClient, days: undefined });
     let isCurrent = true;
     getMarkedDays(selectedSeason, activeClient)
       .then(data => {
         if (isCurrent) {
-          setMarkedDays(prev => ({
-            ...prev,
-            [activeClient]: mapRawDays(data.markedDays || {})
-          }));
+          dispatchMarkedDays({
+            type: "set",
+            clientId: activeClient,
+            days: mapRawDays(data.markedDays || {})
+          });
         }
       })
       .catch(() => {
         if (isCurrent) {
-          setMarkedDays(prev => ({
-            ...prev,
-            [activeClient]: {}
-          }));
+          dispatchMarkedDays({
+            type: "set",
+            clientId: activeClient,
+            days: {}
+          });
           setSnackbar({ open: true, message: "Kunne ikke hente kalender.", severity: "error" });
         }
       });
@@ -340,14 +365,15 @@ export default function CalendarPage() {
 
   // ----------- MARKERING AF DATOER LOGIK START -----------
   const handleDayClick = useCallback((clientIds, dateString, mode, markedDaysState) => {
-    setMarkedDays(prev => {
-      const updated = { ...prev };
-      selectedClients.forEach(cid => {
-        updated[cid] = { ...(updated[cid] || {}), [dateString]: { status: mode } };
+    clientIds.forEach(cid => {
+      dispatchMarkedDays({
+        type: "updateDay",
+        clientId: cid,
+        date: dateString,
+        dayData: { status: mode }
       });
-      return updated;
     });
-  }, [selectedClients]);
+  }, []);
 
   const handleDateShiftLeftClick = useCallback((clientId, date) => {
     if (autoSaveTimer.current) {
@@ -415,10 +441,11 @@ export default function CalendarPage() {
   const handleSaveDateTime = async ({ date, clientId }) => {
     try {
       const data = await getMarkedDays(selectedSeason, clientId);
-      setMarkedDays(prev => ({
-        ...prev,
-        [clientId]: mapRawDays(data.markedDays || {})
-      }));
+      dispatchMarkedDays({
+        type: "set",
+        clientId: clientId,
+        days: mapRawDays(data.markedDays || {})
+      });
       lastDialogSavedMarkedDays.current = {
         ...lastDialogSavedMarkedDays.current,
         [clientId]: mapRawDays(data.markedDays || {})
@@ -432,20 +459,24 @@ export default function CalendarPage() {
 
   const schoolYearMonths = useMemo(() => getSchoolYearMonths(selectedSeason), [selectedSeason]);
 
-  const otherClientNames = selectedClients.length > 1
-    ? filteredClients
-        .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
-        .map(c => `${c.locality || c.name} – ${getSchoolName(schools, c)}`)
-        .filter(Boolean)
-        .join("; ")
-    : "";
-  const activeClientName = activeClient
-    ? (() => {
-        const c = filteredClients.find(c => c.id === activeClient);
-        const schoolName = getSchoolName(schools, c || {});
-        return c ? `${c.locality || c.name}${schoolName ? " – " + schoolName : ""}` : "Automatisk";
-      })()
-    : "Automatisk";
+  const otherClientNames = useMemo(() => (
+    selectedClients.length > 1
+      ? filteredClients
+          .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
+          .map(c => `${c.locality || c.name} – ${getSchoolName(schools, c)}`)
+          .filter(Boolean)
+          .join("; ")
+      : ""
+  ), [selectedClients, filteredClients, activeClient, schools]);
+  const activeClientName = useMemo(() => (
+    activeClient
+      ? (() => {
+          const c = filteredClients.find(c => c.id === activeClient);
+          const schoolName = getSchoolName(schools, c || {});
+          return c ? `${c.locality || c.name}${schoolName ? " – " + schoolName : ""}` : "Automatisk";
+        })()
+      : "Automatisk"
+  ), [activeClient, filteredClients, schools]);
 
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
@@ -493,15 +524,17 @@ export default function CalendarPage() {
         if (activeClient) {
           try {
             const data = await getMarkedDays(selectedSeason, activeClient);
-            setMarkedDays(prev => ({
-              ...prev,
-              [activeClient]: mapRawDays(data.markedDays || {})
-            }));
+            dispatchMarkedDays({
+              type: "set",
+              clientId: activeClient,
+              days: mapRawDays(data.markedDays || {})
+            });
           } catch (e) {
-            setMarkedDays(prev => ({
-              ...prev,
-              [activeClient]: {}
-            }));
+            dispatchMarkedDays({
+              type: "set",
+              clientId: activeClient,
+              days: {}
+            });
           }
         }
       } catch (e) {
@@ -763,7 +796,7 @@ export default function CalendarPage() {
         )}
         {activeClient && !loadingMarkedDays &&
           schoolYearMonths.map(({ name, month, year }) => (
-            <MonthCalendar
+            <MemoizedMonthCalendar
               key={name + year}
               name={name}
               month={month}
@@ -802,8 +835,8 @@ export default function CalendarPage() {
   );
 }
 
-// MonthCalendar med pixel-perfect loader og ugenumre og klikbare datoer
-function MonthCalendar({
+// MonthCalendar med optimeringer og UI-ændringer for ugenumre!
+const MonthCalendar = React.memo(function MonthCalendar({
   name,
   month,
   year,
@@ -827,21 +860,24 @@ function MonthCalendar({
   while (cells.length % 7 !== 0) cells.push(null);
 
   // Ugenummer: find alle uger for denne måned
-  const weekRows = [];
-  let weekStartIdx = 0;
-  while (weekStartIdx < cells.length) {
-    const weekDays = cells.slice(weekStartIdx, weekStartIdx + 7);
-    let firstDay = weekDays.find(d => !!d);
-    let dateObj;
-    if (firstDay) {
-      dateObj = new Date(year, month, firstDay);
-    } else {
-      dateObj = new Date(year, month, 1 + weekStartIdx - offset);
+  const weekRows = useMemo(() => {
+    const rows = [];
+    let weekStartIdx = 0;
+    while (weekStartIdx < cells.length) {
+      const weekDays = cells.slice(weekStartIdx, weekStartIdx + 7);
+      let firstDay = weekDays.find(d => !!d);
+      let dateObj;
+      if (firstDay) {
+        dateObj = new Date(year, month, firstDay);
+      } else {
+        dateObj = new Date(year, month, 1 + weekStartIdx - offset);
+      }
+      const weekNum = getWeekNumber(dateObj);
+      rows.push({ weekNum, weekDays });
+      weekStartIdx += 7;
     }
-    const weekNum = getWeekNumber(dateObj);
-    weekRows.push({ weekNum, weekDays });
-    weekStartIdx += 7;
-  }
+    return rows;
+  }, [cells, year, month, offset]);
 
   const circleSize = 36;
   const innerCircleSize = 32;
@@ -894,16 +930,12 @@ function MonthCalendar({
         }}>
           {name} {year}
         </Typography>
-        {/* Uge-nummer header */}
+        {/* Uge-dage header (ingen "Uge"-overskrift!) */}
         <Box sx={{
           display: "grid",
-          gridTemplateColumns: "44px repeat(7, 1fr)",
+          gridTemplateColumns: "repeat(7, 1fr)",
           columnGap: "0.08rem", rowGap: "0.5rem", mb: 0.5
         }}>
-          <Typography variant="caption" sx={{
-            fontWeight: 700, color: "#666", textAlign: "center",
-            fontSize: { xs: "0.82rem", sm: "0.90rem" }
-          }}>Uge</Typography>
           {weekdayNames.map(wd => (
             <Typography key={wd} variant="caption" sx={{
               fontWeight: 700, color: "#555", textAlign: "center",
@@ -922,21 +954,20 @@ function MonthCalendar({
             <Box key={rowIdx}
               sx={{
                 display: "grid",
-                gridTemplateColumns: "44px repeat(7, 1fr)",
+                gridTemplateColumns: "repeat(8, 1fr)",
                 columnGap: "0.08rem"
               }}>
-              {/* Ugenummer */}
+              {/* Ugenummer - sort, normal, mindre font, ingen cirkel */}
               <Box sx={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontWeight: 700,
-                fontSize: { xs: "0.96rem", sm: "1rem" },
-                color: "#1976d2",
-                background: "#f3f6fa",
-                borderRadius: "10px",
-                height: circleSize,
-                minWidth: 44
+                fontWeight: 400,
+                fontSize: { xs: "0.80rem", sm: "0.88rem" },
+                color: "#222",
+                background: "transparent",
+                minWidth: 0,
+                mr: { xs: 0, sm: 0 }
               }}>
                 {row.weekNum}
               </Box>
@@ -1013,4 +1044,6 @@ function MonthCalendar({
       </CardContent>
     </Card>
   );
-}
+});
+
+const MemoizedMonthCalendar = MonthCalendar;
