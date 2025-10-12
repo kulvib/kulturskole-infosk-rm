@@ -76,7 +76,7 @@ function getDaysInRange(start, end) {
 
 function ClientPowerPeriodTable({ markedDays, days }) {
   return (
-    <TableContainer sx={{ maxHeight: 340, overflowY: "auto", mt: 2 }}>
+    <TableContainer sx={{ maxHeight: 340, overflowY: "auto", mt: 3 }}>
       <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
@@ -164,17 +164,17 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ pb: 2, pt: 1, fontWeight: 500 }}>
+      <DialogTitle sx={{ pb: 3, pt: 2, fontWeight: 500 }}>
         Vis kalender for periode
       </DialogTitle>
-      <DialogContent sx={{ pt: 1 }}>
+      <DialogContent sx={{ pt: 2, px: 4 }}>
         <LocalizationProvider dateAdapter={AdapterDateFns} locale={daLocale}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
-            spacing={3}
+            spacing={4}
             alignItems="center"
             justifyContent="center"
-            sx={{ mb: 2, mt: 1 }}
+            sx={{ mb: 4, mt: 2 }}
           >
             <DatePicker
               label={<span style={{ fontWeight: 500 }}>Startdato</span>}
@@ -240,7 +240,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
           />
         )}
       </DialogContent>
-      <DialogActions sx={{ justifyContent: "center" }}>
+      <DialogActions sx={{ justifyContent: "center", pb: 2, pt: 1 }}>
         <Button onClick={onClose} color="primary">
           Luk
         </Button>
