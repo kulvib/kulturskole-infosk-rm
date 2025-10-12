@@ -17,7 +17,7 @@ import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
-// StatusBadge med 2s puls animation hvis animate=true
+// Status badge med puls animation
 function StatusBadge({ color, text, animate = false, isMobile = false, showText = true }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
@@ -40,18 +40,9 @@ function StatusBadge({ color, text, animate = false, isMobile = false, showText 
         <style>
           {`
             @keyframes pulsate {
-              0% {
-                transform: scale(1);
-                opacity: 1;
-              }
-              50% {
-                transform: scale(1.25);
-                opacity: 0.5;
-              }
-              100% {
-                transform: scale(1);
-                opacity: 1;
-              }
+              0% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.25); opacity: 0.5; }
+              100% { transform: scale(1); opacity: 1; }
             }
           `}
         </style>
@@ -60,12 +51,7 @@ function StatusBadge({ color, text, animate = false, isMobile = false, showText 
   );
 }
 
-// Kiosk status badge med tekst og bounce for ALLE statuser
 function ChromeStatusBadge({ status, color, isMobile = false }) {
-  let fallbackColor = "grey.400";
-  let text = status || "ukendt";
-  let dotColor = color || fallbackColor;
-  const animate = true;
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
       <Typography
@@ -77,9 +63,9 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
           mr: 1,
         }}
       >
-        {text}
+        {status || "ukendt"}
       </Typography>
-      <StatusBadge color={dotColor} animate={animate} isMobile={isMobile} showText={false} />
+      <StatusBadge color={color || "grey.400"} animate isMobile={isMobile} showText={false} />
     </Box>
   );
 }
@@ -101,13 +87,13 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
         <Button
           size="small"
           onClick={handleCopy}
-          style={{
+          sx={{
             minWidth: isMobile ? 20 : 24,
             maxWidth: isMobile ? 20 : 24,
             minHeight: isMobile ? 20 : 24,
             maxHeight: isMobile ? 20 : 24,
-            padding: 0,
-            margin: 0,
+            p: 0,
+            m: 0,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -142,9 +128,8 @@ export default function ClientDetailsHeaderSection({
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const { user } = useAuth(); // Hent bruger fra authcontext
+  const { user } = useAuth();
 
-  // Styles
   const inputStyle = {
     width: isMobile ? "100%" : 180,
     height: 32,
@@ -152,10 +137,11 @@ export default function ClientDetailsHeaderSection({
       fontSize: isMobile ? "0.90rem" : "0.95rem",
       height: isMobile ? "30px" : "32px",
       boxSizing: "border-box",
-      padding: isMobile ? "6px 10px" : "8px 14px",
+      padding: isMobile ? "6px 10px" : "8px 14px"
     },
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
+
   const kioskInputStyle = {
     width: isMobile ? "100%" : 230,
     height: 32,
@@ -163,15 +149,14 @@ export default function ClientDetailsHeaderSection({
       fontSize: isMobile ? "0.90rem" : "0.95rem",
       height: isMobile ? "30px" : "32px",
       boxSizing: "border-box",
-      padding: isMobile ? "6px 10px" : "8px 14px",
+      padding: isMobile ? "6px 10px" : "8px 14px"
     },
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
-  // Papers layout
   return (
     <Box sx={{ maxWidth: 1500, mx: "auto", mt: isMobile ? 1 : 3 }}>
-      {/* Top bar med navigation og refresh */}
+      {/* Top bar */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", mb: 2, gap: isMobile ? 1 : 0 }}>
         <Button
           variant="outlined"
@@ -210,33 +195,21 @@ export default function ClientDetailsHeaderSection({
         </Tooltip>
       </Box>
       {/* Papers */}
-      <Box sx={{
-        display: "flex",
-        flexDirection: isMobile ? "column" : "row",
-        gap: isMobile ? 2 : 4,
-        width: "100%",
-      }}>
-        {/* Paper 1: Klient info */}
-        <Card elevation={3} sx={{
-          flex: 1,
-          minWidth: isMobile ? "100%" : 320,
-          maxWidth: isMobile ? "100%" : 420,
-          borderRadius: 2,
-          mb: isMobile ? 2 : 0,
-        }}>
+      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 2 : 4, width: "100%" }}>
+        {/* Paper 1 */}
+        <Card elevation={3} sx={{ flex: 1, minWidth: isMobile ? "100%" : 320, maxWidth: isMobile ? "100%" : 420, borderRadius: 2, mb: isMobile ? 2 : 0 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom fontWeight={700}>
               Klient Info
             </Typography>
             <Box sx={{ mt: 2 }}>
-              {/* Klient ID kun for admin */}
               {user?.role === "admin" && (
                 <>
                   <Typography variant="body2" fontWeight={600} gutterBottom>
                     Klient ID:
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>
-                    {client.id}
+                    {client?.id}
                   </Typography>
                 </>
               )}
@@ -244,7 +217,7 @@ export default function ClientDetailsHeaderSection({
                 Skole:
               </Typography>
               <Typography variant="body2" sx={{ mb: 2 }}>
-                {client.school || client.name}
+                {client?.school || client?.name}
               </Typography>
               <Typography variant="body2" fontWeight={600} gutterBottom>
                 Lokation:
@@ -257,11 +230,7 @@ export default function ClientDetailsHeaderSection({
                   sx={inputStyle}
                   disabled={savingLocality}
                   inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
-                  onKeyDown={e => {
-                    if (e.key === "Enter") {
-                      handleLocalitySave();
-                    }
-                  }}
+                  onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
                   error={!!localityDirty}
                 />
                 <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
@@ -283,13 +252,8 @@ export default function ClientDetailsHeaderSection({
             </Box>
           </CardContent>
         </Card>
-        {/* Paper 2: Kiosk info */}
-        <Card elevation={3} sx={{
-          flex: 1,
-          minWidth: isMobile ? "100%" : 320,
-          maxWidth: isMobile ? "100%" : 420,
-          borderRadius: 2,
-        }}>
+        {/* Paper 2 */}
+        <Card elevation={3} sx={{ flex: 1, minWidth: isMobile ? "100%" : 320, maxWidth: isMobile ? "100%" : 420, borderRadius: 2 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom fontWeight={700}>
               Kiosk Info
@@ -306,11 +270,7 @@ export default function ClientDetailsHeaderSection({
                   sx={kioskInputStyle}
                   disabled={savingKioskUrl}
                   inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
-                  onKeyDown={e => {
-                    if (e.key === "Enter") {
-                      handleKioskUrlSave();
-                    }
-                  }}
+                  onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
                   error={!!kioskUrlDirty}
                 />
                 <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
