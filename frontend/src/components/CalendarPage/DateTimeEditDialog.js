@@ -251,22 +251,21 @@ export default function DateTimeEditDialog({
       maxWidth="xs"
       fullWidth
     >
-      <DialogTitle sx={{ pb: 0 }}>
+      <DialogTitle sx={{ pb: 2, pt: 1 }}>
         <Box sx={{ display: "flex", alignItems: "center", position: "relative" }}>
           <span style={{ margin: "0 auto" }}>
             {date ? `Rediger tid for ${formatFullDate(date)}` : "Rediger tid"}
           </span>
         </Box>
       </DialogTitle>
-      <DialogContent>
-        {/* Afstand fra overskriften til felterne er nu mt: 2 */}
+      <DialogContent sx={{ pt: 2, px: 3 }}>
         <Box sx={{ mt: 2 }}>
           {loading ? (
             <Box sx={{ minHeight: 80, display: "flex", alignItems: "center" }}>
               <CircularProgress sx={{ mr: 2 }} /> Henter tider...
             </Box>
           ) : (
-            <Box sx={{ display: "flex", gap: 2 }}>
+            <Box sx={{ display: "flex", gap: 3 }}>
               <Box sx={{ flex: 1 }}>
                 <Typography
                   variant="subtitle2"
@@ -287,7 +286,7 @@ export default function DateTimeEditDialog({
                     min: EARLIEST,
                     max: onTimeMax,
                     step: 300,
-                    title: "Angiv her hvornår klienten tænder", // Mouseover tekst
+                    title: "Angiv her hvornår klienten tænder",
                   }}
                 />
               </Box>
@@ -311,7 +310,7 @@ export default function DateTimeEditDialog({
                     min: offTimeMin,
                     max: LATEST,
                     step: 300,
-                    title: "Angiv her hvornår klienten slukker", // Mouseover tekst
+                    title: "Angiv her hvornår klienten slukker",
                   }}
                 />
               </Box>
@@ -319,7 +318,7 @@ export default function DateTimeEditDialog({
           )}
         </Box>
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ pb: 2, pt: 1 }}>
         <Button onClick={onClose} color="inherit" disabled={saving || loading}>
           Annullér
         </Button>
