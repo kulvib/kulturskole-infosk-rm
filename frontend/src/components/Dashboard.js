@@ -180,6 +180,7 @@ export default function Dashboard() {
           fontSize: 16,
           mr: 2,
           textAlign: "right",
+          lineHeight: 1.1, // Mindre linjeafstand!
         }}
       >
         {(user.full_name || user.username) +
@@ -187,7 +188,7 @@ export default function Dashboard() {
         {user.email ? (
           <>
             <br />
-            <span style={{ fontSize: 13, opacity: 0.85 }}>{user.email}</span>
+            <span style={{ fontSize: 13, opacity: 0.85, lineHeight: "1" }}>{user.email}</span>
           </>
         ) : null}
       </Typography>
