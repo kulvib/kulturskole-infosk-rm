@@ -71,7 +71,8 @@ const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
 const formatDate = (year, month, day) =>
   `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 const stripTimeFromDateKey = key => key.split("T")[0];
-const deepEqual = (obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2;
+// FIX: Manglende parantes!
+const deepEqual = (obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2);
 
 // -------- UGENUMMER-BEREGNING --------
 function getWeekNumber(date) {
@@ -337,6 +338,35 @@ export default function CalendarPage() {
     return (day === 0 || day === 6) ? times?.weekend || fallback.weekend : times?.weekday || fallback.weekday;
   }
 
+  // ----------- MARKERING AF DATOER LOGIK START -----------
+  const handleDayClick = useCallback((clientIds, dateString, mode, markedDaysState) => {
+    setMarkedDays(prev => {
+      const updated = { ...prev };
+      selectedClients.forEach(cid => {
+        updated[cid] = { ...(updated[cid] || {}), [dateString]: { status: mode } };
+      });
+      return updated;
+    });
+  }, [selectedClients]);
+
+  const handleDateShiftLeftClick = useCallback((clientId, date) => {
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
+    }
+    setLoadingDialogDate(date);
+    setLoadingDialogClient(clientId);
+    setTimeout(() => {
+      setEditDialogClient(clientId);
+      setEditDialogDate(date);
+      setEditDialogOpen(true);
+      setLoadingDialogDate(null);
+      setLoadingDialogClient(null);
+    }, 1100);
+  }, []);
+
+  // ----------- MARKERING AF DATOER LOGIK SLUT ------------
+
   const handleSaveSingleClient = async (clientId) => {
     if (!clientId) return;
     const allDates = [];
@@ -380,32 +410,6 @@ export default function CalendarPage() {
         setActiveClient(newSelected.length > 0 ? newSelected[newSelected.length - 1] : null);
       }
     }
-  };
-
-  const handleDayClick = (clientIds, dateString, mode, markedDays) => {
-    setMarkedDays(prev => {
-      const updated = { ...prev };
-      selectedClients.forEach(cid => {
-        updated[cid] = { ...(updated[cid] || {}), [dateString]: { status: mode } };
-      });
-      return updated;
-    });
-  };
-
-  const handleDateShiftLeftClick = (clientId, date) => {
-    if (autoSaveTimer.current) {
-      clearTimeout(autoSaveTimer.current);
-      autoSaveTimer.current = null;
-    }
-    setLoadingDialogDate(date);
-    setLoadingDialogClient(clientId);
-    setTimeout(() => {
-      setEditDialogClient(clientId);
-      setEditDialogDate(date);
-      setEditDialogOpen(true);
-      setLoadingDialogDate(null);
-      setLoadingDialogClient(null);
-    }, 1100);
   };
 
   const handleSaveDateTime = async ({ date, clientId }) => {
