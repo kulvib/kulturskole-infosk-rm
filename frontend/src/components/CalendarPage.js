@@ -124,8 +124,11 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
   return (
     <Box>
       <Box sx={{
-        display: "flex", alignItems: "center", mb: 2,
-        flexDirection: { xs: "column", sm: "row" }, gap: { xs: 1, sm: 0 }
+        display: "flex",
+        flexDirection: { xs: "column", sm: "row" },
+        alignItems: { xs: "stretch", sm: "center" },
+        mb: 2,
+        gap: { xs: 1, sm: 2 }
       }}>
         <TextField
           label="Søg klient"
@@ -134,12 +137,10 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
           value={search}
           onChange={e => setSearch(e.target.value)}
           disabled={disabled}
-          sx={{ width: { xs: "100%", sm: "auto" } }}
+          sx={{ width: { xs: "100%", sm: 220 } }}
         />
         <Button
           sx={{
-            ml: { xs: 0, sm: 2 },
-            mt: { xs: 1, sm: 0 },
             minWidth: 0, px: 2,
             width: { xs: "100%", sm: "auto" }
           }}
@@ -158,7 +159,7 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
           sm: "1fr 1fr",
           md: "repeat(5, 1fr)"
         },
-        gap: 1,
+        gap: { xs: 1, sm: 2, md: 2 },
       }}>
         {filteredClients.map(client => (
           <Box
@@ -166,8 +167,8 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
             sx={{
               display: "flex",
               alignItems: "center",
-              px: 1,
-              py: 0.5,
+              px: { xs: 0.5, sm: 1 },
+              py: { xs: 0.5, sm: 0.5 },
               background: selected.includes(client.id) ? "#f0f4ff" : "transparent",
               borderRadius: 1,
               cursor: disabled ? "not-allowed" : "pointer",
@@ -186,7 +187,10 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
               checked={selected.includes(client.id)}
               tabIndex={-1}
               disableRipple
-              sx={{ p: 0, pr: 1 }}
+              sx={{
+                p: 0, pr: 1,
+                minWidth: { xs: 32, sm: 28 }
+              }}
               inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
               disabled={disabled}
             />
@@ -196,25 +200,28 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
                 <Typography variant="body2" sx={{
                   fontWeight: 400,
                   fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
-                  lineHeight: 1.18
+                  lineHeight: 1.18,
+                  wordBreak: "break-word"
                 }}>
                   {client.locality || client.name || "Ingen lokalitet"}
                 </Typography>
               )
               : (
                 // Skole øverst, lokation nederst
-                <Box>
+                <Box sx={{ width: "100%" }}>
                   <Typography variant="body2" sx={{
                     fontWeight: 700,
                     fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
-                    lineHeight: 1.18
+                    lineHeight: 1.18,
+                    wordBreak: "break-word"
                   }}>
                     {getSchoolName(schools, client)}
                   </Typography>
                   <Typography variant="body2" sx={{
                     fontWeight: 400,
                     fontSize: { xs: "0.98rem", sm: "0.94rem", md: "0.88rem" },
-                    lineHeight: 1.12
+                    lineHeight: 1.12,
+                    wordBreak: "break-word"
                   }}>
                     {client.locality || client.name || "Ingen lokalitet"}
                   </Typography>
@@ -567,8 +574,7 @@ export default function CalendarPage() {
             });
           }
         }
-        // FIX: Spinner stopper nu efter gemt uanset om det lykkes!
-        setSavingCalendar(false);
+        setSavingCalendar(false); // <-- Spinner stopper
       } catch (e) {
         setSavingCalendar(false);
       }
@@ -589,15 +595,32 @@ export default function CalendarPage() {
 
   // ----------- RENDER -----------
   return (
-    <Box sx={{ maxWidth: 1500, mx: "auto", mt: { xs: 1, sm: 4 }, fontFamily: "inherit", px: { xs: 0.5, sm: 2 } }}>
-      <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-end' }, mb: 2 }}>
+    <Box sx={{
+      maxWidth: { xs: "100%", sm: 1000, md: 1500 },
+      mx: "auto",
+      mt: { xs: 1, sm: 4 },
+      fontFamily: "inherit",
+      px: { xs: 0.5, sm: 2 }
+    }}>
+      <Box sx={{
+        display: "flex",
+        flexDirection: { xs: "column", sm: "row" },
+        justifyContent: { xs: "center", sm: "flex-end" },
+        mb: 2,
+        alignItems: "center"
+      }}>
         <Tooltip title="Opdater klienter">
           <span>
             <Button
               startIcon={loadingClients ? <CircularProgress size={20} /> : <RefreshIcon />}
               onClick={() => fetchClients(true)}
               disabled={loadingClients}
-              sx={{ minWidth: 0, fontWeight: 500, textTransform: "none", width: { xs: "100%", sm: "auto" } }}
+              sx={{
+                minWidth: 0,
+                fontWeight: 500,
+                textTransform: "none",
+                width: { xs: "100%", sm: "auto" }
+              }}
             >
               {loadingClients ? "Opdaterer..." : "Opdater"}
             </Button>
@@ -703,7 +726,7 @@ export default function CalendarPage() {
                 bgcolor: selectedClients.length < 2 ? "#eee" : undefined,
                 color: selectedClients.length < 2 ? "#888" : undefined,
                 pointerEvents: selectedClients.length < 2 ? "none" : undefined,
-                minWidth: 180,
+                minWidth: { xs: "100%", sm: 180 },
                 width: { xs: "100%", sm: 220 },
                 mt: { xs: 1, sm: 0 }
               }}
@@ -819,8 +842,8 @@ export default function CalendarPage() {
             sm: "1fr 1fr",
             md: "repeat(4, 1fr)"
           },
-          columnGap: "0.08rem",
-          rowGap: "0.5rem",
+          columnGap: { xs: "0.04rem", sm: "0.08rem", md: "0.08rem" },
+          rowGap: { xs: "0.5rem", sm: "0.5rem", md: "0.5rem" },
         }}
       >
         {!activeClient && (
