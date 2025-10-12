@@ -73,6 +73,16 @@ const formatDate = (year, month, day) =>
 const stripTimeFromDateKey = key => key.split("T")[0];
 const deepEqual = (obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2);
 
+// -------- UGENUMMER-BEREGNING --------
+function getWeekNumber(date) {
+  // DK-style: Ugen starter mandag, 4-4-regel (ISO 8601)
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return weekNo;
+}
+
 function mapRawDays(rawDays) {
   const mapped = {};
   Object.keys(rawDays).forEach(key => {
@@ -512,7 +522,6 @@ export default function CalendarPage() {
   // ----------- RENDER -----------
   return (
     <Box sx={{ maxWidth: 1500, mx: "auto", mt: { xs: 1, sm: 4 }, fontFamily: "inherit", px: { xs: 0.5, sm: 2 } }}>
-      {/* Opdater-knap ALTID synlig, udenfor Paper */}
       <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-end' }, mb: 2 }}>
         <Tooltip title="Opdater klienter">
           <span>
@@ -642,7 +651,6 @@ export default function CalendarPage() {
         gap: { xs: 1.5, sm: 0 },
         width: "100%",
       }}>
-        {/* Markering */}
         <Box sx={{
           display: "flex", alignItems: "center", gap: 2, flex: 1,
           justifyContent: { xs: "center", sm: "flex-start" }
@@ -671,7 +679,6 @@ export default function CalendarPage() {
             SLUKKET
           </Button>
         </Box>
-        {/* Vis liste-knap */}
         <Box sx={{
           flex: 1, display: "flex", justifyContent: { xs: "center", sm: "center" }, mb: { xs: 1, sm: 0 }
         }}>
@@ -690,7 +697,6 @@ export default function CalendarPage() {
             Vis liste
           </Button>
         </Box>
-        {/* Sæsonvælger med kontinuerlig fade (opacity) ikon */}
         <Box sx={{
           flex: 1,
           display: "flex",
@@ -793,7 +799,7 @@ export default function CalendarPage() {
   );
 }
 
-// MonthCalendar (pixel-perfect spinner)
+// MonthCalendar med pixel-perfect loader og ugenumre
 function MonthCalendar({
   name,
   month,
@@ -816,6 +822,26 @@ function MonthCalendar({
     ...Array.from({ length: daysInMonth }, (_, d) => d + 1)
   ];
   while (cells.length % 7 !== 0) cells.push(null);
+
+  // Ugenummer: find alle uger for denne måned
+  const weekRows = [];
+  let weekStartIdx = 0;
+  while (weekStartIdx < cells.length) {
+    const weekDays = cells.slice(weekStartIdx, weekStartIdx + 7);
+    let firstDay = weekDays.find(d => !!d);
+    let dateObj;
+    if (firstDay) {
+      dateObj = new Date(year, month, firstDay);
+    } else {
+      dateObj = new Date(year, month, 1 + weekStartIdx - offset);
+    }
+    const weekNum = getWeekNumber(dateObj);
+    weekRows.push({ weekNum, weekDays });
+    weekStartIdx += 7;
+  }
+
+  const circleSizeXs = 36;
+  const circleSizeSm = 33;
 
   const handleMouseDown = (e, dateString) => {
     if (e.shiftKey && e.button === 0) {
@@ -850,10 +876,6 @@ function MonthCalendar({
     return () => window.removeEventListener("mouseup", handleUp);
   }, [isDragging]);
 
-  // Pixel-perfect: Loader og cirkel har samme størrelse og top/left=0
-  const circleSizeXs = 36;
-  const circleSizeSm = 33;
-
   return (
     <Card sx={{
       borderRadius: "14px",
@@ -869,10 +891,16 @@ function MonthCalendar({
         }}>
           {name} {year}
         </Typography>
+        {/* Uge-nummer header */}
         <Box sx={{
-          display: "grid", gridTemplateColumns: "repeat(7, 1fr)",
+          display: "grid",
+          gridTemplateColumns: "44px repeat(7, 1fr)",
           columnGap: "0.08rem", rowGap: "0.5rem", mb: 0.5
         }}>
+          <Typography variant="caption" sx={{
+            fontWeight: 700, color: "#666", textAlign: "center",
+            fontSize: { xs: "0.82rem", sm: "0.90rem" }
+          }}>Uge</Typography>
           {weekdayNames.map(wd => (
             <Typography key={wd} variant="caption" sx={{
               fontWeight: 700, color: "#555", textAlign: "center",
@@ -883,89 +911,93 @@ function MonthCalendar({
           ))}
         </Box>
         <Box sx={{
-          display: "grid", gridTemplateColumns: "repeat(7, 1fr)",
-          columnGap: "0.08rem", rowGap: "0.5rem"
+          display: "grid",
+          gridTemplateRows: `repeat(${weekRows.length}, 1fr)`,
+          rowGap: "0.5rem"
         }}>
-          {cells.map((day, idx) => {
-            if (!day) return <Box key={idx + "-empty"} />;
-            const dateString = formatDate(year, month, day);
-            const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
-            let bg = "#fff";
-            if (cellStatus === "on") bg = "#b4eeb4";
-            if (cellStatus === "off") bg = "#ffb7b7";
-            const isLoading =
-              loadingDialogDate === dateString && loadingDialogClient === clientId;
-            const size = { xs: circleSizeXs, sm: circleSizeSm };
-            return (
-              <Box key={idx}
-                sx={{
-                  display: "flex", justifyContent: "center", alignItems: "center",
-                  p: 0.2, position: "relative"
-                }}>
-                <Box
-                  sx={{
-                    width: size,
-                    height: size,
-                    borderRadius: "50%",
-                    background: bg,
-                    border: "1px solid #eee",
-                    color: "#0a275c",
-                    fontWeight: 500,
-                    fontSize: { xs: "1.15rem", sm: "1.12rem" },
-                    textAlign: "center",
-                    lineHeight: size,
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                    cursor: clientId ? "pointer" : "default",
-                    transition: "background 0.2s",
-                    opacity: clientId ? 1 : 0.55,
-                    position: "relative",
-                    overflow: "visible"
-                  }}
-                  title={
-                    cellStatus === "on"
-                      ? "Tændt (shift+klik for tid)"
-                      : cellStatus === "off"
-                        ? "Slukket"
-                        : ""
-                  }
-                  onMouseDown={e => handleMouseDown(e, dateString)}
-                  onMouseEnter={e => handleMouseEnter(e, dateString)}
-                >
-                  {isLoading && (
-                    <CircularProgress
-                      size={circleSizeXs}
-                      sx={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        zIndex: 1,
-                        color: "#1976d2",
-                        background: "transparent",
-                        width: circleSizeXs,
-                        height: circleSizeXs,
-                      }}
-                    />
-                  )}
-                  <Box
-                    sx={{
-                      position: isLoading ? "absolute" : "static",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      height: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      zIndex: 2,
-                      pointerEvents: "none",
-                    }}
-                  >
-                    {day}
-                  </Box>
-                </Box>
+          {weekRows.map((row, rowIdx) => (
+            <Box key={rowIdx}
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "44px repeat(7, 1fr)",
+                columnGap: "0.08rem"
+              }}>
+              {/* Ugenummer */}
+              <Box sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 700,
+                fontSize: { xs: "0.96rem", sm: "1rem" },
+                color: "#1976d2",
+                background: "#f3f6fa",
+                borderRadius: "10px",
+                height: { xs: 36, sm: 33 },
+                minWidth: 44
+              }}>
+                {row.weekNum}
               </Box>
-            );
-          })}
+              {/* Dage */}
+              {row.weekDays.map((day, idx) => {
+                if (!day) return <Box key={idx + "-empty"} />;
+                const dateString = formatDate(year, month, day);
+                const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
+                let bg = "#fff";
+                if (cellStatus === "on") bg = "#b4eeb4";
+                if (cellStatus === "off") bg = "#ffb7b7";
+                const isLoading =
+                  loadingDialogDate === dateString && loadingDialogClient === clientId;
+                return (
+                  <Box key={idx}
+                    sx={{
+                      display: "flex", justifyContent: "center", alignItems: "center",
+                      p: 0.2, position: "relative"
+                    }}>
+                    <Box sx={{ position: "relative", width: 36, height: 36 }}>
+                      {/* Loader spinner: pixel-perfect rundt om cirklen */}
+                      {isLoading && (
+                        <CircularProgress
+                          size={36}
+                          sx={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            zIndex: 1,
+                            color: "#1976d2",
+                            background: "transparent"
+                          }}
+                        />
+                      )}
+                      {/* Dags-cirkel */}
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          top: 2,
+                          left: 2,
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          background: bg,
+                          border: "1px solid #eee",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#0a275c",
+                          fontWeight: 500,
+                          fontSize: "1.15rem",
+                          zIndex: 2,
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                          pointerEvents: "none"
+                        }}
+                      >
+                        {day}
+                      </Box>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          ))}
         </Box>
       </CardContent>
     </Card>
