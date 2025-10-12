@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper,
-  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack,
-  Fade
+  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
@@ -824,7 +823,7 @@ export default function CalendarPage() {
             Vis liste
           </Button>
         </Box>
-        {/* Sæsonvælger med kontinuerligt fade ikon */}
+        {/* Sæsonvælger med kontinuerlig fade (opacity) ikon */}
         <Box sx={{
           flex: 1,
           display: "flex",
@@ -832,13 +831,20 @@ export default function CalendarPage() {
           alignItems: "center",
           gap: 1
         }}>
-          <Fade in={selectedSeason !== currentSeasonStartYear && fadeIn} timeout={800} unmountOnExit>
-            <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {selectedSeason !== currentSeasonStartYear && (
               <Tooltip title="Ikke indeværende sæson" arrow>
-                <WarningAmberIcon color="warning" sx={{ mr: 0.5 }} />
+                <WarningAmberIcon
+                  color="warning"
+                  sx={{
+                    mr: 0.5,
+                    transition: "opacity 0.7s",
+                    opacity: fadeIn ? 1 : 0.2
+                  }}
+                />
               </Tooltip>
-            </Box>
-          </Fade>
+            )}
+          </Box>
           <Typography variant="h6" sx={{
             fontWeight: 700,
             color: "#0a275c",
@@ -985,7 +991,7 @@ function MonthCalendar({
     return () => window.removeEventListener("mouseup", handleUp);
   }, [isDragging]);
 
-  // Diameter +4px, tal +2px
+  // Diameter +4px, tal +2px, og loading spinner følger cirklens kant, tallet forsvinder aldrig
   return (
     <Card sx={{
       borderRadius: "14px",
@@ -1048,21 +1054,22 @@ function MonthCalendar({
                 }}>
                 <Box
                   sx={{
-                    width: { xs: 36, sm: 33 },    // +4px fra tidligere
-                    height: { xs: 36, sm: 33 },   // +4px fra tidligere
+                    width: { xs: 36, sm: 33 },
+                    height: { xs: 36, sm: 33 },
                     borderRadius: "50%",
                     background: bg,
                     border: "1px solid #eee",
                     color: "#0a275c",
                     fontWeight: 500,
-                    fontSize: { xs: "1.15rem", sm: "1.12rem" }, // +2px
+                    fontSize: { xs: "1.15rem", sm: "1.12rem" },
                     textAlign: "center",
                     lineHeight: { xs: "36px", sm: "33px" },
                     boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
                     cursor: clientId ? "pointer" : "default",
                     transition: "background 0.2s",
                     opacity: clientId ? 1 : 0.55,
-                    position: "relative"
+                    position: "relative",
+                    overflow: "visible"
                   }}
                   title={
                     cellStatus === "on"
@@ -1074,22 +1081,36 @@ function MonthCalendar({
                   onMouseDown={e => handleMouseDown(e, dateString)}
                   onMouseEnter={e => handleMouseEnter(e, dateString)}
                 >
-                  {/* Loading spinner følger cirklens kant, centreres og matches diameter */}
-                  {isLoading ? (
+                  {/* Loading spinner følger cirklens kant, tallet forsvinder aldrig */}
+                  {isLoading && (
                     <CircularProgress
                       size={34}
                       sx={{
                         position: "absolute",
                         top: 1,
                         left: 1,
-                        zIndex: 1201,
+                        zIndex: 1,
                         color: "#1976d2",
                         background: "transparent",
                       }}
                     />
-                  ) : (
-                    day
                   )}
+                  <Box
+                    sx={{
+                      position: isLoading ? "absolute" : "static",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      zIndex: 2,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {day}
+                  </Box>
                 </Box>
               </Box>
             );
