@@ -101,6 +101,7 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
 
 export default function ClientDetailsHeaderSection({
   client,
+  schools,
   locality,
   localityDirty,
   savingLocality,
@@ -122,7 +123,12 @@ export default function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Ens styling som Systeminfo-paper
+  // Helper til skole-navn
+  const getSchoolName = (schoolId) => {
+    const school = schools.find(s => s.id === schoolId);
+    return school ? school.name : <span style={{ color: "#888" }}>Ingen skole</span>;
+  };
+
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
@@ -223,7 +229,7 @@ export default function ClientDetailsHeaderSection({
               )}
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography sx={labelStyle}>Skole:</Typography>
-                <Typography sx={valueStyle}>{client.school}</Typography>
+                <Typography sx={valueStyle}>{getSchoolName(client.school_id)}</Typography>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography sx={labelStyle}>Lokation:</Typography>
