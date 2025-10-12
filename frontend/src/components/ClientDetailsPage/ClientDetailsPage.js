@@ -22,8 +22,9 @@ export default function ClientDetailsPage({
   calendarLoading,
   streamKey,
   onRestartStream,
-  showSnackbar // <- brug denne til lokale beskeder
+  showSnackbar // brug denne til lokale beskeder
 }) {
+  // --- States ---
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
   const [savingLocality, setSavingLocality] = useState(false);
@@ -46,7 +47,7 @@ export default function ClientDetailsPage({
   const [loadingStopLivestream, setLoadingStopLivestream] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
 
-  // Poll for pending_chrome_action og opdater pendingLivestream state
+  // --- Poll for status ---
   useEffect(() => {
     let interval;
     if (client?.id) {
@@ -80,7 +81,7 @@ export default function ClientDetailsPage({
     }
   }, [client]);
 
-  // Brug showSnackbar (prop fra wrapper) til lokale beskeder
+  // --- Handlers ---
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -127,18 +128,15 @@ export default function ClientDetailsPage({
   const handleOpenTerminal = () => openTerminal(client.id);
   const handleOpenRemoteDesktop = () => openRemoteDesktop(client.id);
 
-  // --- HER STARTER STREAMET AUTOMATISK ---
+  // --- Automatiseret livestream start ---
   useEffect(() => {
     if (client?.id) {
       clientAction(client.id, "livestream_start").catch(() => {});
     }
     // eslint-disable-next-line
   }, [client?.id]);
-  // --- SLUT AUTOMATISK START ---
 
-  if (!client) {
-    return null;
-  }
+  if (!client) return null;
 
   return (
     <Box sx={{ maxWidth: 1500, mx: "auto", mt: 3 }}>
