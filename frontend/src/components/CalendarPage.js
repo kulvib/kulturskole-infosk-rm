@@ -567,6 +567,8 @@ export default function CalendarPage() {
             });
           }
         }
+        // FIX: Spinner stopper nu efter gemt uanset om det lykkes!
+        setSavingCalendar(false);
       } catch (e) {
         setSavingCalendar(false);
       }
