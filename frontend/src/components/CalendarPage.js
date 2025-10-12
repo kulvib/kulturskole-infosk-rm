@@ -4,6 +4,7 @@ import {
   Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'; // NYT: til sæson-ikon
 import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes } from "../api";
 import DateTimeEditDialog from "./CalendarPage/DateTimeEditDialog";
 import ClientCalendarDialog from "./CalendarPage/ClientCalendarDialog";
@@ -155,7 +156,7 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
           gridTemplateColumns: {
             xs: "1fr",
             sm: "1fr 1fr",
-            md: "repeat(4, 1fr)"
+            md: "repeat(5, 1fr)" // ÆNDRET: Desktop = 5 klienter pr. række
           },
           gap: 1,
         }}
@@ -172,7 +173,6 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
               borderRadius: 1,
               cursor: disabled ? "not-allowed" : "pointer",
               ":hover": { background: disabled ? "transparent" : "#f3f6fa" },
-              // KUN DESKTOP: fontSize 0.875rem, mobil/tablet behold tidligere fontSize
               fontSize: { xs: "0.96rem", sm: "0.96rem", md: "0.875rem" }
             }}
             onClick={() => {
@@ -233,6 +233,16 @@ export default function CalendarPage() {
   const lastDialogSavedTimestamp = useRef(0);
 
   const seasons = getSeasons();
+
+  // NYT: Find indeværende sæson (til ikon-logik)
+  const currentSeasonStartYear = useMemo(() => {
+    const now = new Date();
+    if (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)) {
+      return now.getFullYear();
+    } else {
+      return now.getFullYear() - 1;
+    }
+  }, []);
 
   useEffect(() => {
     getSchools(token)
@@ -750,6 +760,7 @@ export default function CalendarPage() {
           width: "100%",
         }}
       >
+        {/* Markering */}
         <Box sx={{
           display: "flex",
           alignItems: "center",
@@ -781,6 +792,7 @@ export default function CalendarPage() {
             SLUKKET
           </Button>
         </Box>
+        {/* Vis liste-knap */}
         <Box sx={{
           flex: 1,
           display: "flex",
@@ -802,6 +814,7 @@ export default function CalendarPage() {
             Vis liste
           </Button>
         </Box>
+        {/* Sæsonvælger med ikon */}
         <Box sx={{
           flex: 1,
           display: "flex",
@@ -809,6 +822,12 @@ export default function CalendarPage() {
           alignItems: "center",
           gap: 1
         }}>
+          {/* NYT: Ikon vises kun hvis sæson IKKE er indeværende */}
+          {selectedSeason !== currentSeasonStartYear && (
+            <Tooltip title="Du har valgt en anden sæson end den aktuelle">
+              <WarningAmberIcon color="warning" sx={{ mr: 0.5 }} />
+            </Tooltip>
+          )}
           <Typography variant="h6" sx={{
             fontWeight: 700,
             color: "#0a275c",
@@ -995,7 +1014,7 @@ function MonthCalendar({
         <Box sx={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 0.2,
+          gap: "0px 0.18rem", // ÆNDRET: horisontal gap ~2px tættere (tidligere: 0.2)
         }}>
           {cells.map((day, idx) => {
             if (!day) return <Box key={idx + "-empty"} />;
