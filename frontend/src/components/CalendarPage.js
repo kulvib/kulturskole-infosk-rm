@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper,
-  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack
+  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack,
+  Fade
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import WarningAmberIcon from '@mui/icons-material/WarningAmber'; // NYT: til sæson-ikon
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes } from "../api";
 import DateTimeEditDialog from "./CalendarPage/DateTimeEditDialog";
 import ClientCalendarDialog from "./CalendarPage/ClientCalendarDialog";
@@ -156,7 +157,7 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
           gridTemplateColumns: {
             xs: "1fr",
             sm: "1fr 1fr",
-            md: "repeat(5, 1fr)" // ÆNDRET: Desktop = 5 klienter pr. række
+            md: "repeat(5, 1fr)" // Desktop = 5 klienter pr. række
           },
           gap: 1,
         }}
@@ -234,7 +235,7 @@ export default function CalendarPage() {
 
   const seasons = getSeasons();
 
-  // NYT: Find indeværende sæson (til ikon-logik)
+  // Find indeværende sæson (til ikon-logik)
   const currentSeasonStartYear = useMemo(() => {
     const now = new Date();
     if (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)) {
@@ -814,7 +815,7 @@ export default function CalendarPage() {
             Vis liste
           </Button>
         </Box>
-        {/* Sæsonvælger med ikon */}
+        {/* Sæsonvælger med fade ikon */}
         <Box sx={{
           flex: 1,
           display: "flex",
@@ -822,12 +823,14 @@ export default function CalendarPage() {
           alignItems: "center",
           gap: 1
         }}>
-          {/* NYT: Ikon vises kun hvis sæson IKKE er indeværende */}
-          {selectedSeason !== currentSeasonStartYear && (
-            <Tooltip title="Du har valgt en anden sæson end den aktuelle">
-              <WarningAmberIcon color="warning" sx={{ mr: 0.5 }} />
-            </Tooltip>
-          )}
+          {/* Fade ikon med mouseover: "Ikke indeværende sæson" */}
+          <Fade in={selectedSeason !== currentSeasonStartYear} timeout={600} unmountOnExit>
+            <Box>
+              <Tooltip title="Ikke indeværende sæson" arrow>
+                <WarningAmberIcon color="warning" sx={{ mr: 0.5 }} />
+              </Tooltip>
+            </Box>
+          </Fade>
           <Typography variant="h6" sx={{
             fontWeight: 700,
             color: "#0a275c",
@@ -860,7 +863,9 @@ export default function CalendarPage() {
             sm: "1fr 1fr",
             md: "repeat(4, 1fr)"
           },
-          gap: 3,
+          // Kalender grid: horisontal afstand 2px mindre, vertikal 3px større
+          columnGap: "0.08rem", // tidligere ca. 0.18rem
+          rowGap: "0.5rem", // tidligere ca. 0.31rem, nu 3px større
         }}
       >
         {!activeClient && (
@@ -996,7 +1001,8 @@ function MonthCalendar({
         <Box sx={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 0.2,
+          columnGap: "0.08rem", // horisontal afstand 2px mindre
+          rowGap: "0.5rem",     // vertikal afstand 3px større
           mb: 0.5
         }}>
           {weekdayNames.map(wd => (
@@ -1014,7 +1020,8 @@ function MonthCalendar({
         <Box sx={{
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          gap: "0px 0.18rem", // ÆNDRET: horisontal gap ~2px tættere (tidligere: 0.2)
+          columnGap: "0.08rem", // horisontal afstand 2px mindre
+          rowGap: "0.5rem",     // vertikal afstand 3px større
         }}>
           {cells.map((day, idx) => {
             if (!day) return <Box key={idx + "-empty"} />;
@@ -1026,6 +1033,7 @@ function MonthCalendar({
             const isLoading =
               loadingDialogDate === dateString && loadingDialogClient === clientId;
 
+            // Øg cirkelstørrelse med 2px (width/height)
             return (
               <Box key={idx}
                 sx={{
@@ -1033,8 +1041,8 @@ function MonthCalendar({
                 }}>
                 <Box
                   sx={{
-                    width: { xs: 26, sm: 23 },
-                    height: { xs: 26, sm: 23 },
+                    width: { xs: 28, sm: 25 },  // +2px fra tidligere 26/23
+                    height: { xs: 28, sm: 25 }, // +2px fra tidligere 26/23
                     borderRadius: "50%",
                     background: bg,
                     border: "1px solid #eee",
@@ -1042,7 +1050,7 @@ function MonthCalendar({
                     fontWeight: 500,
                     fontSize: { xs: "1rem", sm: "0.95rem" },
                     textAlign: "center",
-                    lineHeight: { xs: "26px", sm: "23px" },
+                    lineHeight: { xs: "28px", sm: "25px" }, // +2px
                     boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
                     cursor: clientId ? "pointer" : "default",
                     transition: "background 0.2s",
@@ -1060,7 +1068,7 @@ function MonthCalendar({
                   onMouseEnter={e => handleMouseEnter(e, dateString)}
                 >
                   {isLoading ? (
-                    <CircularProgress size={18} sx={{ position: "absolute", top: 2, left: 2, zIndex: 1201 }} />
+                    <CircularProgress size={18} sx={{ position: "absolute", top: 3, left: 3, zIndex: 1201 }} />
                   ) : (
                     day
                   )}
