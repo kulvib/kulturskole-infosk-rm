@@ -41,91 +41,78 @@ const monthNames = [
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
+// -------- Utility Functions --------
 function getSeasons() {
   const now = new Date();
-  let seasonStartYear;
-  if (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)) {
-    seasonStartYear = now.getFullYear();
-  } else {
-    seasonStartYear = now.getFullYear() - 1;
-  }
-  const seasons = [];
-  for (let i = 0; i < 3; i++) {
+  let seasonStartYear = now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)
+    ? now.getFullYear()
+    : now.getFullYear() - 1;
+  return Array.from({ length: 3 }, (_, i) => {
     const start = seasonStartYear + i;
     const end = (start + 1).toString().slice(-2);
-    seasons.push({ label: `${start}/${end}`, value: start });
-  }
-  return seasons;
+    return { label: `${start}/${end}`, value: start };
+  });
 }
 function getSchoolYearMonths(seasonStart) {
-  const months = [];
-  for (let i = 0; i < 5; i++) {
-    months.push({ name: monthNames[i], month: i + 7, year: seasonStart });
-  }
-  for (let i = 5; i < 12; i++) {
-    months.push({ name: monthNames[i], month: i - 5, year: seasonStart + 1 });
-  }
-  return months;
+  return [
+    ...Array.from({ length: 5 }, (_, i) => ({
+      name: monthNames[i],
+      month: i + 7,
+      year: seasonStart,
+    })),
+    ...Array.from({ length: 7 }, (_, i) => ({
+      name: monthNames[i + 5],
+      month: i,
+      year: seasonStart + 1,
+    })),
+  ];
 }
-function getDaysInMonth(month, year) {
-  return new Date(year, month + 1, 0).getDate();
+const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
+const formatDate = (year, month, day) =>
+  `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+const stripTimeFromDateKey = key => key.split("T")[0];
+const deepEqual = (obj1, obj2) => JSON.stringify(obj1) === JSON.stringify(obj2);
+
+function mapRawDays(rawDays) {
+  const mapped = {};
+  Object.keys(rawDays).forEach(key => {
+    mapped[stripTimeFromDateKey(key)] = rawDays[key];
+  });
+  return mapped;
 }
-function formatDate(year, month, day) {
-  const mm = String(month + 1).padStart(2, '0');
-  const dd = String(day).padStart(2, '0');
-  return `${year}-${mm}-${dd}`;
-}
-function stripTimeFromDateKey(key) {
-  return key.split("T")[0];
-}
-function deepEqual(obj1, obj2) {
-  return JSON.stringify(obj1) === JSON.stringify(obj2);
+
+function getSchoolName(schools, client) {
+  const schoolId = client.schoolId || client.school_id;
+  return schools.find(s => String(s.id) === String(schoolId))?.name || "Ukendt skole";
 }
 
 // -------- Hjælpekomponent: Klientvælger --------
 function ClientSelectorInline({ clients, selected, onChange, schools, disabled }) {
   const [search, setSearch] = useState("");
-
-  function getSchoolNameForClient(client) {
-    const schoolId = client.schoolId || client.school_id;
-    const school = schools.find(s => String(s.id) === String(schoolId));
-    return school ? school.name : "Ukendt skole";
-  }
-
-  const sortedClients = useMemo(() => [...clients].sort((a, b) => {
-    const aName = (a.locality || a.name || "").toLowerCase();
-    const bName = (b.locality || b.name || "").toLowerCase();
-    return aName.localeCompare(bName);
-  }), [clients]);
-
-  const filteredClients = useMemo(() => sortedClients.filter(c =>
-    (c.locality || c.name || "").toLowerCase().includes(search.toLowerCase())
-  ), [sortedClients, search]);
-
+  const sortedClients = useMemo(() => [...clients].sort((a, b) =>
+    ((a.locality || a.name || "").toLowerCase())
+      .localeCompare((b.locality || b.name || "").toLowerCase())
+  ), [clients]);
+  const filteredClients = useMemo(() =>
+    sortedClients.filter(c =>
+      (c.locality || c.name || "").toLowerCase().includes(search.toLowerCase())
+    ), [sortedClients, search]);
   const allVisibleIds = filteredClients.map(c => c.id);
   const allMarked = allVisibleIds.length > 0 && allVisibleIds.every(id => selected.includes(id));
-
   const handleToggleAll = () => {
     if (disabled) return;
     if (allMarked) {
       onChange(selected.filter(id => !allVisibleIds.includes(id)));
     } else {
-      const newSelected = Array.from(new Set([...selected, ...allVisibleIds]));
-      onChange(newSelected);
+      onChange(Array.from(new Set([...selected, ...allVisibleIds])));
     }
   };
-
   return (
     <Box>
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          mb: 2,
-          flexDirection: { xs: "column", sm: "row" },
-          gap: { xs: 1, sm: 0 }
-        }}
-      >
+      <Box sx={{
+        display: "flex", alignItems: "center", mb: 2,
+        flexDirection: { xs: "column", sm: "row" }, gap: { xs: 1, sm: 0 }
+      }}>
         <TextField
           label="Søg klient"
           variant="outlined"
@@ -150,17 +137,15 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
           {allMarked ? "Fjern alle" : "Markér alle"}
         </Button>
       </Box>
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            xs: "1fr",
-            sm: "1fr 1fr",
-            md: "repeat(5, 1fr)"
-          },
-          gap: 1,
-        }}
-      >
+      <Box sx={{
+        display: "grid",
+        gridTemplateColumns: {
+          xs: "1fr",
+          sm: "1fr 1fr",
+          md: "repeat(5, 1fr)"
+        },
+        gap: 1,
+      }}>
         {filteredClients.map(client => (
           <Box
             key={client.id}
@@ -177,11 +162,9 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
             }}
             onClick={() => {
               if (disabled) return;
-              if (selected.includes(client.id)) {
-                onChange(selected.filter(sid => sid !== client.id));
-              } else {
-                onChange([...selected, client.id]);
-              }
+              onChange(selected.includes(client.id)
+                ? selected.filter(sid => sid !== client.id)
+                : [...selected, client.id]);
             }}
           >
             <Checkbox
@@ -194,7 +177,7 @@ function ClientSelectorInline({ clients, selected, onChange, schools, disabled }
               disabled={disabled}
             />
             <Typography variant="body2" noWrap sx={{ fontSize: { xs: "0.98rem", sm: "0.98rem", md: "0.875rem" } }}>
-              {(client.locality || client.name || "Ingen lokalitet") + " – " + getSchoolNameForClient(client)}
+              {(client.locality || client.name || "Ingen lokalitet") + " – " + getSchoolName(schools, client)}
             </Typography>
           </Box>
         ))}
@@ -226,31 +209,24 @@ export default function CalendarPage() {
 
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const snackbarTimer = useRef(null);
-
   const autoSaveTimer = useRef(null);
-
   const lastDialogSavedMarkedDays = useRef({});
   const lastDialogSavedTimestamp = useRef(0);
 
   const seasons = getSeasons();
-
   const currentSeasonStartYear = useMemo(() => {
     const now = new Date();
-    if (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)) {
-      return now.getFullYear();
-    } else {
-      return now.getFullYear() - 1;
-    }
+    return (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1))
+      ? now.getFullYear()
+      : now.getFullYear() - 1;
   }, []);
 
-  // ---------- FADE ANIMATION STATE FOR SÆSON-IKON ----------
+  // Fade animation for sæson-ikon
   const [fadeIn, setFadeIn] = useState(true);
   useEffect(() => {
     let timer;
     if (selectedSeason !== currentSeasonStartYear) {
-      timer = setInterval(() => {
-        setFadeIn(prev => !prev);
-      }, 1200); // Skifter fade hver 1.2 sekunder
+      timer = setInterval(() => setFadeIn(f => !f), 1200);
     } else {
       setFadeIn(true);
     }
@@ -258,9 +234,7 @@ export default function CalendarPage() {
   }, [selectedSeason, currentSeasonStartYear]);
 
   useEffect(() => {
-    getSchools(token)
-      .then(setSchools)
-      .catch(() => setSchools([]));
+    getSchools(token).then(setSchools).catch(() => setSchools([]));
   }, [token]);
   const allSchoolTimes = useAllSchoolTimes(schools);
 
@@ -268,8 +242,7 @@ export default function CalendarPage() {
     setLoadingClients(true);
     try {
       const data = await getClients(token);
-      const approvedClients = (data?.filter((c) => c.status === "approved") || []).slice();
-      setClients(approvedClients);
+      setClients((data?.filter((c) => c.status === "approved") || []));
       if (showSuccess) setSnackbar({ open: true, message: "Opdateret!", severity: "success" });
     } catch {
       setClients([]);
@@ -277,22 +250,16 @@ export default function CalendarPage() {
     }
     setLoadingClients(false);
   }, [token]);
+  useEffect(() => { fetchClients(); }, [fetchClients]);
 
-  useEffect(() => {
-    fetchClients();
-  }, [fetchClients]);
-
+  // -------- Differentierede rettigheder og klientfiltrering --------
   const filteredClients = useMemo(() => {
     if (user?.role === "bruger" && user?.school_id) {
-      return clients.filter(
-        c => String(c.schoolId || c.school_id) === String(user.school_id)
-      );
+      return clients.filter(c => String(c.schoolId || c.school_id) === String(user.school_id));
     }
     return selectedSchool === ""
       ? clients
-      : clients.filter(
-          c => String(c.schoolId || c.school_id) === String(selectedSchool)
-        );
+      : clients.filter(c => String(c.schoolId || c.school_id) === String(selectedSchool));
   }, [clients, selectedSchool, user]);
 
   useEffect(() => {
@@ -312,14 +279,9 @@ export default function CalendarPage() {
     getMarkedDays(selectedSeason, activeClient)
       .then(data => {
         if (isCurrent) {
-          const rawDays = data.markedDays || {};
-          const mapped = {};
-          Object.keys(rawDays).forEach(key => {
-            mapped[stripTimeFromDateKey(key)] = rawDays[key];
-          });
           setMarkedDays(prev => ({
             ...prev,
-            [activeClient]: mapped
+            [activeClient]: mapRawDays(data.markedDays || {})
           }));
         }
       })
@@ -336,21 +298,16 @@ export default function CalendarPage() {
   }, [selectedSeason, activeClient, token]);
 
   useEffect(() => {
-    if (editDialogOpen) return;
-    if (!activeClient) return;
+    if (editDialogOpen || !activeClient) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-
-    const changedSinceDialog =
-      !deepEqual(
-        markedDays[activeClient],
-        lastDialogSavedMarkedDays.current[activeClient]
-      );
+    const changedSinceDialog = !deepEqual(
+      markedDays[activeClient],
+      lastDialogSavedMarkedDays.current[activeClient]
+    );
     if (!changedSinceDialog) return;
-
     autoSaveTimer.current = setTimeout(() => {
       handleSaveSingleClient(activeClient);
     }, 1000);
-
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
@@ -358,9 +315,7 @@ export default function CalendarPage() {
 
   function getDefaultTimes(dateStr, clientId) {
     const client = clients.find(c => c.id === clientId);
-    if (!client) {
-      return { onTime: "09:00", offTime: "22:30" };
-    }
+    if (!client) return { onTime: "09:00", offTime: "22:30" };
     const schoolId = client.schoolId || client.school_id;
     const schoolTimes = allSchoolTimes[schoolId];
     const date = new Date(dateStr);
@@ -377,38 +332,19 @@ export default function CalendarPage() {
     if (!clientId) return;
     const allDates = [];
     getSchoolYearMonths(selectedSeason).forEach(({ month, year }) => {
-      const daysInMonth = getDaysInMonth(month, year);
-      for (let d = 1; d <= daysInMonth; d++) {
+      for (let d = 1; d <= getDaysInMonth(month, year); d++) {
         allDates.push(formatDate(year, month, d));
       }
     });
-
-    const payloadMarkedDays = {};
-    payloadMarkedDays[String(clientId)] = {};
+    const payloadMarkedDays = { [String(clientId)]: {} };
     allDates.forEach(dateStr => {
       const md = markedDays[clientId]?.[dateStr];
       const defTimes = getDefaultTimes(dateStr, clientId);
-      if (md && md.status === "on") {
-        const onTime = md.onTime || defTimes.onTime;
-        const offTime = md.offTime || defTimes.offTime;
-        payloadMarkedDays[String(clientId)][dateStr] = {
-          status: "on",
-          onTime,
-          offTime
-        };
-      } else {
-        payloadMarkedDays[String(clientId)][dateStr] = {
-          status: "off"
-        };
-      }
+      payloadMarkedDays[String(clientId)][dateStr] = md && md.status === "on"
+        ? { status: "on", onTime: md.onTime || defTimes.onTime, offTime: md.offTime || defTimes.offTime }
+        : { status: "off" };
     });
-
-    const payload = {
-      clients: [clientId],
-      markedDays: payloadMarkedDays,
-      season: selectedSeason
-    };
-
+    const payload = { clients: [clientId], markedDays: payloadMarkedDays, season: selectedSeason };
     try {
       await saveMarkedDays(payload);
       lastDialogSavedMarkedDays.current = {
@@ -454,7 +390,6 @@ export default function CalendarPage() {
     }
     setLoadingDialogDate(date);
     setLoadingDialogClient(clientId);
-
     setTimeout(() => {
       setEditDialogClient(clientId);
       setEditDialogDate(date);
@@ -467,22 +402,15 @@ export default function CalendarPage() {
   const handleSaveDateTime = async ({ date, clientId }) => {
     try {
       const data = await getMarkedDays(selectedSeason, clientId);
-      const rawDays = data.markedDays || {};
-      const mapped = {};
-      Object.keys(rawDays).forEach(key => {
-        mapped[stripTimeFromDateKey(key)] = rawDays[key];
-      });
       setMarkedDays(prev => ({
         ...prev,
-        [clientId]: mapped
+        [clientId]: mapRawDays(data.markedDays || {})
       }));
-
       lastDialogSavedMarkedDays.current = {
         ...lastDialogSavedMarkedDays.current,
-        [clientId]: mapped
+        [clientId]: mapRawDays(data.markedDays || {})
       };
       lastDialogSavedTimestamp.current = Date.now();
-
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
     } catch {
       setSnackbar({ open: true, message: "Kunne ikke hente nyeste tider", severity: "error" });
@@ -494,18 +422,14 @@ export default function CalendarPage() {
   const otherClientNames = selectedClients.length > 1
     ? filteredClients
         .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
-        .map(c => {
-          const schoolName = schools.find(s => String(s.id) === String(c.schoolId || c.school_id))?.name || "Ukendt skole";
-          return `${c.locality || c.name} – ${schoolName}`;
-        })
+        .map(c => `${c.locality || c.name} – ${getSchoolName(schools, c)}`)
         .filter(Boolean)
         .join("; ")
     : "";
-
   const activeClientName = activeClient
     ? (() => {
         const c = filteredClients.find(c => c.id === activeClient);
-        const schoolName = schools.find(s => String(s.id) === String(c?.schoolId || c?.school_id))?.name;
+        const schoolName = getSchoolName(schools, c || {});
         return c ? `${c.locality || c.name}${schoolName ? " – " + schoolName : ""}` : "Automatisk";
       })()
     : "Automatisk";
@@ -524,8 +448,7 @@ export default function CalendarPage() {
 
       const allDates = [];
       schoolYearMonths.forEach(({ month, year }) => {
-        const daysInMonth = getDaysInMonth(month, year);
-        for (let d = 1; d <= daysInMonth; d++) {
+        for (let d = 1; d <= getDaysInMonth(month, year); d++) {
           allDates.push(formatDate(year, month, d));
         }
       });
@@ -537,19 +460,9 @@ export default function CalendarPage() {
         allDates.forEach(dateStr => {
           const sourceMd = markedDays[activeClient]?.[dateStr];
           const sourceDefTimes = getDefaultTimes(dateStr, activeClient);
-          if (sourceMd && sourceMd.status === "on") {
-            const onTime = sourceMd.onTime || sourceDefTimes.onTime;
-            const offTime = sourceMd.offTime || sourceDefTimes.offTime;
-            payloadMarkedDays[clientKey][dateStr] = {
-              status: "on",
-              onTime,
-              offTime
-            };
-          } else {
-            payloadMarkedDays[clientKey][dateStr] = {
-              status: "off"
-            };
-          }
+          payloadMarkedDays[clientKey][dateStr] = sourceMd && sourceMd.status === "on"
+            ? { status: "on", onTime: sourceMd.onTime || sourceDefTimes.onTime, offTime: sourceMd.offTime || sourceDefTimes.offTime }
+            : { status: "off" };
         });
       });
 
@@ -567,14 +480,9 @@ export default function CalendarPage() {
         if (activeClient) {
           try {
             const data = await getMarkedDays(selectedSeason, activeClient);
-            const rawDays = data.markedDays || {};
-            const mapped = {};
-            Object.keys(rawDays).forEach(key => {
-              mapped[stripTimeFromDateKey(key)] = rawDays[key];
-            });
             setMarkedDays(prev => ({
               ...prev,
-              [activeClient]: mapped
+              [activeClient]: mapRawDays(data.markedDays || {})
             }));
           } catch (e) {
             setMarkedDays(prev => ({
@@ -597,55 +505,28 @@ export default function CalendarPage() {
 
   const clientMarkedDays = markedDays[activeClient];
   const loadingMarkedDays = activeClient && clientMarkedDays === undefined;
-
-  const handleCloseSnackbar = () => {
-    setSnackbar({ open: false, message: "", severity: "success" });
-  };
-
+  const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
   const isDisabled = !activeClient;
+  const sortedSchools = useMemo(() => [...schools].sort((a, b) => a.name.localeCompare(b.name)), [schools]);
 
-  const sortedSchools = useMemo(() =>
-    [...schools].sort((a, b) => a.name.localeCompare(b.name)),
-    [schools]
-  );
-
+  // ----------- RENDER -----------
   return (
-    <Box sx={{
-      maxWidth: 1500,
-      mx: "auto",
-      mt: { xs: 1, sm: 4 },
-      fontFamily: "inherit",
-      px: { xs: 0.5, sm: 2 }
-    }}>
+    <Box sx={{ maxWidth: 1500, mx: "auto", mt: { xs: 1, sm: 4 }, fontFamily: "inherit", px: { xs: 0.5, sm: 2 } }}>
       {/* Opdater-knap ALTID synlig, udenfor Paper */}
-      <Box sx={{
-        display: 'flex',
-        justifyContent: { xs: 'center', sm: 'flex-end' },
-        mb: 2
-      }}>
+      <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-end' }, mb: 2 }}>
         <Tooltip title="Opdater klienter">
           <span>
             <Button
-              startIcon={
-                loadingClients
-                  ? <CircularProgress size={20} />
-                  : <RefreshIcon />
-              }
+              startIcon={loadingClients ? <CircularProgress size={20} /> : <RefreshIcon />}
               onClick={() => fetchClients(true)}
               disabled={loadingClients}
-              sx={{
-                minWidth: 0,
-                fontWeight: 500,
-                textTransform: "none",
-                width: { xs: "100%", sm: "auto" }
-              }}
+              sx={{ minWidth: 0, fontWeight: 500, textTransform: "none", width: { xs: "100%", sm: "auto" } }}
             >
               {loadingClients ? "Opdaterer..." : "Opdater"}
             </Button>
           </span>
         </Tooltip>
       </Box>
-
       {user?.role === "admin" && (
         <Paper elevation={2} sx={{
           p: { xs: 1, sm: 2 },
@@ -656,10 +537,7 @@ export default function CalendarPage() {
         }}>
           <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="flex-start">
             <Box sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 2,
-              width: { xs: "100%", sm: "auto" }
+              display: "flex", alignItems: "center", gap: 2, width: { xs: "100%", sm: "auto" }
             }}>
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: "1rem", sm: "1.25rem" } }}>
                 Vælg skole:
@@ -681,7 +559,6 @@ export default function CalendarPage() {
           </Stack>
         </Paper>
       )}
-
       <Snackbar
         open={snackbar.open}
         autoHideDuration={2000}
@@ -692,7 +569,6 @@ export default function CalendarPage() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
-
       <Paper elevation={2} sx={{
         p: { xs: 1, sm: 2 },
         mb: 3,
@@ -758,23 +634,17 @@ export default function CalendarPage() {
           </Box>
         )}
       </Paper>
-
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: { xs: "stretch", sm: "center" },
-          mb: 3,
-          flexDirection: { xs: "column", sm: "row" },
-          gap: { xs: 1.5, sm: 0 },
-          width: "100%",
-        }}
-      >
+      <Box sx={{
+        display: "flex",
+        alignItems: { xs: "stretch", sm: "center" },
+        mb: 3,
+        flexDirection: { xs: "column", sm: "row" },
+        gap: { xs: 1.5, sm: 0 },
+        width: "100%",
+      }}>
         {/* Markering */}
         <Box sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 2,
-          flex: 1,
+          display: "flex", alignItems: "center", gap: 2, flex: 1,
           justifyContent: { xs: "center", sm: "flex-start" }
         }}>
           <Typography variant="h6" sx={{ mr: 1, fontWeight: 700, fontSize: { xs: "1rem", sm: "1.15rem" } }}>
@@ -803,10 +673,7 @@ export default function CalendarPage() {
         </Box>
         {/* Vis liste-knap */}
         <Box sx={{
-          flex: 1,
-          display: "flex",
-          justifyContent: { xs: "center", sm: "center" },
-          mb: { xs: 1, sm: 0 }
+          flex: 1, display: "flex", justifyContent: { xs: "center", sm: "center" }, mb: { xs: 1, sm: 0 }
         }}>
           <Button
             variant="outlined"
@@ -868,7 +735,6 @@ export default function CalendarPage() {
           </Select>
         </Box>
       </Box>
-
       <Box
         sx={{
           display: "grid",
@@ -918,7 +784,6 @@ export default function CalendarPage() {
         onSaved={handleSaveDateTime}
         localMarkedDays={markedDays[editDialogClient]}
       />
-
       <ClientCalendarDialog
         open={calendarDialogOpen}
         onClose={() => setCalendarDialogOpen(false)}
@@ -928,7 +793,7 @@ export default function CalendarPage() {
   );
 }
 
-// MonthCalendar
+// MonthCalendar (pixel-perfect spinner)
 function MonthCalendar({
   name,
   month,
@@ -943,14 +808,13 @@ function MonthCalendar({
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const draggedDates = useRef(new Set());
-
   const daysInMonth = getDaysInMonth(month, year);
   const firstDayOfWeek = new Date(year, month, 1).getDay();
   const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-
-  const cells = [];
-  for (let i = 0; i < offset; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const cells = [
+    ...Array(offset).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, d) => d + 1)
+  ];
   while (cells.length % 7 !== 0) cells.push(null);
 
   const handleMouseDown = (e, dateString) => {
@@ -979,19 +843,17 @@ function MonthCalendar({
     }
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    draggedDates.current = new Set();
-  };
-
   useEffect(() => {
     if (!isDragging) return;
-    const handleUp = () => handleMouseUp();
+    const handleUp = () => setIsDragging(false);
     window.addEventListener("mouseup", handleUp);
     return () => window.removeEventListener("mouseup", handleUp);
   }, [isDragging]);
 
-  // Diameter +4px, tal +2px, og loading spinner følger cirklens kant, tallet forsvinder aldrig
+  // Pixel-perfect: Loader og cirkel har samme størrelse og top/left=0
+  const circleSizeXs = 36;
+  const circleSizeSm = 33;
+
   return (
     <Card sx={{
       borderRadius: "14px",
@@ -1000,42 +862,29 @@ function MonthCalendar({
       background: "#f9fafc",
       p: { xs: 0.5, sm: 1 }
     }}>
-      <CardContent sx={{
-        p: { xs: 1, sm: 2 }
-      }}>
+      <CardContent sx={{ p: { xs: 1, sm: 2 } }}>
         <Typography variant="h6" sx={{
-          color: "#0a275c",
-          fontWeight: 700,
-          textAlign: "center",
-          fontSize: { xs: "1rem", sm: "1.08rem" },
-          mb: 1
+          color: "#0a275c", fontWeight: 700, textAlign: "center",
+          fontSize: { xs: "1rem", sm: "1.08rem" }, mb: 1
         }}>
           {name} {year}
         </Typography>
         <Box sx={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          columnGap: "0.08rem",
-          rowGap: "0.5rem",
-          mb: 0.5
+          display: "grid", gridTemplateColumns: "repeat(7, 1fr)",
+          columnGap: "0.08rem", rowGap: "0.5rem", mb: 0.5
         }}>
           {weekdayNames.map(wd => (
             <Typography key={wd} variant="caption" sx={{
-              fontWeight: 700,
-              color: "#555",
-              textAlign: "center",
-              fontSize: { xs: "0.82rem", sm: "0.90rem" },
-              letterSpacing: "0.03em"
+              fontWeight: 700, color: "#555", textAlign: "center",
+              fontSize: { xs: "0.82rem", sm: "0.90rem" }, letterSpacing: "0.03em"
             }}>
               {wd}
             </Typography>
           ))}
         </Box>
         <Box sx={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          columnGap: "0.08rem",
-          rowGap: "0.5rem",
+          display: "grid", gridTemplateColumns: "repeat(7, 1fr)",
+          columnGap: "0.08rem", rowGap: "0.5rem"
         }}>
           {cells.map((day, idx) => {
             if (!day) return <Box key={idx + "-empty"} />;
@@ -1046,16 +895,17 @@ function MonthCalendar({
             if (cellStatus === "off") bg = "#ffb7b7";
             const isLoading =
               loadingDialogDate === dateString && loadingDialogClient === clientId;
-
+            const size = { xs: circleSizeXs, sm: circleSizeSm };
             return (
               <Box key={idx}
                 sx={{
-                  display: "flex", justifyContent: "center", alignItems: "center", p: 0.2, position: "relative"
+                  display: "flex", justifyContent: "center", alignItems: "center",
+                  p: 0.2, position: "relative"
                 }}>
                 <Box
                   sx={{
-                    width: { xs: 36, sm: 33 },
-                    height: { xs: 36, sm: 33 },
+                    width: size,
+                    height: size,
                     borderRadius: "50%",
                     background: bg,
                     border: "1px solid #eee",
@@ -1063,7 +913,7 @@ function MonthCalendar({
                     fontWeight: 500,
                     fontSize: { xs: "1.15rem", sm: "1.12rem" },
                     textAlign: "center",
-                    lineHeight: { xs: "36px", sm: "33px" },
+                    lineHeight: size,
                     boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
                     cursor: clientId ? "pointer" : "default",
                     transition: "background 0.2s",
@@ -1081,17 +931,18 @@ function MonthCalendar({
                   onMouseDown={e => handleMouseDown(e, dateString)}
                   onMouseEnter={e => handleMouseEnter(e, dateString)}
                 >
-                  {/* Loading spinner følger cirklens kant, tallet forsvinder aldrig */}
                   {isLoading && (
                     <CircularProgress
-                      size={34}
+                      size={circleSizeXs}
                       sx={{
                         position: "absolute",
-                        top: 1,
-                        left: 1,
+                        top: 0,
+                        left: 0,
                         zIndex: 1,
                         color: "#1976d2",
                         background: "transparent",
+                        width: circleSizeXs,
+                        height: circleSizeXs,
                       }}
                     />
                   )}
