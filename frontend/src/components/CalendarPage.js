@@ -99,7 +99,9 @@ function getSchoolName(schools, client) {
 }
 
 // -------- Hjælpekomponent: Klientvælger --------
-const ClientSelectorInline = React.memo(function ClientSelectorInline({ clients, selected, onChange, schools, disabled }) {
+const ClientSelectorInline = React.memo(function ClientSelectorInline({
+  clients, selected, onChange, schools, disabled, selectedSchool
+}) {
   const [search, setSearch] = useState("");
   const sortedClients = useMemo(() => [...clients].sort((a, b) =>
     ((a.locality || a.name || "").toLowerCase())
@@ -188,22 +190,38 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({ clients,
               inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
               disabled={disabled}
             />
-            <Box>
-              <Typography variant="body2" sx={{
-                fontWeight: 700,
-                fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
-                lineHeight: 1.18
-              }}>
-                {client.locality || client.name || "Ingen lokalitet"}
-              </Typography>
-              <Typography variant="body2" sx={{
-                fontSize: { xs: "0.98rem", sm: "0.94rem", md: "0.88rem" },
-                color: "#666",
-                lineHeight: 1.12
-              }}>
-                {getSchoolName(schools, client)}
-              </Typography>
-            </Box>
+            {selectedSchool
+              ? (
+                // Kun vis lokation/navn
+                <Typography variant="body2" sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
+                  lineHeight: 1.18
+                }}>
+                  {client.locality || client.name || "Ingen lokalitet"}
+                </Typography>
+              )
+              : (
+                // Skole øverst, lokation nederst
+                <Box>
+                  <Typography variant="body2" sx={{
+                    fontSize: { xs: "0.98rem", sm: "0.94rem", md: "0.88rem" },
+                    color: "#666",
+                    lineHeight: 1.12,
+                    fontWeight: 700
+                  }}>
+                    {getSchoolName(schools, client)}
+                  </Typography>
+                  <Typography variant="body2" sx={{
+                    fontWeight: 400,
+                    fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
+                    lineHeight: 1.18
+                  }}>
+                    {client.locality || client.name || "Ingen lokalitet"}
+                  </Typography>
+                </Box>
+              )
+            }
           </Box>
         ))}
       </Box>
@@ -644,12 +662,14 @@ export default function CalendarPage() {
             <CircularProgress />
           </Box>
         )}
+        {/* Pass selectedSchool as prop */}
         <ClientSelectorInline
           clients={filteredClients}
           selected={selectedClients}
           onChange={handleClientSelectorChange}
           schools={schools}
           disabled={false}
+          selectedSchool={selectedSchool}
         />
         {selectedClients.length > 1 && (
           <Box sx={{
