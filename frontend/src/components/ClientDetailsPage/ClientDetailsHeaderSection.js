@@ -131,19 +131,7 @@ export default function ClientDetailsHeaderSection({
   const { user } = useAuth();
 
   const inputStyle = {
-    width: isMobile ? "100%" : 180,
-    height: 32,
-    "& .MuiInputBase-input": {
-      fontSize: isMobile ? "0.90rem" : "0.95rem",
-      height: isMobile ? "30px" : "32px",
-      boxSizing: "border-box",
-      padding: isMobile ? "6px 10px" : "8px 14px"
-    },
-    "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
-  };
-
-  const kioskInputStyle = {
-    width: isMobile ? "100%" : 230,
+    width: "100%",
     height: 32,
     "& .MuiInputBase-input": {
       fontSize: isMobile ? "0.90rem" : "0.95rem",
@@ -155,7 +143,7 @@ export default function ClientDetailsHeaderSection({
   };
 
   return (
-    <Box sx={{ maxWidth: 1500, mx: "auto", mt: isMobile ? 1 : 3 }}>
+    <Box sx={{ maxWidth: 1500, mx: "auto", mt: isMobile ? 1 : 3, width: "100%" }}>
       {/* Top bar */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", mb: 2, gap: isMobile ? 1 : 0 }}>
         <Button
@@ -195,107 +183,118 @@ export default function ClientDetailsHeaderSection({
         </Tooltip>
       </Box>
       {/* Papers */}
-      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 2 : 4, width: "100%" }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          gap: isMobile ? 2 : 0,
+          width: "100%",
+        }}
+      >
         {/* Paper 1 */}
-        <Card elevation={3} sx={{ flex: 1, minWidth: isMobile ? "100%" : 320, maxWidth: isMobile ? "100%" : 420, borderRadius: 2, mb: isMobile ? 2 : 0 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom fontWeight={700}>
-              Klient Info
-            </Typography>
-            <Box sx={{ mt: 2 }}>
-              {user?.role === "admin" && (
-                <>
-                  <Typography variant="body2" fontWeight={600} gutterBottom>
-                    Klient ID:
-                  </Typography>
-                  <Typography variant="body2" sx={{ mb: 2 }}>
-                    {client?.id}
-                  </Typography>
-                </>
-              )}
-              <Typography variant="body2" fontWeight={600} gutterBottom>
-                Skole:
+        <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
+          <Card elevation={3} sx={{ borderRadius: 2, height: "100%" }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom fontWeight={700}>
+                Klient Info
               </Typography>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                {client?.school || client?.name}
-              </Typography>
-              <Typography variant="body2" fontWeight={600} gutterBottom>
-                Lokation:
-              </Typography>
-              <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 0.5 }}>
-                <TextField
-                  size="small"
-                  value={locality}
-                  onChange={handleLocalityChange}
-                  sx={inputStyle}
-                  disabled={savingLocality}
-                  inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
-                  onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
-                  error={!!localityDirty}
-                />
-                <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={handleLocalitySave}
-                  disabled={savingLocality}
-                  sx={{ minWidth: 56 }}
-                >
-                  {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
-                </Button>
-              </Box>
-              {localityDirty && (
-                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
-                  Husk at gemme din ændring!
+              <Box sx={{ mt: 2 }}>
+                {user?.role === "admin" && (
+                  <>
+                    <Typography variant="body2" fontWeight={600} gutterBottom>
+                      Klient ID:
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                      {client?.id}
+                    </Typography>
+                  </>
+                )}
+                <Typography variant="body2" fontWeight={600} gutterBottom>
+                  Skole:
                 </Typography>
-              )}
-            </Box>
-          </CardContent>
-        </Card>
+                <Typography variant="body2" sx={{ mb: 2 }}>
+                  {client?.school || client?.name}
+                </Typography>
+                <Typography variant="body2" fontWeight={600} gutterBottom>
+                  Lokation:
+                </Typography>
+                <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 0.5 }}>
+                  <TextField
+                    size="small"
+                    value={locality}
+                    onChange={handleLocalityChange}
+                    sx={inputStyle}
+                    disabled={savingLocality}
+                    inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
+                    onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
+                    error={!!localityDirty}
+                  />
+                  <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleLocalitySave}
+                    disabled={savingLocality}
+                    sx={{ minWidth: 56 }}
+                  >
+                    {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                  </Button>
+                </Box>
+                {localityDirty && (
+                  <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
+                    Husk at gemme din ændring!
+                  </Typography>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
         {/* Paper 2 */}
-        <Card elevation={3} sx={{ flex: 1, minWidth: isMobile ? "100%" : 320, maxWidth: isMobile ? "100%" : 420, borderRadius: 2 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom fontWeight={700}>
-              Kiosk Info
-            </Typography>
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body2" fontWeight={600} gutterBottom>
-                Kiosk URL:
+        <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
+          <Card elevation={3} sx={{ borderRadius: 2, height: "100%" }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom fontWeight={700}>
+                Kiosk Info
               </Typography>
-              <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 0.5, mb: 2 }}>
-                <TextField
-                  size="small"
-                  value={kioskUrl}
-                  onChange={handleKioskUrlChange}
-                  sx={kioskInputStyle}
-                  disabled={savingKioskUrl}
-                  inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
-                  onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
-                  error={!!kioskUrlDirty}
-                />
-                <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={handleKioskUrlSave}
-                  disabled={savingKioskUrl}
-                  sx={{ minWidth: 56 }}
-                >
-                  {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
-                </Button>
-              </Box>
-              {kioskUrlDirty && (
-                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
-                  Husk at gemme din ændring!
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" fontWeight={600} gutterBottom>
+                  Kiosk URL:
                 </Typography>
-              )}
-              <Typography variant="body2" fontWeight={600} gutterBottom>
-                Kiosk browser status:
-              </Typography>
-              <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-            </Box>
-          </CardContent>
-        </Card>
+                <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 0.5, mb: 2 }}>
+                  <TextField
+                    size="small"
+                    value={kioskUrl}
+                    onChange={handleKioskUrlChange}
+                    sx={inputStyle}
+                    disabled={savingKioskUrl}
+                    inputProps={{ style: { fontSize: isMobile ? 13 : undefined } }}
+                    onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
+                    error={!!kioskUrlDirty}
+                  />
+                  <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleKioskUrlSave}
+                    disabled={savingKioskUrl}
+                    sx={{ minWidth: 56 }}
+                  >
+                    {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                  </Button>
+                </Box>
+                {kioskUrlDirty && (
+                  <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
+                    Husk at gemme din ændring!
+                  </Typography>
+                )}
+                <Typography variant="body2" fontWeight={600} gutterBottom>
+                  Kiosk browser status:
+                </Typography>
+                <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
       </Box>
     </Box>
   );
