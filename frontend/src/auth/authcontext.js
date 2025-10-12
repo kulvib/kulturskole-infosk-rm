@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
@@ -10,7 +10,6 @@ import Typography from "@mui/material/Typography";
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  // Initialiser fra localStorage hvis muligt
   const [token, setToken] = useState(() => localStorage.getItem("token") || "");
   const [user, setUser] = useState(() => {
     try {
@@ -39,22 +38,21 @@ export function AuthProvider({ children }) {
     }
   }, [token, user]);
 
-  // Korrekt initialisering på login
-  const loginUser = (newToken, userData) => {
+  const loginUser = useCallback((newToken, userData) => {
     setToken(newToken);
     setUser(userData);
-  };
+  }, []);
 
-  const logoutUser = () => {
+  const logoutUser = useCallback(() => {
     setToken("");
     setUser(null);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/login", { replace: true });
-  };
+  }, [navigate]);
 
   // Inaktivitets-timer
-  const resetInactivityTimer = () => {
+  const resetInactivityTimer = useCallback(() => {
     setShowWarning(false);
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     if (warningTimer.current) clearTimeout(warningTimer.current);
@@ -65,32 +63,26 @@ export function AuthProvider({ children }) {
         logoutUser();
       }, 60000); // 1 min efter advarsel
     }, 240000); // 4 min
-  };
+  }, [logoutUser]);
 
   useEffect(() => {
     if (token) {
-      window.addEventListener("mousemove", resetInactivityTimer);
-      window.addEventListener("keydown", resetInactivityTimer);
-      window.addEventListener("mousedown", resetInactivityTimer);
-      window.addEventListener("touchstart", resetInactivityTimer);
-
+      const events = ["mousemove", "keydown", "mousedown", "touchstart"];
+      events.forEach(evt => window.addEventListener(evt, resetInactivityTimer));
       resetInactivityTimer();
 
       return () => {
-        window.removeEventListener("mousemove", resetInactivityTimer);
-        window.removeEventListener("keydown", resetInactivityTimer);
-        window.removeEventListener("mousedown", resetInactivityTimer);
-        window.removeEventListener("touchstart", resetInactivityTimer);
+        events.forEach(evt => window.removeEventListener(evt, resetInactivityTimer));
         if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
         if (warningTimer.current) clearTimeout(warningTimer.current);
       };
     }
     // eslint-disable-next-line
-  }, [token]);
+  }, [token, resetInactivityTimer]);
 
-  const handleContinueSession = () => {
+  const handleContinueSession = useCallback(() => {
     resetInactivityTimer();
-  };
+  }, [resetInactivityTimer]);
 
   return (
     <AuthContext.Provider value={{ token, user, loginUser, logoutUser }}>
