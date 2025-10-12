@@ -244,6 +244,20 @@ export default function CalendarPage() {
     }
   }, []);
 
+  // ---------- FADE ANIMATION STATE FOR SÆSON-IKON ----------
+  const [fadeIn, setFadeIn] = useState(true);
+  useEffect(() => {
+    let timer;
+    if (selectedSeason !== currentSeasonStartYear) {
+      timer = setInterval(() => {
+        setFadeIn(prev => !prev);
+      }, 1200); // Skifter fade hver 1.2 sekunder
+    } else {
+      setFadeIn(true);
+    }
+    return () => timer && clearInterval(timer);
+  }, [selectedSeason, currentSeasonStartYear]);
+
   useEffect(() => {
     getSchools(token)
       .then(setSchools)
@@ -810,7 +824,7 @@ export default function CalendarPage() {
             Vis liste
           </Button>
         </Box>
-        {/* Sæsonvælger med fade ikon */}
+        {/* Sæsonvælger med kontinuerligt fade ikon */}
         <Box sx={{
           flex: 1,
           display: "flex",
@@ -818,7 +832,7 @@ export default function CalendarPage() {
           alignItems: "center",
           gap: 1
         }}>
-          <Fade in={selectedSeason !== currentSeasonStartYear} timeout={600} unmountOnExit>
+          <Fade in={selectedSeason !== currentSeasonStartYear && fadeIn} timeout={800} unmountOnExit>
             <Box>
               <Tooltip title="Ikke indeværende sæson" arrow>
                 <WarningAmberIcon color="warning" sx={{ mr: 0.5 }} />
@@ -971,6 +985,7 @@ function MonthCalendar({
     return () => window.removeEventListener("mouseup", handleUp);
   }, [isDragging]);
 
+  // Diameter +4px, tal +2px
   return (
     <Card sx={{
       borderRadius: "14px",
@@ -1026,7 +1041,6 @@ function MonthCalendar({
             const isLoading =
               loadingDialogDate === dateString && loadingDialogClient === clientId;
 
-            // Cirklen 1px større, tallet 1px mindre
             return (
               <Box key={idx}
                 sx={{
@@ -1034,16 +1048,16 @@ function MonthCalendar({
                 }}>
                 <Box
                   sx={{
-                    width: { xs: 30, sm: 27 },
-                    height: { xs: 30, sm: 27 },
+                    width: { xs: 36, sm: 33 },    // +4px fra tidligere
+                    height: { xs: 36, sm: 33 },   // +4px fra tidligere
                     borderRadius: "50%",
                     background: bg,
                     border: "1px solid #eee",
                     color: "#0a275c",
                     fontWeight: 500,
-                    fontSize: { xs: "0.93rem", sm: "0.88rem" },
+                    fontSize: { xs: "1.15rem", sm: "1.12rem" }, // +2px
                     textAlign: "center",
-                    lineHeight: { xs: "30px", sm: "27px" },
+                    lineHeight: { xs: "36px", sm: "33px" },
                     boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
                     cursor: clientId ? "pointer" : "default",
                     transition: "background 0.2s",
@@ -1061,7 +1075,7 @@ function MonthCalendar({
                   onMouseEnter={e => handleMouseEnter(e, dateString)}
                 >
                   {isLoading ? (
-                    <CircularProgress size={18} sx={{ position: "absolute", top: 6, left: 6, zIndex: 1201 }} />
+                    <CircularProgress size={18} sx={{ position: "absolute", top: 10, left: 10, zIndex: 1201 }} />
                   ) : (
                     day
                   )}
