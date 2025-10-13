@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Box, Grid } from "@mui/material";
 import ClientDetailsHeaderSection from "./ClientDetailsHeaderSection";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
@@ -18,7 +18,6 @@ import {
 export default function ClientDetailsPage({
   client,
   refreshing,
-  handleRefresh,
   markedDays,
   calendarLoading,
   streamKey,
@@ -47,32 +46,49 @@ export default function ClientDetailsPage({
   // NYT: State til skoler
   const [schools, setSchools] = useState([]);
 
+  // Polling interval ref
+  const pollingRef = useRef();
+
   // Hent skoler fra backend ved mount
   useEffect(() => {
     getSchools().then(setSchools).catch(() => setSchools([]));
   }, []);
 
-  useEffect(() => {
-    let interval;
-    if (client?.id) {
-      const poll = async () => {
-        try {
-          const updated = await getClient(client.id);
-          const pca = updated.pending_chrome_action;
-          setPendingLivestream(
-            pca === "livestream_start" || pca === "livestream_stop"
-          );
-          setLiveChromeStatus(updated.chrome_status || "unknown");
-          setLiveChromeColor(updated.chrome_color || null);
-          setLastSeen(updated.last_seen || null);
-          setUptime(updated.uptime || null);
-        } catch {}
-      };
-      poll();
-      interval = setInterval(poll, 2000);
+  // Funktion til at hente klientdata fra backend
+  const fetchClientData = async () => {
+    if (!client?.id) return;
+    try {
+      const updated = await getClient(client.id);
+      const pca = updated.pending_chrome_action;
+      setPendingLivestream(
+        pca === "livestream_start" || pca === "livestream_stop"
+      );
+      setLiveChromeStatus(updated.chrome_status || "unknown");
+      setLiveChromeColor(updated.chrome_color || null);
+      setLastSeen(updated.last_seen || null);
+      setUptime(updated.uptime || null);
+    } catch (err) {
+      // Optionelt: showSnackbar({ message: "Kunne ikke hente klientdata", severity: "error" });
     }
-    return () => clearInterval(interval);
+  };
+
+  // Poll hvert sekund, kun mens siden er åben
+  useEffect(() => {
+    if (client?.id) {
+      fetchClientData(); // initial fetch
+      pollingRef.current = setInterval(fetchClientData, 1000);
+    }
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+    // eslint-disable-next-line
   }, [client?.id]);
+
+  // Hvis brugeren trykker på "Opdater" (fra header), skal data straks hentes
+  const handleRefresh = async () => {
+    await fetchClientData();
+    if (showSnackbar) showSnackbar({ message: "Klientdata opdateret!", severity: "info" });
+  };
 
   useEffect(() => {
     if (client) {
@@ -161,7 +177,7 @@ export default function ClientDetailsPage({
             handleKioskUrlSave={handleKioskUrlSave}
             liveChromeStatus={liveChromeStatus}
             liveChromeColor={liveChromeColor}
-            refreshing={refreshing}
+            refreshing={false}
             handleRefresh={handleRefresh}
           />
         </Grid>
