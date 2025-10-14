@@ -7,6 +7,7 @@ from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAc
 from auth import get_current_user
 import os
 import glob
+import json
 
 router = APIRouter()
 
@@ -70,7 +71,7 @@ def get_client(id: int, session=Depends(get_session), user=Depends(get_current_u
     # Ellers ingen adgang
     raise HTTPException(status_code=403, detail="Du har ikke adgang til denne klient")
 
-# Chrome-status (til frontend visning)
+# Chrome-status (til frontend visning) - NY: Læs altid direkte fra chrome_status.json hvis muligt
 @router.get("/clients/{id}/chrome-status")
 def get_chrome_status(
     id: int,
@@ -80,6 +81,24 @@ def get_chrome_status(
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+    status_path = "/home/kulturskolenviborg/api/chrome_status.json"
+    last_step = None
+    try:
+        with open(status_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if "steps" in data and len(data["steps"]) > 0:
+                last_step = data["steps"][-1]
+    except Exception as e:
+        last_step = None
+    if last_step:
+        return {
+            "client_id": client.id,
+            "chrome_status": last_step.get("message", "unknown"),
+            "chrome_last_updated": last_step.get("timestamp", None),
+            "chrome_color": last_step.get("color", None),
+            "step": last_step
+        }
+    # Fallback til database-felt hvis filen ikke kan læses
     return {
         "client_id": client.id,
         "chrome_status": getattr(client, "chrome_status", "unknown"),
