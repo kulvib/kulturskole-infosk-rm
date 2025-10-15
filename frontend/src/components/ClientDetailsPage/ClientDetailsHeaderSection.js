@@ -281,7 +281,8 @@ export default function ClientDetailsHeaderSection({
               )}
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Skole:</Typography>
-                <Box sx={valueStyle}>
+                {/* Forskyder hele dropdown-sektionen til venstre så teksten flugter */}
+                <Box sx={{ ...valueStyle, ml: -1 }}>
                   <Select
                     size="small"
                     value={schoolSelection ?? client.school_id ?? ""}
@@ -293,7 +294,6 @@ export default function ClientDetailsHeaderSection({
                       fontSize: isMobile ? 12 : 14,
                       height: isMobile ? "22px" : "30px",
                       // Ingen ændring af padding! Teksten har sin default placering.
-                      // Hvis du tidligere havde custom padding, lad blot være med at ændre den her.
                     }}
                   >
                     <MenuItem value="">Vælg skole</MenuItem>
