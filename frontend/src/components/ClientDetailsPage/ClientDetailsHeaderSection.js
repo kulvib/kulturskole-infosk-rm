@@ -123,8 +123,8 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
           sx={{
             minWidth: isMobile ? 20 : 24,
             maxWidth: isMobile ? 20 : 24,
-            minHeight: isMobile ? 20 : 24,
-            maxHeight: isMobile ? 20 : 24,
+            minHeight: isMobile ? 32 : 32,
+            maxHeight: isMobile ? 32 : 32,
             p: 0,
             m: 0,
             display: "flex",
@@ -179,12 +179,19 @@ export default function ClientDetailsHeaderSection({
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
   };
-  const valueStyle = {
+  const inputLikeStyle = {
     fontWeight: 400,
     pl: isMobile ? 1 : 2,
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
+    minWidth: 120,
+    height: 32,
+    display: "flex",
+    alignItems: "center",
+    '& .MuiInputBase-root, & .MuiSelect-select, & .MuiTextField-root': {
+      height: 32,
+    }
   };
 
   const inputStyle = {
@@ -192,11 +199,11 @@ export default function ClientDetailsHeaderSection({
     height: 32,
     "& .MuiInputBase-input": {
       fontSize: isMobile ? 12 : 14,
-      height: isMobile ? "30px" : "32px",
+      height: "32px",
       boxSizing: "border-box",
       padding: isMobile ? "6px 10px" : "8px 14px"
     },
-    "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
+    "& .MuiInputBase-root": { height: "32px" },
   };
 
   function renderKioskBrowserData(data) {
@@ -204,7 +211,7 @@ export default function ClientDetailsHeaderSection({
     return Object.entries(data).map(([key, value]) => (
       <Box key={key} sx={{ display: "flex", alignItems: "center", mb: 1 }}>
         <Typography sx={labelStyle}>{key}:</Typography>
-        <Typography sx={valueStyle}>{String(value)}</Typography>
+        <Typography sx={inputLikeStyle}>{String(value)}</Typography>
       </Box>
     ));
   }
@@ -266,23 +273,28 @@ export default function ClientDetailsHeaderSection({
               </Box>
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography sx={labelStyle}>Klientnavn:</Typography>
-                <Typography sx={valueStyle}>{client.name}</Typography>
+                <Typography sx={inputLikeStyle}>{client.name}</Typography>
               </Box>
               {user?.role === "admin" && (
                 <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                   <Typography sx={labelStyle}>Klient ID:</Typography>
-                  <Typography sx={valueStyle}>{client.id}</Typography>
+                  <Typography sx={inputLikeStyle}>{client.id}</Typography>
                 </Box>
               )}
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography sx={labelStyle}>Skole:</Typography>
-                <Box sx={valueStyle}>
+                <Box sx={inputLikeStyle}>
                   <Select
                     size="small"
                     value={schoolSelection ?? client.school_id ?? ""}
                     displayEmpty
                     onChange={e => handleSchoolChange(e.target.value)}
-                    sx={{ minWidth: 120, fontSize: isMobile ? 12 : 14 }}
+                    sx={{
+                      minWidth: 120,
+                      fontSize: isMobile ? 12 : 14,
+                      height: "32px",
+                      "& .MuiSelect-select": { height: "32px", display: "flex", alignItems: "center" }
+                    }}
                   >
                     <MenuItem value="">Vælg skole</MenuItem>
                     {schools.map(school => (
@@ -294,7 +306,7 @@ export default function ClientDetailsHeaderSection({
                     size="small"
                     onClick={handleSchoolSave}
                     disabled={savingSchool || !schoolDirty}
-                    sx={{ minWidth: 56, ml: 1 }}
+                    sx={{ minWidth: 56, ml: 1, height: "32px" }}
                   >
                     {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                   </Button>
@@ -302,12 +314,16 @@ export default function ClientDetailsHeaderSection({
               </Box>
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography sx={labelStyle}>Lokation:</Typography>
-                <Box sx={{ display: "flex", alignItems: "center", flex: 1, ml: 1, gap: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", flex: 1, ml: 1, gap: 1, ...inputLikeStyle }}>
                   <TextField
                     size="small"
                     value={locality}
                     onChange={handleLocalityChange}
-                    sx={inputStyle}
+                    sx={{
+                      ...inputStyle,
+                      height: "32px",
+                      "& .MuiInputBase-root": { height: "32px" }
+                    }}
                     disabled={savingLocality}
                     inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
                     onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
@@ -319,7 +335,7 @@ export default function ClientDetailsHeaderSection({
                     size="small"
                     onClick={handleLocalitySave}
                     disabled={savingLocality}
-                    sx={{ minWidth: 56 }}
+                    sx={{ minWidth: 56, height: "32px" }}
                   >
                     {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                   </Button>
@@ -350,12 +366,16 @@ export default function ClientDetailsHeaderSection({
                 <Typography sx={labelStyle}>Kiosk URL:</Typography>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                <Box sx={{ display: "flex", alignItems: "center", flex: 1, gap: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", flex: 1, gap: 1, ...inputLikeStyle }}>
                   <TextField
                     size="small"
                     value={kioskUrl}
                     onChange={handleKioskUrlChange}
-                    sx={inputStyle}
+                    sx={{
+                      ...inputStyle,
+                      height: "32px",
+                      "& .MuiInputBase-root": { height: "32px" }
+                    }}
                     disabled={savingKioskUrl}
                     inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
                     onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
@@ -367,7 +387,7 @@ export default function ClientDetailsHeaderSection({
                     size="small"
                     onClick={handleKioskUrlSave}
                     disabled={savingKioskUrl}
-                    sx={{ minWidth: 56 }}
+                    sx={{ minWidth: 56, height: "32px" }}
                   >
                     {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                   </Button>
