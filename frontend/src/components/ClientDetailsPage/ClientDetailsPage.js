@@ -22,7 +22,7 @@ export default function ClientDetailsPage({
   calendarLoading,
   streamKey,
   onRestartStream,
-  showSnackbar,
+  showSnackbar
 }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -43,17 +43,18 @@ export default function ClientDetailsPage({
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
 
-  // State til skoler
+  // Skoler
   const [schools, setSchools] = useState([]);
-  // NYT: State til valgt skole
   const [schoolSelection, setSchoolSelection] = useState(client?.school_id ?? "");
   const [savingSchool, setSavingSchool] = useState(false);
   const [schoolDirty, setSchoolDirty] = useState(false);
 
+  // Robust: Track om bruger interagerer med dropdown
+  const userIsSelectingSchool = useRef(false);
+
   // Polling interval ref
   const pollingRef = useRef();
 
-  // Hent skoler fra backend ved mount
   useEffect(() => {
     getSchools().then(setSchools).catch(() => setSchools([]));
   }, []);
@@ -71,31 +72,22 @@ export default function ClientDetailsPage({
       setLiveChromeColor(updated.chrome_color || null);
       setLastSeen(updated.last_seen || null);
       setUptime(updated.uptime || null);
-
-      // Kun opdater schoolSelection hvis IKKE dirty
-      if (!schoolDirty) setSchoolSelection(updated.school_id ?? "");
-    } catch (err) {
-      // Optionelt: showSnackbar({ message: "Kunne ikke hente klientdata", severity: "error" });
-    }
+      // Kun opdater schoolSelection hvis ikke dirty og ikke interagerende
+      if (!schoolDirty && !userIsSelectingSchool.current) {
+        setSchoolSelection(updated.school_id ?? "");
+      }
+    } catch (err) {}
   };
 
-  // Poll hvert sekund, kun mens siden er åben
   useEffect(() => {
     if (client?.id) {
-      fetchClientData(); // initial fetch
+      fetchClientData();
       pollingRef.current = setInterval(fetchClientData, 1000);
     }
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-    // eslint-disable-next-line
   }, [client?.id]);
-
-  // Hvis brugeren trykker på "Opdater" (fra header), skal data straks hentes
-  const handleRefresh = async () => {
-    await fetchClientData();
-    if (showSnackbar) showSnackbar({ message: "Klientdata opdateret!", severity: "info" });
-  };
 
   useEffect(() => {
     if (client) {
@@ -105,11 +97,10 @@ export default function ClientDetailsPage({
       setLiveChromeColor(client.chrome_color || null);
       setLastSeen(client.last_seen || null);
       setUptime(client.uptime || null);
-      // Kun opdater schoolSelection hvis IKKE dirty
-      if (!schoolDirty) setSchoolSelection(client.school_id ?? "");
-      // setSchoolDirty(false); // kun efter gem!
+      if (!schoolDirty && !userIsSelectingSchool.current) {
+        setSchoolSelection(client.school_id ?? "");
+      }
     }
-    // schoolDirty som dependency gør, at denne effect ikke overskriver brugervalg.
   }, [client, schoolDirty, localityDirty, kioskUrlDirty]);
 
   const handleLocalityChange = (e) => {
@@ -162,20 +153,21 @@ export default function ClientDetailsPage({
     if (client?.id) {
       clientAction(client.id, "livestream_start").catch(() => {});
     }
-    // eslint-disable-next-line
   }, [client?.id]);
 
   // Skolevælger
   const handleSchoolChange = (schoolId) => {
     setSchoolSelection(schoolId);
     setSchoolDirty(true);
+    userIsSelectingSchool.current = true;
   };
 
   const handleSchoolSave = async () => {
     setSavingSchool(true);
     try {
       await updateClient(client.id, { school_id: schoolSelection });
-      setSchoolDirty(false); // Nu må vi synce med klient igen
+      setSchoolDirty(false);
+      userIsSelectingSchool.current = false;
       showSnackbar && showSnackbar({ message: "Skolevalg gemt!", severity: "success" });
     } catch (err) {
       showSnackbar && showSnackbar({ message: "Kunne ikke gemme skolevalg: " + err.message, severity: "error" });
