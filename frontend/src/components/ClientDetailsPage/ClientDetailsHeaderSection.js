@@ -19,19 +19,22 @@ import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
+// StatusBadge med 2s puls animation hvis animate=true
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
-      <Box sx={{
-        width: isMobile ? 8 : 10,
-        height: isMobile ? 8 : 10,
-        borderRadius: "50%",
-        bgcolor: color,
-        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-        border: "1px solid #ddd",
-        mr: 1,
-        animation: animate ? "pulsate 2s infinite" : "none"
-      }} />
+      <Box
+        sx={{
+          width: isMobile ? 8 : 10,
+          height: isMobile ? 8 : 10,
+          borderRadius: "50%",
+          bgcolor: color,
+          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+          border: "1px solid #ddd",
+          mr: 1,
+          animation: animate ? "pulsate 2s infinite" : "none"
+        }}
+      />
       <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : 14 }}>
         {text}
       </Typography>
@@ -50,7 +53,6 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
   );
 }
 function StateBadge({ state, isMobile = false }) {
-  // ...som før...
   let color = "grey.400";
   let text = state || "ukendt";
   let animate = false;
@@ -166,6 +168,7 @@ export default function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
+  // Ens styling for rækker/felter
   const rowStyle = {
     display: "flex",
     alignItems: "center",
@@ -285,15 +288,25 @@ export default function ClientDetailsHeaderSection({
                     displayEmpty
                     onChange={e => handleSchoolChange(e.target.value)}
                     sx={{
-                      minWidth: 120,
+                      minWidth: 138,
+                      width: 138,
                       fontSize: isMobile ? 12 : 14,
                       height: isMobile ? "22px" : "30px",
-                      "& .MuiSelect-select": { height: isMobile ? "22px" : "30px", display: "flex", alignItems: "center" }
+                      textAlign: "left",
+                      "& .MuiSelect-select": {
+                        textAlign: "left",
+                        paddingLeft: 0,
+                        height: isMobile ? "22px" : "30px",
+                        display: "flex",
+                        alignItems: "center"
+                      }
                     }}
                   >
-                    <MenuItem value="">Vælg skole</MenuItem>
+                    <MenuItem value="" sx={{ textAlign: "left" }}>Vælg skole</MenuItem>
                     {schools.map(school => (
-                      <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                      <MenuItem key={school.id} value={school.id} sx={{ textAlign: "left" }}>
+                        {school.name}
+                      </MenuItem>
                     ))}
                   </Select>
                   <Button
