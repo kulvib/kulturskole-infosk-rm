@@ -256,12 +256,14 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              {/* Klient info overskrift + Netværksinfo badge */}
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
-                  Klient info
-                </Typography>
-                <Box sx={{ ml: 2 }}>
+              {/* Klient info overskrift */}
+              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18, mb: isMobile ? 0.5 : 1 }}>
+                Klient info
+              </Typography>
+              {/* Netværksinfo badge - aligned med indholdet */}
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Typography sx={labelStyle}>Netværksstatus:</Typography>
+                <Box sx={valueStyle}>
                   <OnlineStatusBadge isOnline={client.isOnline} isMobile={isMobile} />
                 </Box>
               </Box>
