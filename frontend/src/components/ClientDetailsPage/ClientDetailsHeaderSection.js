@@ -19,6 +19,7 @@ import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
+// StatusBadge med 2s puls animation hvis animate=true
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
@@ -296,11 +297,15 @@ export default function ClientDetailsHeaderSection({
                       width: 117,
                       fontSize: isMobile ? 12 : 14,
                       height: isMobile ? "22px" : "30px",
+                      "& .MuiSelect-select": {
+                        textAlign: "left",
+                        paddingLeft: 0 // <-- Vigtigt for venstre alignment med kolonne
+                      }
                     }}
                   >
-                    <MenuItem value="">Vælg skole</MenuItem>
+                    <MenuItem value="" sx={{ textAlign: "left" }}>Vælg skole</MenuItem>
                     {schools.map(school => (
-                      <MenuItem key={school.id} value={school.id}>
+                      <MenuItem key={school.id} value={school.id} sx={{ textAlign: "left" }}>
                         {school.name}
                       </MenuItem>
                     ))}
