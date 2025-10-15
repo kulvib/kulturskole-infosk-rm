@@ -188,10 +188,7 @@ export default function ClientDetailsHeaderSection({
     minWidth: 120,
     height: 32,
     display: "flex",
-    alignItems: "center",
-    '& .MuiInputBase-root, & .MuiSelect-select, & .MuiTextField-root': {
-      height: 32,
-    }
+    alignItems: "center"
   };
 
   const inputStyle = {
@@ -209,7 +206,7 @@ export default function ClientDetailsHeaderSection({
   function renderKioskBrowserData(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
-      <Box key={key} sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+      <Box key={key} sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
         <Typography sx={labelStyle}>{key}:</Typography>
         <Typography sx={inputLikeStyle}>{String(value)}</Typography>
       </Box>
@@ -263,7 +260,7 @@ export default function ClientDetailsHeaderSection({
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               {/* Klient info overskrift + Netværksinfo badge aligned med værdier */}
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Klient info
                 </Typography>
@@ -271,17 +268,17 @@ export default function ClientDetailsHeaderSection({
                   <OnlineStatusBadge isOnline={client.isOnline} isMobile={isMobile} />
                 </Box>
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography sx={labelStyle}>Klientnavn:</Typography>
                 <Typography sx={inputLikeStyle}>{client.name}</Typography>
               </Box>
               {user?.role === "admin" && (
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                   <Typography sx={labelStyle}>Klient ID:</Typography>
                   <Typography sx={inputLikeStyle}>{client.id}</Typography>
                 </Box>
               )}
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography sx={labelStyle}>Skole:</Typography>
                 <Box sx={inputLikeStyle}>
                   <Select
@@ -321,7 +318,7 @@ export default function ClientDetailsHeaderSection({
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               {/* Kiosk info overskrift + Systeminfo badge */}
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Kiosk info
                 </Typography>
@@ -329,10 +326,10 @@ export default function ClientDetailsHeaderSection({
                   <StateBadge state={client.state} isMobile={isMobile} />
                 </Box>
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography sx={labelStyle}>Kiosk URL:</Typography>
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Box sx={{ display: "flex", alignItems: "center", flex: 1, gap: 1, ...inputLikeStyle }}>
                   <TextField
                     size="small"
@@ -365,14 +362,14 @@ export default function ClientDetailsHeaderSection({
                   Husk at gemme din ændring!
                 </Typography>
               )}
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography sx={labelStyle}>Kiosk browser status:</Typography>
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
               </Box>
               {/* Lokation felt placeret her */}
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography sx={labelStyle}>Lokation:</Typography>
                 <Box sx={{ display: "flex", alignItems: "center", flex: 1, ml: 1, gap: 1, ...inputLikeStyle }}>
                   <TextField
