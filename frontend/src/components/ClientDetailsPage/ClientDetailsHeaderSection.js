@@ -284,8 +284,8 @@ export default function ClientDetailsHeaderSection({
               )}
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Skole:</Typography>
-                {/* Her flytter vi hele dropdown-sektionen 8px til venstre for alignment */}
-                <Box sx={{ ...valueStyle, ml: -1 }}>
+                {/* Nu flyttes hele dropdown-sektionen præcist 10px til venstre */}
+                <Box sx={{ ...valueStyle, ml: "-10px" }}>
                   <Select
                     size="small"
                     value={schoolSelection ?? client.school_id ?? ""}
