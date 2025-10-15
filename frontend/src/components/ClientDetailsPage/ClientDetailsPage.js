@@ -22,7 +22,7 @@ export default function ClientDetailsPage({
   calendarLoading,
   streamKey,
   onRestartStream,
-  showSnackbar
+  showSnackbar,
 }) {
   const [locality, setLocality] = useState("");
   const [localityDirty, setLocalityDirty] = useState(false);
@@ -71,7 +71,8 @@ export default function ClientDetailsPage({
       setLiveChromeColor(updated.chrome_color || null);
       setLastSeen(updated.last_seen || null);
       setUptime(updated.uptime || null);
-      // VIGTIGT: Kun opdater schoolSelection hvis IKKE dirty!
+
+      // Kun opdater schoolSelection hvis IKKE dirty
       if (!schoolDirty) setSchoolSelection(updated.school_id ?? "");
     } catch (err) {
       // Optionelt: showSnackbar({ message: "Kunne ikke hente klientdata", severity: "error" });
@@ -104,11 +105,12 @@ export default function ClientDetailsPage({
       setLiveChromeColor(client.chrome_color || null);
       setLastSeen(client.last_seen || null);
       setUptime(client.uptime || null);
-      // VIGTIGT: Kun opdater schoolSelection hvis IKKE dirty!
+      // Kun opdater schoolSelection hvis IKKE dirty
       if (!schoolDirty) setSchoolSelection(client.school_id ?? "");
       // setSchoolDirty(false); // kun efter gem!
     }
-  }, [client, schoolDirty]);
+    // schoolDirty som dependency gør, at denne effect ikke overskriver brugervalg.
+  }, [client, schoolDirty, localityDirty, kioskUrlDirty]);
 
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
