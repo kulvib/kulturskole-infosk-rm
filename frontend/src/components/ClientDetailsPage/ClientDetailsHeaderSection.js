@@ -218,11 +218,6 @@ export default function ClientDetailsHeaderSection({
     ));
   }
 
-  // --- Placering og bredde for dropdown ---
-  // Vi lader dropdown-sektionen følge valueStyle + ingen margin left/right.
-  // Bredde sættes så du kan se AL tekst: fx 260px, eller brug "minWidth: 260" hvis du har MEGET lange skolenavne.
-  // Teksten venstrejusteres og padding fjernes.
-
   return (
     <Box sx={{ width: "100%" }}>
       {/* Topbar */}
@@ -296,13 +291,15 @@ export default function ClientDetailsHeaderSection({
                     displayEmpty
                     onChange={e => handleSchoolChange(e.target.value)}
                     sx={{
-                      minWidth: 260, // Juster denne værdi hvis du har MEGET tekst
+                      position: "relative",
+                      left: "-20px", // Rammen starter 20px længere ude (mod venstre)
+                      minWidth: 260, // Bredde så du kan se lang tekst
                       width: 260,
                       fontSize: isMobile ? 12 : 14,
                       height: isMobile ? "22px" : "30px",
                       "& .MuiSelect-select": {
                         textAlign: "left",
-                        paddingLeft: 0, // Helt venstre, så teksten flugter med kolonnen
+                        paddingLeft: 0, // Tekst forbliver venstre-alignet!
                       }
                     }}
                   >
