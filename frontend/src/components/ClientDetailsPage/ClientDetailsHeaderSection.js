@@ -123,8 +123,8 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
           sx={{
             minWidth: isMobile ? 20 : 24,
             maxWidth: isMobile ? 20 : 24,
-            minHeight: isMobile ? 32 : 32,
-            maxHeight: isMobile ? 32 : 32,
+            minHeight: 32,
+            maxHeight: 32,
             p: 0,
             m: 0,
             display: "flex",
@@ -263,7 +263,7 @@ export default function ClientDetailsHeaderSection({
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               {/* Klient info overskrift + Netværksinfo badge aligned med værdier */}
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Klient info
                 </Typography>
@@ -312,40 +312,7 @@ export default function ClientDetailsHeaderSection({
                   </Button>
                 </Box>
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                <Typography sx={labelStyle}>Lokation:</Typography>
-                <Box sx={{ display: "flex", alignItems: "center", flex: 1, ml: 1, gap: 1, ...inputLikeStyle }}>
-                  <TextField
-                    size="small"
-                    value={locality}
-                    onChange={handleLocalityChange}
-                    sx={{
-                      ...inputStyle,
-                      height: "32px",
-                      "& .MuiInputBase-root": { height: "32px" }
-                    }}
-                    disabled={savingLocality}
-                    inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                    onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
-                    error={!!localityDirty}
-                  />
-                  <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={handleLocalitySave}
-                    disabled={savingLocality}
-                    sx={{ minWidth: 56, height: "32px" }}
-                  >
-                    {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
-                  </Button>
-                </Box>
-              </Box>
-              {(localityDirty || schoolDirty) && (
-                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
-                  Husk at gemme din ændring!
-                </Typography>
-              )}
+              {/* Lokation er nu flyttet til Paper 2 */}
             </CardContent>
           </Card>
         </Box>
@@ -354,7 +321,7 @@ export default function ClientDetailsHeaderSection({
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               {/* Kiosk info overskrift + Systeminfo badge */}
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Kiosk info
                 </Typography>
@@ -404,6 +371,41 @@ export default function ClientDetailsHeaderSection({
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
               </Box>
+              {/* Lokation felt placeret her */}
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Typography sx={labelStyle}>Lokation:</Typography>
+                <Box sx={{ display: "flex", alignItems: "center", flex: 1, ml: 1, gap: 1, ...inputLikeStyle }}>
+                  <TextField
+                    size="small"
+                    value={locality}
+                    onChange={handleLocalityChange}
+                    sx={{
+                      ...inputStyle,
+                      height: "32px",
+                      "& .MuiInputBase-root": { height: "32px" }
+                    }}
+                    disabled={savingLocality}
+                    inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                    onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
+                    error={!!localityDirty}
+                  />
+                  <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleLocalitySave}
+                    disabled={savingLocality}
+                    sx={{ minWidth: 56, height: "32px" }}
+                  >
+                    {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                  </Button>
+                </Box>
+              </Box>
+              {(localityDirty || schoolDirty) && (
+                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
+                  Husk at gemme din ændring!
+                </Typography>
+              )}
               <Box sx={{ mt: 1 }}>
                 {renderKioskBrowserData(kioskBrowserData)}
               </Box>
