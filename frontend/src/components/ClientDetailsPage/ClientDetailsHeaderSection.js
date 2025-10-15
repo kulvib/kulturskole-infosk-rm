@@ -8,7 +8,9 @@ import {
   CircularProgress,
   Tooltip,
   TextField,
-  useMediaQuery
+  Select,
+  MenuItem,
+  useMediaQuery,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -49,7 +51,6 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
   );
 }
 
-// Systeminfo badge
 function StateBadge({ state, isMobile = false }) {
   let color = "grey.400";
   let text = state || "ukendt";
@@ -84,7 +85,6 @@ function StateBadge({ state, isMobile = false }) {
   return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
 }
 
-// Netværksinfo badge
 function OnlineStatusBadge({ isOnline, isMobile = false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
@@ -143,7 +143,12 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
 
 export default function ClientDetailsHeaderSection({
   client,
-  schools,
+  schools = [],
+  schoolSelection,
+  handleSchoolChange,
+  schoolDirty,
+  savingSchool,
+  handleSchoolSave,
   locality,
   localityDirty,
   savingLocality,
@@ -164,12 +169,6 @@ export default function ClientDetailsHeaderSection({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
-
-  // Helper til skole-navn
-  const getSchoolName = (schoolId) => {
-    const school = schools.find(s => s.id === schoolId);
-    return school ? school.name : <span style={{ color: "#888" }}>Ingen skole</span>;
-  };
 
   const labelStyle = {
     fontWeight: 600,
@@ -277,7 +276,29 @@ export default function ClientDetailsHeaderSection({
               )}
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography sx={labelStyle}>Skole:</Typography>
-                <Typography sx={valueStyle}>{getSchoolName(client.school_id)}</Typography>
+                <Box sx={valueStyle}>
+                  <Select
+                    size="small"
+                    value={schoolSelection ?? client.school_id ?? ""}
+                    displayEmpty
+                    onChange={e => handleSchoolChange(e.target.value)}
+                    sx={{ minWidth: 120, fontSize: isMobile ? 12 : 14 }}
+                  >
+                    <MenuItem value="">Vælg skole</MenuItem>
+                    {schools.map(school => (
+                      <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                    ))}
+                  </Select>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleSchoolSave}
+                    disabled={savingSchool || !schoolDirty}
+                    sx={{ minWidth: 56, ml: 1 }}
+                  >
+                    {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                  </Button>
+                </Box>
               </Box>
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography sx={labelStyle}>Lokation:</Typography>
@@ -304,7 +325,7 @@ export default function ClientDetailsHeaderSection({
                   </Button>
                 </Box>
               </Box>
-              {localityDirty && (
+              {(localityDirty || schoolDirty) && (
                 <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
                   Husk at gemme din ændring!
                 </Typography>
