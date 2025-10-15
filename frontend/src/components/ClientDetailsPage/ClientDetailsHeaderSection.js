@@ -52,6 +52,7 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
     </Box>
   );
 }
+
 function StateBadge({ state, isMobile = false }) {
   let color = "grey.400";
   let text = state || "ukendt";
@@ -85,11 +86,13 @@ function StateBadge({ state, isMobile = false }) {
   }
   return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
 }
+
 function OnlineStatusBadge({ isOnline, isMobile = false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
   return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
 }
+
 function ChromeStatusBadge({ status, color, isMobile = false }) {
   let fallbackColor = "grey.400";
   let text = status || "ukendt";
@@ -101,6 +104,7 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
     </Box>
   );
 }
+
 function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   const [copied, setCopied] = React.useState(false);
 
@@ -215,6 +219,11 @@ export default function ClientDetailsHeaderSection({
     ));
   }
 
+  // For nøjagtig alignment: Find offset mellem Typography og Select og match!
+  // Her matcher vi typisk paddingLeft på Select til paddingLeft på Typography.
+  // Samtidig rykker vi hele dropdown-sektionen lidt til venstre.
+  // Hvis du vil justere præcist, brug devtools og mål x-aksen.
+
   return (
     <Box sx={{ width: "100%" }}>
       {/* Topbar */}
@@ -281,19 +290,22 @@ export default function ClientDetailsHeaderSection({
               )}
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Skole:</Typography>
-                {/* Forskyder hele dropdown-sektionen til venstre så teksten flugter */}
-                <Box sx={{ ...valueStyle, ml: -1 }}>
+                {/* Præcis alignment: justér ml og paddingLeft indtil teksten i Select matcher teksten i kolonnen */}
+                <Box sx={{ ...valueStyle, ml: -0.5 }}>
                   <Select
                     size="small"
                     value={schoolSelection ?? client.school_id ?? ""}
                     displayEmpty
                     onChange={e => handleSchoolChange(e.target.value)}
                     sx={{
-                      minWidth: 138, // 15% bredere!
+                      minWidth: 138,
                       width: 138,
                       fontSize: isMobile ? 12 : 14,
                       height: isMobile ? "22px" : "30px",
-                      // Ingen ændring af padding! Teksten har sin default placering.
+                      "& .MuiSelect-select": {
+                        paddingLeft: 16, // match evt. med valueStyle pl: 2 (~16px)
+                        textAlign: "left"
+                      }
                     }}
                   >
                     <MenuItem value="">Vælg skole</MenuItem>
