@@ -19,7 +19,6 @@ import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
-// StatusBadge med 2s puls animation hvis animate=true
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
@@ -219,6 +218,11 @@ export default function ClientDetailsHeaderSection({
     ));
   }
 
+  // --- Placering og bredde for dropdown ---
+  // Vi lader dropdown-sektionen følge valueStyle + ingen margin left/right.
+  // Bredde sættes så du kan se AL tekst: fx 260px, eller brug "minWidth: 260" hvis du har MEGET lange skolenavne.
+  // Teksten venstrejusteres og padding fjernes.
+
   return (
     <Box sx={{ width: "100%" }}>
       {/* Topbar */}
@@ -285,21 +289,20 @@ export default function ClientDetailsHeaderSection({
               )}
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Skole:</Typography>
-                {/* Nu flyttes hele dropdown-sektionen 20px til højre */}
-                <Box sx={{ ...valueStyle, ml: "20px" }}>
+                <Box sx={{ ...valueStyle }}>
                   <Select
                     size="small"
                     value={schoolSelection ?? client.school_id ?? ""}
                     displayEmpty
                     onChange={e => handleSchoolChange(e.target.value)}
                     sx={{
-                      minWidth: 117, // 15% mindre end tidligere 138px
-                      width: 117,
+                      minWidth: 260, // Juster denne værdi hvis du har MEGET tekst
+                      width: 260,
                       fontSize: isMobile ? 12 : 14,
                       height: isMobile ? "22px" : "30px",
                       "& .MuiSelect-select": {
                         textAlign: "left",
-                        paddingLeft: 0 // <-- Vigtigt for venstre alignment med kolonne
+                        paddingLeft: 0, // Helt venstre, så teksten flugter med kolonnen
                       }
                     }}
                   >
