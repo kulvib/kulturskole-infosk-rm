@@ -284,19 +284,18 @@ export default function ClientDetailsHeaderSection({
               )}
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Skole:</Typography>
-                {/* Nu flyttes hele dropdown-sektionen præcist 10px til venstre */}
-                <Box sx={{ ...valueStyle, ml: "-10px" }}>
+                {/* Nu flyttes hele dropdown-sektionen præcist 25px til venstre */}
+                <Box sx={{ ...valueStyle, ml: "-25px" }}>
                   <Select
                     size="small"
                     value={schoolSelection ?? client.school_id ?? ""}
                     displayEmpty
                     onChange={e => handleSchoolChange(e.target.value)}
                     sx={{
-                      minWidth: 138, // 15% bredere end standard
-                      width: 138,
+                      minWidth: 166, // ca. 20% bredere end tidligere 138px
+                      width: 166,
                       fontSize: isMobile ? 12 : 14,
                       height: isMobile ? "22px" : "30px",
-                      // Default padding for tekst - ingen ændring
                     }}
                   >
                     <MenuItem value="">Vælg skole</MenuItem>
