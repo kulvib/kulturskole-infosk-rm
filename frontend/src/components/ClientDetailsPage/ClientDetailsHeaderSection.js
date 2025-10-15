@@ -49,6 +49,48 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
   );
 }
 
+// Systeminfo badge
+function StateBadge({ state, isMobile = false }) {
+  let color = "grey.400";
+  let text = state || "ukendt";
+  let animate = false;
+  if (state) {
+    switch (state.toLowerCase()) {
+      case "normal":
+        color = "#43a047";
+        animate = true;
+        break;
+      case "sleep":
+        color = "#1976d2";
+        animate = true;
+        break;
+      case "maintenance":
+        color = "#ffa000";
+        animate = true;
+        break;
+      case "error":
+        color = "#e53935";
+        animate = true;
+        break;
+      case "offline":
+        color = "#757575";
+        animate = false;
+        break;
+      default:
+        color = "grey.400";
+        animate = false;
+    }
+  }
+  return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
+}
+
+// Netværksinfo badge
+function OnlineStatusBadge({ isOnline, isMobile = false }) {
+  const color = isOnline ? "#43a047" : "#e53935";
+  const text = isOnline ? "online" : "offline";
+  return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
+}
+
 function ChromeStatusBadge({ status, color, isMobile = false }) {
   let fallbackColor = "grey.400";
   let text = status || "ukendt";
@@ -56,7 +98,7 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
   const animate = true;
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
-      <StatusBadge color={dotColor} text={text} animate={animate} isMobile={isMobile} showText={true} />
+      <StatusBadge color={dotColor} text={text} animate={animate} isMobile={isMobile} />
     </Box>
   );
 }
@@ -214,9 +256,15 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18, mb: isMobile ? 0.5 : 1 }}>
-                Klient info
-              </Typography>
+              {/* Klient info overskrift + Netværksinfo badge */}
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
+                  Klient info
+                </Typography>
+                <Box sx={{ ml: 2 }}>
+                  <OnlineStatusBadge isOnline={client.isOnline} isMobile={isMobile} />
+                </Box>
+              </Box>
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography sx={labelStyle}>Klientnavn:</Typography>
                 <Typography sx={valueStyle}>{client.name}</Typography>
@@ -268,9 +316,15 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18, mb: isMobile ? 0.5 : 1 }}>
-                Kiosk info
-              </Typography>
+              {/* Kiosk info overskrift + Systeminfo badge */}
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
+                  Kiosk info
+                </Typography>
+                <Box sx={{ ml: 2 }}>
+                  <StateBadge state={client.state} isMobile={isMobile} />
+                </Box>
+              </Box>
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <Typography sx={labelStyle}>Kiosk URL:</Typography>
               </Box>
