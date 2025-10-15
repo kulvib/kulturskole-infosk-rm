@@ -71,7 +71,8 @@ export default function ClientDetailsPage({
       setLiveChromeColor(updated.chrome_color || null);
       setLastSeen(updated.last_seen || null);
       setUptime(updated.uptime || null);
-      setSchoolSelection(updated.school_id ?? "");
+      // Her: kun opdater schoolSelection hvis IKKE dirty
+      if (!schoolDirty) setSchoolSelection(updated.school_id ?? "");
     } catch (err) {
       // Optionelt: showSnackbar({ message: "Kunne ikke hente klientdata", severity: "error" });
     }
@@ -103,10 +104,11 @@ export default function ClientDetailsPage({
       setLiveChromeColor(client.chrome_color || null);
       setLastSeen(client.last_seen || null);
       setUptime(client.uptime || null);
-      setSchoolSelection(client.school_id ?? "");
-      setSchoolDirty(false);
+      // Her: kun opdater schoolSelection hvis IKKE dirty
+      if (!schoolDirty) setSchoolSelection(client.school_id ?? "");
+      // setSchoolDirty(false); <-- må kun køres efter gem!
     }
-  }, [client]);
+  }, [client, schoolDirty]);
 
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
@@ -171,7 +173,7 @@ export default function ClientDetailsPage({
     setSavingSchool(true);
     try {
       await updateClient(client.id, { school_id: schoolSelection });
-      setSchoolDirty(false);
+      setSchoolDirty(false); // Nu må vi synce med klient igen
       showSnackbar && showSnackbar({ message: "Skolevalg gemt!", severity: "success" });
     } catch (err) {
       showSnackbar && showSnackbar({ message: "Kunne ikke gemme skolevalg: " + err.message, severity: "error" });
