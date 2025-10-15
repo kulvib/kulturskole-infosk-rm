@@ -19,7 +19,6 @@ import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
-// StatusBadge med 2s puls animation hvis animate=true
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
@@ -219,11 +218,6 @@ export default function ClientDetailsHeaderSection({
     ));
   }
 
-  // For nøjagtig alignment: Find offset mellem Typography og Select og match!
-  // Her matcher vi typisk paddingLeft på Select til paddingLeft på Typography.
-  // Samtidig rykker vi hele dropdown-sektionen lidt til venstre.
-  // Hvis du vil justere præcist, brug devtools og mål x-aksen.
-
   return (
     <Box sx={{ width: "100%" }}>
       {/* Topbar */}
@@ -290,22 +284,19 @@ export default function ClientDetailsHeaderSection({
               )}
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Skole:</Typography>
-                {/* Præcis alignment: justér ml og paddingLeft indtil teksten i Select matcher teksten i kolonnen */}
-                <Box sx={{ ...valueStyle, ml: -0.5 }}>
+                {/* Her flytter vi hele dropdown-sektionen 8px til venstre for alignment */}
+                <Box sx={{ ...valueStyle, ml: -1 }}>
                   <Select
                     size="small"
                     value={schoolSelection ?? client.school_id ?? ""}
                     displayEmpty
                     onChange={e => handleSchoolChange(e.target.value)}
                     sx={{
-                      minWidth: 138,
+                      minWidth: 138, // 15% bredere end standard
                       width: 138,
                       fontSize: isMobile ? 12 : 14,
                       height: isMobile ? "22px" : "30px",
-                      "& .MuiSelect-select": {
-                        paddingLeft: 16, // match evt. med valueStyle pl: 2 (~16px)
-                        textAlign: "left"
-                      }
+                      // Default padding for tekst - ingen ændring
                     }}
                   >
                     <MenuItem value="">Vælg skole</MenuItem>
