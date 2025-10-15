@@ -10,7 +10,7 @@ import {
   TextField,
   Select,
   MenuItem,
-  useMediaQuery,
+  useMediaQuery
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -19,20 +19,21 @@ import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
-// StatusBadge med 2s puls animation hvis animate=true
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
-      <Box sx={{
-        width: isMobile ? 8 : 10,
-        height: isMobile ? 8 : 10,
-        borderRadius: "50%",
-        bgcolor: color,
-        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-        border: "1px solid #ddd",
-        mr: 1,
-        animation: animate ? "pulsate 2s infinite" : "none"
-      }} />
+      <Box
+        sx={{
+          width: isMobile ? 8 : 10,
+          height: isMobile ? 8 : 10,
+          borderRadius: "50%",
+          bgcolor: color,
+          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+          border: "1px solid #ddd",
+          mr: 1,
+          animation: animate ? "pulsate 2s infinite" : "none"
+        }}
+      />
       <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : 14 }}>
         {text}
       </Typography>
@@ -89,18 +90,6 @@ function OnlineStatusBadge({ isOnline, isMobile = false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
   return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
-}
-
-function ChromeStatusBadge({ status, color, isMobile = false }) {
-  let fallbackColor = "grey.400";
-  let text = status || "ukendt";
-  let dotColor = color || fallbackColor;
-  const animate = true;
-  return (
-    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
-      <StatusBadge color={dotColor} text={text} animate={animate} isMobile={isMobile} />
-    </Box>
-  );
 }
 
 function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
@@ -170,45 +159,49 @@ export default function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
+  // Ens styling for rækker/felter
+  const rowStyle = {
+    display: "flex",
+    alignItems: "center",
+    height: isMobile ? 22 : 30,
+    mb: 0, // ingen ekstra margin, spacing styres af height
+  };
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
     minWidth: 120,
     pr: isMobile ? 0.25 : 0.5,
-    py: 0,
-    verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
+    verticalAlign: "middle",
   };
-  const inputLikeStyle = {
+  const valueStyle = {
     fontWeight: 400,
     pl: isMobile ? 1 : 2,
-    py: 0,
-    verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
-    minWidth: 120,
-    height: 32,
+    verticalAlign: "middle",
+    minHeight: isMobile ? 22 : 30,
     display: "flex",
-    alignItems: "center"
+    alignItems: "center",
   };
 
   const inputStyle = {
     width: "100%",
-    height: 32,
+    height: isMobile ? 22 : 30,
     "& .MuiInputBase-input": {
       fontSize: isMobile ? 12 : 14,
-      height: "32px",
+      height: isMobile ? "22px" : "30px",
       boxSizing: "border-box",
-      padding: isMobile ? "6px 10px" : "8px 14px"
+      padding: isMobile ? "4px 10px" : "6px 14px"
     },
-    "& .MuiInputBase-root": { height: "32px" },
+    "& .MuiInputBase-root": { height: isMobile ? "22px" : "30px" },
   };
 
   function renderKioskBrowserData(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
-      <Box key={key} sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+      <Box key={key} sx={rowStyle}>
         <Typography sx={labelStyle}>{key}:</Typography>
-        <Typography sx={inputLikeStyle}>{String(value)}</Typography>
+        <Typography sx={valueStyle}>{String(value)}</Typography>
       </Box>
     ));
   }
@@ -259,8 +252,7 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              {/* Klient info overskrift + Netværksinfo badge aligned med værdier */}
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={rowStyle}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Klient info
                 </Typography>
@@ -268,19 +260,19 @@ export default function ClientDetailsHeaderSection({
                   <OnlineStatusBadge isOnline={client.isOnline} isMobile={isMobile} />
                 </Box>
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Klientnavn:</Typography>
-                <Typography sx={inputLikeStyle}>{client.name}</Typography>
+                <Typography sx={valueStyle}>{client.name}</Typography>
               </Box>
               {user?.role === "admin" && (
-                <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+                <Box sx={rowStyle}>
                   <Typography sx={labelStyle}>Klient ID:</Typography>
-                  <Typography sx={inputLikeStyle}>{client.id}</Typography>
+                  <Typography sx={valueStyle}>{client.id}</Typography>
                 </Box>
               )}
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Skole:</Typography>
-                <Box sx={inputLikeStyle}>
+                <Box sx={valueStyle}>
                   <Select
                     size="small"
                     value={schoolSelection ?? client.school_id ?? ""}
@@ -289,8 +281,8 @@ export default function ClientDetailsHeaderSection({
                     sx={{
                       minWidth: 120,
                       fontSize: isMobile ? 12 : 14,
-                      height: "32px",
-                      "& .MuiSelect-select": { height: "32px", display: "flex", alignItems: "center" }
+                      height: isMobile ? "22px" : "30px",
+                      "& .MuiSelect-select": { height: isMobile ? "22px" : "30px", display: "flex", alignItems: "center" }
                     }}
                   >
                     <MenuItem value="">Vælg skole</MenuItem>
@@ -303,7 +295,11 @@ export default function ClientDetailsHeaderSection({
                     size="small"
                     onClick={handleSchoolSave}
                     disabled={savingSchool || !schoolDirty}
-                    sx={{ minWidth: 56, ml: 1, height: "32px" }}
+                    sx={{
+                      minWidth: 56,
+                      ml: 1,
+                      height: isMobile ? "22px" : "30px"
+                    }}
                   >
                     {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                   </Button>
@@ -317,8 +313,7 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              {/* Kiosk info overskrift + Systeminfo badge */}
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={rowStyle}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Kiosk info
                 </Typography>
@@ -326,20 +321,16 @@ export default function ClientDetailsHeaderSection({
                   <StateBadge state={client.state} isMobile={isMobile} />
                 </Box>
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Kiosk URL:</Typography>
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-                <Box sx={{ display: "flex", alignItems: "center", flex: 1, gap: 1, ...inputLikeStyle }}>
+              <Box sx={rowStyle}>
+                <Box sx={{ display: "flex", alignItems: "center", flex: 1, gap: 1 }}>
                   <TextField
                     size="small"
                     value={kioskUrl}
                     onChange={handleKioskUrlChange}
-                    sx={{
-                      ...inputStyle,
-                      height: "32px",
-                      "& .MuiInputBase-root": { height: "32px" }
-                    }}
+                    sx={inputStyle}
                     disabled={savingKioskUrl}
                     inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
                     onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
@@ -351,7 +342,7 @@ export default function ClientDetailsHeaderSection({
                     size="small"
                     onClick={handleKioskUrlSave}
                     disabled={savingKioskUrl}
-                    sx={{ minWidth: 56, height: "32px" }}
+                    sx={{ minWidth: 56, height: isMobile ? "22px" : "30px" }}
                   >
                     {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                   </Button>
@@ -362,25 +353,21 @@ export default function ClientDetailsHeaderSection({
                   Husk at gemme din ændring!
                 </Typography>
               )}
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Kiosk browser status:</Typography>
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={rowStyle}>
                 <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
               </Box>
               {/* Lokation felt placeret her */}
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Lokation:</Typography>
-                <Box sx={{ display: "flex", alignItems: "center", flex: 1, ml: 1, gap: 1, ...inputLikeStyle }}>
+                <Box sx={{ display: "flex", alignItems: "center", flex: 1, ml: 1, gap: 1 }}>
                   <TextField
                     size="small"
                     value={locality}
                     onChange={handleLocalityChange}
-                    sx={{
-                      ...inputStyle,
-                      height: "32px",
-                      "& .MuiInputBase-root": { height: "32px" }
-                    }}
+                    sx={inputStyle}
                     disabled={savingLocality}
                     inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
                     onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
@@ -392,7 +379,7 @@ export default function ClientDetailsHeaderSection({
                     size="small"
                     onClick={handleLocalitySave}
                     disabled={savingLocality}
-                    sx={{ minWidth: 56, height: "32px" }}
+                    sx={{ minWidth: 56, height: isMobile ? "22px" : "30px" }}
                   >
                     {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                   </Button>
