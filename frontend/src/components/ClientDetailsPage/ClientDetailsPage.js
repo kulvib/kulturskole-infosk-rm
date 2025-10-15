@@ -71,7 +71,7 @@ export default function ClientDetailsPage({
       setLiveChromeColor(updated.chrome_color || null);
       setLastSeen(updated.last_seen || null);
       setUptime(updated.uptime || null);
-      // Her: kun opdater schoolSelection hvis IKKE dirty
+      // VIGTIGT: Kun opdater schoolSelection hvis IKKE dirty!
       if (!schoolDirty) setSchoolSelection(updated.school_id ?? "");
     } catch (err) {
       // Optionelt: showSnackbar({ message: "Kunne ikke hente klientdata", severity: "error" });
@@ -104,9 +104,9 @@ export default function ClientDetailsPage({
       setLiveChromeColor(client.chrome_color || null);
       setLastSeen(client.last_seen || null);
       setUptime(client.uptime || null);
-      // Her: kun opdater schoolSelection hvis IKKE dirty
+      // VIGTIGT: Kun opdater schoolSelection hvis IKKE dirty!
       if (!schoolDirty) setSchoolSelection(client.school_id ?? "");
-      // setSchoolDirty(false); <-- må kun køres efter gem!
+      // setSchoolDirty(false); // kun efter gem!
     }
   }, [client, schoolDirty]);
 
