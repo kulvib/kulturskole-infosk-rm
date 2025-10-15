@@ -291,15 +291,13 @@ export default function ClientDetailsHeaderSection({
                     displayEmpty
                     onChange={e => handleSchoolChange(e.target.value)}
                     sx={{
-                      position: "relative",
-                      left: "-10px", // Rammen starter 10px længere ude
-                      minWidth: 250, // fx tidligere 240 + 10 for plads til tekst
-                      width: 250,
+                      minWidth: 240,
+                      width: 240,
                       fontSize: isMobile ? 12 : 14,
                       height: isMobile ? "22px" : "30px",
                       "& .MuiSelect-select": {
                         textAlign: "left",
-                        paddingLeft: 0, // Teksten forbliver perfekt placeret!
+                        paddingLeft: 16, // Præcis samme spacing som kolonne-tekst (pl: 2)
                       }
                     }}
                   >
