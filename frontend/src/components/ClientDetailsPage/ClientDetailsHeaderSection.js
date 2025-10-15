@@ -52,7 +52,6 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
     </Box>
   );
 }
-
 function StateBadge({ state, isMobile = false }) {
   let color = "grey.400";
   let text = state || "ukendt";
@@ -86,13 +85,11 @@ function StateBadge({ state, isMobile = false }) {
   }
   return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
 }
-
 function OnlineStatusBadge({ isOnline, isMobile = false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
   return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
 }
-
 function ChromeStatusBadge({ status, color, isMobile = false }) {
   let fallbackColor = "grey.400";
   let text = status || "ukendt";
@@ -104,7 +101,6 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
     </Box>
   );
 }
-
 function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   const [copied, setCopied] = React.useState(false);
 
@@ -292,23 +288,17 @@ export default function ClientDetailsHeaderSection({
                     displayEmpty
                     onChange={e => handleSchoolChange(e.target.value)}
                     sx={{
-                      minWidth: 138,
+                      minWidth: 138, // 15% bredere!
                       width: 138,
                       fontSize: isMobile ? 12 : 14,
                       height: isMobile ? "22px" : "30px",
-                      textAlign: "left",
-                      "& .MuiSelect-select": {
-                        textAlign: "left",
-                        paddingLeft: isMobile ? 8 : 16, // Ens indrykning som i kolonnen
-                        height: isMobile ? "22px" : "30px",
-                        display: "flex",
-                        alignItems: "center"
-                      }
+                      // Ingen ændring af padding! Teksten har sin default placering.
+                      // Hvis du tidligere havde custom padding, lad blot være med at ændre den her.
                     }}
                   >
-                    <MenuItem value="" sx={{ textAlign: "left" }}>Vælg skole</MenuItem>
+                    <MenuItem value="">Vælg skole</MenuItem>
                     {schools.map(school => (
-                      <MenuItem key={school.id} value={school.id} sx={{ textAlign: "left" }}>
+                      <MenuItem key={school.id} value={school.id}>
                         {school.name}
                       </MenuItem>
                     ))}
