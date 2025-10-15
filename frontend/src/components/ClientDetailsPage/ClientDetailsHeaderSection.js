@@ -19,6 +19,7 @@ import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
+// StatusBadge med 2s puls animation hvis animate=true
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
@@ -51,7 +52,6 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
     </Box>
   );
 }
-
 function StateBadge({ state, isMobile = false }) {
   let color = "grey.400";
   let text = state || "ukendt";
@@ -85,13 +85,22 @@ function StateBadge({ state, isMobile = false }) {
   }
   return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
 }
-
 function OnlineStatusBadge({ isOnline, isMobile = false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
   return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
 }
-
+function ChromeStatusBadge({ status, color, isMobile = false }) {
+  let fallbackColor = "grey.400";
+  let text = status || "ukendt";
+  let dotColor = color || fallbackColor;
+  const animate = true;
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+      <StatusBadge color={dotColor} text={text} animate={animate} isMobile={isMobile} />
+    </Box>
+  );
+}
 function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   const [copied, setCopied] = React.useState(false);
 
@@ -112,8 +121,8 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
           sx={{
             minWidth: isMobile ? 20 : 24,
             maxWidth: isMobile ? 20 : 24,
-            minHeight: 32,
-            maxHeight: 32,
+            minHeight: isMobile ? 22 : 30,
+            maxHeight: isMobile ? 22 : 30,
             p: 0,
             m: 0,
             display: "flex",
@@ -164,7 +173,7 @@ export default function ClientDetailsHeaderSection({
     display: "flex",
     alignItems: "center",
     height: isMobile ? 22 : 30,
-    mb: 0, // ingen ekstra margin, spacing styres af height
+    mb: 0,
   };
   const labelStyle = {
     fontWeight: 600,
