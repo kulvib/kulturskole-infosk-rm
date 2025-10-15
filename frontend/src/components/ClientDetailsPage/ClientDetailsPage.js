@@ -103,6 +103,12 @@ export default function ClientDetailsPage({
     }
   }, [client, schoolDirty, localityDirty, kioskUrlDirty]);
 
+  // --- FIX: handleRefresh skal defineres! ---
+  const handleRefresh = async () => {
+    await fetchClientData();
+    if (showSnackbar) showSnackbar({ message: "Klientdata opdateret!", severity: "info" });
+  };
+
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
