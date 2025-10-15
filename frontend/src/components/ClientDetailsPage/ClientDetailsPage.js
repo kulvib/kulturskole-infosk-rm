@@ -43,8 +43,12 @@ export default function ClientDetailsPage({
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
 
-  // NYT: State til skoler
+  // State til skoler
   const [schools, setSchools] = useState([]);
+  // NYT: State til valgt skole
+  const [schoolSelection, setSchoolSelection] = useState(client?.school_id ?? "");
+  const [savingSchool, setSavingSchool] = useState(false);
+  const [schoolDirty, setSchoolDirty] = useState(false);
 
   // Polling interval ref
   const pollingRef = useRef();
@@ -67,6 +71,7 @@ export default function ClientDetailsPage({
       setLiveChromeColor(updated.chrome_color || null);
       setLastSeen(updated.last_seen || null);
       setUptime(updated.uptime || null);
+      setSchoolSelection(updated.school_id ?? "");
     } catch (err) {
       // Optionelt: showSnackbar({ message: "Kunne ikke hente klientdata", severity: "error" });
     }
@@ -98,6 +103,8 @@ export default function ClientDetailsPage({
       setLiveChromeColor(client.chrome_color || null);
       setLastSeen(client.last_seen || null);
       setUptime(client.uptime || null);
+      setSchoolSelection(client.school_id ?? "");
+      setSchoolDirty(false);
     }
   }, [client]);
 
@@ -154,6 +161,24 @@ export default function ClientDetailsPage({
     // eslint-disable-next-line
   }, [client?.id]);
 
+  // Skolevælger
+  const handleSchoolChange = (schoolId) => {
+    setSchoolSelection(schoolId);
+    setSchoolDirty(true);
+  };
+
+  const handleSchoolSave = async () => {
+    setSavingSchool(true);
+    try {
+      await updateClient(client.id, { school_id: schoolSelection });
+      setSchoolDirty(false);
+      showSnackbar && showSnackbar({ message: "Skolevalg gemt!", severity: "success" });
+    } catch (err) {
+      showSnackbar && showSnackbar({ message: "Kunne ikke gemme skolevalg: " + err.message, severity: "error" });
+    }
+    setSavingSchool(false);
+  };
+
   if (!client) {
     return null;
   }
@@ -165,6 +190,11 @@ export default function ClientDetailsPage({
           <ClientDetailsHeaderSection
             client={client}
             schools={schools}
+            schoolSelection={schoolSelection}
+            handleSchoolChange={handleSchoolChange}
+            schoolDirty={schoolDirty}
+            savingSchool={savingSchool}
+            handleSchoolSave={handleSchoolSave}
             locality={locality}
             localityDirty={localityDirty}
             savingLocality={savingLocality}
