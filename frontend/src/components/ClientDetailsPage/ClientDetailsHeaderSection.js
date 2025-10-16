@@ -191,7 +191,7 @@ export default function ClientDetailsHeaderSection({
     pr: isMobile ? 0.25 : 0.5,
     fontSize: isMobile ? 12 : 14,
     verticalAlign: "middle",
-    textAlign: "right" // Align labels right for column alignment
+    textAlign: "right"
   };
   const valueStyle = {
     fontWeight: 400,
@@ -273,13 +273,12 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={rowStyle}>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
+              {/* MATCH Systeminfo layout for overskrift + badge */}
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
                   Klient info
                 </Typography>
-                <Box sx={{ pl: isMobile ? 1 : 2 }}>
-                  <OnlineStatusBadge isOnline={client.isOnline} isMobile={isMobile} />
-                </Box>
+                <OnlineStatusBadge isOnline={client.isOnline} isMobile={isMobile} />
               </Box>
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Klientnavn:</Typography>
@@ -352,13 +351,12 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={rowStyle}>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
+              {/* MATCH Systeminfo layout for overskrift + badge */}
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
                   Kiosk info
                 </Typography>
-                <Box sx={{ ml: 2 }}>
-                  <StateBadge state={client.state} isMobile={isMobile} />
-                </Box>
+                <StateBadge state={client.state} isMobile={isMobile} />
               </Box>
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Kiosk URL:</Typography>
