@@ -58,7 +58,6 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
   );
 }
 
-// StateBadge
 function StateBadge({ state, isMobile = false }) {
   let color = "grey.400";
   let text = state || "ukendt";
@@ -93,14 +92,12 @@ function StateBadge({ state, isMobile = false }) {
   return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
 }
 
-// OnlineStatusBadge
 function OnlineStatusBadge({ isOnline, isMobile = false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
   return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
 }
 
-// ChromeStatusBadge
 function ChromeStatusBadge({ status, color, isMobile = false }) {
   let fallbackColor = "grey.400";
   let text = status || "ukendt";
@@ -113,7 +110,6 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
   );
 }
 
-// CopyIconButton
 function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   const [copied, setCopied] = React.useState(false);
 
@@ -223,6 +219,7 @@ export default function ClientDetailsHeaderSection({
     ));
   }
 
+  // ----------- RENDER -----------
   return (
     <Box sx={{ width: "100%" }}>
       {/* Topbar */}
@@ -267,7 +264,12 @@ export default function ClientDetailsHeaderSection({
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
         {/* Paper 1 */}
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2 }}>
+          <Card elevation={2} sx={{
+            borderRadius: isMobile ? 1 : 2,
+            // Scrollbar fix: ingen overflow/fast bredde
+            overflow: "visible",
+            minWidth: 0,
+          }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
@@ -302,8 +304,9 @@ export default function ClientDetailsHeaderSection({
                               width: "100%",
                               fontSize: isMobile ? 12 : 14,
                               height: isMobile ? "22px" : "30px",
+                              textAlign: "left", // <- VIGTIG: dropdown-indhold venstrestilles!
                               "& .MuiSelect-select": {
-                                textAlign: "left",
+                                textAlign: "left", // <- VIGTIG: dropdown-indhold venstrestilles!
                                 paddingLeft: isMobile ? 10 : 16,
                                 fontWeight: 400,
                                 fontSize: isMobile ? 12 : 14,
@@ -316,6 +319,7 @@ export default function ClientDetailsHeaderSection({
                                   fontSize: isMobile ? 12 : 14,
                                   fontWeight: 400,
                                   background: "white",
+                                  textAlign: "left", // <- VIGTIG for options
                                 }
                               }
                             }}
@@ -343,10 +347,37 @@ export default function ClientDetailsHeaderSection({
                         </Box>
                       </TableCell>
                     </TableRow>
+                    <TableRow sx={{ height: isMobile ? 22 : 30 }}>
+                      <TableCell sx={cellStyle}>Lokation:</TableCell>
+                      <TableCell sx={valueCellStyle}>
+                        <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
+                          <TextField
+                            size="small"
+                            value={locality}
+                            onChange={handleLocalityChange}
+                            sx={inputStyle}
+                            disabled={savingLocality}
+                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
+                            error={!!localityDirty}
+                          />
+                          <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={handleLocalitySave}
+                            disabled={savingLocality}
+                            sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
+                          >
+                            {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                          </Button>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               </TableContainer>
-              {schoolDirty && (
+              {(localityDirty || schoolDirty) && (
                 <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
                   Husk at gemme din ændring!
                 </Typography>
@@ -356,11 +387,16 @@ export default function ClientDetailsHeaderSection({
         </Box>
         {/* Paper 2 */}
         <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2 }}>
+          <Card elevation={2} sx={{
+            borderRadius: isMobile ? 1 : 2,
+            // Scrollbar fix: ingen overflow/fast bredde
+            overflow: "visible",
+            minWidth: 0,
+          }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
-                  Kiosk info
+                  Kiosk browser info
                 </Typography>
                 <StateBadge state={client.state} isMobile={isMobile} />
               </Box>
@@ -394,61 +430,21 @@ export default function ClientDetailsHeaderSection({
                         </Box>
                       </TableCell>
                     </TableRow>
-                    {kioskUrlDirty && (
-                      <TableRow>
-                        <TableCell colSpan={2}>
-                          <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
-                            Husk at gemme din ændring!
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    )}
                     <TableRow sx={{ height: isMobile ? 22 : 30 }}>
                       <TableCell sx={cellStyle}>Kiosk browser status:</TableCell>
                       <TableCell sx={valueCellStyle}>
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
-                    <TableRow sx={{ height: isMobile ? 22 : 30 }}>
-                      <TableCell sx={cellStyle}>Lokation:</TableCell>
-                      <TableCell sx={valueCellStyle}>
-                        <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-                          <TextField
-                            size="small"
-                            value={locality}
-                            onChange={handleLocalityChange}
-                            sx={inputStyle}
-                            disabled={savingLocality}
-                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
-                            error={!!localityDirty}
-                          />
-                          <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={handleLocalitySave}
-                            disabled={savingLocality}
-                            sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
-                          >
-                            {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
-                          </Button>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                    {(localityDirty || schoolDirty) && (
-                      <TableRow>
-                        <TableCell colSpan={2}>
-                          <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
-                            Husk at gemme din ændring!
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    )}
                     {renderKioskBrowserData(kioskBrowserData)}
                   </TableBody>
                 </Table>
               </TableContainer>
+              {(kioskUrlDirty) && (
+                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
+                  Husk at gemme din ændring!
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Box>
