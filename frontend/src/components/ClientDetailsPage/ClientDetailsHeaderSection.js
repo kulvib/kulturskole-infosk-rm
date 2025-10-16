@@ -14,7 +14,9 @@ import {
   TableCell,
   TableContainer,
   TableRow,
-  useMediaQuery
+  useMediaQuery,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -162,8 +164,8 @@ export default function ClientDetailsHeaderSection({
     fontSize: isMobile ? 12 : 14,
   };
 
-  // Input style for textfields and dropdown, + rød ramme hvis dirty
-  const inputStyle = (dirty) => ({
+  // Input style for textfields and dropdown
+  const inputStyle = {
     width: "100%",
     height: isMobile ? 22 : 30,
     textAlign: "left",
@@ -177,10 +179,8 @@ export default function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": {
       height: isMobile ? "22px" : "30px",
       textAlign: "left",
-      ...(dirty && { border: "2px solid red", borderRadius: "6px" }),
     },
-    ...(dirty && { border: "2px solid red", borderRadius: "6px" }),
-  });
+  };
 
   function renderKioskBrowserData(data) {
     if (!data || typeof data !== "object") return null;
@@ -251,12 +251,7 @@ export default function ClientDetailsHeaderSection({
             minWidth: 0,
             overflow: "visible",
           }}>
-            <CardContent
-              sx={{
-                px: isMobile ? 1 : 2,
-                py: isMobile ? 1 : 2,
-              }}
-            >
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Klient info
@@ -280,39 +275,41 @@ export default function ClientDetailsHeaderSection({
                       <TableCell sx={cellStyle}>Skole:</TableCell>
                       <TableCell sx={valueCellStyle}>
                         <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-                          <Select
-                            size="small"
-                            value={localSchoolSelection}
-                            displayEmpty
-                            onChange={e => setLocalSchoolSelection(e.target.value)}
-                            sx={{
-                              ...inputStyle(schoolDirty),
-                              "& .MuiSelect-select": {
-                                ...inputStyle(schoolDirty)["& .MuiInputBase-input"],
-                                textAlign: "left",
-                                paddingLeft: isMobile ? "10px" : "14px",
-                              }
-                            }}
-                            MenuProps={{
-                              PaperProps: {
-                                sx: {
-                                  fontSize: isMobile ? 12 : 14,
-                                  fontWeight: 400,
-                                  background: "white",
+                          <FormControl fullWidth error={schoolDirty} size="small" variant="outlined">
+                            <Select
+                              size="small"
+                              value={localSchoolSelection}
+                              displayEmpty
+                              onChange={e => setLocalSchoolSelection(e.target.value)}
+                              sx={{
+                                ...inputStyle,
+                                "& .MuiSelect-select": {
+                                  ...inputStyle["& .MuiInputBase-input"],
                                   textAlign: "left",
+                                  paddingLeft: isMobile ? "10px" : "14px",
                                 }
-                              }
-                            }}
-                          >
-                            <MenuItem value="" sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
-                              Vælg skole
-                            </MenuItem>
-                            {schools.map(school => (
-                              <MenuItem key={school.id} value={school.id} sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
-                                {school.name}
+                              }}
+                              MenuProps={{
+                                PaperProps: {
+                                  sx: {
+                                    fontSize: isMobile ? 12 : 14,
+                                    fontWeight: 400,
+                                    background: "white",
+                                    textAlign: "left",
+                                  }
+                                }
+                              }}
+                            >
+                              <MenuItem value="" sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
+                                Vælg skole
                               </MenuItem>
-                            ))}
-                          </Select>
+                              {schools.map(school => (
+                                <MenuItem key={school.id} value={school.id} sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
+                                  {school.name}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
                           <Button
                             variant="outlined"
                             size="small"
@@ -348,12 +345,7 @@ export default function ClientDetailsHeaderSection({
             minWidth: 0,
             overflow: "visible",
           }}>
-            <CardContent
-              sx={{
-                px: isMobile ? 1 : 2,
-                py: isMobile ? 1 : 2,
-              }}
-            >
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Kiosk browser info
@@ -369,10 +361,11 @@ export default function ClientDetailsHeaderSection({
                       <TableCell sx={valueCellStyle}>
                         <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
                           <TextField
+                            error={localLocality !== locality}
                             size="small"
                             value={localLocality}
                             onChange={e => setLocalLocality(e.target.value)}
-                            sx={inputStyle(localityDirty)}
+                            sx={inputStyle}
                           />
                           <Button
                             variant="outlined"
@@ -391,10 +384,11 @@ export default function ClientDetailsHeaderSection({
                       <TableCell sx={valueCellStyle}>
                         <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
                           <TextField
+                            error={localKioskUrl !== kioskUrl}
                             size="small"
                             value={localKioskUrl}
                             onChange={e => setLocalKioskUrl(e.target.value)}
-                            sx={inputStyle(kioskUrlDirty)}
+                            sx={inputStyle}
                           />
                           <Button
                             variant="outlined"
