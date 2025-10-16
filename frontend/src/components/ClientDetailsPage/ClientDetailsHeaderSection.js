@@ -5,8 +5,6 @@ import {
   CardContent,
   Typography,
   Button,
-  CircularProgress,
-  Tooltip,
   TextField,
   Select,
   MenuItem,
@@ -19,7 +17,6 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
@@ -110,59 +107,16 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
   );
 }
 
-// CopyIconButton
-function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
-  const [copied, setCopied] = React.useState(false);
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (err) {}
-  };
-  return (
-    <Tooltip title={copied ? "Kopieret!" : "Kopiér"}>
-      <span>
-        <Button
-          size="small"
-          onClick={handleCopy}
-          sx={{
-            minWidth: isMobile ? 20 : 24,
-            maxWidth: isMobile ? 20 : 24,
-            minHeight: isMobile ? 22 : 30,
-            maxHeight: isMobile ? 22 : 30,
-            p: 0,
-            m: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            verticalAlign: "middle",
-          }}
-          disabled={disabled}
-        >
-          <ContentCopyIcon style={{ fontSize: isMobile ? 13 : iconSize }} color={copied ? "success" : "inherit"} />
-        </Button>
-      </span>
-    </Tooltip>
-  );
-}
-
 export default function ClientDetailsHeaderSection({
   client,
   schools = [],
   schoolSelection,
   handleSchoolChange,
-  schoolDirty,
-  savingSchool,
   handleSchoolSave,
   locality,
-  localityDirty,
-  savingLocality,
   handleLocalityChange,
   handleLocalitySave,
   kioskUrl,
-  kioskUrlDirty,
-  savingKioskUrl,
   handleKioskUrlChange,
   handleKioskUrlSave,
   liveChromeStatus,
@@ -218,7 +172,6 @@ export default function ClientDetailsHeaderSection({
     ));
   }
 
-  // ----------- RENDER -----------
   return (
     <Box sx={{ width: "100%" }}>
       {/* Topbar */}
@@ -238,28 +191,23 @@ export default function ClientDetailsHeaderSection({
         >
           Tilbage til klientoversigt
         </Button>
-        <Tooltip title="Opdater klient">
-          <span>
-            <Button
-              startIcon={refreshing ? <CircularProgress size={isMobile ? 15 : 18} /> : <RefreshIcon fontSize={isMobile ? "small" : "medium"} />}
-              disabled={refreshing}
-              color="primary"
-              onClick={handleRefresh}
-              sx={{
-                fontWeight: 500,
-                textTransform: "none",
-                minWidth: 0,
-                mr: isMobile ? 0 : 1,
-                px: isMobile ? 1.2 : 2,
-                fontSize: isMobile ? "0.93rem" : 14
-              }}
-            >
-              {refreshing ? "Opdaterer..." : "Opdater"}
-            </Button>
-          </span>
-        </Tooltip>
+        <Button
+          startIcon={<RefreshIcon fontSize={isMobile ? "small" : "medium"} />}
+          disabled={refreshing}
+          color="primary"
+          onClick={handleRefresh}
+          sx={{
+            fontWeight: 500,
+            textTransform: "none",
+            minWidth: 0,
+            mr: isMobile ? 0 : 1,
+            px: isMobile ? 1.2 : 2,
+            fontSize: isMobile ? "0.93rem" : 14
+          }}
+        >
+          {refreshing ? "Opdaterer..." : "Opdater"}
+        </Button>
       </Box>
-      {/* Papers */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
         {/* Paper 1 */}
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
@@ -322,7 +270,9 @@ export default function ClientDetailsHeaderSection({
                               }
                             }}
                           >
-                            <MenuItem value="" sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>Vælg skole</MenuItem>
+                            <MenuItem value="" sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
+                              Vælg skole
+                            </MenuItem>
                             {schools.map(school => (
                               <MenuItem key={school.id} value={school.id} sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
                                 {school.name}
@@ -333,14 +283,13 @@ export default function ClientDetailsHeaderSection({
                             variant="outlined"
                             size="small"
                             onClick={handleSchoolSave}
-                            disabled={savingSchool || !schoolDirty}
                             sx={{
                               minWidth: 56,
                               ml: 1,
                               height: isMobile ? "22px" : "30px"
                             }}
                           >
-                            {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                            Gem
                           </Button>
                         </Box>
                       </TableCell>
@@ -354,20 +303,14 @@ export default function ClientDetailsHeaderSection({
                             value={locality}
                             onChange={handleLocalityChange}
                             sx={inputStyle}
-                            disabled={savingLocality}
-                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
-                            error={!!localityDirty}
                           />
-                          <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
                           <Button
                             variant="outlined"
                             size="small"
                             onClick={handleLocalitySave}
-                            disabled={savingLocality}
                             sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
                           >
-                            {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                            Gem
                           </Button>
                         </Box>
                       </TableCell>
@@ -375,11 +318,6 @@ export default function ClientDetailsHeaderSection({
                   </TableBody>
                 </Table>
               </TableContainer>
-              {(localityDirty || schoolDirty) && (
-                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
-                  Husk at gemme din ændring!
-                </Typography>
-              )}
             </CardContent>
           </Card>
         </Box>
@@ -409,20 +347,14 @@ export default function ClientDetailsHeaderSection({
                             value={kioskUrl}
                             onChange={handleKioskUrlChange}
                             sx={inputStyle}
-                            disabled={savingKioskUrl}
-                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
-                            error={!!kioskUrlDirty}
                           />
-                          <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
                           <Button
                             variant="outlined"
                             size="small"
                             onClick={handleKioskUrlSave}
-                            disabled={savingKioskUrl}
                             sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
                           >
-                            {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                            Gem
                           </Button>
                         </Box>
                       </TableCell>
@@ -437,11 +369,6 @@ export default function ClientDetailsHeaderSection({
                   </TableBody>
                 </Table>
               </TableContainer>
-              {(kioskUrlDirty) && (
-                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
-                  Husk at gemme din ændring!
-                </Typography>
-              )}
             </CardContent>
           </Card>
         </Box>
