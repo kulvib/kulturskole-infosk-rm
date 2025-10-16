@@ -25,7 +25,7 @@ import { useAuth } from "../../auth/authcontext";
 // StatusBadge
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 1 }}>
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 0.5 }}>
       <Box
         sx={{
           width: isMobile ? 8 : 10,
@@ -33,7 +33,7 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           borderRadius: "50%",
           bgcolor: color,
           border: "1px solid #ddd",
-          mr: 1,
+          mr: 0.5,
           animation: animate ? "pulsate 2s infinite" : "none"
         }}
       />
@@ -120,7 +120,7 @@ export default function ClientDetailsHeaderSection({
   useEffect(() => { setLocalKioskUrl(kioskUrl ?? ""); }, [kioskUrl]);
   useEffect(() => { setLocalSchoolSelection(schoolSelection ?? client.school_id ?? ""); }, [schoolSelection, client.school_id]);
 
-  // Dirty states (rammen bliver rød hvis feltet er ændret)
+  // Dirty states
   const localityDirty = localLocality !== (locality ?? "");
   const kioskUrlDirty = localKioskUrl !== (kioskUrl ?? "");
   const schoolDirty = localSchoolSelection !== (schoolSelection ?? client.school_id ?? "");
@@ -192,7 +192,7 @@ export default function ClientDetailsHeaderSection({
     ));
   }
 
-  // Paper width styling
+  // Paper width styling (40% / 60%) og automatisk tilpasning – ingen minWidth/overflow!
   const paper1Width = isMobile ? "100%" : "40%";
   const paper2Width = isMobile ? "100%" : "60%";
 
@@ -232,22 +232,38 @@ export default function ClientDetailsHeaderSection({
           {refreshing ? "Opdaterer..." : "Opdater"}
         </Button>
       </Box>
-      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
+      <Box sx={{
+        display: "flex",
+        flexDirection: isMobile ? "column" : "row",
+        width: "100%",
+        alignItems: "flex-start",
+      }}>
         {/* Paper 1 */}
-        <Box sx={{ width: paper1Width, pr: isMobile ? 0 : 1 }}>
+        <Box sx={{
+          width: paper1Width,
+          pr: isMobile ? 0 : 1,
+          minWidth: 0,
+          overflow: "visible",
+          flex: "0 1 auto",
+        }}>
           <Card elevation={2} sx={{
             borderRadius: isMobile ? 1 : 2,
-            overflow: "visible",
             minWidth: 0,
+            overflow: "visible",
           }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
+            <CardContent
+              sx={{
+                px: isMobile ? 1 : 2,
+                py: isMobile ? 1 : 2,
+              }}
+            >
+              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Klient info
                 </Typography>
                 <OnlineStatusBadge isOnline={client.isOnline} isMobile={isMobile} />
               </Box>
-              <TableContainer>
+              <TableContainer sx={{ overflow: "visible" }}>
                 <Table size="small" aria-label="klientinfo">
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 22 : 30 }}>
@@ -320,20 +336,31 @@ export default function ClientDetailsHeaderSection({
           </Card>
         </Box>
         {/* Paper 2 */}
-        <Box sx={{ width: paper2Width, pl: isMobile ? 0 : 1 }}>
+        <Box sx={{
+          width: paper2Width,
+          pl: isMobile ? 0 : 1,
+          minWidth: 0,
+          overflow: "visible",
+          flex: "0 1 auto",
+        }}>
           <Card elevation={2} sx={{
             borderRadius: isMobile ? 1 : 2,
-            overflow: "visible",
             minWidth: 0,
+            overflow: "visible",
           }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
+            <CardContent
+              sx={{
+                px: isMobile ? 1 : 2,
+                py: isMobile ? 1 : 2,
+              }}
+            >
+              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Kiosk browser info
                 </Typography>
                 <StateBadge state={client.state} isMobile={isMobile} />
               </Box>
-              <TableContainer>
+              <TableContainer sx={{ overflow: "visible" }}>
                 <Table size="small" aria-label="kioskinfo">
                   <TableBody>
                     {/* Lokation først, ovenover Kiosk URL */}
