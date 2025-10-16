@@ -219,7 +219,6 @@ export default function ClientDetailsHeaderSection({
     ));
   }
 
-  // ----------- RENDER -----------
   return (
     <Box sx={{ width: "100%" }}>
       {/* Topbar */}
@@ -266,7 +265,6 @@ export default function ClientDetailsHeaderSection({
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{
             borderRadius: isMobile ? 1 : 2,
-            // Scrollbar fix: ingen overflow/fast bredde
             overflow: "visible",
             minWidth: 0,
           }}>
@@ -304,9 +302,9 @@ export default function ClientDetailsHeaderSection({
                               width: "100%",
                               fontSize: isMobile ? 12 : 14,
                               height: isMobile ? "22px" : "30px",
-                              textAlign: "left", // <- VIGTIG: dropdown-indhold venstrestilles!
+                              textAlign: "left",
                               "& .MuiSelect-select": {
-                                textAlign: "left", // <- VIGTIG: dropdown-indhold venstrestilles!
+                                textAlign: "left",
                                 paddingLeft: isMobile ? 10 : 16,
                                 fontWeight: 400,
                                 fontSize: isMobile ? 12 : 14,
@@ -319,7 +317,7 @@ export default function ClientDetailsHeaderSection({
                                   fontSize: isMobile ? 12 : 14,
                                   fontWeight: 400,
                                   background: "white",
-                                  textAlign: "left", // <- VIGTIG for options
+                                  textAlign: "left",
                                 }
                               }
                             }}
@@ -347,6 +345,35 @@ export default function ClientDetailsHeaderSection({
                         </Box>
                       </TableCell>
                     </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              {schoolDirty && (
+                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
+                  Husk at gemme din ændring!
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
+        {/* Paper 2 */}
+        <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
+          <Card elevation={2} sx={{
+            borderRadius: isMobile ? 1 : 2,
+            overflow: "visible",
+            minWidth: 0,
+          }}>
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
+                  Kiosk browser info
+                </Typography>
+                <StateBadge state={client.state} isMobile={isMobile} />
+              </Box>
+              <TableContainer>
+                <Table size="small" aria-label="kioskinfo">
+                  <TableBody>
+                    {/* Lokation først */}
                     <TableRow sx={{ height: isMobile ? 22 : 30 }}>
                       <TableCell sx={cellStyle}>Lokation:</TableCell>
                       <TableCell sx={valueCellStyle}>
@@ -374,35 +401,6 @@ export default function ClientDetailsHeaderSection({
                         </Box>
                       </TableCell>
                     </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              {(localityDirty || schoolDirty) && (
-                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
-                  Husk at gemme din ændring!
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Box>
-        {/* Paper 2 */}
-        <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{
-            borderRadius: isMobile ? 1 : 2,
-            // Scrollbar fix: ingen overflow/fast bredde
-            overflow: "visible",
-            minWidth: 0,
-          }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
-                  Kiosk browser info
-                </Typography>
-                <StateBadge state={client.state} isMobile={isMobile} />
-              </Box>
-              <TableContainer>
-                <Table size="small" aria-label="kioskinfo">
-                  <TableBody>
                     <TableRow sx={{ height: isMobile ? 22 : 30 }}>
                       <TableCell sx={cellStyle}>Kiosk URL:</TableCell>
                       <TableCell sx={valueCellStyle}>
@@ -440,7 +438,7 @@ export default function ClientDetailsHeaderSection({
                   </TableBody>
                 </Table>
               </TableContainer>
-              {(kioskUrlDirty) && (
+              {(localityDirty || kioskUrlDirty) && (
                 <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
                   Husk at gemme din ændring!
                 </Typography>
