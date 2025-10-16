@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Grid } from "@mui/material";
 import ClientDetailsHeaderSection from "./ClientDetailsHeaderSection";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
@@ -18,6 +18,7 @@ import {
 export default function ClientDetailsPage({
   client,
   refreshing,
+  handleRefresh,
   markedDays,
   calendarLoading,
   streamKey,
@@ -43,54 +44,34 @@ export default function ClientDetailsPage({
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
 
-  // Skoler
+  // NYT: State til skoler
   const [schools, setSchools] = useState([]);
-  const [schoolSelection, setSchoolSelection] = useState(client?.school_id ?? "");
-  const [savingSchool, setSavingSchool] = useState(false);
-  const [schoolDirty, setSchoolDirty] = useState(false);
 
-  // Robust: Track om bruger interagerer med dropdown
-  const userIsSelectingSchool = useRef(false);
-
-  // Polling interval ref
-  const pollingRef = useRef();
-
+  // Hent skoler fra backend ved mount
   useEffect(() => {
     getSchools().then(setSchools).catch(() => setSchools([]));
   }, []);
 
-  // Funktion til at hente klientdata fra backend
-  const fetchClientData = async () => {
-    if (!client?.id) return;
-    try {
-      const updated = await getClient(client.id);
-      const pca = updated.pending_chrome_action;
-      setPendingLivestream(
-        pca === "livestream_start" || pca === "livestream_stop"
-      );
-      setLiveChromeStatus(updated.chrome_status || "unknown");
-      setLiveChromeColor(updated.chrome_color || null);
-      setLastSeen(updated.last_seen || null);
-      setUptime(updated.uptime || null);
-      // Kun opdater schoolSelection hvis ikke dirty og ikke interagerende
-      if (!schoolDirty && !userIsSelectingSchool.current) {
-        setSchoolSelection(updated.school_id ?? "");
-      }
-      // OBS: vi lader caller styre locality/kioskUrl sync (du har safety net useEffect længere nede)
-    } catch (err) {
-      // ignore errors silently (could log if needed)
-      // console.error("fetchClientData error", err);
-    }
-  };
-
   useEffect(() => {
+    let interval;
     if (client?.id) {
-      fetchClientData();
-      pollingRef.current = setInterval(fetchClientData, 1000);
+      const poll = async () => {
+        try {
+          const updated = await getClient(client.id);
+          const pca = updated.pending_chrome_action;
+          setPendingLivestream(
+            pca === "livestream_start" || pca === "livestream_stop"
+          );
+          setLiveChromeStatus(updated.chrome_status || "unknown");
+          setLiveChromeColor(updated.chrome_color || null);
+          setLastSeen(updated.last_seen || null);
+          setUptime(updated.uptime || null);
+        } catch {}
+      };
+      poll();
+      interval = setInterval(poll, 2000);
     }
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
+    return () => clearInterval(interval);
   }, [client?.id]);
 
   useEffect(() => {
@@ -101,82 +82,40 @@ export default function ClientDetailsPage({
       setLiveChromeColor(client.chrome_color || null);
       setLastSeen(client.last_seen || null);
       setUptime(client.uptime || null);
-      if (!schoolDirty && !userIsSelectingSchool.current) {
-        setSchoolSelection(client.school_id ?? "");
-      }
     }
-  }, [client, schoolDirty, localityDirty, kioskUrlDirty]);
+  }, [client]);
 
-  // handleRefresh: genindlæs klientdata og vis snackbar
-  const handleRefresh = async () => {
-    await fetchClientData();
-    if (showSnackbar) showSnackbar({ message: "Klientdata opdateret!", severity: "info" });
-  };
-
-  // Locality handlers - instrumented + return saved value
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
   };
   const handleLocalitySave = async () => {
-    if (!client?.id) return;
     setSavingLocality(true);
     try {
-      console.log("[handleLocalitySave] sending:", { clientId: client.id, locality });
-      const res = await updateClient(client.id, { locality });
-      console.log("[handleLocalitySave] response:", res);
-      // Accept different shapes from api wrapper (res, res.data, or normalized object)
-      const savedLocality = res?.locality ?? res?.data?.locality ?? locality;
-      setLocality(savedLocality);
+      await updateClient(client.id, { locality });
       setLocalityDirty(false);
       showSnackbar && showSnackbar({ message: "Lokation gemt!", severity: "success" });
-      return savedLocality;
     } catch (err) {
-      const serverMsg = err?.response?.data?.message || err?.message || String(err);
-      console.error("[handleLocalitySave] error:", err);
-      showSnackbar && showSnackbar({ message: "Kunne ikke gemme lokation: " + serverMsg, severity: "error" });
-      throw err;
-    } finally {
-      setSavingLocality(false);
+      showSnackbar && showSnackbar({ message: "Kunne ikke gemme lokation: " + err.message, severity: "error" });
     }
+    setSavingLocality(false);
   };
 
-  // Kiosk URL handlers - instrumented + return saved value
   const handleKioskUrlChange = (e) => {
     setKioskUrl(e.target.value);
     setKioskUrlDirty(true);
   };
   const handleKioskUrlSave = async () => {
-    if (!client?.id) return;
     setSavingKioskUrl(true);
     try {
-      console.log("[handleKioskUrlSave] sending:", { clientId: client.id, kioskUrl });
-      const res = await pushKioskUrl(client.id, kioskUrl);
-      console.log("[handleKioskUrlSave] response:", res);
-      const savedUrl = res?.kiosk_url ?? res?.kioskUrl ?? res?.data?.kiosk_url ?? kioskUrl;
-      setKioskUrl(savedUrl);
+      await pushKioskUrl(client.id, kioskUrl);
       setKioskUrlDirty(false);
       showSnackbar && showSnackbar({ message: "Kiosk webadresse opdateret!", severity: "success" });
-      return savedUrl;
     } catch (err) {
-      const serverMsg = err?.response?.data?.message || err?.message || String(err);
-      console.error("[handleKioskUrlSave] error:", err);
-      showSnackbar && showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + serverMsg, severity: "error" });
-      throw err;
-    } finally {
-      setSavingKioskUrl(false);
+      showSnackbar && showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + err.message, severity: "error" });
     }
+    setSavingKioskUrl(false);
   };
-
-  // Når backend har opdateret, og local value matcher backend, reset dirty state (safety net)
-  useEffect(() => {
-    if (client && localityDirty && locality === (client.locality || "")) {
-      setLocalityDirty(false);
-    }
-    if (client && kioskUrlDirty && kioskUrl === (client.kiosk_url || "")) {
-      setKioskUrlDirty(false);
-    }
-  }, [client, locality, kioskUrl]);
 
   const handleClientAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
@@ -184,7 +123,7 @@ export default function ClientDetailsPage({
       await clientAction(client.id, action);
       showSnackbar && showSnackbar({ message: "Handlingen blev udført!", severity: "success" });
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Fejl: " + (err?.message || err), severity: "error" });
+      showSnackbar && showSnackbar({ message: "Fejl: " + err.message, severity: "error" });
     }
     setActionLoading((prev) => ({ ...prev, [action]: false }));
   };
@@ -196,36 +135,8 @@ export default function ClientDetailsPage({
     if (client?.id) {
       clientAction(client.id, "livestream_start").catch(() => {});
     }
+    // eslint-disable-next-line
   }, [client?.id]);
-
-  // Skolevælger
-  const handleSchoolChange = (schoolId) => {
-    setSchoolSelection(schoolId);
-    setSchoolDirty(true);
-    userIsSelectingSchool.current = true;
-  };
-
-  const handleSchoolSave = async () => {
-    if (!client?.id) return;
-    setSavingSchool(true);
-    try {
-      console.log("[handleSchoolSave] sending:", { clientId: client.id, schoolSelection });
-      const res = await updateClient(client.id, { school_id: schoolSelection });
-      console.log("[handleSchoolSave] response:", res);
-      const saved = res?.school_id ?? res?.data?.school_id ?? schoolSelection;
-      setSchoolDirty(false);
-      userIsSelectingSchool.current = false;
-      showSnackbar && showSnackbar({ message: "Skolevalg gemt!", severity: "success" });
-      return saved;
-    } catch (err) {
-      const serverMsg = err?.response?.data?.message || err?.message || String(err);
-      console.error("[handleSchoolSave] error:", err);
-      showSnackbar && showSnackbar({ message: "Kunne ikke gemme skolevalg: " + serverMsg, severity: "error" });
-      throw err;
-    } finally {
-      setSavingSchool(false);
-    }
-  };
 
   if (!client) {
     return null;
@@ -238,11 +149,6 @@ export default function ClientDetailsPage({
           <ClientDetailsHeaderSection
             client={client}
             schools={schools}
-            schoolSelection={schoolSelection}
-            handleSchoolChange={handleSchoolChange}
-            schoolDirty={schoolDirty}
-            savingSchool={savingSchool}
-            handleSchoolSave={handleSchoolSave}
             locality={locality}
             localityDirty={localityDirty}
             savingLocality={savingLocality}
