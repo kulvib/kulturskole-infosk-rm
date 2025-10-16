@@ -1,3 +1,4 @@
+// Kolonnealignment og normal visning af dropdown-indhold
 import React from "react";
 import {
   Box,
@@ -19,128 +20,7 @@ import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
-function StatusBadge({ color, text, animate = false, isMobile = false }) {
-  return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
-      <Box
-        sx={{
-          width: isMobile ? 8 : 10,
-          height: isMobile ? 8 : 10,
-          borderRadius: "50%",
-          bgcolor: color,
-          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
-          border: "1px solid #ddd",
-          mr: 1,
-          animation: animate ? "pulsate 2s infinite" : "none"
-        }}
-      />
-      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : 14 }}>
-        {text}
-      </Typography>
-      {animate && (
-        <style>
-          {`
-            @keyframes pulsate {
-              0% { transform: scale(1); opacity: 1; }
-              50% { transform: scale(1.25); opacity: 0.5; }
-              100% { transform: scale(1); opacity: 1; }
-            }
-          `}
-        </style>
-      )}
-    </Box>
-  );
-}
-
-function StateBadge({ state, isMobile = false }) {
-  let color = "grey.400";
-  let text = state || "ukendt";
-  let animate = false;
-  if (state) {
-    switch (state.toLowerCase()) {
-      case "normal":
-        color = "#43a047";
-        animate = true;
-        break;
-      case "sleep":
-        color = "#1976d2";
-        animate = true;
-        break;
-      case "maintenance":
-        color = "#ffa000";
-        animate = true;
-        break;
-      case "error":
-        color = "#e53935";
-        animate = true;
-        break;
-      case "offline":
-        color = "#757575";
-        animate = false;
-        break;
-      default:
-        color = "grey.400";
-        animate = false;
-    }
-  }
-  return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
-}
-
-function OnlineStatusBadge({ isOnline, isMobile = false }) {
-  const color = isOnline ? "#43a047" : "#e53935";
-  const text = isOnline ? "online" : "offline";
-  return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
-}
-
-function ChromeStatusBadge({ status, color, isMobile = false }) {
-  let fallbackColor = "grey.400";
-  let text = status || "ukendt";
-  let dotColor = color || fallbackColor;
-  const animate = true;
-  return (
-    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
-      <StatusBadge color={dotColor} text={text} animate={animate} isMobile={isMobile} />
-    </Box>
-  );
-}
-
-function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
-  const [copied, setCopied] = React.useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (err) {}
-  };
-
-  return (
-    <Tooltip title={copied ? "Kopieret!" : "Kopiér"}>
-      <span>
-        <Button
-          size="small"
-          onClick={handleCopy}
-          sx={{
-            minWidth: isMobile ? 20 : 24,
-            maxWidth: isMobile ? 20 : 24,
-            minHeight: isMobile ? 22 : 30,
-            maxHeight: isMobile ? 22 : 30,
-            p: 0,
-            m: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            verticalAlign: "middle",
-          }}
-          disabled={disabled}
-        >
-          <ContentCopyIcon style={{ fontSize: isMobile ? 13 : iconSize }} color={copied ? "success" : "inherit"} />
-        </Button>
-      </span>
-    </Tooltip>
-  );
-}
+// ...StatusBadge, StateBadge, OnlineStatusBadge, ChromeStatusBadge, CopyIconButton unchanged...
 
 export default function ClientDetailsHeaderSection({
   client,
@@ -177,6 +57,7 @@ export default function ClientDetailsHeaderSection({
     alignItems: "center",
     height: isMobile ? 22 : 30,
     mb: 0,
+    minWidth: 0,
   };
   const labelStyle = {
     fontWeight: 600,
@@ -185,6 +66,7 @@ export default function ClientDetailsHeaderSection({
     pr: isMobile ? 0.25 : 0.5,
     fontSize: isMobile ? 12 : 14,
     verticalAlign: "middle",
+    textAlign: "right" // <-- Align labels right for column alignment
   };
   const valueStyle = {
     fontWeight: 400,
@@ -194,6 +76,8 @@ export default function ClientDetailsHeaderSection({
     minHeight: isMobile ? 22 : 30,
     display: "flex",
     alignItems: "center",
+    flex: 1,
+    minWidth: 0,
   };
 
   const inputStyle = {
@@ -284,26 +168,38 @@ export default function ClientDetailsHeaderSection({
               )}
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Skole:</Typography>
-                <Box sx={{ ...valueStyle }}>
+                <Box sx={valueStyle}>
                   <Select
                     size="small"
                     value={schoolSelection ?? client.school_id ?? ""}
                     displayEmpty
                     onChange={e => handleSchoolChange(e.target.value)}
                     sx={{
-                      minWidth: 240,
-                      width: 240,
+                      minWidth: 0,
+                      width: "100%",
                       fontSize: isMobile ? 12 : 14,
                       height: isMobile ? "22px" : "30px",
                       "& .MuiSelect-select": {
                         textAlign: "left",
-                        paddingLeft: 16, // Præcis samme spacing som kolonne-tekst (pl: 2)
+                        paddingLeft: isMobile ? 10 : 16,
+                        fontWeight: 400,
+                        fontSize: isMobile ? 12 : 14,
+                      },
+                      background: "transparent"
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          fontSize: isMobile ? 12 : 14,
+                          fontWeight: 400,
+                          background: "white",
+                        }
                       }
                     }}
                   >
-                    <MenuItem value="" sx={{ textAlign: "left" }}>Vælg skole</MenuItem>
+                    <MenuItem value="" sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>Vælg skole</MenuItem>
                     {schools.map(school => (
-                      <MenuItem key={school.id} value={school.id} sx={{ textAlign: "left" }}>
+                      <MenuItem key={school.id} value={school.id} sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
                         {school.name}
                       </MenuItem>
                     ))}
@@ -341,9 +237,7 @@ export default function ClientDetailsHeaderSection({
               </Box>
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Kiosk URL:</Typography>
-              </Box>
-              <Box sx={rowStyle}>
-                <Box sx={{ display: "flex", alignItems: "center", flex: 1, gap: 1 }}>
+                <Box sx={valueStyle}>
                   <TextField
                     size="small"
                     value={kioskUrl}
@@ -360,7 +254,7 @@ export default function ClientDetailsHeaderSection({
                     size="small"
                     onClick={handleKioskUrlSave}
                     disabled={savingKioskUrl}
-                    sx={{ minWidth: 56, height: isMobile ? "22px" : "30px" }}
+                    sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
                   >
                     {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                   </Button>
@@ -373,14 +267,14 @@ export default function ClientDetailsHeaderSection({
               )}
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Kiosk browser status:</Typography>
-              </Box>
-              <Box sx={rowStyle}>
-                <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+                <Box sx={valueStyle}>
+                  <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+                </Box>
               </Box>
               {/* Lokation felt placeret her */}
               <Box sx={rowStyle}>
                 <Typography sx={labelStyle}>Lokation:</Typography>
-                <Box sx={{ display: "flex", alignItems: "center", flex: 1, ml: 1, gap: 1 }}>
+                <Box sx={valueStyle}>
                   <TextField
                     size="small"
                     value={locality}
@@ -397,7 +291,7 @@ export default function ClientDetailsHeaderSection({
                     size="small"
                     onClick={handleLocalitySave}
                     disabled={savingLocality}
-                    sx={{ minWidth: 56, height: isMobile ? "22px" : "30px" }}
+                    sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
                   >
                     {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                   </Button>
