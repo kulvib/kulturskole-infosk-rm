@@ -16,7 +16,8 @@ import {
   TableRow,
   useMediaQuery,
   FormControl,
-  InputLabel,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -36,7 +37,7 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           bgcolor: color,
           border: "1px solid #ddd",
           mr: 0.5,
-          animation: animate ? "pulsate 2s infinite" : "none"
+          animation: animate ? "pulsate 2s infinite" : "none",
         }}
       />
       <Typography variant="body2" sx={{ fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
@@ -62,12 +63,29 @@ function StateBadge({ state, isMobile = false }) {
   let animate = false;
   if (state) {
     switch (state.toLowerCase()) {
-      case "normal": color = "#43a047"; animate = true; break;
-      case "sleep": color = "#1976d2"; animate = true; break;
-      case "maintenance": color = "#ffa000"; animate = true; break;
-      case "error": color = "#e53935"; animate = true; break;
-      case "offline": color = "#757575"; animate = false; break;
-      default: color = "grey.400"; animate = false;
+      case "normal":
+        color = "#43a047";
+        animate = true;
+        break;
+      case "sleep":
+        color = "#1976d2";
+        animate = true;
+        break;
+      case "maintenance":
+        color = "#ffa000";
+        animate = true;
+        break;
+      case "error":
+        color = "#e53935";
+        animate = true;
+        break;
+      case "offline":
+        color = "#757575";
+        animate = false;
+        break;
+      default:
+        color = "grey.400";
+        animate = false;
     }
   }
   return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
@@ -109,42 +127,49 @@ export default function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Local state for inputs and saving
+  // Local editable state
   const [localLocality, setLocalLocality] = useState(locality ?? "");
   const [localKioskUrl, setLocalKioskUrl] = useState(kioskUrl ?? "");
   const [localSchoolSelection, setLocalSchoolSelection] = useState(schoolSelection ?? client.school_id ?? "");
+
+  // Baseline states: det "sande" gemte værdigrundlag vi sammenligner imod
+  const [baselineLocality, setBaselineLocality] = useState(locality ?? "");
+  const [baselineKioskUrl, setBaselineKioskUrl] = useState(kioskUrl ?? "");
+  const [baselineSchoolSelection, setBaselineSchoolSelection] = useState(schoolSelection ?? client.school_id ?? "");
+
+  // Saving flags
   const [savingLocality, setSavingLocality] = useState(false);
   const [savingKioskUrl, setSavingKioskUrl] = useState(false);
   const [savingSchool, setSavingSchool] = useState(false);
 
-  // Sync props to local state if changed externally
-  useEffect(() => { setLocalLocality(locality ?? ""); }, [locality]);
-  useEffect(() => { setLocalKioskUrl(kioskUrl ?? ""); }, [kioskUrl]);
-  useEffect(() => { setLocalSchoolSelection(schoolSelection ?? client.school_id ?? ""); }, [schoolSelection, client.school_id]);
+  // Snackbar state for user feedback
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success"); // "success" | "error" | "info" | "warning"
 
-  // Dirty states
-  const localityDirty = localLocality !== (locality ?? "");
-  const kioskUrlDirty = localKioskUrl !== (kioskUrl ?? "");
-  const schoolDirty = localSchoolSelection !== (schoolSelection ?? client.school_id ?? "");
+  // Sync incoming props to both local editable and baseline if props change externally
+  useEffect(() => {
+    setLocalLocality(locality ?? "");
+    setBaselineLocality(locality ?? "");
+  }, [locality]);
 
-  // Handlers with spinner effect
-  const onSaveLocality = async () => {
-    setSavingLocality(true);
-    await handleLocalitySave(localLocality);
-    setSavingLocality(false);
-  };
-  const onSaveKioskUrl = async () => {
-    setSavingKioskUrl(true);
-    await handleKioskUrlSave(localKioskUrl);
-    setSavingKioskUrl(false);
-  };
-  const onSaveSchool = async () => {
-    setSavingSchool(true);
-    await handleSchoolSave(localSchoolSelection);
-    setSavingSchool(false);
-  };
+  useEffect(() => {
+    setLocalKioskUrl(kioskUrl ?? "");
+    setBaselineKioskUrl(kioskUrl ?? "");
+  }, [kioskUrl]);
 
-  // Fælles cell style for begge papers!
+  useEffect(() => {
+    const val = schoolSelection ?? client.school_id ?? "";
+    setLocalSchoolSelection(val);
+    setBaselineSchoolSelection(val);
+  }, [schoolSelection, client.school_id]);
+
+  // Dirty checks relative to baseline
+  const localityDirty = localLocality !== baselineLocality;
+  const kioskUrlDirty = localKioskUrl !== baselineKioskUrl;
+  const schoolDirty = localSchoolSelection !== baselineSchoolSelection;
+
+  // Table cell styles (ens i begge papers)
   const cellStyle = {
     border: 0,
     fontWeight: 600,
@@ -182,6 +207,66 @@ export default function ClientDetailsHeaderSection({
     },
   };
 
+  // Helper to show snackbar
+  const showSnackbar = (message, severity = "success") => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  // Save handlers: update baseline when save completes successfully
+  const onSaveLocality = async () => {
+    if (!localityDirty || savingLocality) return;
+    setSavingLocality(true);
+    try {
+      const result = await handleLocalitySave(localLocality);
+      // If handler returns a normalized/saved value, prefer it; otherwise use the local value
+      const savedValue = result !== undefined ? result : localLocality;
+      setBaselineLocality(savedValue);
+      setLocalLocality(savedValue);
+      showSnackbar("Lokation gemt", "success");
+    } catch (err) {
+      console.error("Fejl ved gem af Lokation:", err);
+      showSnackbar("Kunne ikke gemme lokation", "error");
+    } finally {
+      setSavingLocality(false);
+    }
+  };
+
+  const onSaveKioskUrl = async () => {
+    if (!kioskUrlDirty || savingKioskUrl) return;
+    setSavingKioskUrl(true);
+    try {
+      const result = await handleKioskUrlSave(localKioskUrl);
+      const savedValue = result !== undefined ? result : localKioskUrl;
+      setBaselineKioskUrl(savedValue);
+      setLocalKioskUrl(savedValue);
+      showSnackbar("Kiosk URL gemt", "success");
+    } catch (err) {
+      console.error("Fejl ved gem af Kiosk URL:", err);
+      showSnackbar("Kunne ikke gemme Kiosk URL", "error");
+    } finally {
+      setSavingKioskUrl(false);
+    }
+  };
+
+  const onSaveSchool = async () => {
+    if (!schoolDirty || savingSchool) return;
+    setSavingSchool(true);
+    try {
+      const result = await handleSchoolSave(localSchoolSelection);
+      const savedValue = result !== undefined ? result : localSchoolSelection;
+      setBaselineSchoolSelection(savedValue);
+      setLocalSchoolSelection(savedValue);
+      showSnackbar("Skole gemt", "success");
+    } catch (err) {
+      console.error("Fejl ved gem af Skole:", err);
+      showSnackbar("Kunne ikke gemme skole", "error");
+    } finally {
+      setSavingSchool(false);
+    }
+  };
+
   function renderKioskBrowserData(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
@@ -192,14 +277,23 @@ export default function ClientDetailsHeaderSection({
     ));
   }
 
-  // Paper width styling (40% / 60%) og automatisk tilpasning – ingen minWidth/overflow!
+  // Paper widths
   const paper1Width = isMobile ? "100%" : "40%";
   const paper2Width = isMobile ? "100%" : "60%";
 
   return (
     <Box sx={{ width: "100%" }}>
       {/* Topbar */}
-      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", mb: isMobile ? 0.5 : 1, gap: isMobile ? 1 : 0 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          justifyContent: "space-between",
+          alignItems: isMobile ? "stretch" : "center",
+          mb: isMobile ? 0.5 : 1,
+          gap: isMobile ? 1 : 0,
+        }}
+      >
         <Button
           variant="outlined"
           startIcon={<ArrowBackIcon sx={{ fontSize: isMobile ? 19 : 20 }} />}
@@ -226,31 +320,17 @@ export default function ClientDetailsHeaderSection({
             minWidth: 0,
             mr: isMobile ? 0 : 1,
             px: isMobile ? 1.2 : 2,
-            fontSize: isMobile ? "0.93rem" : 14
+            fontSize: isMobile ? "0.93rem" : 14,
           }}
         >
           {refreshing ? "Opdaterer..." : "Opdater"}
         </Button>
       </Box>
-      <Box sx={{
-        display: "flex",
-        flexDirection: isMobile ? "column" : "row",
-        width: "100%",
-        alignItems: "flex-start",
-      }}>
+
+      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%", alignItems: "flex-start" }}>
         {/* Paper 1 */}
-        <Box sx={{
-          width: paper1Width,
-          pr: isMobile ? 0 : 1,
-          minWidth: 0,
-          overflow: "visible",
-          flex: "0 1 auto",
-        }}>
-          <Card elevation={2} sx={{
-            borderRadius: isMobile ? 1 : 2,
-            minWidth: 0,
-            overflow: "visible",
-          }}>
+        <Box sx={{ width: paper1Width, pr: isMobile ? 0 : 1, minWidth: 0, overflow: "visible", flex: "0 1 auto" }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, minWidth: 0, overflow: "visible" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
@@ -258,6 +338,7 @@ export default function ClientDetailsHeaderSection({
                 </Typography>
                 <OnlineStatusBadge isOnline={client.isOnline} isMobile={isMobile} />
               </Box>
+
               <TableContainer sx={{ overflow: "visible" }}>
                 <Table size="small" aria-label="klientinfo">
                   <TableBody>
@@ -265,12 +346,14 @@ export default function ClientDetailsHeaderSection({
                       <TableCell sx={cellStyle}>Klientnavn:</TableCell>
                       <TableCell sx={valueCellStyle}>{client.name}</TableCell>
                     </TableRow>
+
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 22 : 30 }}>
                         <TableCell sx={cellStyle}>Klient ID:</TableCell>
                         <TableCell sx={valueCellStyle}>{client.id}</TableCell>
                       </TableRow>
                     )}
+
                     <TableRow sx={{ height: isMobile ? 22 : 30 }}>
                       <TableCell sx={cellStyle}>Skole:</TableCell>
                       <TableCell sx={valueCellStyle}>
@@ -280,14 +363,14 @@ export default function ClientDetailsHeaderSection({
                               size="small"
                               value={localSchoolSelection}
                               displayEmpty
-                              onChange={e => setLocalSchoolSelection(e.target.value)}
+                              onChange={(e) => setLocalSchoolSelection(e.target.value)}
                               sx={{
                                 ...inputStyle,
                                 "& .MuiSelect-select": {
                                   ...inputStyle["& .MuiInputBase-input"],
                                   textAlign: "left",
                                   paddingLeft: isMobile ? "10px" : "14px",
-                                }
+                                },
                               }}
                               MenuProps={{
                                 PaperProps: {
@@ -296,14 +379,14 @@ export default function ClientDetailsHeaderSection({
                                     fontWeight: 400,
                                     background: "white",
                                     textAlign: "left",
-                                  }
-                                }
+                                  },
+                                },
                               }}
                             >
                               <MenuItem value="" sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
                                 Vælg skole
                               </MenuItem>
-                              {schools.map(school => (
+                              {schools.map((school) => (
                                 <MenuItem key={school.id} value={school.id} sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
                                   {school.name}
                                 </MenuItem>
@@ -314,12 +397,8 @@ export default function ClientDetailsHeaderSection({
                             variant="outlined"
                             size="small"
                             onClick={onSaveSchool}
-                            disabled={savingSchool}
-                            sx={{
-                              minWidth: 56,
-                              ml: 1,
-                              height: isMobile ? "22px" : "30px"
-                            }}
+                            disabled={!schoolDirty || savingSchool}
+                            sx={{ minWidth: 56, ml: 1, height: isMobile ? "22px" : "30px" }}
                           >
                             {savingSchool ? <CircularProgress size={14} /> : "Gem"}
                           </Button>
@@ -332,19 +411,10 @@ export default function ClientDetailsHeaderSection({
             </CardContent>
           </Card>
         </Box>
+
         {/* Paper 2 */}
-        <Box sx={{
-          width: paper2Width,
-          pl: isMobile ? 0 : 1,
-          minWidth: 0,
-          overflow: "visible",
-          flex: "0 1 auto",
-        }}>
-          <Card elevation={2} sx={{
-            borderRadius: isMobile ? 1 : 2,
-            minWidth: 0,
-            overflow: "visible",
-          }}>
+        <Box sx={{ width: paper2Width, pl: isMobile ? 0 : 1, minWidth: 0, overflow: "visible", flex: "0 1 auto" }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, minWidth: 0, overflow: "visible" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
@@ -352,26 +422,26 @@ export default function ClientDetailsHeaderSection({
                 </Typography>
                 <StateBadge state={client.state} isMobile={isMobile} />
               </Box>
+
               <TableContainer sx={{ overflow: "visible" }}>
                 <Table size="small" aria-label="kioskinfo">
                   <TableBody>
-                    {/* Lokation først, ovenover Kiosk URL */}
                     <TableRow sx={{ height: isMobile ? 22 : 30 }}>
                       <TableCell sx={cellStyle}>Lokation:</TableCell>
                       <TableCell sx={valueCellStyle}>
                         <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
                           <TextField
-                            error={localLocality !== locality}
+                            error={localLocality !== baselineLocality}
                             size="small"
                             value={localLocality}
-                            onChange={e => setLocalLocality(e.target.value)}
+                            onChange={(e) => setLocalLocality(e.target.value)}
                             sx={inputStyle}
                           />
                           <Button
                             variant="outlined"
                             size="small"
                             onClick={onSaveLocality}
-                            disabled={savingLocality}
+                            disabled={!localityDirty || savingLocality}
                             sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
                           >
                             {savingLocality ? <CircularProgress size={14} /> : "Gem"}
@@ -379,22 +449,23 @@ export default function ClientDetailsHeaderSection({
                         </Box>
                       </TableCell>
                     </TableRow>
+
                     <TableRow sx={{ height: isMobile ? 22 : 30 }}>
                       <TableCell sx={cellStyle}>Kiosk URL:</TableCell>
                       <TableCell sx={valueCellStyle}>
                         <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
                           <TextField
-                            error={localKioskUrl !== kioskUrl}
+                            error={localKioskUrl !== baselineKioskUrl}
                             size="small"
                             value={localKioskUrl}
-                            onChange={e => setLocalKioskUrl(e.target.value)}
+                            onChange={(e) => setLocalKioskUrl(e.target.value)}
                             sx={inputStyle}
                           />
                           <Button
                             variant="outlined"
                             size="small"
                             onClick={onSaveKioskUrl}
-                            disabled={savingKioskUrl}
+                            disabled={!kioskUrlDirty || savingKioskUrl}
                             sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
                           >
                             {savingKioskUrl ? <CircularProgress size={14} /> : "Gem"}
@@ -402,12 +473,14 @@ export default function ClientDetailsHeaderSection({
                         </Box>
                       </TableCell>
                     </TableRow>
+
                     <TableRow sx={{ height: isMobile ? 22 : 30 }}>
                       <TableCell sx={cellStyle}>Kiosk browser status:</TableCell>
                       <TableCell sx={valueCellStyle}>
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
+
                     {renderKioskBrowserData(kioskBrowserData)}
                   </TableBody>
                 </Table>
@@ -416,6 +489,17 @@ export default function ClientDetailsHeaderSection({
           </Card>
         </Box>
       </Box>
+
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3500}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: "100%" }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
