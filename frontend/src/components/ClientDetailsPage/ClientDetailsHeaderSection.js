@@ -13,7 +13,11 @@ import {
   TableBody,
   TableCell,
   TableContainer,
-  TableRow
+  TableRow,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -21,6 +25,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
+import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 // Fælles StatusBadge med 2s puls animation hvis animate=true
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
@@ -165,7 +170,7 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
 
 export default function ClientDetailsHeaderSection({
   client,
-  schools,
+  schools = [],
   locality,
   localityDirty,
   savingLocality,
@@ -181,17 +186,87 @@ export default function ClientDetailsHeaderSection({
   refreshing,
   handleRefresh,
   kioskBrowserData = {},
+  onSchoolUpdated, // optional callback(updatedClient)
+  showSnackbar, // optional callback for messages
 }) {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Helper til skole-navn
-  const getSchoolName = (schoolId) => {
-    if (!Array.isArray(schools)) return <span style={{ color: "#888" }}>Ingen skole</span>;
-    const school = schools.find(s => s && (s.id === schoolId || String(s.id) === String(schoolId)));
-    return school ? school.name : <span style={{ color: "#888" }}>Ingen skole</span>;
+  // School state: prefer prop 'schools' if provided; fallback to fetching via apiGetSchools
+  const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
+  const [loadingSchools, setLoadingSchools] = React.useState(false);
+  const [schoolsError, setSchoolsError] = React.useState(null);
+
+  const [selectedSchool, setSelectedSchool] = React.useState(client?.school_id ?? "");
+  const [savingSchool, setSavingSchool] = React.useState(false);
+
+  // Sync incoming prop changes
+  React.useEffect(() => {
+    if (Array.isArray(schools) && schools.length) {
+      setSchoolsList(schools);
+    }
+  }, [schools]);
+
+  // Sync selected school when client changes
+  React.useEffect(() => {
+    setSelectedSchool(client?.school_id ?? "");
+  }, [client?.school_id]);
+
+  // If no schools provided, fetch from backend
+  React.useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (Array.isArray(schools) && schools.length) {
+        // parent provided schools, no need to fetch
+        return;
+      }
+      setLoadingSchools(true);
+      setSchoolsError(null);
+      try {
+        const data = await apiGetSchools();
+        if (cancelled) return;
+        if (Array.isArray(data)) setSchoolsList(data);
+        else if (Array.isArray(data.schools)) setSchoolsList(data.schools);
+      } catch (err) {
+        if (cancelled) return;
+        setSchoolsError(err.message || "Fejl ved hentning af skoler");
+      } finally {
+        if (!cancelled) setLoadingSchools(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [schools]);
+
+  const handleSchoolSelectChange = (e) => {
+    setSelectedSchool(e.target.value);
+  };
+
+  const handleSchoolSave = async () => {
+    if (!client || !client.id) return;
+    if (String(selectedSchool) === String(client.school_id)) return;
+    setSavingSchool(true);
+    try {
+      // Use apiUpdateClient helper to PATCH the client (expects updateClient(clientId, payload))
+      const updated = await apiUpdateClient(client.id, { school_id: selectedSchool });
+      // Notify parent if provided
+      if (typeof onSchoolUpdated === "function") {
+        onSchoolUpdated(updated || { ...client, school_id: selectedSchool });
+      }
+      // Optional snackbar message via prop
+      if (typeof showSnackbar === "function") {
+        showSnackbar({ message: "Skole opdateret", severity: "success" });
+      }
+    } catch (err) {
+      console.error("Fejl ved opdatering af skole:", err);
+      if (typeof showSnackbar === "function") {
+        showSnackbar({ message: "Kunne ikke opdatere skole: " + (err.message || err), severity: "error" });
+      }
+    } finally {
+      setSavingSchool(false);
+    }
   };
 
   const labelStyle = {
@@ -274,9 +349,9 @@ export default function ClientDetailsHeaderSection({
         </Tooltip>
       </Box>
 
-      {/* Papers (begge nu med tabel-layout as before) */}
+      {/* Papers */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
-        {/* Paper 1 - Klient info (table layout) */}
+        {/* Paper 1 - Klient info */}
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
@@ -284,7 +359,6 @@ export default function ClientDetailsHeaderSection({
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Klient info
                 </Typography>
-                {/* Flyttet: OnlineStatusBadge fra ClientDetailsInfoSection -> vises her */}
                 <Box sx={{ ml: 1 }}>
                   <OnlineStatusBadge isOnline={client?.isOnline} isMobile={isMobile} />
                 </Box>
@@ -309,10 +383,47 @@ export default function ClientDetailsHeaderSection({
                       </TableRow>
                     )}
 
-                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
+                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        {getSchoolName(client?.school_id)}
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <FormControl size={isMobile ? "small" : "medium"} fullWidth>
+                            <InputLabel id="school-select-label">Vælg skole</InputLabel>
+                            <Select
+                              labelId="school-select-label"
+                              id="school-select"
+                              value={selectedSchool ?? ""}
+                              label="Vælg skole"
+                              onChange={handleSchoolSelectChange}
+                              disabled={loadingSchools}
+                              renderValue={(val) => {
+                                if (!val) return <span style={{ color: "#888" }}>Ingen skole</span>;
+                                const s = (schoolsList || []).find(x => String(x.id) === String(val));
+                                return s ? s.name : String(val);
+                              }}
+                              inputProps={{ "aria-label": "Skole" }}
+                            >
+                              <MenuItem value="">
+                                <em>Ingen skole</em>
+                              </MenuItem>
+                              {(schoolsList || []).map(s => (
+                                <MenuItem key={s.id} value={s.id}>
+                                  {s.name}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={handleSchoolSave}
+                            disabled={savingSchool || String(selectedSchool) === String(client?.school_id)}
+                            sx={{ minWidth: 56 }}
+                          >
+                            {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                          </Button>
+                        </Box>
                       </TableCell>
                     </TableRow>
 
@@ -342,11 +453,6 @@ export default function ClientDetailsHeaderSection({
                             {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
-                        {localityDirty && (
-                          <Typography variant="caption" color="warning.main" sx={{ pl: 0, mt: 0.5 }}>
-                            Husk at gemme din ændring!
-                          </Typography>
-                        )}
                       </TableCell>
                     </TableRow>
 
@@ -358,7 +464,7 @@ export default function ClientDetailsHeaderSection({
           </Card>
         </Box>
 
-        {/* Paper 2 - Kiosk info (table layout) */}
+        {/* Paper 2 - Kiosk info */}
         <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
@@ -366,7 +472,6 @@ export default function ClientDetailsHeaderSection({
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Kiosk info
                 </Typography>
-                {/* Flyttet: StateBadge fra ClientDetailsInfoSection -> vises her */}
                 <Box sx={{ ml: 1 }}>
                   <StateBadge state={client?.state} isMobile={isMobile} />
                 </Box>
@@ -401,11 +506,6 @@ export default function ClientDetailsHeaderSection({
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
-                        {kioskUrlDirty && (
-                          <Typography variant="caption" color="warning.main" sx={{ pl: 0, mt: 0.5 }}>
-                            Husk at gemme din ændring!
-                          </Typography>
-                        )}
                       </TableCell>
                     </TableRow>
 
