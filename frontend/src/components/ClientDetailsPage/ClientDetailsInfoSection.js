@@ -61,48 +61,6 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
   );
 }
 
-// Online/offline badge med 2s puls, grøn/rød
-function OnlineStatusBadge({ isOnline, isMobile=false }) {
-  const color = isOnline ? "#43a047" : "#e53935";
-  const text = isOnline ? "online" : "offline";
-  return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
-}
-
-// State badge med 2s puls på farvede states, ikke på "ukendt"
-function StateBadge({ state, isMobile=false }) {
-  let color = "grey.400";
-  let text = state || "ukendt";
-  let animate = false;
-  if (state) {
-    switch (state.toLowerCase()) {
-      case "normal":
-        color = "#43a047";
-        animate = true;
-        break;
-      case "sleep":
-        color = "#1976d2";
-        animate = true;
-        break;
-      case "maintenance":
-        color = "#ffa000";
-        animate = true;
-        break;
-      case "error":
-        color = "#e53935";
-        animate = true;
-        break;
-      case "offline":
-        color = "#757575";
-        animate = false;
-        break;
-      default:
-        color = "grey.400";
-        animate = false;
-    }
-  }
-  return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
-}
-
 function formatDateShort(dt) {
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
   const dayName = ukedage[dt.getDay()];
@@ -428,6 +386,7 @@ export default function ClientDetailsInfoSection({
           </CardContent>
         </Card>
       </Grid>
+
       <Grid item xs={12} md={4}>
         <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
           <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
@@ -435,12 +394,13 @@ export default function ClientDetailsInfoSection({
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
                 Systeminfo
               </Typography>
-              <StateBadge state={client.state} isMobile={isMobile} />
+              {/* StateBadge removed from here (moved to header) */}
             </Box>
             <SystemInfoTable client={client} uptime={uptime} lastSeen={lastSeen} isMobile={isMobile} />
           </CardContent>
         </Card>
       </Grid>
+
       <Grid item xs={12} md={4}>
         <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
           <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
@@ -448,7 +408,7 @@ export default function ClientDetailsInfoSection({
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
                 Netværksinfo
               </Typography>
-              <OnlineStatusBadge isOnline={client.isOnline} isMobile={isMobile} />
+              {/* OnlineStatusBadge removed from here (moved to header) */}
             </Box>
             <NetworkInfoTable client={client} isMobile={isMobile} />
           </CardContent>
