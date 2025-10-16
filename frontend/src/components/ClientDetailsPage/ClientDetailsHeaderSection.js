@@ -14,10 +14,7 @@ import {
   TableCell,
   TableContainer,
   TableRow,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel
+  MenuItem
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -308,6 +305,12 @@ export default function ClientDetailsHeaderSection({
     ));
   }
 
+  const getSelectedSchoolName = () => {
+    if (!selectedSchool) return "";
+    const s = (schoolsList || []).find(x => String(x.id) === String(selectedSchool));
+    return s ? s.name : String(selectedSchool);
+  };
+
   return (
     <Box sx={{ width: "100%" }}>
       {/* Topbar */}
@@ -387,32 +390,36 @@ export default function ClientDetailsHeaderSection({
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <FormControl size={isMobile ? "small" : "medium"} fullWidth>
-                            <InputLabel id="school-select-label">Vælg skole</InputLabel>
-                            <Select
-                              labelId="school-select-label"
-                              id="school-select"
-                              value={selectedSchool ?? ""}
-                              label="Vælg skole"
-                              onChange={handleSchoolSelectChange}
-                              disabled={loadingSchools}
-                              renderValue={(val) => {
-                                if (!val) return <span style={{ color: "#888" }}>Ingen skole</span>;
-                                const s = (schoolsList || []).find(x => String(x.id) === String(val));
-                                return s ? s.name : String(val);
-                              }}
-                              inputProps={{ "aria-label": "Skole" }}
-                            >
-                              <MenuItem value="">
-                                <em>Ingen skole</em>
+                          {/* Brug TextField med select så ramme matcher Lokation's TextField */}
+                          <TextField
+                            select
+                            size="small"
+                            value={selectedSchool ?? ""}
+                            onChange={handleSchoolSelectChange}
+                            disabled={loadingSchools}
+                            sx={{ ...inputStyle }}
+                            fullWidth
+                            label="Vælg skole"
+                            SelectProps={{ MenuProps: { disablePortal: true } }}
+                            inputProps={{ "aria-label": "Skole" }}
+                          >
+                            <MenuItem value="">
+                              <em>Ingen skole</em>
+                            </MenuItem>
+                            {(schoolsList || []).map(s => (
+                              <MenuItem key={s.id} value={s.id}>
+                                {s.name}
                               </MenuItem>
-                              {(schoolsList || []).map(s => (
-                                <MenuItem key={s.id} value={s.id}>
-                                  {s.name}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
+                            ))}
+                          </TextField>
+
+                          {/* Kopi-ikon: kopierer skolens navn, samme logik som lokation */}
+                          <CopyIconButton
+                            value={getSelectedSchoolName()}
+                            disabled={!getSelectedSchoolName()}
+                            iconSize={isMobile ? 13 : 15}
+                            isMobile={isMobile}
+                          />
 
                           <Button
                             variant="outlined"
