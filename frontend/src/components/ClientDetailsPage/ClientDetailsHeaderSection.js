@@ -1,4 +1,3 @@
-// Kolonnealignment og normal visning af dropdown-indhold
 import React from "react";
 import {
   Box,
@@ -20,7 +19,133 @@ import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
-// ...StatusBadge, StateBadge, OnlineStatusBadge, ChromeStatusBadge, CopyIconButton unchanged...
+// StatusBadge
+function StatusBadge({ color, text, animate = false, isMobile = false }) {
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
+      <Box
+        sx={{
+          width: isMobile ? 8 : 10,
+          height: isMobile ? 8 : 10,
+          borderRadius: "50%",
+          bgcolor: color,
+          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+          border: "1px solid #ddd",
+          mr: 1,
+          animation: animate ? "pulsate 2s infinite" : "none"
+        }}
+      />
+      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : 14 }}>
+        {text}
+      </Typography>
+      {animate && (
+        <style>
+          {`
+            @keyframes pulsate {
+              0% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.25); opacity: 0.5; }
+              100% { transform: scale(1); opacity: 1; }
+            }
+          `}
+        </style>
+      )}
+    </Box>
+  );
+}
+
+// StateBadge
+function StateBadge({ state, isMobile = false }) {
+  let color = "grey.400";
+  let text = state || "ukendt";
+  let animate = false;
+  if (state) {
+    switch (state.toLowerCase()) {
+      case "normal":
+        color = "#43a047";
+        animate = true;
+        break;
+      case "sleep":
+        color = "#1976d2";
+        animate = true;
+        break;
+      case "maintenance":
+        color = "#ffa000";
+        animate = true;
+        break;
+      case "error":
+        color = "#e53935";
+        animate = true;
+        break;
+      case "offline":
+        color = "#757575";
+        animate = false;
+        break;
+      default:
+        color = "grey.400";
+        animate = false;
+    }
+  }
+  return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
+}
+
+// OnlineStatusBadge
+function OnlineStatusBadge({ isOnline, isMobile = false }) {
+  const color = isOnline ? "#43a047" : "#e53935";
+  const text = isOnline ? "online" : "offline";
+  return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
+}
+
+// ChromeStatusBadge
+function ChromeStatusBadge({ status, color, isMobile = false }) {
+  let fallbackColor = "grey.400";
+  let text = status || "ukendt";
+  let dotColor = color || fallbackColor;
+  const animate = true;
+  return (
+    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+      <StatusBadge color={dotColor} text={text} animate={animate} isMobile={isMobile} />
+    </Box>
+  );
+}
+
+// CopyIconButton
+function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {}
+  };
+
+  return (
+    <Tooltip title={copied ? "Kopieret!" : "Kopiér"}>
+      <span>
+        <Button
+          size="small"
+          onClick={handleCopy}
+          sx={{
+            minWidth: isMobile ? 20 : 24,
+            maxWidth: isMobile ? 20 : 24,
+            minHeight: isMobile ? 22 : 30,
+            maxHeight: isMobile ? 22 : 30,
+            p: 0,
+            m: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            verticalAlign: "middle",
+          }}
+          disabled={disabled}
+        >
+          <ContentCopyIcon style={{ fontSize: isMobile ? 13 : iconSize }} color={copied ? "success" : "inherit"} />
+        </Button>
+      </span>
+    </Tooltip>
+  );
+}
 
 export default function ClientDetailsHeaderSection({
   client,
@@ -66,7 +191,7 @@ export default function ClientDetailsHeaderSection({
     pr: isMobile ? 0.25 : 0.5,
     fontSize: isMobile ? 12 : 14,
     verticalAlign: "middle",
-    textAlign: "right" // <-- Align labels right for column alignment
+    textAlign: "right" // Align labels right for column alignment
   };
   const valueStyle = {
     fontWeight: 400,
