@@ -25,20 +25,19 @@ import { useAuth } from "../../auth/authcontext";
 // StatusBadge
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 1 }}>
       <Box
         sx={{
           width: isMobile ? 8 : 10,
           height: isMobile ? 8 : 10,
           borderRadius: "50%",
           bgcolor: color,
-          boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
           animation: animate ? "pulsate 2s infinite" : "none"
         }}
       />
-      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : 14 }}>
+      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
         {text}
       </Typography>
       {animate && (
@@ -121,6 +120,11 @@ export default function ClientDetailsHeaderSection({
   useEffect(() => { setLocalKioskUrl(kioskUrl ?? ""); }, [kioskUrl]);
   useEffect(() => { setLocalSchoolSelection(schoolSelection ?? client.school_id ?? ""); }, [schoolSelection, client.school_id]);
 
+  // Dirty states (rammen bliver rød hvis feltet er ændret)
+  const localityDirty = localLocality !== (locality ?? "");
+  const kioskUrlDirty = localKioskUrl !== (kioskUrl ?? "");
+  const schoolDirty = localSchoolSelection !== (schoolSelection ?? client.school_id ?? "");
+
   // Handlers with spinner effect
   const onSaveLocality = async () => {
     setSavingLocality(true);
@@ -138,12 +142,12 @@ export default function ClientDetailsHeaderSection({
     setSavingSchool(false);
   };
 
-  // Table cell styles: tydeligt mindre spacing!
+  // Fælles cell style for begge papers!
   const cellStyle = {
     border: 0,
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: 0.05, // Minimal padding right!
+    pr: 0.1,
     py: 0,
     verticalAlign: "middle",
     height: isMobile ? 22 : 30,
@@ -151,15 +155,15 @@ export default function ClientDetailsHeaderSection({
   };
   const valueCellStyle = {
     border: 0,
-    pl: 0.05, // Minimal padding left!
+    pl: 0.1,
     py: 0,
     verticalAlign: "middle",
     height: isMobile ? 22 : 30,
     fontSize: isMobile ? 12 : 14,
   };
 
-  // Input style for textfields and dropdown
-  const inputStyle = {
+  // Input style for textfields and dropdown, + rød ramme hvis dirty
+  const inputStyle = (dirty) => ({
     width: "100%",
     height: isMobile ? 22 : 30,
     textAlign: "left",
@@ -173,8 +177,10 @@ export default function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": {
       height: isMobile ? "22px" : "30px",
       textAlign: "left",
+      ...(dirty && { border: "2px solid red", borderRadius: "6px" }),
     },
-  };
+    ...(dirty && { border: "2px solid red", borderRadius: "6px" }),
+  });
 
   function renderKioskBrowserData(data) {
     if (!data || typeof data !== "object") return null;
@@ -235,7 +241,7 @@ export default function ClientDetailsHeaderSection({
             minWidth: 0,
           }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
                   Klient info
                 </Typography>
@@ -264,11 +270,11 @@ export default function ClientDetailsHeaderSection({
                             displayEmpty
                             onChange={e => setLocalSchoolSelection(e.target.value)}
                             sx={{
-                              ...inputStyle,
+                              ...inputStyle(schoolDirty),
                               "& .MuiSelect-select": {
-                                ...inputStyle["& .MuiInputBase-input"],
+                                ...inputStyle(schoolDirty)["& .MuiInputBase-input"],
                                 textAlign: "left",
-                                paddingLeft: isMobile ? "10px" : "14px", // Matcher TextField!
+                                paddingLeft: isMobile ? "10px" : "14px",
                               }
                             }}
                             MenuProps={{
@@ -307,28 +313,6 @@ export default function ClientDetailsHeaderSection({
                         </Box>
                       </TableCell>
                     </TableRow>
-                    <TableRow sx={{ height: isMobile ? 22 : 30 }}>
-                      <TableCell sx={cellStyle}>Lokation:</TableCell>
-                      <TableCell sx={valueCellStyle}>
-                        <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-                          <TextField
-                            size="small"
-                            value={localLocality}
-                            onChange={e => setLocalLocality(e.target.value)}
-                            sx={inputStyle}
-                          />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={onSaveLocality}
-                            disabled={savingLocality}
-                            sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
-                          >
-                            {savingLocality ? <CircularProgress size={14} /> : "Gem"}
-                          </Button>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -343,7 +327,7 @@ export default function ClientDetailsHeaderSection({
             minWidth: 0,
           }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
                   Kiosk browser info
                 </Typography>
@@ -352,6 +336,29 @@ export default function ClientDetailsHeaderSection({
               <TableContainer>
                 <Table size="small" aria-label="kioskinfo">
                   <TableBody>
+                    {/* Lokation først, ovenover Kiosk URL */}
+                    <TableRow sx={{ height: isMobile ? 22 : 30 }}>
+                      <TableCell sx={cellStyle}>Lokation:</TableCell>
+                      <TableCell sx={valueCellStyle}>
+                        <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
+                          <TextField
+                            size="small"
+                            value={localLocality}
+                            onChange={e => setLocalLocality(e.target.value)}
+                            sx={inputStyle(localityDirty)}
+                          />
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={onSaveLocality}
+                            disabled={savingLocality}
+                            sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
+                          >
+                            {savingLocality ? <CircularProgress size={14} /> : "Gem"}
+                          </Button>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
                     <TableRow sx={{ height: isMobile ? 22 : 30 }}>
                       <TableCell sx={cellStyle}>Kiosk URL:</TableCell>
                       <TableCell sx={valueCellStyle}>
@@ -360,7 +367,7 @@ export default function ClientDetailsHeaderSection({
                             size="small"
                             value={localKioskUrl}
                             onChange={e => setLocalKioskUrl(e.target.value)}
-                            sx={inputStyle}
+                            sx={inputStyle(kioskUrlDirty)}
                           />
                           <Button
                             variant="outlined"
