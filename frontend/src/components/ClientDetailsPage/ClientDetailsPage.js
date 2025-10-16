@@ -76,6 +76,9 @@ export default function ClientDetailsPage({
       if (!schoolDirty && !userIsSelectingSchool.current) {
         setSchoolSelection(updated.school_id ?? "");
       }
+      // OPTIMISTISK: Opdatér kun locality/kioskUrl hvis ikke dirty!
+      if (!localityDirty) setLocality(updated.locality || "");
+      if (!kioskUrlDirty) setKioskUrl(updated.kiosk_url || "");
     } catch (err) {}
   };
 
@@ -87,6 +90,7 @@ export default function ClientDetailsPage({
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
+    // eslint-disable-next-line
   }, [client?.id]);
 
   useEffect(() => {
@@ -101,6 +105,7 @@ export default function ClientDetailsPage({
         setSchoolSelection(client.school_id ?? "");
       }
     }
+    // eslint-disable-next-line
   }, [client, schoolDirty, localityDirty, kioskUrlDirty]);
 
   // --- FIX: handleRefresh skal defineres! ---
@@ -117,12 +122,14 @@ export default function ClientDetailsPage({
     setSavingLocality(true);
     try {
       await updateClient(client.id, { locality });
-      setLocalityDirty(false);
+      // Sæt ikke localityDirty til false før fetchClientData har leveret den nye værdi!
+      // setLocalityDirty(false);  <-- denne er nu fjernet
       showSnackbar && showSnackbar({ message: "Lokation gemt!", severity: "success" });
     } catch (err) {
       showSnackbar && showSnackbar({ message: "Kunne ikke gemme lokation: " + err.message, severity: "error" });
     }
     setSavingLocality(false);
+    // localityDirty reset sker først, når backend har opdateret og useEffect ovenfor kører
   };
 
   const handleKioskUrlChange = (e) => {
@@ -133,13 +140,25 @@ export default function ClientDetailsPage({
     setSavingKioskUrl(true);
     try {
       await pushKioskUrl(client.id, kioskUrl);
-      setKioskUrlDirty(false);
+      // setKioskUrlDirty(false); <-- denne er nu fjernet
       showSnackbar && showSnackbar({ message: "Kiosk webadresse opdateret!", severity: "success" });
     } catch (err) {
       showSnackbar && showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + err.message, severity: "error" });
     }
     setSavingKioskUrl(false);
+    // kioskUrlDirty reset sker først, når backend har opdateret og useEffect ovenfor kører
   };
+
+  // Når backend har opdateret, og local value matcher backend, reset dirty state
+  useEffect(() => {
+    if (client && localityDirty && locality === (client.locality || "")) {
+      setLocalityDirty(false);
+    }
+    if (client && kioskUrlDirty && kioskUrl === (client.kiosk_url || "")) {
+      setKioskUrlDirty(false);
+    }
+    // eslint-disable-next-line
+  }, [client, locality, kioskUrl]);
 
   const handleClientAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
