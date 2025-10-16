@@ -138,12 +138,12 @@ export default function ClientDetailsHeaderSection({
     setSavingSchool(false);
   };
 
-  // Table cell styles: reduceret padding!
+  // Table cell styles: tydeligt mindre spacing!
   const cellStyle = {
     border: 0,
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.1 : 0.2, // Mindre padding right!
+    pr: 0.05, // Minimal padding right!
     py: 0,
     verticalAlign: "middle",
     height: isMobile ? 22 : 30,
@@ -151,23 +151,29 @@ export default function ClientDetailsHeaderSection({
   };
   const valueCellStyle = {
     border: 0,
-    pl: isMobile ? 0.1 : 0.2, // Mindre padding left!
+    pl: 0.05, // Minimal padding left!
     py: 0,
     verticalAlign: "middle",
     height: isMobile ? 22 : 30,
     fontSize: isMobile ? 12 : 14,
   };
 
+  // Input style for textfields and dropdown
   const inputStyle = {
     width: "100%",
     height: isMobile ? 22 : 30,
+    textAlign: "left",
     "& .MuiInputBase-input": {
       fontSize: isMobile ? 12 : 14,
       height: isMobile ? "22px" : "30px",
       boxSizing: "border-box",
-      padding: isMobile ? "4px 10px" : "6px 14px"
+      padding: isMobile ? "4px 10px" : "6px 14px",
+      textAlign: "left",
     },
-    "& .MuiInputBase-root": { height: isMobile ? "22px" : "30px" },
+    "& .MuiInputBase-root": {
+      height: isMobile ? "22px" : "30px",
+      textAlign: "left",
+    },
   };
 
   function renderKioskBrowserData(data) {
@@ -179,6 +185,10 @@ export default function ClientDetailsHeaderSection({
       </TableRow>
     ));
   }
+
+  // Paper width styling
+  const paper1Width = isMobile ? "100%" : "40%";
+  const paper2Width = isMobile ? "100%" : "60%";
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -218,7 +228,7 @@ export default function ClientDetailsHeaderSection({
       </Box>
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
         {/* Paper 1 */}
-        <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
+        <Box sx={{ width: paper1Width, pr: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{
             borderRadius: isMobile ? 1 : 2,
             overflow: "visible",
@@ -254,18 +264,12 @@ export default function ClientDetailsHeaderSection({
                             displayEmpty
                             onChange={e => setLocalSchoolSelection(e.target.value)}
                             sx={{
-                              minWidth: 0,
-                              width: "100%",
-                              fontSize: isMobile ? 12 : 14,
-                              height: isMobile ? "22px" : "30px",
-                              textAlign: "left",
+                              ...inputStyle,
                               "& .MuiSelect-select": {
-                                textAlign: "left", // Venstrestil teksten!
-                                paddingLeft: 0, // Helt venstre!
-                                fontWeight: 400,
-                                fontSize: isMobile ? 12 : 14,
-                              },
-                              background: "transparent"
+                                ...inputStyle["& .MuiInputBase-input"],
+                                textAlign: "left",
+                                paddingLeft: isMobile ? "10px" : "14px", // Matcher TextField!
+                              }
                             }}
                             MenuProps={{
                               PaperProps: {
@@ -332,7 +336,7 @@ export default function ClientDetailsHeaderSection({
           </Card>
         </Box>
         {/* Paper 2 */}
-        <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
+        <Box sx={{ width: paper2Width, pl: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{
             borderRadius: isMobile ? 1 : 2,
             overflow: "visible",
