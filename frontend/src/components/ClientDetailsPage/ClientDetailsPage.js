@@ -79,7 +79,9 @@ export default function ClientDetailsPage({
       // OPTIMISTISK: Opdatér kun locality/kioskUrl hvis ikke dirty!
       if (!localityDirty) setLocality(updated.locality || "");
       if (!kioskUrlDirty) setKioskUrl(updated.kiosk_url || "");
-    } catch (err) {}
+    } catch (err) {
+      // ignore errors silently (could log if needed)
+    }
   };
 
   useEffect(() => {
@@ -108,12 +110,13 @@ export default function ClientDetailsPage({
     // eslint-disable-next-line
   }, [client, schoolDirty, localityDirty, kioskUrlDirty]);
 
-  // --- FIX: handleRefresh skal defineres! ---
+  // handleRefresh: genindlæs klientdata og vis snackbar
   const handleRefresh = async () => {
     await fetchClientData();
     if (showSnackbar) showSnackbar({ message: "Klientdata opdateret!", severity: "info" });
   };
 
+  // Locality handlers
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -121,17 +124,23 @@ export default function ClientDetailsPage({
   const handleLocalitySave = async () => {
     setSavingLocality(true);
     try {
-      await updateClient(client.id, { locality });
-      // Sæt ikke localityDirty til false før fetchClientData har leveret den nye værdi!
-      // setLocalityDirty(false);  <-- denne er nu fjernet
+      const res = await updateClient(client.id, { locality });
+      // Forsøg at hente gemt/normaliseret værdi fra respons
+      const savedLocality = res?.locality ?? res?.data?.locality ?? locality;
+      // Opdater lokal state og nulstil dirty (vi returnerer saved value for child komponenter)
+      setLocality(savedLocality);
+      setLocalityDirty(false);
       showSnackbar && showSnackbar({ message: "Lokation gemt!", severity: "success" });
+      return savedLocality;
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Kunne ikke gemme lokation: " + err.message, severity: "error" });
+      showSnackbar && showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
+      throw err;
+    } finally {
+      setSavingLocality(false);
     }
-    setSavingLocality(false);
-    // localityDirty reset sker først, når backend har opdateret og useEffect ovenfor kører
   };
 
+  // Kiosk URL handlers
   const handleKioskUrlChange = (e) => {
     setKioskUrl(e.target.value);
     setKioskUrlDirty(true);
@@ -139,17 +148,21 @@ export default function ClientDetailsPage({
   const handleKioskUrlSave = async () => {
     setSavingKioskUrl(true);
     try {
-      await pushKioskUrl(client.id, kioskUrl);
-      // setKioskUrlDirty(false); <-- denne er nu fjernet
+      const res = await pushKioskUrl(client.id, kioskUrl);
+      const savedUrl = res?.kiosk_url ?? res?.kioskUrl ?? res?.data?.kiosk_url ?? kioskUrl;
+      setKioskUrl(savedUrl);
+      setKioskUrlDirty(false);
       showSnackbar && showSnackbar({ message: "Kiosk webadresse opdateret!", severity: "success" });
+      return savedUrl;
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + err.message, severity: "error" });
+      showSnackbar && showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
+      throw err;
+    } finally {
+      setSavingKioskUrl(false);
     }
-    setSavingKioskUrl(false);
-    // kioskUrlDirty reset sker først, når backend har opdateret og useEffect ovenfor kører
   };
 
-  // Når backend har opdateret, og local value matcher backend, reset dirty state
+  // Når backend har opdateret, og local value matcher backend, reset dirty state (safety net)
   useEffect(() => {
     if (client && localityDirty && locality === (client.locality || "")) {
       setLocalityDirty(false);
@@ -166,7 +179,7 @@ export default function ClientDetailsPage({
       await clientAction(client.id, action);
       showSnackbar && showSnackbar({ message: "Handlingen blev udført!", severity: "success" });
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Fejl: " + err.message, severity: "error" });
+      showSnackbar && showSnackbar({ message: "Fejl: " + (err?.message || err), severity: "error" });
     }
     setActionLoading((prev) => ({ ...prev, [action]: false }));
   };
@@ -190,14 +203,18 @@ export default function ClientDetailsPage({
   const handleSchoolSave = async () => {
     setSavingSchool(true);
     try {
-      await updateClient(client.id, { school_id: schoolSelection });
+      const res = await updateClient(client.id, { school_id: schoolSelection });
+      const saved = res?.school_id ?? res?.data?.school_id ?? schoolSelection;
       setSchoolDirty(false);
       userIsSelectingSchool.current = false;
       showSnackbar && showSnackbar({ message: "Skolevalg gemt!", severity: "success" });
+      return saved;
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Kunne ikke gemme skolevalg: " + err.message, severity: "error" });
+      showSnackbar && showSnackbar({ message: "Kunne ikke gemme skolevalg: " + (err?.message || err), severity: "error" });
+      throw err;
+    } finally {
+      setSavingSchool(false);
     }
-    setSavingSchool(false);
   };
 
   if (!client) {
@@ -228,7 +245,7 @@ export default function ClientDetailsPage({
             handleKioskUrlSave={handleKioskUrlSave}
             liveChromeStatus={liveChromeStatus}
             liveChromeColor={liveChromeColor}
-            refreshing={false}
+            refreshing={refreshing}
             handleRefresh={handleRefresh}
           />
         </Grid>
