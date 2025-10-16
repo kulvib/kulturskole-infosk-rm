@@ -198,6 +198,7 @@ export default function ClientDetailsHeaderSection({
 
   const [selectedSchool, setSelectedSchool] = React.useState(client?.school_id ?? "");
   const [savingSchool, setSavingSchool] = React.useState(false);
+  const [selectedSchoolDirty, setSelectedSchoolDirty] = React.useState(false);
 
   // Sync incoming prop changes
   React.useEffect(() => {
@@ -209,6 +210,7 @@ export default function ClientDetailsHeaderSection({
   // Sync selected school when client changes
   React.useEffect(() => {
     setSelectedSchool(client?.school_id ?? "");
+    setSelectedSchoolDirty(false);
   }, [client?.school_id]);
 
   // If no schools provided, fetch from backend
@@ -238,7 +240,10 @@ export default function ClientDetailsHeaderSection({
   }, [schools]);
 
   const handleSchoolSelectChange = (e) => {
-    setSelectedSchool(e.target.value);
+    const newVal = e.target.value;
+    setSelectedSchool(newVal);
+    // mark dirty if different from current server value
+    setSelectedSchoolDirty(String(newVal) !== String(client?.school_id));
   };
 
   const handleSchoolSave = async () => {
@@ -256,6 +261,8 @@ export default function ClientDetailsHeaderSection({
       if (typeof showSnackbar === "function") {
         showSnackbar({ message: "Skole opdateret", severity: "success" });
       }
+      // reset dirty on success
+      setSelectedSchoolDirty(false);
     } catch (err) {
       console.error("Fejl ved opdatering af skole:", err);
       if (typeof showSnackbar === "function") {
@@ -399,9 +406,10 @@ export default function ClientDetailsHeaderSection({
                             disabled={loadingSchools}
                             sx={{ ...inputStyle }}
                             fullWidth
-                            label="Vælg skole"
                             SelectProps={{ MenuProps: { disablePortal: true } }}
                             inputProps={{ "aria-label": "Skole" }}
+                            error={!!selectedSchoolDirty} // gør rammen rød når ændret og ikke gemt
+                            onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
                           >
                             <MenuItem value="">
                               <em>Ingen skole</em>
