@@ -5,6 +5,7 @@ import {
   CardContent,
   Typography,
   Button,
+  CircularProgress,
   TextField,
   Select,
   MenuItem,
@@ -54,47 +55,27 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
     </Box>
   );
 }
-
 function StateBadge({ state, isMobile = false }) {
   let color = "grey.400";
   let text = state || "ukendt";
   let animate = false;
   if (state) {
     switch (state.toLowerCase()) {
-      case "normal":
-        color = "#43a047";
-        animate = true;
-        break;
-      case "sleep":
-        color = "#1976d2";
-        animate = true;
-        break;
-      case "maintenance":
-        color = "#ffa000";
-        animate = true;
-        break;
-      case "error":
-        color = "#e53935";
-        animate = true;
-        break;
-      case "offline":
-        color = "#757575";
-        animate = false;
-        break;
-      default:
-        color = "grey.400";
-        animate = false;
+      case "normal": color = "#43a047"; animate = true; break;
+      case "sleep": color = "#1976d2"; animate = true; break;
+      case "maintenance": color = "#ffa000"; animate = true; break;
+      case "error": color = "#e53935"; animate = true; break;
+      case "offline": color = "#757575"; animate = false; break;
+      default: color = "grey.400"; animate = false;
     }
   }
   return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
 }
-
 function OnlineStatusBadge({ isOnline, isMobile = false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
   return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
 }
-
 function ChromeStatusBadge({ status, color, isMobile = false }) {
   let fallbackColor = "grey.400";
   let text = status || "ukendt";
@@ -111,7 +92,6 @@ export default function ClientDetailsHeaderSection({
   client,
   schools = [],
   schoolSelection,
-  handleSchoolChange,
   handleSchoolSave,
   locality,
   handleLocalitySave,
@@ -128,22 +108,42 @@ export default function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Local state for form fields
+  // Local state for inputs and saving
   const [localLocality, setLocalLocality] = useState(locality ?? "");
   const [localKioskUrl, setLocalKioskUrl] = useState(kioskUrl ?? "");
   const [localSchoolSelection, setLocalSchoolSelection] = useState(schoolSelection ?? client.school_id ?? "");
+  const [savingLocality, setSavingLocality] = useState(false);
+  const [savingKioskUrl, setSavingKioskUrl] = useState(false);
+  const [savingSchool, setSavingSchool] = useState(false);
 
-  // Synchronize prop values to local state if they change
+  // Sync props to local state if changed externally
   useEffect(() => { setLocalLocality(locality ?? ""); }, [locality]);
   useEffect(() => { setLocalKioskUrl(kioskUrl ?? ""); }, [kioskUrl]);
   useEffect(() => { setLocalSchoolSelection(schoolSelection ?? client.school_id ?? ""); }, [schoolSelection, client.school_id]);
 
-  // Table cell styles
+  // Handlers with spinner effect
+  const onSaveLocality = async () => {
+    setSavingLocality(true);
+    await handleLocalitySave(localLocality);
+    setSavingLocality(false);
+  };
+  const onSaveKioskUrl = async () => {
+    setSavingKioskUrl(true);
+    await handleKioskUrlSave(localKioskUrl);
+    setSavingKioskUrl(false);
+  };
+  const onSaveSchool = async () => {
+    setSavingSchool(true);
+    await handleSchoolSave(localSchoolSelection);
+    setSavingSchool(false);
+  };
+
+  // Table cell styles: reduceret padding!
   const cellStyle = {
     border: 0,
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5,
+    pr: isMobile ? 0.1 : 0.2, // Mindre padding right!
     py: 0,
     verticalAlign: "middle",
     height: isMobile ? 22 : 30,
@@ -151,7 +151,7 @@ export default function ClientDetailsHeaderSection({
   };
   const valueCellStyle = {
     border: 0,
-    pl: isMobile ? 0.25 : 0.5,
+    pl: isMobile ? 0.1 : 0.2, // Mindre padding left!
     py: 0,
     verticalAlign: "middle",
     height: isMobile ? 22 : 30,
@@ -260,8 +260,8 @@ export default function ClientDetailsHeaderSection({
                               height: isMobile ? "22px" : "30px",
                               textAlign: "left",
                               "& .MuiSelect-select": {
-                                textAlign: "left",
-                                paddingLeft: isMobile ? 10 : 16,
+                                textAlign: "left", // Venstrestil teksten!
+                                paddingLeft: 0, // Helt venstre!
                                 fontWeight: 400,
                                 fontSize: isMobile ? 12 : 14,
                               },
@@ -290,14 +290,15 @@ export default function ClientDetailsHeaderSection({
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={() => handleSchoolSave(localSchoolSelection)}
+                            onClick={onSaveSchool}
+                            disabled={savingSchool}
                             sx={{
                               minWidth: 56,
                               ml: 1,
                               height: isMobile ? "22px" : "30px"
                             }}
                           >
-                            Gem
+                            {savingSchool ? <CircularProgress size={14} /> : "Gem"}
                           </Button>
                         </Box>
                       </TableCell>
@@ -315,10 +316,11 @@ export default function ClientDetailsHeaderSection({
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={() => handleLocalitySave(localLocality)}
+                            onClick={onSaveLocality}
+                            disabled={savingLocality}
                             sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
                           >
-                            Gem
+                            {savingLocality ? <CircularProgress size={14} /> : "Gem"}
                           </Button>
                         </Box>
                       </TableCell>
@@ -359,10 +361,11 @@ export default function ClientDetailsHeaderSection({
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={() => handleKioskUrlSave(localKioskUrl)}
+                            onClick={onSaveKioskUrl}
+                            disabled={savingKioskUrl}
                             sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
                           >
-                            Gem
+                            {savingKioskUrl ? <CircularProgress size={14} /> : "Gem"}
                           </Button>
                         </Box>
                       </TableCell>
