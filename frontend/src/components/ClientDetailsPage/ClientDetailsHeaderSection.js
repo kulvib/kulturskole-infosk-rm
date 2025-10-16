@@ -267,7 +267,7 @@ export default function ClientDetailsHeaderSection({
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
         {/* Paper 1 */}
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2 }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
@@ -356,7 +356,7 @@ export default function ClientDetailsHeaderSection({
         </Box>
         {/* Paper 2 */}
         <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2 }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : 18 }}>
