@@ -22,7 +22,6 @@ import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
-// Simpel copy-knap
 function CopyIconButton({ value, disabled }) {
   const [copied, setCopied] = React.useState(false);
   const handleCopy = async () => {
@@ -43,7 +42,6 @@ function CopyIconButton({ value, disabled }) {
   );
 }
 
-// StatusBadge (bruges kun til online-status og state)
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: 2 }}>
@@ -119,7 +117,6 @@ export default function ClientDetailsHeaderSection({
 
   return (
     <Box sx={{ width: "100%" }}>
-      {/* Topbar */}
       <Box sx={{
         display: "flex",
         flexDirection: isMobile ? "column" : "row",
