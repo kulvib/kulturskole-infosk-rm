@@ -76,11 +76,10 @@ export default function ClientDetailsPage({
       if (!schoolDirty && !userIsSelectingSchool.current) {
         setSchoolSelection(updated.school_id ?? "");
       }
-      // OPTIMISTISK: Opdatér kun locality/kioskUrl hvis ikke dirty!
-      if (!localityDirty) setLocality(updated.locality || "");
-      if (!kioskUrlDirty) setKioskUrl(updated.kiosk_url || "");
+      // OBS: vi lader caller styre locality/kioskUrl sync (du har safety net useEffect længere nede)
     } catch (err) {
       // ignore errors silently (could log if needed)
+      // console.error("fetchClientData error", err);
     }
   };
 
@@ -92,7 +91,6 @@ export default function ClientDetailsPage({
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-    // eslint-disable-next-line
   }, [client?.id]);
 
   useEffect(() => {
@@ -107,7 +105,6 @@ export default function ClientDetailsPage({
         setSchoolSelection(client.school_id ?? "");
       }
     }
-    // eslint-disable-next-line
   }, [client, schoolDirty, localityDirty, kioskUrlDirty]);
 
   // handleRefresh: genindlæs klientdata og vis snackbar
@@ -116,46 +113,55 @@ export default function ClientDetailsPage({
     if (showSnackbar) showSnackbar({ message: "Klientdata opdateret!", severity: "info" });
   };
 
-  // Locality handlers
+  // Locality handlers - instrumented + return saved value
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
   };
   const handleLocalitySave = async () => {
+    if (!client?.id) return;
     setSavingLocality(true);
     try {
+      console.log("[handleLocalitySave] sending:", { clientId: client.id, locality });
       const res = await updateClient(client.id, { locality });
-      // Forsøg at hente gemt/normaliseret værdi fra respons
+      console.log("[handleLocalitySave] response:", res);
+      // Accept different shapes from api wrapper (res, res.data, or normalized object)
       const savedLocality = res?.locality ?? res?.data?.locality ?? locality;
-      // Opdater lokal state og nulstil dirty (vi returnerer saved value for child komponenter)
       setLocality(savedLocality);
       setLocalityDirty(false);
       showSnackbar && showSnackbar({ message: "Lokation gemt!", severity: "success" });
       return savedLocality;
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
+      const serverMsg = err?.response?.data?.message || err?.message || String(err);
+      console.error("[handleLocalitySave] error:", err);
+      showSnackbar && showSnackbar({ message: "Kunne ikke gemme lokation: " + serverMsg, severity: "error" });
       throw err;
     } finally {
       setSavingLocality(false);
     }
   };
 
-  // Kiosk URL handlers
+  // Kiosk URL handlers - instrumented + return saved value
   const handleKioskUrlChange = (e) => {
     setKioskUrl(e.target.value);
     setKioskUrlDirty(true);
   };
   const handleKioskUrlSave = async () => {
+    if (!client?.id) return;
     setSavingKioskUrl(true);
     try {
+      console.log("[handleKioskUrlSave] sending:", { clientId: client.id, kioskUrl });
       const res = await pushKioskUrl(client.id, kioskUrl);
+      console.log("[handleKioskUrlSave] response:", res);
       const savedUrl = res?.kiosk_url ?? res?.kioskUrl ?? res?.data?.kiosk_url ?? kioskUrl;
       setKioskUrl(savedUrl);
       setKioskUrlDirty(false);
       showSnackbar && showSnackbar({ message: "Kiosk webadresse opdateret!", severity: "success" });
       return savedUrl;
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
+      const serverMsg = err?.response?.data?.message || err?.message || String(err);
+      console.error("[handleKioskUrlSave] error:", err);
+      showSnackbar && showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + serverMsg, severity: "error" });
       throw err;
     } finally {
       setSavingKioskUrl(false);
@@ -170,7 +176,6 @@ export default function ClientDetailsPage({
     if (client && kioskUrlDirty && kioskUrl === (client.kiosk_url || "")) {
       setKioskUrlDirty(false);
     }
-    // eslint-disable-next-line
   }, [client, locality, kioskUrl]);
 
   const handleClientAction = async (action) => {
@@ -201,16 +206,21 @@ export default function ClientDetailsPage({
   };
 
   const handleSchoolSave = async () => {
+    if (!client?.id) return;
     setSavingSchool(true);
     try {
+      console.log("[handleSchoolSave] sending:", { clientId: client.id, schoolSelection });
       const res = await updateClient(client.id, { school_id: schoolSelection });
+      console.log("[handleSchoolSave] response:", res);
       const saved = res?.school_id ?? res?.data?.school_id ?? schoolSelection;
       setSchoolDirty(false);
       userIsSelectingSchool.current = false;
       showSnackbar && showSnackbar({ message: "Skolevalg gemt!", severity: "success" });
       return saved;
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Kunne ikke gemme skolevalg: " + (err?.message || err), severity: "error" });
+      const serverMsg = err?.response?.data?.message || err?.message || String(err);
+      console.error("[handleSchoolSave] error:", err);
+      showSnackbar && showSnackbar({ message: "Kunne ikke gemme skolevalg: " + serverMsg, severity: "error" });
       throw err;
     } finally {
       setSavingSchool(false);
