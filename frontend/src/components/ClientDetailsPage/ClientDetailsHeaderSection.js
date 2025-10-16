@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Card,
@@ -114,10 +114,8 @@ export default function ClientDetailsHeaderSection({
   handleSchoolChange,
   handleSchoolSave,
   locality,
-  handleLocalityChange,
   handleLocalitySave,
   kioskUrl,
-  handleKioskUrlChange,
   handleKioskUrlSave,
   liveChromeStatus,
   liveChromeColor,
@@ -130,7 +128,17 @@ export default function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Tabel-celle styles
+  // Local state for form fields
+  const [localLocality, setLocalLocality] = useState(locality ?? "");
+  const [localKioskUrl, setLocalKioskUrl] = useState(kioskUrl ?? "");
+  const [localSchoolSelection, setLocalSchoolSelection] = useState(schoolSelection ?? client.school_id ?? "");
+
+  // Synchronize prop values to local state if they change
+  useEffect(() => { setLocalLocality(locality ?? ""); }, [locality]);
+  useEffect(() => { setLocalKioskUrl(kioskUrl ?? ""); }, [kioskUrl]);
+  useEffect(() => { setLocalSchoolSelection(schoolSelection ?? client.school_id ?? ""); }, [schoolSelection, client.school_id]);
+
+  // Table cell styles
   const cellStyle = {
     border: 0,
     fontWeight: 600,
@@ -242,9 +250,9 @@ export default function ClientDetailsHeaderSection({
                         <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
                           <Select
                             size="small"
-                            value={schoolSelection ?? client.school_id ?? ""}
+                            value={localSchoolSelection}
                             displayEmpty
-                            onChange={e => handleSchoolChange(e.target.value)}
+                            onChange={e => setLocalSchoolSelection(e.target.value)}
                             sx={{
                               minWidth: 0,
                               width: "100%",
@@ -282,7 +290,7 @@ export default function ClientDetailsHeaderSection({
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={handleSchoolSave}
+                            onClick={() => handleSchoolSave(localSchoolSelection)}
                             sx={{
                               minWidth: 56,
                               ml: 1,
@@ -300,14 +308,14 @@ export default function ClientDetailsHeaderSection({
                         <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
                           <TextField
                             size="small"
-                            value={locality}
-                            onChange={handleLocalityChange}
+                            value={localLocality}
+                            onChange={e => setLocalLocality(e.target.value)}
                             sx={inputStyle}
                           />
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={handleLocalitySave}
+                            onClick={() => handleLocalitySave(localLocality)}
                             sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
                           >
                             Gem
@@ -344,14 +352,14 @@ export default function ClientDetailsHeaderSection({
                         <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
                           <TextField
                             size="small"
-                            value={kioskUrl}
-                            onChange={handleKioskUrlChange}
+                            value={localKioskUrl}
+                            onChange={e => setLocalKioskUrl(e.target.value)}
                             sx={inputStyle}
                           />
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={handleKioskUrlSave}
+                            onClick={() => handleKioskUrlSave(localKioskUrl)}
                             sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
                           >
                             Gem
