@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -27,7 +27,9 @@ import { useTheme } from "@mui/material/styles";
 import { clientAction } from "../../api";
 import { useAuth } from "../../auth/authcontext";
 
-export default function ClientDetailsActionsSection({
+// Denne komponent opdateres ikke via polling eller client-objekt – kun via props ændret af brugerhandlinger!
+
+function ClientDetailsActionsSection({
   clientId,
   handleOpenTerminal,
   handleOpenRemoteDesktop,
@@ -45,22 +47,22 @@ export default function ClientDetailsActionsSection({
     minWidth: 0,
     width: "100%",
     height: 38,
-    fontSize: "0.95rem",      // Lidt større for god læsbarhed
+    fontSize: "0.95rem",
     textTransform: "none",
     fontWeight: 500,
     lineHeight: 1.18,
-    py: 0.75,                 // 0.75*8 = 6px (vertikal padding)
-    px: 1.25,                 // 1.25*8 = 10px (horisontal padding)
+    py: 0.75,
+    px: 1.25,
     m: 0,
     whiteSpace: "nowrap",
     display: "inline-flex",
     justifyContent: "center",
-    borderRadius: 2.8,        // Let afrunding
+    borderRadius: 2.8,
     boxShadow: 1,
   };
 
   // Main action handler
-  async function handleClientAction(action) {
+  const handleClientAction = useCallback(async (action) => {
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
       await clientAction(clientId, action);
@@ -70,7 +72,7 @@ export default function ClientDetailsActionsSection({
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
-  }
+  }, [clientId]);
 
   // Wrapper for Tooltip så den ikke vises på mobil
   const MaybeTooltip = ({ title, children }) =>
@@ -271,3 +273,6 @@ export default function ClientDetailsActionsSection({
     </Card>
   );
 }
+
+// Memoize for kun at re-rendre på prop-skift
+export default React.memo(ClientDetailsActionsSection);
