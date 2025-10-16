@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
   Box,
   Card,
@@ -6,40 +6,32 @@ import {
   Typography,
   Button,
   CircularProgress,
+  Tooltip,
   TextField,
-  Select,
-  MenuItem,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableRow,
-  useMediaQuery,
-  FormControl,
-  InputLabel,
+  useMediaQuery
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 
-// StatusBadge
+// StatusBadge med 2s puls animation hvis animate=true
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", ml: 0.5 }}>
-      <Box
-        sx={{
-          width: isMobile ? 8 : 10,
-          height: isMobile ? 8 : 10,
-          borderRadius: "50%",
-          bgcolor: color,
-          border: "1px solid #ddd",
-          mr: 0.5,
-          animation: animate ? "pulsate 2s infinite" : "none"
-        }}
-      />
-      <Typography variant="body2" sx={{ fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
+    <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
+      <Box sx={{
+        width: isMobile ? 8 : 10,
+        height: isMobile ? 8 : 10,
+        borderRadius: "50%",
+        bgcolor: color,
+        boxShadow: "0 0 2px rgba(0,0,0,0.12)",
+        border: "1px solid #ddd",
+        mr: 1,
+        animation: animate ? "pulsate 2s infinite" : "none"
+      }} />
+      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : 14 }}>
         {text}
       </Typography>
       {animate && (
@@ -56,27 +48,7 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
     </Box>
   );
 }
-function StateBadge({ state, isMobile = false }) {
-  let color = "grey.400";
-  let text = state || "ukendt";
-  let animate = false;
-  if (state) {
-    switch (state.toLowerCase()) {
-      case "normal": color = "#43a047"; animate = true; break;
-      case "sleep": color = "#1976d2"; animate = true; break;
-      case "maintenance": color = "#ffa000"; animate = true; break;
-      case "error": color = "#e53935"; animate = true; break;
-      case "offline": color = "#757575"; animate = false; break;
-      default: color = "grey.400"; animate = false;
-    }
-  }
-  return <StatusBadge color={color} text={text.toLowerCase()} animate={animate} isMobile={isMobile} />;
-}
-function OnlineStatusBadge({ isOnline, isMobile = false }) {
-  const color = isOnline ? "#43a047" : "#e53935";
-  const text = isOnline ? "online" : "offline";
-  return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
-}
+
 function ChromeStatusBadge({ status, color, isMobile = false }) {
   let fallbackColor = "grey.400";
   let text = status || "ukendt";
@@ -84,19 +56,61 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
   const animate = true;
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
-      <StatusBadge color={dotColor} text={text} animate={animate} isMobile={isMobile} />
+      <StatusBadge color={dotColor} text={text} animate={animate} isMobile={isMobile} showText={true} />
     </Box>
+  );
+}
+
+function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {}
+  };
+
+  return (
+    <Tooltip title={copied ? "Kopieret!" : "Kopiér"}>
+      <span>
+        <Button
+          size="small"
+          onClick={handleCopy}
+          sx={{
+            minWidth: isMobile ? 20 : 24,
+            maxWidth: isMobile ? 20 : 24,
+            minHeight: isMobile ? 20 : 24,
+            maxHeight: isMobile ? 20 : 24,
+            p: 0,
+            m: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            verticalAlign: "middle",
+          }}
+          disabled={disabled}
+        >
+          <ContentCopyIcon style={{ fontSize: isMobile ? 13 : iconSize }} color={copied ? "success" : "inherit"} />
+        </Button>
+      </span>
+    </Tooltip>
   );
 }
 
 export default function ClientDetailsHeaderSection({
   client,
-  schools = [],
-  schoolSelection,
-  handleSchoolSave,
+  schools,
   locality,
+  localityDirty,
+  savingLocality,
+  handleLocalityChange,
   handleLocalitySave,
   kioskUrl,
+  kioskUrlDirty,
+  savingKioskUrl,
+  handleKioskUrlChange,
   handleKioskUrlSave,
   liveChromeStatus,
   liveChromeColor,
@@ -109,114 +123,50 @@ export default function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Lokal editable state + baseline (kun minimal logik)
-  const [localLocality, setLocalLocality] = useState(locality ?? "");
-  const [baselineLocality, setBaselineLocality] = useState(locality ?? "");
-  const [localKioskUrl, setLocalKioskUrl] = useState(kioskUrl ?? "");
-  const [baselineKioskUrl, setBaselineKioskUrl] = useState(kioskUrl ?? "");
-  const [localSchoolSelection, setLocalSchoolSelection] = useState(schoolSelection ?? client?.school_id ?? "");
-  const [baselineSchoolSelection, setBaselineSchoolSelection] = useState(schoolSelection ?? client?.school_id ?? "");
-
-  // Sync props -> lokal & baseline når parent ændrer (bevarer dit layout-opførsel)
-  useEffect(() => { setLocalLocality(locality ?? ""); setBaselineLocality(locality ?? ""); }, [locality]);
-  useEffect(() => { setLocalKioskUrl(kioskUrl ?? ""); setBaselineKioskUrl(kioskUrl ?? ""); }, [kioskUrl]);
-  useEffect(() => { setLocalSchoolSelection(schoolSelection ?? client?.school_id ?? ""); setBaselineSchoolSelection(schoolSelection ?? client?.school_id ?? ""); }, [schoolSelection, client?.school_id]);
-
-  // Dirty checks (baseret på baseline) - bruges til MUI error
-  const localityDirty = localLocality !== baselineLocality;
-  const kioskUrlDirty = localKioskUrl !== baselineKioskUrl;
-  const schoolDirty = localSchoolSelection !== baselineSchoolSelection;
-
-  // Når vi saver: kald parent handler (forvent at parent returnerer saved value eller kaster)
-  const onSaveLocality = async () => {
-    if (!localityDirty) return;
-    try {
-      const result = await handleLocalitySave?.(localLocality);
-      const saved = result !== undefined ? result : localLocality;
-      setBaselineLocality(saved);
-      setLocalLocality(saved);
-    } catch (err) {
-      // Parent viser snackbar/fejl - vi logger kun her
-      // eslint-disable-next-line no-console
-      console.error("Lokation save fejlede:", err);
-    }
-  };
-  const onSaveKioskUrl = async () => {
-    if (!kioskUrlDirty) return;
-    try {
-      const result = await handleKioskUrlSave?.(localKioskUrl);
-      const saved = result !== undefined ? result : localKioskUrl;
-      setBaselineKioskUrl(saved);
-      setLocalKioskUrl(saved);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error("Kiosk URL save fejlede:", err);
-    }
-  };
-  const onSaveSchool = async () => {
-    if (!schoolDirty) return;
-    try {
-      const result = await handleSchoolSave?.(localSchoolSelection);
-      const saved = result !== undefined ? result : localSchoolSelection;
-      setBaselineSchoolSelection(saved);
-      setLocalSchoolSelection(saved);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error("Skole save fejlede:", err);
-    }
+  // Helper til skole-navn
+  const getSchoolName = (schoolId) => {
+    const school = schools.find(s => s.id === schoolId);
+    return school ? school.name : <span style={{ color: "#888" }}>Ingen skole</span>;
   };
 
-  // Fælles cell style for begge papers (samme som du ønskede)
-  const cellStyle = {
-    border: 0,
+  const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: 0.1,
+    minWidth: 120,
+    pr: isMobile ? 0.25 : 0.5,
     py: 0,
     verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
     fontSize: isMobile ? 12 : 14,
   };
-  const valueCellStyle = {
-    border: 0,
-    pl: 0.1,
+  const valueStyle = {
+    fontWeight: 400,
+    pl: isMobile ? 1 : 2,
     py: 0,
     verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
     fontSize: isMobile ? 12 : 14,
   };
 
-  // Input style for textfields og dropdown (venstrestillet som TextField)
   const inputStyle = {
     width: "100%",
-    height: isMobile ? 22 : 30,
-    textAlign: "left",
+    height: 32,
     "& .MuiInputBase-input": {
       fontSize: isMobile ? 12 : 14,
-      height: isMobile ? "22px" : "30px",
+      height: isMobile ? "30px" : "32px",
       boxSizing: "border-box",
-      padding: isMobile ? "4px 10px" : "6px 14px",
-      textAlign: "left",
+      padding: isMobile ? "6px 10px" : "8px 14px"
     },
-    "& .MuiInputBase-root": {
-      height: isMobile ? "22px" : "30px",
-      textAlign: "left",
-    },
+    "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
   function renderKioskBrowserData(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
-      <TableRow key={key} sx={{ height: isMobile ? 22 : 30 }}>
-        <TableCell sx={cellStyle}>{key}:</TableCell>
-        <TableCell sx={valueCellStyle}>{String(value)}</TableCell>
-      </TableRow>
+      <Box key={key} sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+        <Typography sx={labelStyle}>{key}:</Typography>
+        <Typography sx={valueStyle}>{String(value)}</Typography>
+      </Box>
     ));
   }
-
-  // Paper width styling 40% / 60% på desktop, 100% på mobil
-  const paper1Width = isMobile ? "100%" : "40%";
-  const paper2Width = isMobile ? "100%" : "60%";
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -237,215 +187,131 @@ export default function ClientDetailsHeaderSection({
         >
           Tilbage til klientoversigt
         </Button>
-        <Button
-          startIcon={<RefreshIcon fontSize={isMobile ? "small" : "medium"} />}
-          disabled={refreshing}
-          color="primary"
-          onClick={handleRefresh}
-          sx={{
-            fontWeight: 500,
-            textTransform: "none",
-            minWidth: 0,
-            mr: isMobile ? 0 : 1,
-            px: isMobile ? 1.2 : 2,
-            fontSize: isMobile ? "0.93rem" : 14
-          }}
-        >
-          {refreshing ? "Opdaterer..." : "Opdater"}
-        </Button>
+        <Tooltip title="Opdater klient">
+          <span>
+            <Button
+              startIcon={refreshing ? <CircularProgress size={isMobile ? 15 : 18} /> : <RefreshIcon fontSize={isMobile ? "small" : "medium"} />}
+              disabled={refreshing}
+              color="primary"
+              onClick={handleRefresh}
+              sx={{
+                fontWeight: 500,
+                textTransform: "none",
+                minWidth: 0,
+                mr: isMobile ? 0 : 1,
+                px: isMobile ? 1.2 : 2,
+                fontSize: isMobile ? "0.93rem" : 14
+              }}
+            >
+              {refreshing ? "Opdaterer..." : "Opdater"}
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
-      <Box sx={{
-        display: "flex",
-        flexDirection: isMobile ? "column" : "row",
-        width: "100%",
-        alignItems: "flex-start",
-      }}>
+      {/* Papers */}
+      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
         {/* Paper 1 */}
-        <Box sx={{
-          width: paper1Width,
-          pr: isMobile ? 0 : 1,
-          minWidth: 0,
-          overflow: "visible",
-          flex: "0 1 auto",
-        }}>
-          <Card elevation={2} sx={{
-            borderRadius: isMobile ? 1 : 2,
-            minWidth: 0,
-            overflow: "visible",
-          }}>
+        <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1 }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
-                  Klient info
-                </Typography>
-                <OnlineStatusBadge isOnline={client?.isOnline} isMobile={isMobile} />
+              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18, mb: isMobile ? 0.5 : 1 }}>
+                Klient info
+              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Typography sx={labelStyle}>Klientnavn:</Typography>
+                <Typography sx={valueStyle}>{client.name}</Typography>
               </Box>
-              <TableContainer sx={{ overflow: "visible" }}>
-                <Table size="small" aria-label="klientinfo">
-                  <TableBody>
-                    <TableRow sx={{ height: isMobile ? 22 : 30 }}>
-                      <TableCell sx={cellStyle}>Klientnavn:</TableCell>
-                      <TableCell sx={valueCellStyle}>{client?.name}</TableCell>
-                    </TableRow>
-                    {user?.role === "admin" && (
-                      <TableRow sx={{ height: isMobile ? 22 : 30 }}>
-                        <TableCell sx={cellStyle}>Klient ID:</TableCell>
-                        <TableCell sx={valueCellStyle}>{client?.id}</TableCell>
-                      </TableRow>
-                    )}
-                    <TableRow sx={{ height: isMobile ? 22 : 30 }}>
-                      <TableCell sx={cellStyle}>Skole:</TableCell>
-                      <TableCell sx={valueCellStyle}>
-                        <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-                          <FormControl fullWidth error={schoolDirty} size="small" variant="outlined">
-                            <InputLabel sx={{ fontSize: isMobile ? 12 : 14, ml: 0.5 }}>Skole</InputLabel>
-                            <Select
-                              size="small"
-                              value={localSchoolSelection}
-                              displayEmpty
-                              label="Skole"
-                              onChange={e => {
-                                const v = e.target.value;
-                                setLocalSchoolSelection(v);
-                                // forward if parent provided a handler named handleSchoolSave? parent may provide change handler separately
-                                // We keep behavior minimal: don't call save here, parent saves when "Gem" clicked.
-                              }}
-                              sx={{
-                                ...inputStyle,
-                                "& .MuiSelect-select": {
-                                  ...inputStyle["& .MuiInputBase-input"],
-                                  textAlign: "left",
-                                  paddingLeft: isMobile ? "10px" : "14px",
-                                }
-                              }}
-                              MenuProps={{
-                                PaperProps: {
-                                  sx: {
-                                    fontSize: isMobile ? 12 : 14,
-                                    fontWeight: 400,
-                                    background: "white",
-                                    textAlign: "left",
-                                  }
-                                }
-                              }}
-                            >
-                              <MenuItem value="" sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
-                                Vælg skole
-                              </MenuItem>
-                              {schools.map(school => (
-                                <MenuItem key={school.id} value={school.id} sx={{ textAlign: "left", fontWeight: 400, fontSize: isMobile ? 12 : 14 }}>
-                                  {school.name}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={onSaveSchool}
-                            disabled={!schoolDirty}
-                            sx={{
-                              minWidth: 56,
-                              ml: 1,
-                              height: isMobile ? "22px" : "30px"
-                            }}
-                          >
-                            {/* Parent handles saving spinner; we keep disabled logic minimal */}
-                            Gem
-                          </Button>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              {user?.role === "admin" && (
+                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                  <Typography sx={labelStyle}>Klient ID:</Typography>
+                  <Typography sx={valueStyle}>{client.id}</Typography>
+                </Box>
+              )}
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Typography sx={labelStyle}>Skole:</Typography>
+                <Typography sx={valueStyle}>{getSchoolName(client.school_id)}</Typography>
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Typography sx={labelStyle}>Lokation:</Typography>
+                <Box sx={{ display: "flex", alignItems: "center", flex: 1, ml: 1, gap: 1 }}>
+                  <TextField
+                    size="small"
+                    value={locality}
+                    onChange={handleLocalityChange}
+                    sx={inputStyle}
+                    disabled={savingLocality}
+                    inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                    onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
+                    error={!!localityDirty}
+                  />
+                  <CopyIconButton value={locality} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleLocalitySave}
+                    disabled={savingLocality}
+                    sx={{ minWidth: 56 }}
+                  >
+                    {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                  </Button>
+                </Box>
+              </Box>
+              {localityDirty && (
+                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
+                  Husk at gemme din ændring!
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Box>
         {/* Paper 2 */}
-        <Box sx={{
-          width: paper2Width,
-          pl: isMobile ? 0 : 1,
-          minWidth: 0,
-          overflow: "visible",
-          flex: "0 1 auto",
-        }}>
-          <Card elevation={2} sx={{
-            borderRadius: isMobile ? 1 : 2,
-            minWidth: 0,
-            overflow: "visible",
-          }}>
+        <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
-                  Kiosk browser info
-                </Typography>
-                <StateBadge state={client?.state} isMobile={isMobile} />
+              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18, mb: isMobile ? 0.5 : 1 }}>
+                Kiosk info
+              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Typography sx={labelStyle}>Kiosk URL:</Typography>
               </Box>
-              <TableContainer sx={{ overflow: "visible" }}>
-                <Table size="small" aria-label="kioskinfo">
-                  <TableBody>
-                    {/* Lokation først, ovenover Kiosk URL */}
-                    <TableRow sx={{ height: isMobile ? 22 : 30 }}>
-                      <TableCell sx={cellStyle}>Lokation:</TableCell>
-                      <TableCell sx={valueCellStyle}>
-                        <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-                          <TextField
-                            error={localityDirty}
-                            size="small"
-                            value={localLocality}
-                            onChange={e => {
-                              setLocalLocality(e.target.value);
-                              // forward change to parent minimal if parent expects event via handleLocalitySave signature - we avoid breaking API
-                            }}
-                            sx={inputStyle}
-                          />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={onSaveLocality}
-                            disabled={!localityDirty}
-                            sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
-                          >
-                            { /* keep spinner controlled by parent if they pass saving props; here we show text only to preserve layout */ }
-                            Gem
-                          </Button>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow sx={{ height: isMobile ? 22 : 30 }}>
-                      <TableCell sx={cellStyle}>Kiosk URL:</TableCell>
-                      <TableCell sx={valueCellStyle}>
-                        <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-                          <TextField
-                            error={kioskUrlDirty}
-                            size="small"
-                            value={localKioskUrl}
-                            onChange={e => setLocalKioskUrl(e.target.value)}
-                            sx={inputStyle}
-                          />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={onSaveKioskUrl}
-                            disabled={!kioskUrlDirty}
-                            sx={{ minWidth: 56, height: isMobile ? "22px" : "30px", ml: 1 }}
-                          >
-                            Gem
-                          </Button>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow sx={{ height: isMobile ? 22 : 30 }}>
-                      <TableCell sx={cellStyle}>Kiosk browser status:</TableCell>
-                      <TableCell sx={valueCellStyle}>
-                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                      </TableCell>
-                    </TableRow>
-                    {renderKioskBrowserData(kioskBrowserData)}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", flex: 1, gap: 1 }}>
+                  <TextField
+                    size="small"
+                    value={kioskUrl}
+                    onChange={handleKioskUrlChange}
+                    sx={inputStyle}
+                    disabled={savingKioskUrl}
+                    inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                    onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
+                    error={!!kioskUrlDirty}
+                  />
+                  <CopyIconButton value={kioskUrl} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleKioskUrlSave}
+                    disabled={savingKioskUrl}
+                    sx={{ minWidth: 56 }}
+                  >
+                    {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                  </Button>
+                </Box>
+              </Box>
+              {kioskUrlDirty && (
+                <Typography variant="caption" color="warning.main" sx={{ pl: 1, mt: 0.5 }}>
+                  Husk at gemme din ændring!
+                </Typography>
+              )}
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Typography sx={labelStyle}>Kiosk browser status:</Typography>
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+              </Box>
+              <Box sx={{ mt: 1 }}>
+                {renderKioskBrowserData(kioskBrowserData)}
+              </Box>
             </CardContent>
           </Card>
         </Box>
