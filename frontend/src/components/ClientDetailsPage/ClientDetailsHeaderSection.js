@@ -24,38 +24,81 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
+// Simple name->hex map for common color names as a robust fallback
+const COLOR_NAME_MAP = {
+  red: "#e53935",
+  green: "#43a047",
+  yellow: "#ffa000",
+  orange: "#ff9800",
+  blue: "#1976d2",
+  grey: "#9e9e9e",
+  gray: "#9e9e9e",
+  black: "#000000",
+  white: "#ffffff"
+};
+
+function resolveColor(theme, color) {
+  // Return a string usable by MUI sx.bgcolor
+  if (!color) return theme.palette?.grey?.[400] || "#bdbdbd";
+
+  // If already an object (unlikely), try to stringify
+  if (typeof color === "object") {
+    try {
+      return String(color);
+    } catch (e) {
+      return theme.palette?.grey?.[400] || "#bdbdbd";
+    }
+  }
+
+  if (typeof color !== "string") return String(color);
+
+  const trimmed = color.trim();
+
+  // allow hex and rgb/rgba through unchanged
+  if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(trimmed) || /^rgba?\(/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  const lower = trimmed.toLowerCase();
+
+  // theme token like "grey.400" or "success.main"
+  if (lower.includes(".")) {
+    const [paletteKey, shade] = lower.split(".");
+    const pal = theme.palette?.[paletteKey];
+    if (pal) {
+      // shade may be numeric ("400") or "main"
+      if (shade && pal[shade]) return pal[shade];
+      if (pal.main) return pal.main;
+      // if paletteKey directly maps to a color string
+      if (typeof pal === "string") return pal;
+    }
+  }
+
+  // theme direct key e.g. "success"
+  if (theme.palette?.[lower]) {
+    const pal = theme.palette[lower];
+    if (typeof pal === "string") return pal;
+    if (pal.main) return pal.main;
+  }
+
+  // common name -> hex fallback
+  if (COLOR_NAME_MAP[lower]) return COLOR_NAME_MAP[lower];
+
+  // otherwise return trimmed (may be a CSS color name not in map)
+  return trimmed;
+}
+
 // Fælles StatusBadge med 2s puls animation hvis animate=true
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
 
-  const resolvedBg = React.useMemo(() => {
-    if (!color) return theme.palette?.grey?.[400] || "#bdbdbd";
+  const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
 
-    // hvis farven er noget som "grey.400" eller "success.main"
-    if (typeof color === "string" && color.includes(".")) {
-      const [paletteKey, shade] = color.split(".");
-      try {
-        const paletteValue = theme.palette?.[paletteKey];
-        if (paletteValue) {
-          // shade kan være 'main' eller '400'
-          const val = paletteValue[shade] ?? paletteValue.main ?? paletteValue;
-          if (val) return val;
-        }
-      } catch (e) {
-        // fallback til color string
-      }
-    }
-
-    // hvis farven svarer til et palette-navn, f.eks. "success"
-    if (typeof color === "string" && theme.palette?.[color]) {
-      const pal = theme.palette[color];
-      if (typeof pal === "string") return pal;
-      if (pal.main) return pal.main;
-    }
-
-    // ellers returner farvestrengen som CSS-værdi (fx "red" eller "#ff0000")
-    return color;
-  }, [color, theme]);
+  // Debug info (temporary) - helps confirm what frontend receives and resolves
+  React.useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log("StatusBadge debug - color prop:", color, "resolvedBg:", resolvedBg);
+  }, [color, resolvedBg]);
 
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
@@ -128,6 +171,13 @@ function StateBadge({ state, isMobile = false }) {
 function ChromeStatusBadge({ status, color, isMobile = false }) {
   let text = status || "ukendt";
   const animate = true;
+
+  // debug - see what the component actually receives
+  React.useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log("ChromeStatusBadge props -> status:", status, "color:", color);
+  }, [status, color]);
+
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
       <StatusBadge color={color} text={text} animate={animate} isMobile={isMobile} />
@@ -213,6 +263,12 @@ export default function ClientDetailsHeaderSection({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
+
+  // Quick debug: log incoming chrome props at parent level
+  React.useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log("ClientDetailsHeaderSection debug - liveChromeStatus:", liveChromeStatus, "liveChromeColor:", liveChromeColor, "client.id:", client?.id);
+  }, [liveChromeStatus, liveChromeColor, client?.id]);
 
   // School state: prefer prop 'schools' if provided; fallback to fetching via apiGetSchools
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
