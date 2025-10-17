@@ -229,15 +229,15 @@ export async function clientAction(id, action) {
     method = "POST";
     payload = { action: "livestream_stop" };
   }
-  // Sleep/Wakeup via state endpoint
+  // Sleep/Wakeup via chrome-command endpoint (ændret: sender "sleep" / "wakeup")
   else if (action === "sleep") {
-    url = `${apiUrl}/api/clients/${id}/state`;
-    method = "PUT";
-    payload = { state: "sleep" };
+    url = `${apiUrl}/api/clients/${id}/chrome-command`;
+    method = "POST";
+    payload = { action: "sleep" };
   } else if (action === "wakeup") {
-    url = `${apiUrl}/api/clients/${id}/state`;
-    method = "PUT";
-    payload = { state: "normal" };
+    url = `${apiUrl}/api/clients/${id}/chrome-command`;
+    method = "POST";
+    payload = { action: "wakeup" };
   }
   // Restart/Shutdown via update endpoint
   else if (action === "restart") {
