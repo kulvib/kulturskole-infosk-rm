@@ -88,17 +88,11 @@ function resolveColor(theme, color) {
   return trimmed;
 }
 
-// Fælles StatusBadge med 2s puls animation hvis animate=true
+// Fælles StatusBadge med 2s puls animation (kun transform + opacity)
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
 
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
-
-  // Debug info (temporary) - helps confirm what frontend receives and resolves
-  React.useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log("StatusBadge debug - color prop:", color, "resolvedBg:", resolvedBg);
-  }, [color, resolvedBg]);
 
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
@@ -112,6 +106,7 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           border: "1px solid #ddd",
           mr: 1,
           animation: animate ? "pulsate 2s infinite" : "none",
+          // Keyframes animate only transform and opacity — DO NOT touch background/background-color
           "@keyframes pulsate": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
@@ -171,13 +166,6 @@ function StateBadge({ state, isMobile = false }) {
 function ChromeStatusBadge({ status, color, isMobile = false }) {
   let text = status || "ukendt";
   const animate = true;
-
-  // debug - see what the component actually receives
-  React.useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log("ChromeStatusBadge props -> status:", status, "color:", color);
-  }, [status, color]);
-
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
       <StatusBadge color={color} text={text} animate={animate} isMobile={isMobile} />
@@ -263,12 +251,6 @@ export default function ClientDetailsHeaderSection({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
-
-  // Quick debug: log incoming chrome props at parent level
-  React.useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log("ClientDetailsHeaderSection debug - liveChromeStatus:", liveChromeStatus, "liveChromeColor:", liveChromeColor, "client.id:", client?.id);
-  }, [liveChromeStatus, liveChromeColor, client?.id]);
 
   // School state: prefer prop 'schools' if provided; fallback to fetching via apiGetSchools
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
