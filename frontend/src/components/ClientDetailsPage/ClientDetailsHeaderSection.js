@@ -24,8 +24,11 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
+// DEBUG flag: sæt true for at se raw/resolved farver i konsollen
+const DEBUG_CHROME_COLOR = false;
+
 // Fælles StatusBadge med 2s puls animation hvis animate=true
-function StatusBadge({ color, text, animate = false, isMobile = false }) {
+function StatusBadge({ color, text, animate = false, isMobile = false, showText = true }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
       <Box
@@ -36,13 +39,15 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           bgcolor: color,
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
-          mr: 1,
+          mr: showText ? 1 : 0,
           animation: animate ? "pulsate 2s infinite" : "none"
         }}
       />
-      <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : 14 }}>
-        {text}
-      </Typography>
+      {showText && (
+        <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : 14 }}>
+          {text}
+        </Typography>
+      )}
       {animate && (
         <style>
           {`
@@ -100,14 +105,101 @@ function StateBadge({ state, isMobile = false }) {
   return <StatusBadge color={color} text={String(text).toLowerCase()} animate={animate} isMobile={isMobile} />;
 }
 
+// --- Helper: normaliser farveinput fra backend eller map baseret på status ---
+function mapStatusToColor(status, theme) {
+  const s = (status || "").toLowerCase();
+  if (s.includes("error") || s.includes("fail") || s.includes("crash")) {
+    return theme?.palette?.error?.main || "#e53935";
+  }
+  if (s.includes("offline") || s === "offline" || s === "off") {
+    return theme?.palette?.grey?.[600] || "#757575";
+  }
+  if (s.includes("unknown") || s === "unknown" || !s) {
+    return theme?.palette?.grey?.[400] || "#BDBDBD";
+  }
+  return theme?.palette?.success?.main || "#43a047";
+}
+
+function normalizeColorInput(colorInput, status, theme) {
+  if (!colorInput) {
+    if (DEBUG_CHROME_COLOR) console.debug("normalizeColorInput: empty input -> status fallback", status);
+    return mapStatusToColor(status, theme);
+  }
+
+  // Strings: hex, rgb/hsl or palette keys or color names
+  if (typeof colorInput === "string") {
+    const s = colorInput.trim();
+    // hex or rgb/hsl
+    if (/^#([0-9A-Fa-f]{3,8})$/.test(s) || /^rgb/i.test(s) || /^hsl/i.test(s)) {
+      return s;
+    }
+    // simple color name like "red"
+    if (/^[a-zA-Z]+$/.test(s)) {
+      return s;
+    }
+    // theme.palette keys: e.g. "success" or "success.main" or "primary.dark"
+    try {
+      // direct key
+      if (theme?.palette && theme.palette[s]) {
+        const val = theme.palette[s];
+        if (typeof val === "string") return val;
+        if (val && val.main) return val.main;
+      }
+      // dotted path
+      if (s.indexOf(".") >= 0 && theme?.palette) {
+        const parts = s.split(".");
+        let cur = theme.palette;
+        for (const p of parts) {
+          if (cur && cur[p] !== undefined) cur = cur[p];
+          else {
+            if (DEBUG_CHROME_COLOR) console.debug("normalizeColorInput: palette key not found:", s);
+            return mapStatusToColor(status, theme);
+          }
+        }
+        if (typeof cur === "string") return cur;
+        if (cur && cur.main) return cur.main;
+      }
+    } catch (e) {
+      if (DEBUG_CHROME_COLOR) console.debug("normalizeColorInput palette lookup error:", e);
+      return mapStatusToColor(status, theme);
+    }
+    // fallback: return string (browser might accept it)
+    return s;
+  }
+
+  // Object shapes (e.g. { main: "#fff" })
+  if (typeof colorInput === "object") {
+    if (colorInput.main) return colorInput.main;
+    const keys = Object.keys(colorInput);
+    if (keys.length && typeof colorInput[keys[0]] === "string") return colorInput[keys[0]];
+  }
+
+  // last fallback
+  return mapStatusToColor(status, theme);
+}
+
+// ChromeStatusBadge opdateret til at normalisere farver via theme
 function ChromeStatusBadge({ status, color, isMobile = false }) {
-  let fallbackColor = "grey.400";
-  let text = status || "ukendt";
-  let dotColor = color || fallbackColor;
+  const theme = useTheme();
+  const resolvedColor = normalizeColorInput(color, status, theme);
+  if (DEBUG_CHROME_COLOR) console.debug("ChromeStatusBadge:", { status, rawColor: color, resolvedColor });
+  const text = status || "ukendt";
+  // Bounce for alle statuser
   const animate = true;
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
-      <StatusBadge color={dotColor} text={text} animate={animate} isMobile={isMobile} />
+      <Typography
+        variant="body2"
+        sx={{
+          fontWeight: 400,
+          textTransform: "none",
+          fontSize: isMobile ? 12 : 14,
+          mr: 1,
+        }}
+      >
+        {text}
+      </Typography>
+      <StatusBadge color={resolvedColor} animate={animate} isMobile={isMobile} showText={false} />
     </Box>
   );
 }
@@ -121,7 +213,6 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(value);
       } else {
-        // fallback
         const textarea = document.createElement("textarea");
         textarea.value = value;
         textarea.style.position = "fixed";
@@ -183,15 +274,15 @@ export default function ClientDetailsHeaderSection({
   refreshing,
   handleRefresh,
   kioskBrowserData = {},
-  onSchoolUpdated, // optional callback(updatedClient)
-  showSnackbar, // optional callback for messages
+  onSchoolUpdated,
+  showSnackbar,
 }) {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // School state: prefer prop 'schools' if provided; fallback to fetching via apiGetSchools
+  // School state
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
   const [loadingSchools, setLoadingSchools] = React.useState(false);
   const [schoolsError, setSchoolsError] = React.useState(null);
@@ -200,27 +291,21 @@ export default function ClientDetailsHeaderSection({
   const [savingSchool, setSavingSchool] = React.useState(false);
   const [selectedSchoolDirty, setSelectedSchoolDirty] = React.useState(false);
 
-  // Sync incoming prop changes
   React.useEffect(() => {
     if (Array.isArray(schools) && schools.length) {
       setSchoolsList(schools);
     }
   }, [schools]);
 
-  // Sync selected school when client changes
   React.useEffect(() => {
     setSelectedSchool(client?.school_id ?? "");
     setSelectedSchoolDirty(false);
   }, [client?.school_id]);
 
-  // If no schools provided, fetch from backend
   React.useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (Array.isArray(schools) && schools.length) {
-        // parent provided schools, no need to fetch
-        return;
-      }
+      if (Array.isArray(schools) && schools.length) return;
       setLoadingSchools(true);
       setSchoolsError(null);
       try {
@@ -242,7 +327,6 @@ export default function ClientDetailsHeaderSection({
   const handleSchoolSelectChange = (e) => {
     const newVal = e.target.value;
     setSelectedSchool(newVal);
-    // mark dirty if different from current server value
     setSelectedSchoolDirty(String(newVal) !== String(client?.school_id));
   };
 
@@ -251,17 +335,13 @@ export default function ClientDetailsHeaderSection({
     if (String(selectedSchool) === String(client.school_id)) return;
     setSavingSchool(true);
     try {
-      // Use apiUpdateClient helper to PATCH the client (expects updateClient(clientId, payload))
       const updated = await apiUpdateClient(client.id, { school_id: selectedSchool });
-      // Notify parent if provided
       if (typeof onSchoolUpdated === "function") {
         onSchoolUpdated(updated || { ...client, school_id: selectedSchool });
       }
-      // Optional snackbar message via prop
       if (typeof showSnackbar === "function") {
         showSnackbar({ message: "Skole opdateret", severity: "success" });
       }
-      // reset dirty on success
       setSelectedSchoolDirty(false);
     } catch (err) {
       console.error("Fejl ved opdatering af skole:", err);
@@ -408,7 +488,7 @@ export default function ClientDetailsHeaderSection({
                             fullWidth
                             SelectProps={{ MenuProps: { disablePortal: true } }}
                             inputProps={{ "aria-label": "Skole" }}
-                            error={!!selectedSchoolDirty} // gør rammen rød når ændret og ikke gemt
+                            error={!!selectedSchoolDirty}
                             onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
                           >
                             <MenuItem value="">
@@ -421,7 +501,6 @@ export default function ClientDetailsHeaderSection({
                             ))}
                           </TextField>
 
-                          {/* Kopi-ikon: kopierer skolens navn, samme logik som lokation */}
                           <CopyIconButton
                             value={getSelectedSchoolName()}
                             disabled={!getSelectedSchoolName()}
@@ -470,6 +549,45 @@ export default function ClientDetailsHeaderSection({
                         </Box>
                       </TableCell>
                     </TableRow>
+
+                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <TextField
+                            size="small"
+                            value={kioskUrl ?? ""}
+                            onChange={handleKioskUrlChange}
+                            sx={inputStyle}
+                            disabled={savingKioskUrl}
+                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                            onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
+                            error={!!kioskUrlDirty}
+                            fullWidth
+                          />
+                          <CopyIconButton value={kioskUrl ?? ""} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={handleKioskUrlSave}
+                            disabled={savingKioskUrl}
+                            sx={{ minWidth: 56 }}
+                          >
+                            {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                          </Button>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+
+                    <TableRow sx={{ height: isMobile ? 32 : 40 }}>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+                      </TableCell>
+                    </TableRow>
+
+                    {/* Rækker for kioskBrowserData */}
+                    {renderKioskBrowserDataRows(kioskBrowserData)}
 
                   </TableBody>
                 </Table>
