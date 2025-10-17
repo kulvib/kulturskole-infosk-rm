@@ -24,7 +24,15 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
-// Simple name->hex map for common color names as a robust fallback
+/*
+  ClientDetailsHeaderSection - komplet komponent
+  Rettelser/forbedringer inkluderet:
+  - Robust color resolution (theme tokens, hex, color names).
+  - Unik keyframe-navn (pulsateStatusBadge) og keyframes animerer KUN transform+opacity.
+  - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
+  - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
+*/
+
 const COLOR_NAME_MAP = {
   red: "#e53935",
   green: "#43a047",
@@ -38,23 +46,15 @@ const COLOR_NAME_MAP = {
 };
 
 function resolveColor(theme, color) {
-  // Return a string usable by MUI sx.bgcolor
   if (!color) return theme.palette?.grey?.[400] || "#bdbdbd";
-
-  // If already an object (unlikely), try to stringify
   if (typeof color === "object") {
-    try {
-      return String(color);
-    } catch (e) {
-      return theme.palette?.grey?.[400] || "#bdbdbd";
-    }
+    try { return String(color); } catch (e) { return theme.palette?.grey?.[400] || "#bdbdbd"; }
   }
-
   if (typeof color !== "string") return String(color);
 
   const trimmed = color.trim();
 
-  // allow hex and rgb/rgba through unchanged
+  // hex or rgb(a)
   if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(trimmed) || /^rgba?\(/i.test(trimmed)) {
     return trimmed;
   }
@@ -66,10 +66,8 @@ function resolveColor(theme, color) {
     const [paletteKey, shade] = lower.split(".");
     const pal = theme.palette?.[paletteKey];
     if (pal) {
-      // shade may be numeric ("400") or "main"
       if (shade && pal[shade]) return pal[shade];
       if (pal.main) return pal.main;
-      // if paletteKey directly maps to a color string
       if (typeof pal === "string") return pal;
     }
   }
@@ -81,17 +79,17 @@ function resolveColor(theme, color) {
     if (pal.main) return pal.main;
   }
 
-  // common name -> hex fallback
+  // map common names to hex
   if (COLOR_NAME_MAP[lower]) return COLOR_NAME_MAP[lower];
 
-  // otherwise return trimmed (may be a CSS color name not in map)
+  // fallback to the raw trimmed string (may be valid CSS color)
   return trimmed;
 }
 
-// Fælles StatusBadge med 2s puls animation (kun transform + opacity)
+// StatusBadge - dot + label. animation only transforms and opacity (no background)
+// inline style is used to force background-color so global keyframes/styles can't override it.
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
-
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
 
   return (
@@ -101,17 +99,26 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           width: isMobile ? 8 : 10,
           height: isMobile ? 8 : 10,
           borderRadius: "50%",
-          bgcolor: resolvedBg,
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
-          animation: animate ? "pulsate 2s infinite" : "none",
-          // Keyframes animate only transform and opacity — DO NOT touch background/background-color
-          "@keyframes pulsate": {
+          // use our unique animation name via sx (keeps theme-based style generation)
+          animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
+          // keyframes animate only transform+opacity
+          "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
+        }}
+        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
+        style={{
+          backgroundColor: resolvedBg,
+          // enforce our animation properties inline as well so the element uses our unique keyframes
+          animationName: animate ? "pulsateStatusBadge" : "none",
+          animationDuration: animate ? "2s" : undefined,
+          animationIterationCount: animate ? "infinite" : undefined,
+          animationTimingFunction: animate ? "ease" : undefined
         }}
       />
       <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : 14 }}>
@@ -121,43 +128,24 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
   );
 }
 
-// Online/offline badge med 2s puls, grøn/rød
 function OnlineStatusBadge({ isOnline, isMobile = false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
   return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
 }
 
-// State badge med 2s puls på farvede states, ikke på "ukendt"
 function StateBadge({ state, isMobile = false }) {
   let color = "grey.400";
   let text = state || "ukendt";
   let animate = false;
   if (state) {
     switch (state.toLowerCase()) {
-      case "normal":
-        color = "#43a047";
-        animate = true;
-        break;
-      case "sleep":
-        color = "#1976d2";
-        animate = true;
-        break;
-      case "maintenance":
-        color = "#ffa000";
-        animate = true;
-        break;
-      case "error":
-        color = "#e53935";
-        animate = true;
-        break;
-      case "offline":
-        color = "#757575";
-        animate = false;
-        break;
-      default:
-        color = "grey.400";
-        animate = false;
+      case "normal": color = "#43a047"; animate = true; break;
+      case "sleep": color = "#1976d2"; animate = true; break;
+      case "maintenance": color = "#ffa000"; animate = true; break;
+      case "error": color = "#e53935"; animate = true; break;
+      case "offline": color = "#757575"; animate = false; break;
+      default: color = "grey.400"; animate = false;
     }
   }
   return <StatusBadge color={color} text={String(text).toLowerCase()} animate={animate} isMobile={isMobile} />;
@@ -165,10 +153,9 @@ function StateBadge({ state, isMobile = false }) {
 
 function ChromeStatusBadge({ status, color, isMobile = false }) {
   let text = status || "ukendt";
-  const animate = true;
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center" }}>
-      <StatusBadge color={color} text={text} animate={animate} isMobile={isMobile} />
+      <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />
     </Box>
   );
 }
@@ -182,7 +169,6 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(value);
       } else {
-        // fallback
         const textarea = document.createElement("textarea");
         textarea.value = value;
         textarea.style.position = "fixed";
@@ -195,7 +181,7 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch (err) {
-      // ignore
+      // ignore copy errors
     }
   };
 
@@ -244,15 +230,15 @@ export default function ClientDetailsHeaderSection({
   refreshing,
   handleRefresh,
   kioskBrowserData = {},
-  onSchoolUpdated, // optional callback(updatedClient)
-  showSnackbar, // optional callback for messages
+  onSchoolUpdated,
+  showSnackbar,
 }) {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // School state: prefer prop 'schools' if provided; fallback to fetching via apiGetSchools
+  // Schools state (prefer prop)
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
   const [loadingSchools, setLoadingSchools] = React.useState(false);
   const [schoolsError, setSchoolsError] = React.useState(null);
@@ -261,37 +247,33 @@ export default function ClientDetailsHeaderSection({
   const [savingSchool, setSavingSchool] = React.useState(false);
   const [selectedSchoolDirty, setSelectedSchoolDirty] = React.useState(false);
 
-  // Sync incoming prop changes
+  // Sync props -> state
   React.useEffect(() => {
     if (Array.isArray(schools) && schools.length) {
       setSchoolsList(schools);
     }
   }, [schools]);
 
-  // Sync selected school when client changes
   React.useEffect(() => {
     setSelectedSchool(client?.school_id ?? "");
     setSelectedSchoolDirty(false);
   }, [client?.school_id]);
 
-  // If no schools provided, fetch from backend
+  // fetch schools if not provided
   React.useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (Array.isArray(schools) && schools.length) {
-        // parent provided schools, no need to fetch
-        return;
-      }
+      if (Array.isArray(schools) && schools.length) return;
       setLoadingSchools(true);
       setSchoolsError(null);
       try {
         const data = await apiGetSchools();
         if (cancelled) return;
         if (Array.isArray(data)) setSchoolsList(data);
-        else if (Array.isArray(data.schools)) setSchoolsList(data.schools);
+        else if (Array.isArray(data?.schools)) setSchoolsList(data.schools);
       } catch (err) {
         if (cancelled) return;
-        setSchoolsError(err.message || "Fejl ved hentning af skoler");
+        setSchoolsError(err?.message || "Fejl ved hentning af skoler");
       } finally {
         if (!cancelled) setLoadingSchools(false);
       }
@@ -303,7 +285,6 @@ export default function ClientDetailsHeaderSection({
   const handleSchoolSelectChange = (e) => {
     const newVal = e.target.value;
     setSelectedSchool(newVal);
-    // mark dirty if different from current server value
     setSelectedSchoolDirty(String(newVal) !== String(client?.school_id));
   };
 
@@ -312,22 +293,18 @@ export default function ClientDetailsHeaderSection({
     if (String(selectedSchool) === String(client.school_id)) return;
     setSavingSchool(true);
     try {
-      // Use apiUpdateClient helper to PATCH the client (expects updateClient(clientId, payload))
       const updated = await apiUpdateClient(client.id, { school_id: selectedSchool });
-      // Notify parent if provided
       if (typeof onSchoolUpdated === "function") {
         onSchoolUpdated(updated || { ...client, school_id: selectedSchool });
       }
-      // Optional snackbar message via prop
       if (typeof showSnackbar === "function") {
         showSnackbar({ message: "Skole opdateret", severity: "success" });
       }
-      // reset dirty on success
       setSelectedSchoolDirty(false);
     } catch (err) {
       console.error("Fejl ved opdatering af skole:", err);
       if (typeof showSnackbar === "function") {
-        showSnackbar({ message: "Kunne ikke opdatere skole: " + (err.message || err), severity: "error" });
+        showSnackbar({ message: "Kunne ikke opdatere skole: " + (err?.message || err), severity: "error" });
       }
     } finally {
       setSavingSchool(false);
@@ -379,25 +356,20 @@ export default function ClientDetailsHeaderSection({
     return s ? s.name : String(selectedSchool);
   };
 
+  // Render
   return (
-    <Box sx={{ width: "100%" }}>
+    <Box sx={{ width: "100%" }} data-testid="client-details-header">
       {/* Topbar */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", mb: isMobile ? 0.5 : 1, gap: isMobile ? 1 : 0 }}>
         <Button
           variant="outlined"
           startIcon={<ArrowBackIcon sx={{ fontSize: isMobile ? 19 : 20 }} />}
           onClick={() => navigate("/clients")}
-          sx={{
-            textTransform: "none",
-            fontWeight: 500,
-            minWidth: 0,
-            px: isMobile ? 1.2 : 2,
-            fontSize: isMobile ? "0.93rem" : 14,
-            mb: isMobile ? 0.5 : 0,
-          }}
+          sx={{ textTransform: "none", fontWeight: 500, minWidth: 0, px: isMobile ? 1.2 : 2, fontSize: isMobile ? "0.93rem" : 14, mb: isMobile ? 0.5 : 0 }}
         >
           Tilbage til klientoversigt
         </Button>
+
         <Tooltip title="Opdater klient">
           <span>
             <Button
@@ -405,14 +377,7 @@ export default function ClientDetailsHeaderSection({
               disabled={refreshing}
               color="primary"
               onClick={handleRefresh}
-              sx={{
-                fontWeight: 500,
-                textTransform: "none",
-                minWidth: 0,
-                mr: isMobile ? 0 : 1,
-                px: isMobile ? 1.2 : 2,
-                fontSize: isMobile ? "0.93rem" : 14
-              }}
+              sx={{ fontWeight: 500, textTransform: "none", minWidth: 0, mr: isMobile ? 0 : 1, px: isMobile ? 1.2 : 2, fontSize: isMobile ? "0.93rem" : 14 }}
             >
               {refreshing ? "Opdaterer..." : "Opdater"}
             </Button>
@@ -422,14 +387,12 @@ export default function ClientDetailsHeaderSection({
 
       {/* Papers */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
-        {/* Paper 1 - Klient info */}
+        {/* Klient info */}
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
-                  Klient info
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Klient info</Typography>
                 <Box sx={{ ml: 1 }}>
                   <OnlineStatusBadge isOnline={client?.isOnline} isMobile={isMobile} />
                 </Box>
@@ -440,17 +403,13 @@ export default function ClientDetailsHeaderSection({
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        {client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}
-                      </TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                          {client?.id ?? "?"}
-                        </TableCell>
+                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
                       </TableRow>
                     )}
 
@@ -458,7 +417,6 @@ export default function ClientDetailsHeaderSection({
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          {/* Brug TextField med select så ramme matcher Lokation's TextField */}
                           <TextField
                             select
                             size="small"
@@ -469,34 +427,16 @@ export default function ClientDetailsHeaderSection({
                             fullWidth
                             SelectProps={{ MenuProps: { disablePortal: true } }}
                             inputProps={{ "aria-label": "Skole" }}
-                            error={!!selectedSchoolDirty} // gør rammen rød når ændret og ikke gemt
+                            error={!!selectedSchoolDirty}
                             onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
                           >
-                            <MenuItem value="">
-                              <em>Ingen skole</em>
-                            </MenuItem>
-                            {(schoolsList || []).map(s => (
-                              <MenuItem key={s.id} value={s.id}>
-                                {s.name}
-                              </MenuItem>
-                            ))}
+                            <MenuItem value=""><em>Ingen skole</em></MenuItem>
+                            {(schoolsList || []).map(s => (<MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>))}
                           </TextField>
 
-                          {/* Kopi-ikon: kopierer skolens navn, samme logik som lokation */}
-                          <CopyIconButton
-                            value={getSelectedSchoolName()}
-                            disabled={!getSelectedSchoolName()}
-                            iconSize={isMobile ? 13 : 15}
-                            isMobile={isMobile}
-                          />
+                          <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
 
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={handleSchoolSave}
-                            disabled={savingSchool || String(selectedSchool) === String(client?.school_id)}
-                            sx={{ minWidth: 56 }}
-                          >
+                          <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: 56 }}>
                             {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
@@ -519,13 +459,7 @@ export default function ClientDetailsHeaderSection({
                             fullWidth
                           />
                           <CopyIconButton value={locality ?? ""} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={handleLocalitySave}
-                            disabled={savingLocality}
-                            sx={{ minWidth: 56 }}
-                          >
+                          <Button variant="outlined" size="small" onClick={handleLocalitySave} disabled={savingLocality} sx={{ minWidth: 56 }}>
                             {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
@@ -540,17 +474,13 @@ export default function ClientDetailsHeaderSection({
           </Card>
         </Box>
 
-        {/* Paper 2 - Kiosk info */}
+        {/* Kiosk info */}
         <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
-                  Kiosk info
-                </Typography>
-                <Box sx={{ ml: 1 }}>
-                  <StateBadge state={client?.state} isMobile={isMobile} />
-                </Box>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Kiosk info</Typography>
+                <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
               </Box>
 
               <TableContainer>
@@ -572,13 +502,7 @@ export default function ClientDetailsHeaderSection({
                             fullWidth
                           />
                           <CopyIconButton value={kioskUrl ?? ""} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={handleKioskUrlSave}
-                            disabled={savingKioskUrl}
-                            sx={{ minWidth: 56 }}
-                          >
+                          <Button variant="outlined" size="small" onClick={handleKioskUrlSave} disabled={savingKioskUrl} sx={{ minWidth: 56 }}>
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
@@ -592,7 +516,6 @@ export default function ClientDetailsHeaderSection({
                       </TableCell>
                     </TableRow>
 
-                    {/* Rækker for kioskBrowserData */}
                     {renderKioskBrowserDataRows(kioskBrowserData)}
 
                   </TableBody>
