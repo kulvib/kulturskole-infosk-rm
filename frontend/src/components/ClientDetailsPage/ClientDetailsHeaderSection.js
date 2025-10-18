@@ -545,7 +545,9 @@ function propsAreEqual(prev, next) {
     "savingKioskUrl",
     "liveChromeStatus",
     "liveChromeColor",
-    "refreshing"
+    "refreshing",
+    // optional token if parent provides it (useful if you want explicit change detection)
+    "liveChromeTimestamp"
   ];
   for (const k of simpleKeys) {
     if (prev[k] !== next[k]) return false;
@@ -554,7 +556,7 @@ function propsAreEqual(prev, next) {
   // Compare client fields we care about shallowly
   const prevClient = prev.client || {};
   const nextClient = next.client || {};
-  const clientKeys = ["id", "name", "isOnline", "school_id", "state"];
+  const clientKeys = ["id", "name", "isOnline", "school_id", "state", "chrome_status", "chrome_color"];
   for (const k of clientKeys) {
     if (prevClient[k] !== nextClient[k]) return false;
   }
