@@ -12,15 +12,14 @@ import {
   openTerminal,
   openRemoteDesktop,
   getSchools,
+  getChromeStatus,
 } from "../../api";
 
 /*
-  ClientDetailsPage.js
-
-  - Wrapper fetcher fuld client (15s). Denne komponent:
-    * holder lokal clientState for optimistic updates
-    * poller /clients/{id}/chrome-status hvert 1s (robust fetch)
-    * sender showSnackbar og refreshing videre til ActionsSection
+  ClientDetailsPage.js - uses api.getChromeStatus for 1s polling
+  - polling via recursive setTimeout
+  - updates liveChromeStatus from json.chrome_status (or fallback to step.message)
+  - uses getChromeStatus which attaches Authorization header (JWT)
 */
 
 export default function ClientDetailsPage({
@@ -90,64 +89,49 @@ export default function ClientDetailsPage({
     return () => { cancelled = true; };
   }, []);
 
-  /*
-    Poll chrome-status every 1s, but only update when step timestamp/message changes.
-    Implementation is robust:
-    - tries both /api/ and no-prefix paths
-    - includes credentials (cookies) in fetch in case backend uses session auth
-    - shallow-change detection prevents unnecessary re-renders
-  */
+  // Poll chrome-status every 1s using api.getChromeStatus
   useEffect(() => {
     if (!clientState?.id) return;
     let cancelled = false;
-    let intervalId = null;
+    let timerId = null;
+    const POLL_INTERVAL_MS = 1000;
 
-    const pollChromeStatus = async () => {
-      if (!clientState?.id) return;
-      const tryUrls = [
-        `/api/clients/${clientState.id}/chrome-status`,
-        `/clients/${clientState.id}/chrome-status`
-      ];
-      for (const url of tryUrls) {
-        try {
-          const res = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } });
-          if (!res.ok) {
-            // try next url
-            continue;
-          }
-          const json = await res.json();
-          const step = json.step || {};
-          const timestamp = step.timestamp ?? json.chrome_last_updated ?? null;
-          const message = json.chrome_status ?? step.message ?? null;
-          const color = json.chrome_color ?? step.color ?? null;
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const json = await getChromeStatus(clientState.id);
+        // prefer direct chrome_status field, fallback to step
+        const message = json.chrome_status ?? (json.step && json.step.message) ?? null;
+        const color = json.chrome_color ?? (json.step && json.step.color) ?? null;
+        const timestamp = json.chrome_last_updated ?? (json.step && json.step.timestamp) ?? null;
 
-          const last = lastChromeStepRef.current;
-          const changed = (timestamp && timestamp !== last.timestamp) || (message && message !== last.message);
-          if (changed) {
-            lastChromeStepRef.current = { timestamp, message };
-            if (!cancelled) {
-              if (message !== null) setLiveChromeStatus(message);
-              if (color !== null) setLiveChromeColor(color);
-              // Update local clientState so header shows same info immediately
-              setClientState(prev => prev ? ({ ...prev, chrome_status: message, chrome_color: color }) : prev);
-            }
+        const last = lastChromeStepRef.current;
+        const changed = (timestamp && timestamp !== last.timestamp) || (message && message !== last.message);
+        if (changed) {
+          lastChromeStepRef.current = { timestamp, message };
+          if (!cancelled) {
+            if (message !== null) setLiveChromeStatus(message);
+            if (color !== null) setLiveChromeColor(color);
+            // update clientState locally so header shows same info immediately
+            setClientState(prev => prev ? ({ ...prev, chrome_status: message, chrome_color: color }) : prev);
           }
-          // success, do not try other URLs
-          break;
-        } catch (err) {
-          // network/parse error -> try next url
-          continue;
+        }
+      } catch (err) {
+        // ignore errors — could be auth/network; wrapper's snackbar can show persistent errors if desired
+        // optional: if you want visible debug: console.debug('chrome-status poll error', err);
+      } finally {
+        if (!cancelled) {
+          timerId = setTimeout(poll, POLL_INTERVAL_MS);
         }
       }
     };
 
-    // initial and then every 1s
-    pollChromeStatus();
-    intervalId = setInterval(pollChromeStatus, 1000); // 1s
+    // start polling immediately
+    poll();
 
     return () => {
       cancelled = true;
-      clearInterval(intervalId);
+      if (timerId) clearTimeout(timerId);
     };
   }, [clientState?.id]);
 
@@ -160,7 +144,6 @@ export default function ClientDetailsPage({
     try {
       if (!memoizedClientId) throw new Error("No client id");
       await apiClientAction(memoizedClientId, action);
-      // Use wrapper snackbar if provided
       if (typeof showSnackbar === "function") showSnackbar({ message: "Handlingen blev udført!", severity: "success" });
     } catch (err) {
       if (typeof showSnackbar === "function") showSnackbar({ message: "Fejl: " + (err?.message || err), severity: "error" });
@@ -179,10 +162,9 @@ export default function ClientDetailsPage({
     openRemoteDesktop(memoizedClientId);
   }, [memoizedClientId]);
 
-  // Header callback: update local clientState when school is updated
+  // Callback passed to header: update local clientState when school is updated
   const handleSchoolUpdated = useCallback(async (updatedClient) => {
     if (!clientState) return;
-    // If API returned a full updated client, use it; otherwise ask wrapper to refresh
     if (updatedClient && updatedClient.id === clientState.id && Object.keys(updatedClient).length > 1) {
       setClientState(prev => ({ ...(prev || {}), ...(updatedClient || {}) }));
     } else {
@@ -223,11 +205,9 @@ export default function ClientDetailsPage({
     setSavingKioskUrl(true);
     try {
       await pushKioskUrl(clientState.id, kioskUrl);
-      // ask wrapper to refresh full client after pushing kiosk url
       if (typeof handleRefresh === "function") {
         try { await handleRefresh(); } catch {}
       } else {
-        // fallback: update local state
         setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
       }
       setKioskUrlDirty(false);
@@ -243,6 +223,7 @@ export default function ClientDetailsPage({
     if (memoizedClientId) {
       apiClientAction(memoizedClientId, "livestream_start").catch(() => {});
     }
+    // intentionally only when client id changes
   }, [memoizedClientId]);
 
   // Memoize actionLoading to avoid prop reference churn
@@ -277,14 +258,12 @@ export default function ClientDetailsPage({
             showSnackbar={showSnackbar}
           />
         </Grid>
-
         <Grid item xs={12}>
           <ClientDetailsLivestreamSection
             clientId={clientState?.id}
             key={streamKey}
           />
         </Grid>
-
         <Grid item xs={12}>
           <ClientDetailsInfoSection
             client={clientState}
@@ -295,7 +274,6 @@ export default function ClientDetailsPage({
             setCalendarDialogOpen={setCalendarDialogOpen}
           />
         </Grid>
-
         <Grid item xs={12}>
           <ClientDetailsActionsSection
             clientId={memoizedClientId}
@@ -307,7 +285,6 @@ export default function ClientDetailsPage({
           />
         </Grid>
       </Grid>
-
       <ClientCalendarDialog
         open={calendarDialogOpen}
         onClose={() => setCalendarDialogOpen(false)}
