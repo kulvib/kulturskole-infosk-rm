@@ -17,12 +17,10 @@ import {
 /*
   ClientDetailsPage.js
 
-  Behaviour:
-  - Relies on wrapper (ClientDetailsPageWrapper) to fetch the full client object periodically (15s).
-  - Polls /clients/{id}/chrome-status every 1s and updates UI only when the step/timestamp/message changes.
-  - Keeps local optimistic updates for locality/kioskUrl.
-  - Stabilizes callbacks with useCallback and memoizes actionLoading for React.memo compatibility in the ActionsSection.
-  - Passes showSnackbar and refreshing down to ActionsSection so wrapper centralizes feedback.
+  - Wrapper fetcher fuld client (15s). Denne komponent:
+    * holder lokal clientState for optimistic updates
+    * poller /clients/{id}/chrome-status hvert 1s (robust fetch)
+    * sender showSnackbar og refreshing videre til ActionsSection
 */
 
 export default function ClientDetailsPage({
@@ -93,41 +91,53 @@ export default function ClientDetailsPage({
   }, []);
 
   /*
-    NOTE:
-    - This component intentionally does NOT poll GET /clients/{id} for the full client.
-    - The wrapper (ClientDetailsPageWrapper) is expected to fetch the client and pass it as `client` prop (every 15s).
-    - We keep a dedicated chrome-status poll here at 1s so kiosk/browser status is near-live.
+    Poll chrome-status every 1s, but only update when step timestamp/message changes.
+    Implementation is robust:
+    - tries both /api/ and no-prefix paths
+    - includes credentials (cookies) in fetch in case backend uses session auth
+    - shallow-change detection prevents unnecessary re-renders
   */
-
-  // Poll chrome-status every 1s, but only update when the step/timestamp/message changes
   useEffect(() => {
     if (!clientState?.id) return;
     let cancelled = false;
     let intervalId = null;
 
     const pollChromeStatus = async () => {
-      try {
-        const res = await fetch(`/api/clients/${clientState.id}/chrome-status`);
-        if (!res.ok) return;
-        const json = await res.json();
-        const step = json.step || {};
-        const timestamp = step.timestamp ?? json.chrome_last_updated ?? null;
-        const message = json.chrome_status ?? step.message ?? null;
-        const color = json.chrome_color ?? step.color ?? null;
-
-        const last = lastChromeStepRef.current;
-        const changed = (timestamp && timestamp !== last.timestamp) || (message && message !== last.message);
-        if (changed) {
-          lastChromeStepRef.current = { timestamp, message };
-          if (!cancelled) {
-            if (message !== null) setLiveChromeStatus(message);
-            if (color !== null) setLiveChromeColor(color);
-            // Optionally update clientState so header reflects same info immediately
-            setClientState(prev => prev ? ({ ...prev, chrome_status: message, chrome_color: color }) : prev);
+      if (!clientState?.id) return;
+      const tryUrls = [
+        `/api/clients/${clientState.id}/chrome-status`,
+        `/clients/${clientState.id}/chrome-status`
+      ];
+      for (const url of tryUrls) {
+        try {
+          const res = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } });
+          if (!res.ok) {
+            // try next url
+            continue;
           }
+          const json = await res.json();
+          const step = json.step || {};
+          const timestamp = step.timestamp ?? json.chrome_last_updated ?? null;
+          const message = json.chrome_status ?? step.message ?? null;
+          const color = json.chrome_color ?? step.color ?? null;
+
+          const last = lastChromeStepRef.current;
+          const changed = (timestamp && timestamp !== last.timestamp) || (message && message !== last.message);
+          if (changed) {
+            lastChromeStepRef.current = { timestamp, message };
+            if (!cancelled) {
+              if (message !== null) setLiveChromeStatus(message);
+              if (color !== null) setLiveChromeColor(color);
+              // Update local clientState so header shows same info immediately
+              setClientState(prev => prev ? ({ ...prev, chrome_status: message, chrome_color: color }) : prev);
+            }
+          }
+          // success, do not try other URLs
+          break;
+        } catch (err) {
+          // network/parse error -> try next url
+          continue;
         }
-      } catch (e) {
-        // ignore errors - polling continues
       }
     };
 
@@ -172,11 +182,10 @@ export default function ClientDetailsPage({
   // Header callback: update local clientState when school is updated
   const handleSchoolUpdated = useCallback(async (updatedClient) => {
     if (!clientState) return;
-    // If API returned a full updated client, use it; otherwise ask wrapper to refresh (wrapper owns full-client fetching)
+    // If API returned a full updated client, use it; otherwise ask wrapper to refresh
     if (updatedClient && updatedClient.id === clientState.id && Object.keys(updatedClient).length > 1) {
       setClientState(prev => ({ ...(prev || {}), ...(updatedClient || {}) }));
     } else {
-      // Ask wrapper to refresh by calling handleRefresh if available
       if (typeof handleRefresh === "function") {
         try { await handleRefresh(); } catch {}
       }
@@ -234,7 +243,6 @@ export default function ClientDetailsPage({
     if (memoizedClientId) {
       apiClientAction(memoizedClientId, "livestream_start").catch(() => {});
     }
-    // intentionally only when client id changes
   }, [memoizedClientId]);
 
   // Memoize actionLoading to avoid prop reference churn
@@ -291,12 +299,9 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <ClientDetailsActionsSection
             clientId={memoizedClientId}
-            actionLoading={memoActionLoading}
             handleClientAction={handleClientAction}
             handleOpenTerminal={handleOpenTerminal}
             handleOpenRemoteDesktop={handleOpenRemoteDesktop}
-            shutdownDialogOpen={shutdownDialogOpen}
-            setShutdownDialogOpen={setShutdownDialogOpen}
             refreshing={refreshing}
             showSnackbar={showSnackbar}
           />
