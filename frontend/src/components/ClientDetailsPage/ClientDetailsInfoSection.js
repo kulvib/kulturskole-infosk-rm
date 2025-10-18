@@ -22,13 +22,10 @@ import { useTheme } from "@mui/material/styles";
 
 /*
   ClientDetailsInfoSection (opdateret)
-  - Rettelser:
-    * Importerede TableHead (manglede tidligere).
-    * Comparator udvidet til også at sammenligne client.uptime og client.last_seen.
-    * Strengere/eksakte sammenligninger (!==) for uptime og lastSeen-props.
-    * Robust håndtering af forskellige uptime/lastSeen-formater (nummer/ISO/string).
-  - Komponenten modtager uptime og lastSeen som props fra parent (som poller hvert 1s).
-  - React.memo med custom comparator så komponenten kun rerender når relevante værdier ændrer sig.
+  - Tilføjet React.memo med custom comparator (propsAreEqual) i bunden,
+    så komponenten rerender når relevante props ændrer sig (især uptime og lastSeen).
+  - Comparator sammenligner både client-objektets nøglefelter og de separate uptime/lastSeen props.
+  - Robust håndtering af forskellige uptime/lastSeen-formater i formatter-funktionerne.
 */
 
 // Fælles StatusBadge med 2 sekunders puls animation
@@ -52,9 +49,18 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
         <style>
           {`
             @keyframes pulsate {
-              0% { transform: scale(1); opacity: 1; }
-              50% { transform: scale(1.25); opacity: 0.5; }
-              100% { transform: scale(1); opacity: 1; }
+              0% {
+                transform: scale(1);
+                opacity: 1;
+              }
+              50% {
+                transform: scale(1.25);
+                opacity: 0.5;
+              }
+              100% {
+                transform: scale(1);
+                opacity: 1;
+              }
             }
           `}
         </style>
@@ -143,16 +149,17 @@ function ClientPowerShortTable({ markedDays, isMobile=false }) {
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
+  // Accept ISO-ish strings or epoch numbers; be defensive
   if (typeof dateStr === "number") {
     d = new Date(dateStr);
-  } else {
-    if (typeof dateStr === "string" && (dateStr.endsWith("Z") || dateStr.match(/[\+\-]\d{2}:?\d{2}$/))) {
+  } else if (typeof dateStr === "string") {
+    if (dateStr.endsWith("Z") || dateStr.match(/[\+\-]\d{2}:?\d{2}$/)) {
       d = new Date(dateStr);
-    } else if (typeof dateStr === "string") {
-      d = new Date(dateStr + "Z");
     } else {
-      d = new Date(dateStr);
+      d = new Date(dateStr + "Z");
     }
+  } else {
+    d = new Date(dateStr);
   }
   if (Number.isNaN(d.getTime())) return "ukendt";
   const formatter = new Intl.DateTimeFormat("da-DK", {
@@ -178,7 +185,7 @@ function formatDateTime(dateStr, withSeconds = false) {
 }
 
 function formatUptime(uptimeStr) {
-  if (!uptimeStr && uptimeStr !== 0) return "ukendt";
+  if (uptimeStr === null || uptimeStr === undefined) return "ukendt";
   let totalSeconds = 0;
   if (typeof uptimeStr === "number") {
     totalSeconds = Math.floor(uptimeStr);
@@ -356,7 +363,7 @@ function NetworkInfoTable({ client, isMobile=false }) {
 
 function ClientDetailsInfoSection({
   client,
-  markedDays = {},
+  markedDays,
   uptime,
   lastSeen,
   calendarDialogOpen,
@@ -460,8 +467,8 @@ function propsAreEqual(prev, next) {
   }
 
   // uptime and lastSeen props must be compared strictly — they are updated frequently by parent poll
-  if ((prev.uptime !== next.uptime)) return false;
-  if ((prev.lastSeen !== next.lastSeen)) return false;
+  if (prev.uptime !== next.uptime) return false;
+  if (prev.lastSeen !== next.lastSeen) return false;
 
   // calendar dialog handlers don't affect rendering comparison
   return true;
