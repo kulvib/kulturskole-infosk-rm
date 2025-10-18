@@ -12,7 +12,7 @@ export default function ClientDetailsPageWrapper() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [streamKey, setStreamKey] = useState(0);
 
-  // Wrapper-snackbar (global besked, fx refresh OK eller fetch-fejl)
+  // Central snackbar (wrapper) til al brugerfeedback
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   // Fejltilstand ved manglende adgang/404
   const [notFound, setNotFound] = useState(false);
@@ -66,10 +66,11 @@ export default function ClientDetailsPageWrapper() {
     setSnackbar({ open: false, message: "", severity: "success" });
   };
 
-  // Lokal snackbar til lokale handlinger (vises kun i ClientDetailsPage)
-  const [localSnackbar, setLocalSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const handleLocalSnackbar = (msgObj) => setLocalSnackbar({ ...msgObj, open: true });
-  const handleCloseLocalSnackbar = () => setLocalSnackbar({ open: false, message: "", severity: "success" });
+  // Centraliseret snackbar-funktion, sendes ned til children som showSnackbar
+  const handleShowSnackbar = (msgObj) => {
+    if (!msgObj || typeof msgObj !== "object") return;
+    setSnackbar({ open: true, message: msgObj.message || "", severity: msgObj.severity || "success" });
+  };
 
   // Hvis fejlet fetch/adgang -> vis fejl
   if (notFound) {
@@ -96,7 +97,7 @@ export default function ClientDetailsPageWrapper() {
 
   return (
     <>
-      {/* Global (wrapper) snackbar */}
+      {/* Central (wrapper) snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3500}
@@ -107,17 +108,7 @@ export default function ClientDetailsPageWrapper() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
-      {/* Lokal snackbar fra child */}
-      <Snackbar
-        open={localSnackbar.open}
-        autoHideDuration={3400}
-        onClose={handleCloseLocalSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <MuiAlert elevation={6} variant="filled" onClose={handleCloseLocalSnackbar} severity={localSnackbar.severity}>
-          {localSnackbar.message}
-        </MuiAlert>
-      </Snackbar>
+
       <ClientDetailsPage
         client={client}
         refreshing={refreshing}
@@ -126,7 +117,7 @@ export default function ClientDetailsPageWrapper() {
         calendarLoading={calendarLoading}
         streamKey={streamKey}
         onRestartStream={handleRestartStream}
-        showSnackbar={handleLocalSnackbar} // Funktion ned til child!
+        showSnackbar={handleShowSnackbar} // Central snackbar-funktion ned til child
       />
     </>
   );
