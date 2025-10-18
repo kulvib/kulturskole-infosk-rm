@@ -19,18 +19,36 @@ export default function ClientDetailsPageWrapper() {
 
   // Ref til interval så vi kan starte interval EFTER første fetch og rydde korrekt
   const intervalRef = useRef(null);
+  // Ref til aktiv AbortController for fetchAllData så vi kan afbryde request ved unmount
+  const activeAbortRef = useRef(null);
 
-  // Fetch all data
+  // Fetch all data - returnerer clientData eller null
   const fetchAllData = async (forceUpdate = false) => {
-    if (!clientId) return;
+    if (!clientId) return null;
     setCalendarLoading(true);
     setNotFound(false);
+
+    // afbrydel tidligere fetch hvis nogen
+    if (activeAbortRef.current) {
+      try { activeAbortRef.current.abort(); } catch {}
+      activeAbortRef.current = null;
+    }
+    const ac = new AbortController();
+    activeAbortRef.current = ac;
+
     try {
       const [clientData, season] = await Promise.all([
         getClient(clientId),
         getCurrentSeason()
       ]);
-      const calendarData = await getMarkedDays(season.id, clientId);
+      // hent markedDays (kan bruge season.id)
+      let calendarData = {};
+      try {
+        calendarData = await getMarkedDays(season.id, clientId);
+      } catch (errInner) {
+        // ikke fatal for klientvisning — vis snackbar, men fortsæt
+        setSnackbar({ open: true, message: "Kunne ikke hente kalenderdata: " + (errInner?.message || errInner), severity: "warning" });
+      }
 
       setClient(prev => {
         if (forceUpdate || JSON.stringify(clientData) !== JSON.stringify(prev)) {
@@ -40,12 +58,35 @@ export default function ClientDetailsPageWrapper() {
       });
 
       setMarkedDays({ ...calendarData?.markedDays });
+
+      activeAbortRef.current = null;
+      setCalendarLoading(false);
+      return clientData;
     } catch (err) {
-      // Ved fejl: vis notFound + snackbar
-      setNotFound(true);
-      setSnackbar({ open: true, message: "Ingen adgang eller klient ikke fundet", severity: "error" });
+      // Hvis fetch blev afbrudt, ignorer
+      if (err && err.name === "AbortError") {
+        activeAbortRef.current = null;
+        setCalendarLoading(false);
+        return null;
+      }
+
+      // Undersøg fejltekst/status hvis muligt — sæt notFound kun for 401/403/404
+      const msg = (err && err.message) ? String(err.message) : "Ukendt fejl ved hentning af data";
+      const lower = msg.toLowerCase();
+      const isAuthOrNotFound = lower.includes("401") || lower.includes("403") || lower.includes("404") || lower.includes("ingen adgang") || lower.includes("ikke fundet") || lower.includes("unauthorized");
+
+      if (isAuthOrNotFound) {
+        setNotFound(true);
+        setSnackbar({ open: true, message: "Ingen adgang eller klient ikke fundet", severity: "error" });
+      } else {
+        // midlertidig/netværksfejl — vis snackbar men behold siden
+        setSnackbar({ open: true, message: "Fejl ved hentning af data: " + msg, severity: "error" });
+      }
+
+      activeAbortRef.current = null;
+      setCalendarLoading(false);
+      return null;
     }
-    setCalendarLoading(false);
   };
 
   useEffect(() => {
@@ -54,21 +95,29 @@ export default function ClientDetailsPageWrapper() {
     // IIFE for at kunne await før interval oprettes
     (async () => {
       if (!clientId) return;
-      await fetchAllData(false); // initial hent
+      // initial hent
+      await fetchAllData(false);
       if (cancelled) return;
 
       // Start interval EFTER initial fetch så child får client tidligt
       if (intervalRef.current) clearInterval(intervalRef.current);
       intervalRef.current = setInterval(() => {
+        // ignorer result — fetchAllData internt opdaterer state
         fetchAllData(false);
       }, 15000); // full client: every 15s
     })();
 
     return () => {
       cancelled = true;
+      // clear interval
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
+      }
+      // abort active fetch if any
+      if (activeAbortRef.current) {
+        try { activeAbortRef.current.abort(); } catch {}
+        activeAbortRef.current = null;
       }
     };
   }, [clientId]);
