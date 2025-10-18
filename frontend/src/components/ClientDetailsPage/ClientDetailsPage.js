@@ -17,12 +17,10 @@ import {
 } from "../../api";
 
 /*
-  ClientDetailsPage.js
-
-  Poller /api/clients/:id/chrome-status hvert 1s og:
-  - opdaterer chrome_status + chrome_color
-  - opdaterer last_seen + uptime på samme måde (change-detektion strict !==)
-  - hvis chrome-status endpoint ikke indeholder last_seen/uptime, bruger en fallback: kald getClient hvert 5. poll for kun at opdatere dem
+  ClientDetailsPage.js - debug/robust polling version
+  - Poller getChromeStatus every 1s and updates chrome_status, chrome_color, last_seen and uptime.
+  - Logs poll results to console.debug so du kan se præcis hvad backend returnerer.
+  - Fallback-getClient kører hvert poll (FALLBACK_GETCLIENT_EVERY = 1) for debugging; sæt til 5+ i produktion.
 */
 
 export default function ClientDetailsPage({
@@ -48,10 +46,10 @@ export default function ClientDetailsPage({
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
 
-  const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status || "unknown");
-  const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color || null);
-  const [lastSeen, setLastSeen] = useState(client?.last_seen || null);
-  const [uptime, setUptime] = useState(client?.uptime || null);
+  const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status ?? "unknown");
+  const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color ?? null);
+  const [lastSeen, setLastSeen] = useState(client?.last_seen ?? null);
+  const [uptime, setUptime] = useState(client?.uptime ?? null);
 
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
@@ -60,10 +58,10 @@ export default function ClientDetailsPage({
 
   // remember last polled tokens/values (strict comparison)
   const lastPolledRef = useRef({
-    timestamp: null,
-    message: null,
-    lastSeen: null,
-    uptime: null,
+    timestamp: client?.chrome_last_updated ?? null,
+    message: client?.chrome_status ?? null,
+    lastSeen: client?.last_seen ?? null,
+    uptime: client?.uptime ?? null,
   });
 
   // counter to schedule fallback getClient calls for last_seen/uptime if needed
@@ -90,6 +88,7 @@ export default function ClientDetailsPage({
       lastSeen: clientState.last_seen ?? null,
       uptime: clientState.uptime ?? null,
     };
+    pollCountRef.current = 0; // reset
   }, [clientState]);
 
   // Fetch schools if needed
@@ -111,33 +110,37 @@ export default function ClientDetailsPage({
     let cancelled = false;
     let timerId = null;
     const POLL_INTERVAL_MS = 1000;
-    const FALLBACK_GETCLIENT_EVERY = 5; // every 5 polls (~5s) call getClient if needed
+    const FALLBACK_GETCLIENT_EVERY = 1; // DEBUG: run fallback every poll. Set to 5 in production.
 
     const poll = async () => {
       if (cancelled) return;
       pollCountRef.current += 1;
       try {
         const json = await getChromeStatus(clientState.id);
+        // debug: show raw response
+        console.debug("[poll] getChromeStatus response:", json);
 
         // prefer direct fields; fallback to step.* if necessary
-        const message = json.chrome_status ?? (json.step && json.step.message) ?? null;
-        const color = json.chrome_color ?? (json.step && json.step.color) ?? null;
-        const timestamp = json.chrome_last_updated ?? (json.step && json.step.timestamp) ?? null;
+        const message = json?.chrome_status ?? (json?.step && json.step.message) ?? null;
+        const color = json?.chrome_color ?? (json?.step && json.step.color) ?? null;
+        const timestamp = json?.chrome_last_updated ?? (json?.step && json.step.timestamp) ?? null;
 
         // try to extract last_seen and uptime from chrome-status response if present
         const lastSeenVal =
-          json.last_seen ??
-          json.client_last_seen ??
-          json.chrome_last_seen ??
-          (json.client && json.client.last_seen) ??
+          json?.last_seen ??
+          json?.client_last_seen ??
+          json?.chrome_last_seen ??
+          (json?.client && json.client.last_seen) ??
           null;
 
         const uptimeVal =
-          json.uptime ??
-          json.client_uptime ??
-          json.chrome_uptime ??
-          (json.client && json.client.uptime) ??
+          json?.uptime ??
+          json?.client_uptime ??
+          json?.chrome_uptime ??
+          (json?.client && json.client.uptime) ??
           null;
+
+        console.debug("[poll] parsed:", { timestamp, message, lastSeenVal, uptimeVal, pollCount: pollCountRef.current });
 
         const last = lastPolledRef.current;
 
@@ -164,15 +167,17 @@ export default function ClientDetailsPage({
               uptime: uptimeVal ?? prev.uptime,
               chrome_last_updated: timestamp ?? prev.chrome_last_updated,
             }) : prev);
+            console.debug("[poll] state updated from chrome-status");
           }
         }
 
         // fallback: if the chrome-status JSON didn't include last_seen/uptime, periodically call getClient
-        const needFallbackForLastSeen = typeof lastSeenVal === "undefined" || lastSeenVal === null;
-        const needFallbackForUptime = typeof uptimeVal === "undefined" || uptimeVal === null;
+        const needFallbackForLastSeen = (lastSeenVal === null || typeof lastSeenVal === "undefined");
+        const needFallbackForUptime = (uptimeVal === null || typeof uptimeVal === "undefined");
         if ((needFallbackForLastSeen || needFallbackForUptime) && (pollCountRef.current % FALLBACK_GETCLIENT_EVERY === 0)) {
           try {
             const full = await getClient(clientState.id);
+            console.debug("[poll] fallback getClient response:", { last_seen: full?.last_seen, uptime: full?.uptime });
             if (full) {
               const fsLastSeen = full.last_seen ?? null;
               const fsUptime = full.uptime ?? null;
@@ -190,14 +195,15 @@ export default function ClientDetailsPage({
               }
               if (updated && !cancelled) {
                 setClientState(prev => prev ? ({ ...prev, last_seen: fsLastSeen ?? prev.last_seen, uptime: fsUptime ?? prev.uptime }) : prev);
+                console.debug("[poll] state updated from fallback getClient");
               }
             }
           } catch (e) {
-            // ignore fallback errors
+            console.debug("[poll] fallback getClient error:", e);
           }
         }
       } catch (err) {
-        // ignore polling errors (auth/network) — wrapper may surface persistent errors elsewhere
+        console.debug("[poll] getChromeStatus error:", err);
       } finally {
         // schedule next poll
         if (!cancelled) {
