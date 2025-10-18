@@ -46,7 +46,7 @@ export default function ClientDetailsPageWrapper() {
 
   useEffect(() => {
     fetchAllData();
-    const timer = setInterval(() => fetchAllData(false), 15000);
+    const timer = setInterval(() => fetchAllData(false), 15000); // full client: every 15s
     return () => clearInterval(timer);
   }, [clientId]);
 
