@@ -103,6 +103,31 @@ export async function getClient(id) {
   return await res.json();
 }
 
+// NY: HENT KIOSK/CHROME STATUS (bruges af frontend poll)
+export async function getChromeStatus(id) {
+  const token = getToken();
+  if (!token) throw new Error("Token mangler - du er ikke logget ind");
+  const res = await fetch(`${apiUrl}/api/clients/${id}/chrome-status`, {
+    headers: {
+      Authorization: "Bearer " + token,
+      Accept: "application/json",
+    },
+  });
+  if (res.status === 401) {
+    localStorage.removeItem("token");
+    throw new Error("401 Unauthorized: Login udløbet – log ind igen");
+  }
+  if (!res.ok) {
+    let msg = "Kunne ikke hente chrome status";
+    try {
+      const data = await res.json();
+      msg = data.detail || data.message || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
 // OPDATÉR KLIENT (login)
 export async function updateClient(id, updates) {
   const token = getToken();
@@ -523,7 +548,6 @@ export async function getSchoolTimes(schoolId) {
   return await res.json();
 }
 
-// OPDATER TIDER FOR EN SKOLE
 export async function updateSchoolTimes(schoolId, updates) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
