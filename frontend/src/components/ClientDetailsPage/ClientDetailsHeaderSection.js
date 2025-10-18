@@ -31,6 +31,7 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   - Unik keyframe-navn (pulsateStatusBadge) og keyframes animerer KUN transform+opacity.
   - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
   - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
+  - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
 */
 
 const COLOR_NAME_MAP = {
@@ -212,7 +213,7 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   );
 }
 
-export default function ClientDetailsHeaderSection({
+function ClientDetailsHeaderSection({
   client,
   schools = [],
   locality,
@@ -350,11 +351,11 @@ export default function ClientDetailsHeaderSection({
     ));
   }
 
-  const getSelectedSchoolName = () => {
+  const getSelectedSchoolName = React.useCallback(() => {
     if (!selectedSchool) return "";
     const s = (schoolsList || []).find(x => String(x.id) === String(selectedSchool));
     return s ? s.name : String(selectedSchool);
-  };
+  }, [selectedSchool, schoolsList]);
 
   // Render
   return (
@@ -529,3 +530,55 @@ export default function ClientDetailsHeaderSection({
     </Box>
   );
 }
+
+// Custom shallow comparator for React.memo:
+// Only re-render header when props that affect its UI actually change.
+// We check a set of primitives and a few client fields that header displays.
+function propsAreEqual(prev, next) {
+  // Compare simple primitive props
+  const simpleKeys = [
+    "locality",
+    "localityDirty",
+    "savingLocality",
+    "kioskUrl",
+    "kioskUrlDirty",
+    "savingKioskUrl",
+    "liveChromeStatus",
+    "liveChromeColor",
+    "refreshing"
+  ];
+  for (const k of simpleKeys) {
+    if (prev[k] !== next[k]) return false;
+  }
+
+  // Compare client fields we care about shallowly
+  const prevClient = prev.client || {};
+  const nextClient = next.client || {};
+  const clientKeys = ["id", "name", "isOnline", "school_id", "state"];
+  for (const k of clientKeys) {
+    if (prevClient[k] !== nextClient[k]) return false;
+  }
+
+  // Compare schools length and basic identity to detect meaningful changes
+  const prevSchools = prev.schools || [];
+  const nextSchools = next.schools || [];
+  if (prevSchools.length !== nextSchools.length) return false;
+  for (let i = 0; i < prevSchools.length; i++) {
+    if ((prevSchools[i]?.id ?? null) !== (nextSchools[i]?.id ?? null)) return false;
+  }
+
+  // Compare kioskBrowserData shallowly by keys/values
+  const prevKbd = prev.kioskBrowserData || {};
+  const nextKbd = next.kioskBrowserData || {};
+  const prevKbdKeys = Object.keys(prevKbd);
+  const nextKbdKeys = Object.keys(nextKbd);
+  if (prevKbdKeys.length !== nextKbdKeys.length) return false;
+  for (const key of prevKbdKeys) {
+    if (prevKbd[key] !== nextKbd[key]) return false;
+  }
+
+  // If we've reached here, treat props as equal (no re-render needed)
+  return true;
+}
+
+export default React.memo(ClientDetailsHeaderSection, propsAreEqual);
