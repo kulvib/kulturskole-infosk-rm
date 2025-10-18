@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import Hls from "hls.js";
 import {
   Box,
@@ -81,15 +81,18 @@ function formatLagValue(val) {
   return Number(val).toFixed(3).replace(/(\.\d*?[1-9])0+$|\.0*$/, "$1");
 }
 
-export default function ClientDetailsLivestreamSection({ clientId }) {
+export default function ClientDetailsLivestreamSection({
+  clientId,
+  refreshing: parentRefreshing = false, // sync from parent when provided
+  onRestartStream = null,
+  streamKey = null
+}) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
 
   const [manifestReady, setManifestReady] = useState(false);
   const [error, setError] = useState("");
   const [lastLive, setLastLive] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
   const [lastSegmentLag, setLastSegmentLag] = useState(null);
@@ -107,33 +110,43 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
   const [autoRefreshed, setAutoRefreshed] = useState(false);
   const [manualRefreshed, setManualRefreshed] = useState(false);
 
+  // Lokal fallback key hvis parent ikke leverer streamKey/onRestartStream
+  const [localRefreshKey, setLocalRefreshKey] = useState(0);
+
+  // Intern refreshing state (for immediate local feedback) but synced with parentRefreshing
+  const [refreshing, setRefreshing] = useState(false);
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // --- NYT: State for at vise fullscreen overlay-knap ---
+  // Controls overlay
   const [showControls, setShowControls] = useState(false);
 
-  // --- NYT: Timer til at skjule controls automatisk ---
+  // Sync internal refreshing with parent prop
+  useEffect(() => {
+    setRefreshing(Boolean(parentRefreshing));
+  }, [parentRefreshing]);
+
+  // Auto-hide controls
   useEffect(() => {
     if (!showControls) return;
     const timeout = setTimeout(() => setShowControls(false), 2200);
     return () => clearTimeout(timeout);
   }, [showControls]);
 
-  // --- NYT: Mouse events til at vise/skjule controls ---
   const handleMouseMove = () => setShowControls(true);
 
-  function handleVideoWaiting() {
-    setBuffering(true);
-  }
-  function handleVideoPlaying() {
-    setBuffering(false);
-  }
-  function handleVideoCanPlay() {
-    setBuffering(false);
-  }
+  function handleVideoWaiting() { setBuffering(true); }
+  function handleVideoPlaying() { setBuffering(false); }
+  function handleVideoCanPlay() { setBuffering(false); }
 
+  // effectiveRefreshKey: parent streamKey if provided, otherwise localRefreshKey
+  const effectiveRefreshKey = useMemo(() => {
+    return (typeof streamKey !== "undefined" && streamKey !== null) ? streamKey : localRefreshKey;
+  }, [streamKey, localRefreshKey]);
+
+  // maybeResetSegments - run when effectiveRefreshKey changes
   useEffect(() => {
     if (!clientId) return;
     let ignore = false;
@@ -162,8 +175,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
     maybeResetSegments();
     return () => { ignore = true; };
-  }, [clientId, refreshKey]);
+  }, [clientId, effectiveRefreshKey]);
 
+  // Main manifest/polling & playback setup - depends on effectiveRefreshKey to remount
   useEffect(() => {
     if (!clientId) return;
     const video = videoRef.current;
@@ -178,7 +192,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       setError("");
       setManifestReady(true);
       setLastLive(new Date());
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      if (video && video.canPlayType && video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = hlsUrl;
       } else if (Hls.isSupported()) {
         hls = new Hls();
@@ -200,9 +214,11 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
           }
         });
       }
-      video.muted = true;
-      video.autoplay = true;
-      video.playsInline = true;
+      if (video) {
+        video.muted = true;
+        video.autoplay = true;
+        video.playsInline = true;
+      }
     };
 
     const cleanup = () => {
@@ -211,8 +227,10 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
         hlsRef.current = null;
       }
       if (videoRef.current) {
-        videoRef.current.removeAttribute("src");
-        videoRef.current.load();
+        try {
+          videoRef.current.removeAttribute("src");
+          videoRef.current.load();
+        } catch {}
       }
     };
 
@@ -242,6 +260,7 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       }
     };
 
+    // start polling immediately
     poll();
     pollInterval = setInterval(() => {
       if (stopPolling) return;
@@ -253,8 +272,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       clearInterval(pollInterval);
       cleanup();
     };
-  }, [clientId, refreshKey]);
+  }, [clientId, effectiveRefreshKey]);
 
+  // Poll last-segment-info to compute backend lag
   useEffect(() => {
     if (!clientId) return;
     if (!isSafari() && !manifestReady) return;
@@ -284,8 +304,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
     pollSegmentLag();
     return () => { stop = true; };
-  }, [clientId, manifestReady]);
+  }, [clientId, manifestReady, effectiveRefreshKey]);
 
+  // Player-reported lag (from HLS instance)
   useEffect(() => {
     if (!manifestReady) return;
     let interval;
@@ -300,8 +321,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [manifestReady]);
+  }, [manifestReady, effectiveRefreshKey]);
 
+  // Manifest EXT-X-PROGRAM-DATE-TIME based lag
   useEffect(() => {
     if (!clientId || !manifestReady) return;
     let stop = false;
@@ -323,8 +345,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
     pollManifestProgramDateTime();
     return () => { stop = true; };
-  }, [clientId, manifestReady]);
+  }, [clientId, manifestReady, effectiveRefreshKey]);
 
+  // lastLive ticker for UI
   useEffect(() => {
     let interval;
     if (manifestReady) {
@@ -334,16 +357,21 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
       }, 5000);
     }
     return () => clearInterval(interval);
-  }, [manifestReady]);
+  }, [manifestReady, effectiveRefreshKey]);
 
+  // Auto refresh: call parent's onRestartStream if provided, otherwise use local key
   useEffect(() => {
     const interval = setInterval(() => {
       setAutoRefreshed(true);
-      setManifestReady(false);
-      setRefreshKey(prev => prev + 1);
+      if (typeof onRestartStream === "function") {
+        // parent should set its refreshing flag; we synced to it in effect above
+        onRestartStream();
+      } else {
+        setLocalRefreshKey(k => k + 1);
+      }
     }, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [onRestartStream]);
 
   useEffect(() => {
     if (autoRefreshed) {
@@ -359,15 +387,19 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
     }
   }, [manualRefreshed]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    setManifestReady(false);
+  // Manual refresh: mark local flag and notify parent to restart stream
+  const handleRefreshClick = () => {
     setManualRefreshed(true);
-    setTimeout(() => {
-      setRefreshing(false);
-      setRefreshKey(prev => prev + 1);
-    }, 500);
-    setAutoRefreshed(false);
+    // optimistic local feedback: if parent does not control refreshing, show local spinner briefly
+    if (typeof onRestartStream === "function") {
+      // parent will set its refreshing flag; we've synced to it above
+      onRestartStream();
+    } else {
+      // fallback to local remounting behaviour and local spinner
+      setRefreshing(true);
+      setLocalRefreshKey(k => k + 1);
+      setTimeout(() => setRefreshing(false), 800);
+    }
   };
 
   const handleFullscreen = () => {
@@ -443,9 +475,9 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 <span>
                   <IconButton
                     aria-label="refresh"
-                    onClick={handleRefresh}
+                    onClick={handleRefreshClick}
                     size={isMobile ? "small" : "medium"}
-                    disabled={refreshing}
+                    disabled={refreshing || !clientId}
                   >
                     {refreshing ? <CircularProgress size={isMobile ? 20 : 18} color="inherit" /> : <RefreshIcon sx={{ fontSize: isMobile ? 26 : undefined }} />}
                   </IconButton>
@@ -484,7 +516,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
               position: "relative"
             }}
           >
-            {/* --- VIDEO-WRAPPER MED OVERLAY-KNAP --- */}
             <Box
               sx={{
                 position: "relative",
@@ -520,8 +551,8 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   display: "block",
                 }}
                 tabIndex={-1}
+                key={effectiveRefreshKey}
               />
-              {/* --- FULLSCREEN KNAP SOM OVERLAY --- */}
               {manifestReady && (
                 <IconButton
                   onClick={handleFullscreen}
@@ -548,7 +579,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                   <FullscreenIcon sx={{ fontSize: isMobile ? 26 : 32 }} />
                 </IconButton>
               )}
-              {/* evt. buffering overlay som før */}
               {buffering && (
                 <Box
                   sx={{
@@ -572,7 +602,6 @@ export default function ClientDetailsLivestreamSection({ clientId }) {
                 </Box>
               )}
             </Box>
-            {/* ... loading state ... */}
             {!manifestReady && (
               <Box sx={{
                 display: "flex",
