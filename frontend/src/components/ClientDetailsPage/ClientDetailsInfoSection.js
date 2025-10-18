@@ -7,6 +7,7 @@ import {
   Button,
   Tooltip,
   Table,
+  TableHead,
   TableBody,
   TableCell,
   TableContainer,
@@ -21,10 +22,13 @@ import { useTheme } from "@mui/material/styles";
 
 /*
   ClientDetailsInfoSection (opdateret)
-  - Bruger uptime og lastSeen props direkte (de opdateres af parent's 1s chrome-status poll).
-  - Komponent er memoized (React.memo) med en custom comparator, så den kun rerender når relevante props ændrer sig:
-    client (nøglefelter), markedDays, uptime eller lastSeen.
-  - Mindsker unødvendige rerenders, men sikrer at "Oppetid" og "Sidst set" opdateres straks når parent ændrer disse props.
+  - Rettelser:
+    * Importerede TableHead (manglede tidligere).
+    * Comparator udvidet til også at sammenligne client.uptime og client.last_seen.
+    * Strengere/eksakte sammenligninger (!==) for uptime og lastSeen-props.
+    * Robust håndtering af forskellige uptime/lastSeen-formater (nummer/ISO/string).
+  - Komponenten modtager uptime og lastSeen som props fra parent (som poller hvert 1s).
+  - React.memo med custom comparator så komponenten kun rerender når relevante værdier ændrer sig.
 */
 
 // Fælles StatusBadge med 2 sekunders puls animation
@@ -48,18 +52,9 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
         <style>
           {`
             @keyframes pulsate {
-              0% {
-                transform: scale(1);
-                opacity: 1;
-              }
-              50% {
-                transform: scale(1.25);
-                opacity: 0.5;
-              }
-              100% {
-                transform: scale(1);
-                opacity: 1;
-              }
+              0% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.25); opacity: 0.5; }
+              100% { transform: scale(1); opacity: 1; }
             }
           `}
         </style>
@@ -76,6 +71,7 @@ function formatDateShort(dt) {
   const year = dt.getFullYear();
   return `${dayName} ${day}.${month} ${year}`;
 }
+
 function getStatusAndTimesFromRaw(markedDays, dt) {
   const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
   const data = markedDays[dateKey];
@@ -88,6 +84,7 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
     powerOff: data.offTime || ""
   };
 }
+
 function StatusText({ status, isMobile=false }) {
   return (
     <Typography
@@ -103,6 +100,7 @@ function StatusText({ status, isMobile=false }) {
     </Typography>
   );
 }
+
 function ClientPowerShortTable({ markedDays, isMobile=false }) {
   const days = [];
   const now = new Date();
@@ -131,12 +129,8 @@ function ClientPowerShortTable({ markedDays, isMobile=false }) {
               <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: isMobile ? 22 : 30 }}>
                 <TableCell sx={cellStyle}>{formatDateShort(dt)}</TableCell>
                 <TableCell sx={cellStyle}><StatusText status={status} isMobile={isMobile} /></TableCell>
-                <TableCell sx={cellStyle}>
-                  {status === "on" && powerOn ? powerOn : ""}
-                </TableCell>
-                <TableCell sx={cellStyle}>
-                  {status === "on" && powerOff ? powerOff : ""}
-                </TableCell>
+                <TableCell sx={cellStyle}>{status === "on" && powerOn ? powerOn : ""}</TableCell>
+                <TableCell sx={cellStyle}>{status === "on" && powerOff ? powerOff : ""}</TableCell>
               </TableRow>
             );
           })}
@@ -149,14 +143,15 @@ function ClientPowerShortTable({ markedDays, isMobile=false }) {
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
-  // Accept ISO-ish strings or epoch numbers
   if (typeof dateStr === "number") {
     d = new Date(dateStr);
   } else {
-    if (dateStr.endsWith("Z") || dateStr.match(/[\+\-]\d{2}:?\d{2}$/)) {
+    if (typeof dateStr === "string" && (dateStr.endsWith("Z") || dateStr.match(/[\+\-]\d{2}:?\d{2}$/))) {
       d = new Date(dateStr);
-    } else {
+    } else if (typeof dateStr === "string") {
       d = new Date(dateStr + "Z");
+    } else {
+      d = new Date(dateStr);
     }
   }
   if (Number.isNaN(d.getTime())) return "ukendt";
@@ -183,11 +178,11 @@ function formatDateTime(dateStr, withSeconds = false) {
 }
 
 function formatUptime(uptimeStr) {
-  if (!uptimeStr) return "ukendt";
+  if (!uptimeStr && uptimeStr !== 0) return "ukendt";
   let totalSeconds = 0;
   if (typeof uptimeStr === "number") {
     totalSeconds = Math.floor(uptimeStr);
-  } else if (uptimeStr.includes('-')) {
+  } else if (typeof uptimeStr === "string" && uptimeStr.includes('-')) {
     const [d, hms] = uptimeStr.split('-');
     const [h = "0", m = "0", s = "0"] = hms.split(':');
     totalSeconds =
@@ -195,7 +190,7 @@ function formatUptime(uptimeStr) {
       parseInt(h, 10) * 3600 +
       parseInt(m, 10) * 60 +
       parseInt(s, 10);
-  } else if (uptimeStr.includes(':')) {
+  } else if (typeof uptimeStr === "string" && uptimeStr.includes(':')) {
     const parts = uptimeStr.split(':').map(Number);
     if (parts.length === 3) {
       totalSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
@@ -212,7 +207,6 @@ function formatUptime(uptimeStr) {
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const mins = Math.floor((totalSeconds % 3600) / 60);
   const secs = totalSeconds % 60;
-
   return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
 }
 
@@ -443,13 +437,18 @@ function propsAreEqual(prev, next) {
   if (prevClient.id !== nextClient.id) return false;
   if (prevClient.ubuntu_version !== nextClient.ubuntu_version) return false;
   if (prevClient.created_at !== nextClient.created_at) return false;
+
+  // client.last_seen and client.uptime (in case parent updates client object directly)
+  if ((prevClient.last_seen || "") !== (nextClient.last_seen || "")) return false;
+  if ((prevClient.uptime || "") !== (nextClient.uptime || "")) return false;
+
   // network fields
   if ((prevClient.wifi_ip_address || "") !== (nextClient.wifi_ip_address || "")) return false;
   if ((prevClient.wifi_mac_address || "") !== (nextClient.wifi_mac_address || "")) return false;
   if ((prevClient.lan_ip_address || "") !== (nextClient.lan_ip_address || "")) return false;
   if ((prevClient.lan_mac_address || "") !== (nextClient.lan_mac_address || "")) return false;
 
-  // markedDays: shallow compare keys length (typical small object)
+  // markedDays: shallow compare keys length
   const prevMarked = prev.markedDays || {};
   const nextMarked = next.markedDays || {};
   const prevKeys = Object.keys(prevMarked);
@@ -460,9 +459,9 @@ function propsAreEqual(prev, next) {
     if (prevMarked[k] !== nextMarked[k]) return false;
   }
 
-  // uptime and lastSeen must be compared — these are expected to change frequently via parent poll
-  if ((prev.uptime || "") !== (next.uptime || "")) return false;
-  if ((prev.lastSeen || "") !== (next.lastSeen || "")) return false;
+  // uptime and lastSeen props must be compared strictly — they are updated frequently by parent poll
+  if ((prev.uptime !== next.uptime)) return false;
+  if ((prev.lastSeen !== next.lastSeen)) return false;
 
   // calendar dialog handlers don't affect rendering comparison
   return true;
