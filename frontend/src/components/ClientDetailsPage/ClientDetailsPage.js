@@ -22,6 +22,7 @@ import {
   - Polls /clients/{id}/chrome-status every 1s and updates UI only when the step/timestamp/message changes.
   - Keeps local optimistic updates for locality/kioskUrl.
   - Stabilizes callbacks with useCallback and memoizes actionLoading for React.memo compatibility in the ActionsSection.
+  - Passes showSnackbar and refreshing down to ActionsSection so wrapper centralizes feedback.
 */
 
 export default function ClientDetailsPage({
@@ -149,9 +150,10 @@ export default function ClientDetailsPage({
     try {
       if (!memoizedClientId) throw new Error("No client id");
       await apiClientAction(memoizedClientId, action);
-      showSnackbar && showSnackbar({ message: "Handlingen blev udført!", severity: "success" });
+      // Use wrapper snackbar if provided
+      if (typeof showSnackbar === "function") showSnackbar({ message: "Handlingen blev udført!", severity: "success" });
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Fejl: " + (err?.message || err), severity: "error" });
+      if (typeof showSnackbar === "function") showSnackbar({ message: "Fejl: " + (err?.message || err), severity: "error" });
     } finally {
       setActionLoading((prev) => ({ ...prev, [action]: false }));
     }
@@ -179,7 +181,7 @@ export default function ClientDetailsPage({
         try { await handleRefresh(); } catch {}
       }
     }
-    showSnackbar && showSnackbar({ message: "Skole opdateret", severity: "success" });
+    if (typeof showSnackbar === "function") showSnackbar({ message: "Skole opdateret", severity: "success" });
   }, [clientState, handleRefresh, showSnackbar]);
 
   // Locality handlers
@@ -195,9 +197,9 @@ export default function ClientDetailsPage({
       if (updated) setClientState(prev => ({ ...(prev || {}), ...(updated || {}) }));
       else setClientState(prev => ({ ...(prev || {}), locality }));
       setLocalityDirty(false);
-      showSnackbar && showSnackbar({ message: "Lokation gemt!", severity: "success" });
+      if (typeof showSnackbar === "function") showSnackbar({ message: "Lokation gemt!", severity: "success" });
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
+      if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
     }
     setSavingLocality(false);
   };
@@ -220,9 +222,9 @@ export default function ClientDetailsPage({
         setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
       }
       setKioskUrlDirty(false);
-      showSnackbar && showSnackbar({ message: "Kiosk webadresse opdateret!", severity: "success" });
+      if (typeof showSnackbar === "function") showSnackbar({ message: "Kiosk webadresse opdateret!", severity: "success" });
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
+      if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
     }
     setSavingKioskUrl(false);
   };
@@ -295,6 +297,8 @@ export default function ClientDetailsPage({
             handleOpenRemoteDesktop={handleOpenRemoteDesktop}
             shutdownDialogOpen={shutdownDialogOpen}
             setShutdownDialogOpen={setShutdownDialogOpen}
+            refreshing={refreshing}
+            showSnackbar={showSnackbar}
           />
         </Grid>
       </Grid>
