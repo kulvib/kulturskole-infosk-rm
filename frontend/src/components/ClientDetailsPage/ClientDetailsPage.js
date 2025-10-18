@@ -13,16 +13,16 @@ import {
   openRemoteDesktop,
   getSchools,
   getChromeStatus,
+  getClient,
 } from "../../api";
 
 /*
   ClientDetailsPage.js
 
-  - Wrapper fetcher fuld client (15s). Denne komponent:
-    * holder lokal clientState for optimistic updates
-    * poller /api/clients/{id}/chrome-status hvert 1s via getChromeStatus()
-    * opdaterer chrome_status, chrome_color, last_seen og uptime fra samme poll (med change-detektion)
-    * sender showSnackbar og refreshing videre til ActionsSection
+  Poller /api/clients/:id/chrome-status hvert 1s og:
+  - opdaterer chrome_status + chrome_color
+  - opdaterer last_seen + uptime på samme måde (change-detektion strict !==)
+  - hvis chrome-status endpoint ikke indeholder last_seen/uptime, bruger en fallback: kald getClient hvert 5. poll for kun at opdatere dem
 */
 
 export default function ClientDetailsPage({
@@ -35,7 +35,6 @@ export default function ClientDetailsPage({
   onRestartStream,
   showSnackbar
 }) {
-  // Local copy of client so we can update UI optimistically / reflect small immediate changes
   const [clientState, setClientState] = useState(client);
 
   const [locality, setLocality] = useState("");
@@ -57,29 +56,43 @@ export default function ClientDetailsPage({
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
 
-  // Schools
   const [schools, setSchools] = useState([]);
 
-  // Ref to remember last polled values so we only update on change
-  const lastPolledRef = useRef({ timestamp: null, message: null, lastSeen: null, uptime: null });
+  // remember last polled tokens/values (strict comparison)
+  const lastPolledRef = useRef({
+    timestamp: null,
+    message: null,
+    lastSeen: null,
+    uptime: null,
+  });
+
+  // counter to schedule fallback getClient calls for last_seen/uptime if needed
+  const pollCountRef = useRef(0);
 
   // Sync local clientState when incoming prop changes
   useEffect(() => {
     setClientState(client);
   }, [client]);
 
-  // Initialize fields from clientState when it changes (but respect dirty flags)
+  // Init fields from clientState (respect dirty flags)
   useEffect(() => {
     if (!clientState) return;
     if (!localityDirty) setLocality(clientState.locality || "");
     if (!kioskUrlDirty) setKioskUrl(clientState.kiosk_url || "");
-    setLiveChromeStatus(clientState.chrome_status || "unknown");
-    setLiveChromeColor(clientState.chrome_color || null);
-    setLastSeen(clientState.last_seen || null);
-    setUptime(clientState.uptime || null);
+    setLiveChromeStatus(clientState.chrome_status ?? "unknown");
+    setLiveChromeColor(clientState.chrome_color ?? null);
+    setLastSeen(clientState.last_seen ?? null);
+    setUptime(clientState.uptime ?? null);
+    // initialize lastPolledRef so first poll has baseline from server-provided client
+    lastPolledRef.current = {
+      timestamp: clientState.chrome_last_updated ?? null,
+      message: clientState.chrome_status ?? null,
+      lastSeen: clientState.last_seen ?? null,
+      uptime: clientState.uptime ?? null,
+    };
   }, [clientState]);
 
-  // Hent skoler fra backend ved mount
+  // Fetch schools if needed
   useEffect(() => {
     let cancelled = false;
     getSchools().then(data => {
@@ -92,77 +105,107 @@ export default function ClientDetailsPage({
     return () => { cancelled = true; };
   }, []);
 
-  // Poll chrome-status every 1s using api.getChromeStatus
+  // Poll chrome-status every 1s. Also update last_seen + uptime using same strict logic.
   useEffect(() => {
     if (!clientState?.id) return;
     let cancelled = false;
     let timerId = null;
     const POLL_INTERVAL_MS = 1000;
+    const FALLBACK_GETCLIENT_EVERY = 5; // every 5 polls (~5s) call getClient if needed
 
     const poll = async () => {
       if (cancelled) return;
+      pollCountRef.current += 1;
       try {
         const json = await getChromeStatus(clientState.id);
 
-        // Prefer direct fields; fallback to step.* if necessary
+        // prefer direct fields; fallback to step.* if necessary
         const message = json.chrome_status ?? (json.step && json.step.message) ?? null;
         const color = json.chrome_color ?? (json.step && json.step.color) ?? null;
         const timestamp = json.chrome_last_updated ?? (json.step && json.step.timestamp) ?? null;
 
-        // Try to extract last_seen and uptime from the chrome-status response if backend includes them.
-        // Support common key names as fallback (so it's robust to minor backend differences).
+        // try to extract last_seen and uptime from chrome-status response if present
         const lastSeenVal =
           json.last_seen ??
           json.client_last_seen ??
           json.chrome_last_seen ??
-          json.client?.last_seen ??
+          (json.client && json.client.last_seen) ??
           null;
 
         const uptimeVal =
           json.uptime ??
           json.client_uptime ??
           json.chrome_uptime ??
-          json.client?.uptime ??
+          (json.client && json.client.uptime) ??
           null;
 
         const last = lastPolledRef.current;
+
+        // strict comparison: update when any value !== previous value (handles falsy values too)
         const changed =
-          (timestamp && timestamp !== last.timestamp) ||
-          (message && message !== last.message) ||
-          (lastSeenVal && lastSeenVal !== last.lastSeen) ||
-          (uptimeVal && uptimeVal !== last.uptime);
+          (timestamp !== last.timestamp) ||
+          (message !== last.message) ||
+          (lastSeenVal !== last.lastSeen) ||
+          (uptimeVal !== last.uptime);
 
         if (changed) {
           lastPolledRef.current = { timestamp, message, lastSeen: lastSeenVal, uptime: uptimeVal };
           if (!cancelled) {
-            if (message !== null) {
-              setLiveChromeStatus(message);
+            if (message !== null) setLiveChromeStatus(message);
+            if (color !== null) setLiveChromeColor(color);
+            if (lastSeenVal !== undefined) setLastSeen(lastSeenVal);
+            if (uptimeVal !== undefined) setUptime(uptimeVal);
+            // update local clientState so other sections see same info
+            setClientState(prev => prev ? ({
+              ...prev,
+              chrome_status: message ?? prev.chrome_status,
+              chrome_color: color ?? prev.chrome_color,
+              last_seen: lastSeenVal ?? prev.last_seen,
+              uptime: uptimeVal ?? prev.uptime,
+              chrome_last_updated: timestamp ?? prev.chrome_last_updated,
+            }) : prev);
+          }
+        }
+
+        // fallback: if the chrome-status JSON didn't include last_seen/uptime, periodically call getClient
+        const needFallbackForLastSeen = typeof lastSeenVal === "undefined" || lastSeenVal === null;
+        const needFallbackForUptime = typeof uptimeVal === "undefined" || uptimeVal === null;
+        if ((needFallbackForLastSeen || needFallbackForUptime) && (pollCountRef.current % FALLBACK_GETCLIENT_EVERY === 0)) {
+          try {
+            const full = await getClient(clientState.id);
+            if (full) {
+              const fsLastSeen = full.last_seen ?? null;
+              const fsUptime = full.uptime ?? null;
+              let updated = false;
+              const lastRef = lastPolledRef.current;
+              if (fsLastSeen !== lastRef.lastSeen) {
+                lastPolledRef.current.lastSeen = fsLastSeen;
+                if (!cancelled) setLastSeen(fsLastSeen);
+                updated = true;
+              }
+              if (fsUptime !== lastRef.uptime) {
+                lastPolledRef.current.uptime = fsUptime;
+                if (!cancelled) setUptime(fsUptime);
+                updated = true;
+              }
+              if (updated && !cancelled) {
+                setClientState(prev => prev ? ({ ...prev, last_seen: fsLastSeen ?? prev.last_seen, uptime: fsUptime ?? prev.uptime }) : prev);
+              }
             }
-            if (color !== null) {
-              setLiveChromeColor(color);
-            }
-            if (lastSeenVal !== null) {
-              setLastSeen(lastSeenVal);
-            }
-            if (uptimeVal !== null) {
-              setUptime(uptimeVal);
-            }
-            // Update clientState locally so other sections reflect same info immediately
-            setClientState(prev => prev ? ({ ...prev, chrome_status: message ?? prev.chrome_status, chrome_color: color ?? prev.chrome_color, last_seen: lastSeenVal ?? prev.last_seen, uptime: uptimeVal ?? prev.uptime }) : prev);
+          } catch (e) {
+            // ignore fallback errors
           }
         }
       } catch (err) {
-        // ignore errors — polling continues
-        // optional: log for debug when needed
-        // console.debug("getChromeStatus error:", err);
+        // ignore polling errors (auth/network) — wrapper may surface persistent errors elsewhere
       } finally {
+        // schedule next poll
         if (!cancelled) {
           timerId = setTimeout(poll, POLL_INTERVAL_MS);
         }
       }
     };
 
-    // start polling immediately
     poll();
 
     return () => {
@@ -171,12 +214,12 @@ export default function ClientDetailsPage({
     };
   }, [clientState?.id]);
 
-  // Stable, memoized clientId to use in callbacks
+  // stable memoized clientId for callbacks
   const memoizedClientId = clientState?.id ?? null;
 
-  // Stabilize callbacks for Actions-section to avoid unnecessary rerenders
+  // action handlers
   const handleClientAction = useCallback(async (action) => {
-    setActionLoading((prev) => ({ ...prev, [action]: true }));
+    setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
       if (!memoizedClientId) throw new Error("No client id");
       await apiClientAction(memoizedClientId, action);
@@ -184,7 +227,7 @@ export default function ClientDetailsPage({
     } catch (err) {
       if (typeof showSnackbar === "function") showSnackbar({ message: "Fejl: " + (err?.message || err), severity: "error" });
     } finally {
-      setActionLoading((prev) => ({ ...prev, [action]: false }));
+      setActionLoading(prev => ({ ...prev, [action]: false }));
     }
   }, [memoizedClientId, showSnackbar]);
 
@@ -198,14 +241,12 @@ export default function ClientDetailsPage({
     openRemoteDesktop(memoizedClientId);
   }, [memoizedClientId]);
 
-  // Header callback: update local clientState when school is updated
+  // header school update callback
   const handleSchoolUpdated = useCallback(async (updatedClient) => {
     if (!clientState) return;
-    // If API returned a full updated client, use it; otherwise ask wrapper to refresh (wrapper owns full-client fetching)
     if (updatedClient && updatedClient.id === clientState.id && Object.keys(updatedClient).length > 1) {
       setClientState(prev => ({ ...(prev || {}), ...(updatedClient || {}) }));
     } else {
-      // Ask wrapper to refresh by calling handleRefresh if available
       if (typeof handleRefresh === "function") {
         try { await handleRefresh(); } catch {}
       }
@@ -213,7 +254,7 @@ export default function ClientDetailsPage({
     if (typeof showSnackbar === "function") showSnackbar({ message: "Skole opdateret", severity: "success" });
   }, [clientState, handleRefresh, showSnackbar]);
 
-  // Locality handlers
+  // locality handlers
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -233,7 +274,7 @@ export default function ClientDetailsPage({
     setSavingLocality(false);
   };
 
-  // Kiosk URL handlers
+  // kiosk url handlers
   const handleKioskUrlChange = (e) => {
     setKioskUrl(e.target.value);
     setKioskUrlDirty(true);
@@ -243,11 +284,9 @@ export default function ClientDetailsPage({
     setSavingKioskUrl(true);
     try {
       await pushKioskUrl(clientState.id, kioskUrl);
-      // ask wrapper to refresh full client after pushing kiosk url
       if (typeof handleRefresh === "function") {
         try { await handleRefresh(); } catch {}
       } else {
-        // fallback: update local state
         setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
       }
       setKioskUrlDirty(false);
@@ -258,20 +297,16 @@ export default function ClientDetailsPage({
     setSavingKioskUrl(false);
   };
 
-  // Ensure livestream_start is triggered when client appears
+  // start livestream when client appears
   useEffect(() => {
     if (memoizedClientId) {
       apiClientAction(memoizedClientId, "livestream_start").catch(() => {});
     }
-    // intentionally only when client id changes
   }, [memoizedClientId]);
 
-  // Memoize actionLoading to avoid prop reference churn
   const memoActionLoading = useMemo(() => actionLoading, [actionLoading]);
 
-  if (!clientState) {
-    return null;
-  }
+  if (!clientState) return null;
 
   return (
     <Box sx={{ maxWidth: 1500, mx: "auto", mt: 3 }}>
@@ -300,10 +335,7 @@ export default function ClientDetailsPage({
         </Grid>
 
         <Grid item xs={12}>
-          <ClientDetailsLivestreamSection
-            clientId={clientState?.id}
-            key={streamKey}
-          />
+          <ClientDetailsLivestreamSection clientId={clientState?.id} key={streamKey} />
         </Grid>
 
         <Grid item xs={12}>
@@ -329,11 +361,7 @@ export default function ClientDetailsPage({
         </Grid>
       </Grid>
 
-      <ClientCalendarDialog
-        open={calendarDialogOpen}
-        onClose={() => setCalendarDialogOpen(false)}
-        clientId={clientState.id}
-      />
+      <ClientCalendarDialog open={calendarDialogOpen} onClose={() => setCalendarDialogOpen(false)} clientId={clientState.id} />
     </Box>
   );
 }
