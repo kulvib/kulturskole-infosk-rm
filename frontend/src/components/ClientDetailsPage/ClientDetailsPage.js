@@ -17,10 +17,11 @@ import {
 } from "../../api";
 
 /*
-  ClientDetailsPage.js - debug/robust polling version
-  - Poller getChromeStatus every 1s and updates chrome_status, chrome_color, last_seen and uptime.
-  - Logs poll results to console.debug so du kan se præcis hvad backend returnerer.
-  - Fallback-getClient kører hvert poll (FALLBACK_GETCLIENT_EVERY = 1) for debugging; sæt til 5+ i produktion.
+  ClientDetailsPage.js (opdateret)
+  - Poller getChromeStatus hvert 1s og opdaterer kun de lokale state-variabler
+    (liveChromeStatus, liveChromeColor, lastSeen, uptime). Undgår at opdatere hele clientState hver poll.
+  - Bruger getChromeStatus(..., { fallbackToClient: true }) så last_seen/uptime bliver leveret, selvom chrome-status endpoint ikke returnerer dem.
+  - Reducerer blink fordi færre props/objektreferencer ændres.
 */
 
 export default function ClientDetailsPage({
@@ -46,6 +47,7 @@ export default function ClientDetailsPage({
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
 
+  // Hyppigt opdaterede, lokal-state felter (disse skal opdatere UI hvert 1s)
   const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status ?? "unknown");
   const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color ?? null);
   const [lastSeen, setLastSeen] = useState(client?.last_seen ?? null);
@@ -64,34 +66,34 @@ export default function ClientDetailsPage({
     uptime: client?.uptime ?? null,
   });
 
-  // counter to schedule fallback getClient calls for last_seen/uptime if needed
+  // counter for optional fallback logic (we now use fallbackToClient inside getChromeStatus)
   const pollCountRef = useRef(0);
 
-  // Sync local clientState when incoming prop changes
+  // Sync local clientState when wrapper client prop changes (rare - every 15s)
   useEffect(() => {
     setClientState(client);
   }, [client]);
 
-  // Init fields from clientState (respect dirty flags)
+  // Initialize fields from clientState (respect dirty flags)
   useEffect(() => {
     if (!clientState) return;
     if (!localityDirty) setLocality(clientState.locality || "");
     if (!kioskUrlDirty) setKioskUrl(clientState.kiosk_url || "");
+    // initialize the "hyppige" local states from client (baseline)
     setLiveChromeStatus(clientState.chrome_status ?? "unknown");
     setLiveChromeColor(clientState.chrome_color ?? null);
     setLastSeen(clientState.last_seen ?? null);
     setUptime(clientState.uptime ?? null);
-    // initialize lastPolledRef so first poll has baseline from server-provided client
     lastPolledRef.current = {
       timestamp: clientState.chrome_last_updated ?? null,
       message: clientState.chrome_status ?? null,
       lastSeen: clientState.last_seen ?? null,
       uptime: clientState.uptime ?? null,
     };
-    pollCountRef.current = 0; // reset
+    pollCountRef.current = 0;
   }, [clientState]);
 
-  // Fetch schools if needed
+  // Fetch schools on mount if needed
   useEffect(() => {
     let cancelled = false;
     getSchools().then(data => {
@@ -104,47 +106,27 @@ export default function ClientDetailsPage({
     return () => { cancelled = true; };
   }, []);
 
-  // Poll chrome-status every 1s. Also update last_seen + uptime using same strict logic.
+  // Poll chrome-status every 1s. Use getChromeStatus(..., { fallbackToClient: true }) so uptime/last_seen arrive.
   useEffect(() => {
     if (!clientState?.id) return;
     let cancelled = false;
     let timerId = null;
     const POLL_INTERVAL_MS = 1000;
-    const FALLBACK_GETCLIENT_EVERY = 1; // DEBUG: run fallback every poll. Set to 5 in production.
 
     const poll = async () => {
       if (cancelled) return;
       pollCountRef.current += 1;
       try {
-        const json = await getChromeStatus(clientState.id);
-        // debug: show raw response
-        console.debug("[poll] getChromeStatus response:", json);
-
-        // prefer direct fields; fallback to step.* if necessary
+        // Request chrome-status and ask for fallback merged data if backend doesn't include uptime/last_seen
+        const json = await getChromeStatus(clientState.id, { fallbackToClient: true });
+        // parse fields (prioritize direct keys)
         const message = json?.chrome_status ?? (json?.step && json.step.message) ?? null;
         const color = json?.chrome_color ?? (json?.step && json.step.color) ?? null;
         const timestamp = json?.chrome_last_updated ?? (json?.step && json.step.timestamp) ?? null;
-
-        // try to extract last_seen and uptime from chrome-status response if present
-        const lastSeenVal =
-          json?.last_seen ??
-          json?.client_last_seen ??
-          json?.chrome_last_seen ??
-          (json?.client && json.client.last_seen) ??
-          null;
-
-        const uptimeVal =
-          json?.uptime ??
-          json?.client_uptime ??
-          json?.chrome_uptime ??
-          (json?.client && json.client.uptime) ??
-          null;
-
-        console.debug("[poll] parsed:", { timestamp, message, lastSeenVal, uptimeVal, pollCount: pollCountRef.current });
+        const lastSeenVal = json?.last_seen ?? json?.client?.last_seen ?? null;
+        const uptimeVal = json?.uptime ?? json?.client?.uptime ?? null;
 
         const last = lastPolledRef.current;
-
-        // strict comparison: update when any value !== previous value (handles falsy values too)
         const changed =
           (timestamp !== last.timestamp) ||
           (message !== last.message) ||
@@ -152,60 +134,21 @@ export default function ClientDetailsPage({
           (uptimeVal !== last.uptime);
 
         if (changed) {
+          // Update only the LOCAL frequent states (don't setClientState to avoid large re-renders)
           lastPolledRef.current = { timestamp, message, lastSeen: lastSeenVal, uptime: uptimeVal };
           if (!cancelled) {
             if (message !== null) setLiveChromeStatus(message);
             if (color !== null) setLiveChromeColor(color);
             if (lastSeenVal !== undefined) setLastSeen(lastSeenVal);
             if (uptimeVal !== undefined) setUptime(uptimeVal);
-            // update local clientState so other sections see same info
-            setClientState(prev => prev ? ({
-              ...prev,
-              chrome_status: message ?? prev.chrome_status,
-              chrome_color: color ?? prev.chrome_color,
-              last_seen: lastSeenVal ?? prev.last_seen,
-              uptime: uptimeVal ?? prev.uptime,
-              chrome_last_updated: timestamp ?? prev.chrome_last_updated,
-            }) : prev);
-            console.debug("[poll] state updated from chrome-status");
-          }
-        }
-
-        // fallback: if the chrome-status JSON didn't include last_seen/uptime, periodically call getClient
-        const needFallbackForLastSeen = (lastSeenVal === null || typeof lastSeenVal === "undefined");
-        const needFallbackForUptime = (uptimeVal === null || typeof uptimeVal === "undefined");
-        if ((needFallbackForLastSeen || needFallbackForUptime) && (pollCountRef.current % FALLBACK_GETCLIENT_EVERY === 0)) {
-          try {
-            const full = await getClient(clientState.id);
-            console.debug("[poll] fallback getClient response:", { last_seen: full?.last_seen, uptime: full?.uptime });
-            if (full) {
-              const fsLastSeen = full.last_seen ?? null;
-              const fsUptime = full.uptime ?? null;
-              let updated = false;
-              const lastRef = lastPolledRef.current;
-              if (fsLastSeen !== lastRef.lastSeen) {
-                lastPolledRef.current.lastSeen = fsLastSeen;
-                if (!cancelled) setLastSeen(fsLastSeen);
-                updated = true;
-              }
-              if (fsUptime !== lastRef.uptime) {
-                lastPolledRef.current.uptime = fsUptime;
-                if (!cancelled) setUptime(fsUptime);
-                updated = true;
-              }
-              if (updated && !cancelled) {
-                setClientState(prev => prev ? ({ ...prev, last_seen: fsLastSeen ?? prev.last_seen, uptime: fsUptime ?? prev.uptime }) : prev);
-                console.debug("[poll] state updated from fallback getClient");
-              }
-            }
-          } catch (e) {
-            console.debug("[poll] fallback getClient error:", e);
+            // Do NOT call setClientState here on every poll. Only update clientState when wrapper refreshes,
+            // or when user triggers actions that should persist server-side.
           }
         }
       } catch (err) {
+        // Ignore transient polling errors here (wrapper fetch handles "full client" errors)
         console.debug("[poll] getChromeStatus error:", err);
       } finally {
-        // schedule next poll
         if (!cancelled) {
           timerId = setTimeout(poll, POLL_INTERVAL_MS);
         }
@@ -223,7 +166,7 @@ export default function ClientDetailsPage({
   // stable memoized clientId for callbacks
   const memoizedClientId = clientState?.id ?? null;
 
-  // action handlers
+  // action handlers (unchanged)
   const handleClientAction = useCallback(async (action) => {
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
@@ -247,10 +190,10 @@ export default function ClientDetailsPage({
     openRemoteDesktop(memoizedClientId);
   }, [memoizedClientId]);
 
-  // header school update callback
   const handleSchoolUpdated = useCallback(async (updatedClient) => {
     if (!clientState) return;
     if (updatedClient && updatedClient.id === clientState.id && Object.keys(updatedClient).length > 1) {
+      // occasional full client update from user action -> update clientState
       setClientState(prev => ({ ...(prev || {}), ...(updatedClient || {}) }));
     } else {
       if (typeof handleRefresh === "function") {
@@ -260,7 +203,6 @@ export default function ClientDetailsPage({
     if (typeof showSnackbar === "function") showSnackbar({ message: "Skole opdateret", severity: "success" });
   }, [clientState, handleRefresh, showSnackbar]);
 
-  // locality handlers
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -280,7 +222,6 @@ export default function ClientDetailsPage({
     setSavingLocality(false);
   };
 
-  // kiosk url handlers
   const handleKioskUrlChange = (e) => {
     setKioskUrl(e.target.value);
     setKioskUrlDirty(true);
