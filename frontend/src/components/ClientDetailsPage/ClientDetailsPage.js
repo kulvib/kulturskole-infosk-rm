@@ -16,10 +16,13 @@ import {
 } from "../../api";
 
 /*
-  ClientDetailsPage.js - uses api.getChromeStatus for 1s polling
-  - polling via recursive setTimeout
-  - updates liveChromeStatus from json.chrome_status (or fallback to step.message)
-  - uses getChromeStatus which attaches Authorization header (JWT)
+  ClientDetailsPage.js
+
+  - Wrapper fetcher fuld client (15s). Denne komponent:
+    * holder lokal clientState for optimistic updates
+    * poller /api/clients/{id}/chrome-status hvert 1s via getChromeStatus()
+    * opdaterer chrome_status, chrome_color, last_seen og uptime fra samme poll (med change-detektion)
+    * sender showSnackbar og refreshing videre til ActionsSection
 */
 
 export default function ClientDetailsPage({
@@ -57,8 +60,8 @@ export default function ClientDetailsPage({
   // Schools
   const [schools, setSchools] = useState([]);
 
-  // Ref to remember last chrome-status step timestamp/message so we only update on change
-  const lastChromeStepRef = useRef({ timestamp: null, message: null });
+  // Ref to remember last polled values so we only update on change
+  const lastPolledRef = useRef({ timestamp: null, message: null, lastSeen: null, uptime: null });
 
   // Sync local clientState when incoming prop changes
   useEffect(() => {
@@ -100,25 +103,58 @@ export default function ClientDetailsPage({
       if (cancelled) return;
       try {
         const json = await getChromeStatus(clientState.id);
-        // prefer direct chrome_status field, fallback to step
+
+        // Prefer direct fields; fallback to step.* if necessary
         const message = json.chrome_status ?? (json.step && json.step.message) ?? null;
         const color = json.chrome_color ?? (json.step && json.step.color) ?? null;
         const timestamp = json.chrome_last_updated ?? (json.step && json.step.timestamp) ?? null;
 
-        const last = lastChromeStepRef.current;
-        const changed = (timestamp && timestamp !== last.timestamp) || (message && message !== last.message);
+        // Try to extract last_seen and uptime from the chrome-status response if backend includes them.
+        // Support common key names as fallback (so it's robust to minor backend differences).
+        const lastSeenVal =
+          json.last_seen ??
+          json.client_last_seen ??
+          json.chrome_last_seen ??
+          json.client?.last_seen ??
+          null;
+
+        const uptimeVal =
+          json.uptime ??
+          json.client_uptime ??
+          json.chrome_uptime ??
+          json.client?.uptime ??
+          null;
+
+        const last = lastPolledRef.current;
+        const changed =
+          (timestamp && timestamp !== last.timestamp) ||
+          (message && message !== last.message) ||
+          (lastSeenVal && lastSeenVal !== last.lastSeen) ||
+          (uptimeVal && uptimeVal !== last.uptime);
+
         if (changed) {
-          lastChromeStepRef.current = { timestamp, message };
+          lastPolledRef.current = { timestamp, message, lastSeen: lastSeenVal, uptime: uptimeVal };
           if (!cancelled) {
-            if (message !== null) setLiveChromeStatus(message);
-            if (color !== null) setLiveChromeColor(color);
-            // update clientState locally so header shows same info immediately
-            setClientState(prev => prev ? ({ ...prev, chrome_status: message, chrome_color: color }) : prev);
+            if (message !== null) {
+              setLiveChromeStatus(message);
+            }
+            if (color !== null) {
+              setLiveChromeColor(color);
+            }
+            if (lastSeenVal !== null) {
+              setLastSeen(lastSeenVal);
+            }
+            if (uptimeVal !== null) {
+              setUptime(uptimeVal);
+            }
+            // Update clientState locally so other sections reflect same info immediately
+            setClientState(prev => prev ? ({ ...prev, chrome_status: message ?? prev.chrome_status, chrome_color: color ?? prev.chrome_color, last_seen: lastSeenVal ?? prev.last_seen, uptime: uptimeVal ?? prev.uptime }) : prev);
           }
         }
       } catch (err) {
-        // ignore errors — could be auth/network; wrapper's snackbar can show persistent errors if desired
-        // optional: if you want visible debug: console.debug('chrome-status poll error', err);
+        // ignore errors — polling continues
+        // optional: log for debug when needed
+        // console.debug("getChromeStatus error:", err);
       } finally {
         if (!cancelled) {
           timerId = setTimeout(poll, POLL_INTERVAL_MS);
@@ -162,12 +198,14 @@ export default function ClientDetailsPage({
     openRemoteDesktop(memoizedClientId);
   }, [memoizedClientId]);
 
-  // Callback passed to header: update local clientState when school is updated
+  // Header callback: update local clientState when school is updated
   const handleSchoolUpdated = useCallback(async (updatedClient) => {
     if (!clientState) return;
+    // If API returned a full updated client, use it; otherwise ask wrapper to refresh (wrapper owns full-client fetching)
     if (updatedClient && updatedClient.id === clientState.id && Object.keys(updatedClient).length > 1) {
       setClientState(prev => ({ ...(prev || {}), ...(updatedClient || {}) }));
     } else {
+      // Ask wrapper to refresh by calling handleRefresh if available
       if (typeof handleRefresh === "function") {
         try { await handleRefresh(); } catch {}
       }
@@ -205,9 +243,11 @@ export default function ClientDetailsPage({
     setSavingKioskUrl(true);
     try {
       await pushKioskUrl(clientState.id, kioskUrl);
+      // ask wrapper to refresh full client after pushing kiosk url
       if (typeof handleRefresh === "function") {
         try { await handleRefresh(); } catch {}
       } else {
+        // fallback: update local state
         setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
       }
       setKioskUrlDirty(false);
@@ -258,12 +298,14 @@ export default function ClientDetailsPage({
             showSnackbar={showSnackbar}
           />
         </Grid>
+
         <Grid item xs={12}>
           <ClientDetailsLivestreamSection
             clientId={clientState?.id}
             key={streamKey}
           />
         </Grid>
+
         <Grid item xs={12}>
           <ClientDetailsInfoSection
             client={clientState}
@@ -274,6 +316,7 @@ export default function ClientDetailsPage({
             setCalendarDialogOpen={setCalendarDialogOpen}
           />
         </Grid>
+
         <Grid item xs={12}>
           <ClientDetailsActionsSection
             clientId={memoizedClientId}
@@ -285,6 +328,7 @@ export default function ClientDetailsPage({
           />
         </Grid>
       </Grid>
+
       <ClientCalendarDialog
         open={calendarDialogOpen}
         onClose={() => setCalendarDialogOpen(false)}
