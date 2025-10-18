@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -28,19 +28,51 @@ import { clientAction } from "../../api";
 import { useAuth } from "../../auth/authcontext";
 
 // Denne komponent opdateres ikke via polling eller client-objekt – kun via props ændret af brugerhandlinger!
+// Ændring: bruger wrapperens showSnackbar hvis den er tilgængelig; fallback til lokal snackbar ellers.
+// Også: nulstil lokal actionLoading når clientId ændrer sig eller når optional prop `refreshing` skifter til false.
 
 function ClientDetailsActionsSection({
   clientId,
   handleOpenTerminal,
   handleOpenRemoteDesktop,
+  refreshing, // optional: hvis wrapper sender refreshing-flag kan vi rydde loading når refresh er færdig
+  showSnackbar // optional: funktion fra wrapper til at vise snackbar centrally
 }) {
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [localSnackbar, setLocalSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
+
+  // Nulstil lokale loading-states når clientId skifter (fx ved navigation) for at undgå fastlåst UI
+  useEffect(() => {
+    setActionLoading({});
+  }, [clientId]);
+
+  // Hvis parent sender refreshing, ryd også loading når refreshing går fra true -> false
+  useEffect(() => {
+    if (typeof refreshing !== "undefined") {
+      if (!refreshing) {
+        setActionLoading({});
+      }
+    }
+  }, [refreshing]);
+
+  // Helper: centraliseret notifikation (brug wrapper hvis tilgængelig, ellers lokal snackbar)
+  const notify = useCallback((msgObj) => {
+    if (typeof showSnackbar === "function") {
+      try {
+        showSnackbar(msgObj);
+      } catch (e) {
+        // Fallback til lokal snackbar hvis wrapper-fejl
+        setLocalSnackbar({ open: true, message: msgObj.message || "", severity: msgObj.severity || "success" });
+      }
+    } else {
+      setLocalSnackbar({ open: true, message: msgObj.message || "", severity: msgObj.severity || "success" });
+    }
+  }, [showSnackbar]);
 
   // Tilpasset knapstyle: height: 38px og harmoniske værdier
   const actionBtnStyle = {
@@ -66,13 +98,13 @@ function ClientDetailsActionsSection({
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
       await clientAction(clientId, action);
-      setSnackbar({ open: true, message: 'Handling udført!', severity: 'success' });
+      notify({ message: 'Handling udført!', severity: 'success' });
     } catch (err) {
-      setSnackbar({ open: true, message: 'Fejl: ' + (err?.message || 'Kunne ikke udføre handling'), severity: 'error' });
+      notify({ message: 'Fejl: ' + (err?.message || 'Kunne ikke udføre handling'), severity: 'error' });
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
-  }, [clientId]);
+  }, [clientId, notify]);
 
   // Wrapper for Tooltip så den ikke vises på mobil
   const MaybeTooltip = ({ title, children }) =>
@@ -255,18 +287,20 @@ function ClientDetailsActionsSection({
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Lokal snackbar fallback hvis wrapper ikke leverer showSnackbar */}
         <Snackbar
-          open={snackbar.open}
+          open={localSnackbar.open}
           autoHideDuration={3000}
-          onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+          onClose={() => setLocalSnackbar(s => ({ ...s, open: false }))}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         >
           <Alert
-            onClose={() => setSnackbar(s => ({ ...s, open: false }))}
-            severity={snackbar.severity}
+            onClose={() => setLocalSnackbar(s => ({ ...s, open: false }))}
+            severity={localSnackbar.severity}
             sx={{ width: '100%' }}
           >
-            {snackbar.message}
+            {localSnackbar.message}
           </Alert>
         </Snackbar>
       </CardContent>
