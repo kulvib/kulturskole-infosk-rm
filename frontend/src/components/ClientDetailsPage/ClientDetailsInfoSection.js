@@ -7,7 +7,6 @@ import {
   Button,
   Tooltip,
   Table,
-  TableHead,
   TableBody,
   TableCell,
   TableContainer,
@@ -19,6 +18,14 @@ import {
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useTheme } from "@mui/material/styles";
+
+/*
+  ClientDetailsInfoSection (opdateret)
+  - Bruger uptime og lastSeen props direkte (de opdateres af parent's 1s chrome-status poll).
+  - Komponent er memoized (React.memo) med en custom comparator, så den kun rerender når relevante props ændrer sig:
+    client (nøglefelter), markedDays, uptime eller lastSeen.
+  - Mindsker unødvendige rerenders, men sikrer at "Oppetid" og "Sidst set" opdateres straks når parent ændrer disse props.
+*/
 
 // Fælles StatusBadge med 2 sekunders puls animation
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
@@ -138,14 +145,21 @@ function ClientPowerShortTable({ markedDays, isMobile=false }) {
     </TableContainer>
   );
 }
+
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
-  if (dateStr.endsWith("Z") || dateStr.match(/[\+\-]\d{2}:?\d{2}$/)) {
+  // Accept ISO-ish strings or epoch numbers
+  if (typeof dateStr === "number") {
     d = new Date(dateStr);
   } else {
-    d = new Date(dateStr + "Z");
+    if (dateStr.endsWith("Z") || dateStr.match(/[\+\-]\d{2}:?\d{2}$/)) {
+      d = new Date(dateStr);
+    } else {
+      d = new Date(dateStr + "Z");
+    }
   }
+  if (Number.isNaN(d.getTime())) return "ukendt";
   const formatter = new Intl.DateTimeFormat("da-DK", {
     timeZone: "Europe/Copenhagen",
     year: "numeric",
@@ -167,10 +181,13 @@ function formatDateTime(dateStr, withSeconds = false) {
     ? `${day}.${month} ${year}, kl. ${hour}:${minute}:${second}`
     : `${day}.${month} ${year}, kl. ${hour}:${minute}`;
 }
+
 function formatUptime(uptimeStr) {
   if (!uptimeStr) return "ukendt";
   let totalSeconds = 0;
-  if (uptimeStr.includes('-')) {
+  if (typeof uptimeStr === "number") {
+    totalSeconds = Math.floor(uptimeStr);
+  } else if (uptimeStr.includes('-')) {
     const [d, hms] = uptimeStr.split('-');
     const [h = "0", m = "0", s = "0"] = hms.split(':');
     totalSeconds =
@@ -190,6 +207,7 @@ function formatUptime(uptimeStr) {
   } else {
     totalSeconds = parseInt(uptimeStr, 10);
   }
+  if (!isFinite(totalSeconds) || Number.isNaN(totalSeconds)) return "ukendt";
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const mins = Math.floor((totalSeconds % 3600) / 60);
@@ -197,6 +215,7 @@ function formatUptime(uptimeStr) {
 
   return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
 }
+
 function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
   const cellStyle = {
     border: 0,
@@ -224,7 +243,7 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
             <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
-                {client.ubuntu_version || "ukendt"}
+                {client?.ubuntu_version || "ukendt"}
               </Box>
             </TableCell>
           </TableRow>
@@ -248,7 +267,7 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
             <TableCell sx={cellStyle}>Tilføjet:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
-                {formatDateTime(client.created_at, true)}
+                {formatDateTime(client?.created_at, true)}
               </Box>
             </TableCell>
           </TableRow>
@@ -314,25 +333,25 @@ function NetworkInfoTable({ client, isMobile=false }) {
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>IP-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <CopyField value={client.wifi_ip_address || "ukendt"} isMobile={isMobile} />
+              <CopyField value={client?.wifi_ip_address || "ukendt"} isMobile={isMobile} />
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <CopyField value={client.wifi_mac_address || "ukendt"} isMobile={isMobile} />
+              <CopyField value={client?.wifi_mac_address || "ukendt"} isMobile={isMobile} />
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>IP-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <CopyField value={client.lan_ip_address || "ukendt"} isMobile={isMobile} />
+              <CopyField value={client?.lan_ip_address || "ukendt"} isMobile={isMobile} />
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <CopyField value={client.lan_mac_address || "ukendt"} isMobile={isMobile} />
+              <CopyField value={client?.lan_mac_address || "ukendt"} isMobile={isMobile} />
             </TableCell>
           </TableRow>
         </TableBody>
@@ -341,9 +360,9 @@ function NetworkInfoTable({ client, isMobile=false }) {
   );
 }
 
-export default function ClientDetailsInfoSection({
+function ClientDetailsInfoSection({
   client,
-  markedDays,
+  markedDays = {},
   uptime,
   lastSeen,
   calendarDialogOpen,
@@ -394,7 +413,6 @@ export default function ClientDetailsInfoSection({
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
                 Systeminfo
               </Typography>
-              {/* StateBadge removed from here (moved to header) */}
             </Box>
             <SystemInfoTable client={client} uptime={uptime} lastSeen={lastSeen} isMobile={isMobile} />
           </CardContent>
@@ -408,7 +426,6 @@ export default function ClientDetailsInfoSection({
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
                 Netværksinfo
               </Typography>
-              {/* OnlineStatusBadge removed from here (moved to header) */}
             </Box>
             <NetworkInfoTable client={client} isMobile={isMobile} />
           </CardContent>
@@ -417,3 +434,38 @@ export default function ClientDetailsInfoSection({
     </Grid>
   );
 }
+
+// Custom comparator: only re-render when relevant props change
+function propsAreEqual(prev, next) {
+  // compare client identity and a few key display fields
+  const prevClient = prev.client || {};
+  const nextClient = next.client || {};
+  if (prevClient.id !== nextClient.id) return false;
+  if (prevClient.ubuntu_version !== nextClient.ubuntu_version) return false;
+  if (prevClient.created_at !== nextClient.created_at) return false;
+  // network fields
+  if ((prevClient.wifi_ip_address || "") !== (nextClient.wifi_ip_address || "")) return false;
+  if ((prevClient.wifi_mac_address || "") !== (nextClient.wifi_mac_address || "")) return false;
+  if ((prevClient.lan_ip_address || "") !== (nextClient.lan_ip_address || "")) return false;
+  if ((prevClient.lan_mac_address || "") !== (nextClient.lan_mac_address || "")) return false;
+
+  // markedDays: shallow compare keys length (typical small object)
+  const prevMarked = prev.markedDays || {};
+  const nextMarked = next.markedDays || {};
+  const prevKeys = Object.keys(prevMarked);
+  const nextKeys = Object.keys(nextMarked);
+  if (prevKeys.length !== nextKeys.length) return false;
+  for (let i = 0; i < prevKeys.length; i++) {
+    const k = prevKeys[i];
+    if (prevMarked[k] !== nextMarked[k]) return false;
+  }
+
+  // uptime and lastSeen must be compared — these are expected to change frequently via parent poll
+  if ((prev.uptime || "") !== (next.uptime || "")) return false;
+  if ((prev.lastSeen || "") !== (next.lastSeen || "")) return false;
+
+  // calendar dialog handlers don't affect rendering comparison
+  return true;
+}
+
+export default React.memo(ClientDetailsInfoSection, propsAreEqual);
