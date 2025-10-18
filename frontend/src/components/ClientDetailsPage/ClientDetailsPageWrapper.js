@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { getClient, getMarkedDays, getCurrentSeason } from "../../api";
 import ClientDetailsPage from "./ClientDetailsPage";
@@ -16,6 +16,9 @@ export default function ClientDetailsPageWrapper() {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   // Fejltilstand ved manglende adgang/404
   const [notFound, setNotFound] = useState(false);
+
+  // Ref til interval så vi kan starte interval EFTER første fetch og rydde korrekt
+  const intervalRef = useRef(null);
 
   // Fetch all data
   const fetchAllData = async (forceUpdate = false) => {
@@ -38,6 +41,7 @@ export default function ClientDetailsPageWrapper() {
 
       setMarkedDays({ ...calendarData?.markedDays });
     } catch (err) {
+      // Ved fejl: vis notFound + snackbar
       setNotFound(true);
       setSnackbar({ open: true, message: "Ingen adgang eller klient ikke fundet", severity: "error" });
     }
@@ -45,9 +49,28 @@ export default function ClientDetailsPageWrapper() {
   };
 
   useEffect(() => {
-    fetchAllData();
-    const timer = setInterval(() => fetchAllData(false), 15000); // full client: every 15s
-    return () => clearInterval(timer);
+    let cancelled = false;
+
+    // IIFE for at kunne await før interval oprettes
+    (async () => {
+      if (!clientId) return;
+      await fetchAllData(false); // initial hent
+      if (cancelled) return;
+
+      // Start interval EFTER initial fetch så child får client tidligt
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(() => {
+        fetchAllData(false);
+      }, 15000); // full client: every 15s
+    })();
+
+    return () => {
+      cancelled = true;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
   }, [clientId]);
 
   const handleRefresh = async () => {
