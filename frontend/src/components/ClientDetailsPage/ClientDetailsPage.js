@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Box, Grid } from "@mui/material";
 import ClientDetailsHeaderSection from "./ClientDetailsHeaderSection";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
@@ -8,12 +8,21 @@ import ClientCalendarDialog from "../CalendarPage/ClientCalendarDialog";
 import {
   updateClient,
   pushKioskUrl,
-  clientAction,
+  clientAction as apiClientAction,
   openTerminal,
   openRemoteDesktop,
-  getClient,
   getSchools,
 } from "../../api";
+
+/*
+  ClientDetailsPage.js
+
+  Behaviour:
+  - Relies on wrapper (ClientDetailsPageWrapper) to fetch the full client object periodically (15s).
+  - Polls /clients/{id}/chrome-status every 1s and updates UI only when the step/timestamp/message changes.
+  - Keeps local optimistic updates for locality/kioskUrl.
+  - Stabilizes callbacks with useCallback and memoizes actionLoading for React.memo compatibility in the ActionsSection.
+*/
 
 export default function ClientDetailsPage({
   client,
@@ -25,7 +34,7 @@ export default function ClientDetailsPage({
   onRestartStream,
   showSnackbar
 }) {
-  // Local copy of client so we can update UI optimistically / refresh after changes
+  // Local copy of client so we can update UI optimistically / reflect small immediate changes
   const [clientState, setClientState] = useState(client);
 
   const [locality, setLocality] = useState("");
@@ -47,8 +56,11 @@ export default function ClientDetailsPage({
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
   const [pendingLivestream, setPendingLivestream] = useState(false);
 
-  // NYT: State til skoler
+  // Schools
   const [schools, setSchools] = useState([]);
+
+  // Ref to remember last chrome-status step timestamp/message so we only update on change
+  const lastChromeStepRef = useRef({ timestamp: null, message: null });
 
   // Sync local clientState when incoming prop changes
   useEffect(() => {
@@ -79,35 +91,98 @@ export default function ClientDetailsPage({
     return () => { cancelled = true; };
   }, []);
 
-  // Poll opdateret klient-data (uafhængig af parent prop) for live-status/opdateringer
+  /*
+    NOTE:
+    - This component intentionally does NOT poll GET /clients/{id} for the full client.
+    - The wrapper (ClientDetailsPageWrapper) is expected to fetch the client and pass it as `client` prop (every 15s).
+    - We keep a dedicated chrome-status poll here at 1s so kiosk/browser status is near-live.
+  */
+
+  // Poll chrome-status every 1s, but only update when the step/timestamp/message changes
   useEffect(() => {
-    let interval;
-    if (clientState?.id) {
-      const poll = async () => {
-        try {
-          const updated = await getClient(clientState.id);
-          const pca = updated.pending_chrome_action;
-          setPendingLivestream(
-            pca === "livestream_start" || pca === "livestream_stop"
-          );
-          setLiveChromeStatus(updated.chrome_status || "unknown");
-          setLiveChromeColor(updated.chrome_color || null);
-          setLastSeen(updated.last_seen || null);
-          setUptime(updated.uptime || null);
-          // keep local clientState reasonably fresh
-          setClientState(prev => {
-            // shallow merge updated fields into prev to preserve local changes if any
-            if (!prev) return updated;
-            return { ...prev, ...updated };
-          });
-        } catch {}
-      };
-      poll();
-      interval = setInterval(poll, 2000);
-    }
-    return () => clearInterval(interval);
+    if (!clientState?.id) return;
+    let cancelled = false;
+    let intervalId = null;
+
+    const pollChromeStatus = async () => {
+      try {
+        const res = await fetch(`/api/clients/${clientState.id}/chrome-status`);
+        if (!res.ok) return;
+        const json = await res.json();
+        const step = json.step || {};
+        const timestamp = step.timestamp ?? json.chrome_last_updated ?? null;
+        const message = json.chrome_status ?? step.message ?? null;
+        const color = json.chrome_color ?? step.color ?? null;
+
+        const last = lastChromeStepRef.current;
+        const changed = (timestamp && timestamp !== last.timestamp) || (message && message !== last.message);
+        if (changed) {
+          lastChromeStepRef.current = { timestamp, message };
+          if (!cancelled) {
+            if (message !== null) setLiveChromeStatus(message);
+            if (color !== null) setLiveChromeColor(color);
+            // Optionally update clientState so header reflects same info immediately
+            setClientState(prev => prev ? ({ ...prev, chrome_status: message, chrome_color: color }) : prev);
+          }
+        }
+      } catch (e) {
+        // ignore errors - polling continues
+      }
+    };
+
+    // initial and then every 1s
+    pollChromeStatus();
+    intervalId = setInterval(pollChromeStatus, 1000); // 1s
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
   }, [clientState?.id]);
 
+  // Stable, memoized clientId to use in callbacks
+  const memoizedClientId = clientState?.id ?? null;
+
+  // Stabilize callbacks for Actions-section to avoid unnecessary rerenders
+  const handleClientAction = useCallback(async (action) => {
+    setActionLoading((prev) => ({ ...prev, [action]: true }));
+    try {
+      if (!memoizedClientId) throw new Error("No client id");
+      await apiClientAction(memoizedClientId, action);
+      showSnackbar && showSnackbar({ message: "Handlingen blev udført!", severity: "success" });
+    } catch (err) {
+      showSnackbar && showSnackbar({ message: "Fejl: " + (err?.message || err), severity: "error" });
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [action]: false }));
+    }
+  }, [memoizedClientId, showSnackbar]);
+
+  const handleOpenTerminal = useCallback(() => {
+    if (!memoizedClientId) return;
+    openTerminal(memoizedClientId);
+  }, [memoizedClientId]);
+
+  const handleOpenRemoteDesktop = useCallback(() => {
+    if (!memoizedClientId) return;
+    openRemoteDesktop(memoizedClientId);
+  }, [memoizedClientId]);
+
+  // Header callback: update local clientState when school is updated
+  const handleSchoolUpdated = useCallback(async (updatedClient) => {
+    if (!clientState) return;
+    // If API returned a full updated client, use it; otherwise ask wrapper to refresh (wrapper owns full-client fetching)
+    if (updatedClient && updatedClient.id === clientState.id && Object.keys(updatedClient).length > 1) {
+      setClientState(prev => ({ ...(prev || {}), ...(updatedClient || {}) }));
+    } else {
+      // Ask wrapper to refresh by calling handleRefresh if available
+      if (typeof handleRefresh === "function") {
+        try { await handleRefresh(); } catch {}
+      }
+    }
+    showSnackbar && showSnackbar({ message: "Skole opdateret", severity: "success" });
+  }, [clientState, handleRefresh, showSnackbar]);
+
+  // Locality handlers
   const handleLocalityChange = (e) => {
     setLocality(e.target.value);
     setLocalityDirty(true);
@@ -117,17 +192,17 @@ export default function ClientDetailsPage({
     setSavingLocality(true);
     try {
       const updated = await updateClient(clientState.id, { locality });
-      // update local clientState with response if provided, otherwise patch locally
       if (updated) setClientState(prev => ({ ...(prev || {}), ...(updated || {}) }));
       else setClientState(prev => ({ ...(prev || {}), locality }));
       setLocalityDirty(false);
       showSnackbar && showSnackbar({ message: "Lokation gemt!", severity: "success" });
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Kunne ikke gemme lokation: " + (err.message || err), severity: "error" });
+      showSnackbar && showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
     }
     setSavingLocality(false);
   };
 
+  // Kiosk URL handlers
   const handleKioskUrlChange = (e) => {
     setKioskUrl(e.target.value);
     setKioskUrlDirty(true);
@@ -137,56 +212,31 @@ export default function ClientDetailsPage({
     setSavingKioskUrl(true);
     try {
       await pushKioskUrl(clientState.id, kioskUrl);
-      // pushKioskUrl may not return full client; refresh client to be safe
-      try {
-        const refreshed = await getClient(clientState.id);
-        if (refreshed) setClientState(refreshed);
-      } catch {}
+      // ask wrapper to refresh full client after pushing kiosk url
+      if (typeof handleRefresh === "function") {
+        try { await handleRefresh(); } catch {}
+      } else {
+        // fallback: update local state
+        setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
+      }
       setKioskUrlDirty(false);
       showSnackbar && showSnackbar({ message: "Kiosk webadresse opdateret!", severity: "success" });
     } catch (err) {
-      showSnackbar && showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err.message || err), severity: "error" });
+      showSnackbar && showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
     }
     setSavingKioskUrl(false);
   };
 
-  const handleClientAction = async (action) => {
-    setActionLoading((prev) => ({ ...prev, [action]: true }));
-    try {
-      await clientAction(clientState.id, action);
-      showSnackbar && showSnackbar({ message: "Handlingen blev udført!", severity: "success" });
-    } catch (err) {
-      showSnackbar && showSnackbar({ message: "Fejl: " + (err.message || err), severity: "error" });
-    }
-    setActionLoading((prev) => ({ ...prev, [action]: false }));
-  };
-
-  const handleOpenTerminal = () => openTerminal(clientState.id);
-  const handleOpenRemoteDesktop = () => openRemoteDesktop(clientState.id);
-
+  // Ensure livestream_start is triggered when client appears
   useEffect(() => {
-    if (clientState?.id) {
-      clientAction(clientState.id, "livestream_start").catch(() => {});
+    if (memoizedClientId) {
+      apiClientAction(memoizedClientId, "livestream_start").catch(() => {});
     }
-    // eslint-disable-next-line
-  }, [clientState?.id]);
+    // intentionally only when client id changes
+  }, [memoizedClientId]);
 
-  // Callback passed to header: update local clientState when school is updated
-  const handleSchoolUpdated = async (updatedClient) => {
-    if (!clientState) return;
-    // If API returned a full updated client, use it; otherwise refresh from backend
-    if (updatedClient && updatedClient.id === clientState.id && Object.keys(updatedClient).length > 1) {
-      setClientState(prev => ({ ...(prev || {}), ...(updatedClient || {}) }));
-    } else {
-      try {
-        const refreshed = await getClient(clientState.id);
-        if (refreshed) setClientState(refreshed);
-      } catch (err) {
-        // ignore
-      }
-    }
-    showSnackbar && showSnackbar({ message: "Skole opdateret", severity: "success" });
-  };
+  // Memoize actionLoading to avoid prop reference churn
+  const memoActionLoading = useMemo(() => actionLoading, [actionLoading]);
 
   if (!clientState) {
     return null;
@@ -217,12 +267,14 @@ export default function ClientDetailsPage({
             showSnackbar={showSnackbar}
           />
         </Grid>
+
         <Grid item xs={12}>
           <ClientDetailsLivestreamSection
             clientId={clientState?.id}
             key={streamKey}
           />
         </Grid>
+
         <Grid item xs={12}>
           <ClientDetailsInfoSection
             client={clientState}
@@ -233,10 +285,11 @@ export default function ClientDetailsPage({
             setCalendarDialogOpen={setCalendarDialogOpen}
           />
         </Grid>
+
         <Grid item xs={12}>
           <ClientDetailsActionsSection
-            clientId={clientState?.id}
-            actionLoading={actionLoading}
+            clientId={memoizedClientId}
+            actionLoading={memoActionLoading}
             handleClientAction={handleClientAction}
             handleOpenTerminal={handleOpenTerminal}
             handleOpenRemoteDesktop={handleOpenRemoteDesktop}
@@ -245,6 +298,7 @@ export default function ClientDetailsPage({
           />
         </Grid>
       </Grid>
+
       <ClientCalendarDialog
         open={calendarDialogOpen}
         onClose={() => setCalendarDialogOpen(false)}
