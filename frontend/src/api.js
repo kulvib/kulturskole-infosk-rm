@@ -1,3 +1,4 @@
+// api.js
 export const apiUrl = process.env.REACT_APP_API_URL || "https://kulturskole-infosk-rm.onrender.com";
 
 // TOKEN
@@ -104,15 +105,19 @@ export async function getClient(id) {
 }
 
 // NY: HENT KIOSK/CHROME STATUS (bruges af frontend poll)
-export async function getChromeStatus(id) {
+// Tilføjet valgfrit parameter fallbackToClient: hvis true og chrome-status-respons mangler last_seen/uptime,
+// vil vi hente getClient og merge disse felter før vi returnerer.
+export async function getChromeStatus(id, { fallbackToClient = false } = {}) {
   const token = getToken();
   if (!token) throw new Error("Token mangler - du er ikke logget ind");
+
   const res = await fetch(`${apiUrl}/api/clients/${id}/chrome-status`, {
     headers: {
       Authorization: "Bearer " + token,
       Accept: "application/json",
     },
   });
+
   if (res.status === 401) {
     localStorage.removeItem("token");
     throw new Error("401 Unauthorized: Login udløbet – log ind igen");
@@ -123,9 +128,43 @@ export async function getChromeStatus(id) {
       const data = await res.json();
       msg = data.detail || data.message || msg;
     } catch {}
+    if (fallbackToClient) {
+      try {
+        const full = await getClient(id);
+        return {
+          chrome_status: full.chrome_status ?? null,
+          chrome_color: full.chrome_color ?? null,
+          chrome_last_updated: full.chrome_last_updated ?? null,
+          last_seen: full.last_seen ?? null,
+          uptime: full.uptime ?? null,
+        };
+      } catch (e) {
+        throw new Error(msg);
+      }
+    }
     throw new Error(msg);
   }
-  return await res.json();
+
+  const json = await res.json();
+
+  if (fallbackToClient) {
+    const missingLastSeen = typeof (json?.last_seen) === "undefined" || json?.last_seen === null;
+    const missingUptime = typeof (json?.uptime) === "undefined" || json?.uptime === null;
+    if (missingLastSeen || missingUptime) {
+      try {
+        const full = await getClient(id);
+        return {
+          ...json,
+          last_seen: json.last_seen ?? full.last_seen ?? null,
+          uptime: json.uptime ?? full.uptime ?? null,
+        };
+      } catch (e) {
+        return json;
+      }
+    }
+  }
+
+  return json;
 }
 
 // OPDATÉR KLIENT (login)
@@ -254,7 +293,7 @@ export async function clientAction(id, action) {
     method = "POST";
     payload = { action: "livestream_stop" };
   }
-  // Sleep/Wakeup via chrome-command endpoint (ændret: sender "sleep" / "wakeup")
+  // Sleep/Wakeup via chrome-command endpoint
   else if (action === "sleep") {
     url = `${apiUrl}/api/clients/${id}/chrome-command`;
     method = "POST";
