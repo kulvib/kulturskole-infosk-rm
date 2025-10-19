@@ -57,6 +57,8 @@ class Client(ClientBase, table=True):
     pending_shutdown: Optional[bool] = False
     chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = Field(default=ChromeAction.NONE)
+    # New field: stores the origin/source of pending_chrome_action (e.g. "actionbutton", "calendar", "manual", "backend")
+    pending_chrome_action_source: Optional[str] = None
     school_id: Optional[int] = Field(default=None, foreign_key="school.id")
     state: Optional[str] = Field(
         default="normal",
@@ -78,6 +80,8 @@ class ClientCreate(ClientBase):
     chrome_status: Optional[str] = None
     chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = ChromeAction.NONE
+    # Accept source at creation time if provided
+    pending_chrome_action_source: Optional[str] = None
     school_id: Optional[int] = None
     state: Optional[str] = Field(default="normal")
 
@@ -97,6 +101,8 @@ class ClientUpdate(SQLModel):
     chrome_last_updated: Optional[datetime] = None
     chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = None
+    # Allow updating the source via API
+    pending_chrome_action_source: Optional[str] = None
     school_id: Optional[int] = None
     state: Optional[str] = None
     livestream_status: Optional[str] = None
