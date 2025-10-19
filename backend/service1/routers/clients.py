@@ -168,21 +168,50 @@ def set_chrome_command(
     session=Depends(get_session),
     user=Depends(get_current_user)
 ):
+    """
+    Body schema expected example:
+      {"action":"wakeup", "source":"actionbutton"}
+    source is optional. Allowed values (recommended): "actionbutton", "calendar", "manual".
+    If source is omitted, existing behavior (backend) is preserved.
+    """
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     action = data.get("action")
-    if action == "livestream_start" and client.pending_chrome_action == "livestream_start":
+    source = data.get("source")  # optional origin/source specifier
+
+    # Prevent duplicate livestream requests (existing behavior)
+    # Note: pending_chrome_action on model is an Enum; compare .value for string comparisons if needed
+    if action == "livestream_start" and getattr(client.pending_chrome_action, "value", client.pending_chrome_action) == "livestream_start":
         raise HTTPException(status_code=400, detail="Livestream already requested")
+
     try:
         chrome_action = ChromeAction(action)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid action '{action}'")
+
+    # Set the pending action
     client.pending_chrome_action = chrome_action
+
+    # Validate and set source if provided
+    if source is not None:
+        if not isinstance(source, str):
+            raise HTTPException(status_code=400, detail="Invalid source value")
+        src_lower = source.lower()
+        allowed = {"actionbutton", "calendar", "manual", "backend"}
+        if src_lower not in allowed:
+            raise HTTPException(status_code=400, detail=f"Invalid source '{source}'. Allowed: {sorted(list(allowed))}")
+        # Persist the source string on the client model (ensure column exists)
+        try:
+            client.pending_chrome_action_source = src_lower
+        except Exception:
+            # If model doesn't have the attribute, raise a clear error so you can add DB column
+            raise HTTPException(status_code=500, detail="Server not configured to store pending_chrome_action_source (add column to Client model)")
+
     session.add(client)
     session.commit()
     session.refresh(client)
-    return {"ok": True, "pending_chrome_action": client.pending_chrome_action.value}
+    return {"ok": True, "pending_chrome_action": client.pending_chrome_action.value, "pending_chrome_action_source": getattr(client, "pending_chrome_action_source", None)}
 
 # Klienten henter aktuel kommando
 @router.get("/clients/{id}/chrome-command")
@@ -194,7 +223,10 @@ def get_chrome_command(
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    return {"action": client.pending_chrome_action.value if client.pending_chrome_action else None}
+    return {
+        "action": client.pending_chrome_action.value if client.pending_chrome_action else None,
+        "source": getattr(client, "pending_chrome_action_source", None)
+    }
 
 # Opret ny klient
 @router.post("/clients/", response_model=Client)
@@ -223,6 +255,7 @@ async def create_client(
         pending_reboot=False,
         pending_shutdown=False,
         pending_chrome_action=getattr(client_in, "pending_chrome_action", ChromeAction.NONE),
+        pending_chrome_action_source=getattr(client_in, "pending_chrome_action_source", None),
         school_id=getattr(client_in, "school_id", None),
         state=getattr(client_in, "state", "normal"),
         livestream_status="idle",
@@ -281,6 +314,16 @@ async def update_client(
                 client.pending_chrome_action = ChromeAction(val)
             except (ValueError, TypeError):
                 pass
+    # Support updating pending_chrome_action_source via API if present in pydantic model
+    if "pending_chrome_action_source" in client_update.__fields_set__:
+        try:
+            src = getattr(client_update, "pending_chrome_action_source")
+            if src is None:
+                client.pending_chrome_action_source = None
+            else:
+                client.pending_chrome_action_source = str(src).lower()
+        except Exception:
+            pass
     if getattr(client_update, "school_id", None) is not None:
         client.school_id = client_update.school_id
     if getattr(client_update, "state", None) is not None:
