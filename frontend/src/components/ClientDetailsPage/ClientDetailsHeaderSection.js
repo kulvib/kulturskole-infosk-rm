@@ -451,13 +451,14 @@ function ClientDetailsHeaderSection({
       </Box>
 
       {/* Papers */}
-      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
+      {/* NOTE: explicit alignItems: "stretch" sikrer at flex-items kan strækkes på tværs (row-axis = height). */}
+      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%", alignItems: isMobile ? "stretch" : "stretch" }}>
         {/* Klient info (left) */}
-        <Box sx={{ width: leftPaperWidth, pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
-          {/* Card height changed to auto and ensured overflow handling to avoid scrollbars */}
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden" }}>
-            {/* CardContent receives NO_SCROLL_SX to hide any scrollbars in descendants */}
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX }}>
+        <Box sx={{ width: leftPaperWidth, pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0, display: "flex", flexDirection: "column" }}>
+          {/* Card height changed to 100% and made flex-column så den kan fylde wrapperens højde */}
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {/* CardContent receives NO_SCROLL_SX to hide any scrollbars in descendants and flex:1 for stretch */}
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX, flex: 1, display: "flex", flexDirection: "column" }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Klient info</Typography>
                 <Box sx={{ ml: 1 }}>
@@ -522,10 +523,10 @@ function ClientDetailsHeaderSection({
         </Box>
 
         {/* Infoskærm status (right) */}
-        <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1 }}>
-          {/* Card height changed to auto and NO_SCROLL_SX applied */}
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden", ...rightPaperDisabledStyle }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX }}>
+        <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1, display: "flex", flexDirection: "column" }}>
+          {/* Card height changed to 100% and NO_SCROLL_SX applied; kort bruger flex så begge cards kan matches i højde */}
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", ...rightPaperDisabledStyle }}>
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX, flex: 1, display: "flex", flexDirection: "column" }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
                 {/* Hide state badge if client is explicitly offline */}
