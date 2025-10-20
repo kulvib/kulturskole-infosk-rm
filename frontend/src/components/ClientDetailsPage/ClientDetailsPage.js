@@ -290,6 +290,7 @@ export default function ClientDetailsPage({
             lastSeen={lastSeen}
             calendarDialogOpen={calendarDialogOpen}
             setCalendarDialogOpen={setCalendarDialogOpen}
+            clientOnline={clientState?.isOnline} /* NEW: inform info section about online-status */
           />
         </Grid>
 
