@@ -22,6 +22,16 @@ export default function ClientDetailsPageWrapper() {
   // Ref til aktiv AbortController for fetchAllData så vi kan afbryde request ved unmount
   const activeAbortRef = useRef(null);
 
+  // Helper: merge client but preserve previous isOnline unless server explicitly provided it
+  function mergeClientPreserveOnline(prev, updated) {
+    if (!updated) return prev;
+    return {
+      ...(prev || {}),
+      ...(updated || {}),
+      isOnline: (typeof updated.isOnline === "undefined") ? prev?.isOnline : updated.isOnline
+    };
+  }
+
   // Fetch all data - returnerer clientData eller null
   const fetchAllData = async (forceUpdate = false) => {
     if (!clientId) return null;
@@ -51,8 +61,9 @@ export default function ClientDetailsPageWrapper() {
       }
 
       setClient(prev => {
+        // hvis forceUpdate eller data er forskellig, merge men bevar prev.isOnline hvis server ikke returnerede det
         if (forceUpdate || JSON.stringify(clientData) !== JSON.stringify(prev)) {
-          return clientData;
+          return mergeClientPreserveOnline(prev, clientData);
         }
         return prev;
       });
