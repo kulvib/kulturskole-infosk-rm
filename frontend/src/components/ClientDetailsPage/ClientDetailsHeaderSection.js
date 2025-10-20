@@ -28,8 +28,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   ClientDetailsHeaderSection - komplet komponent
   Ændringer:
   - Desktop: paper 1 = 40%, paper 2 = 60%
-  - Flyttet "Lokation" til paper 2 over "Kiosk URL"
-  - "Kiosk browser status" value vises én linje under label (separeret TableRow)
+  - Lokation er placeret i paper 2 (øverst)
+  - Kiosk URL ligger direkte under Lokation
+  - Kiosk browser status: label på egen række og value på separat række under label
+  - Table-layout fixed, label width 140px (desktop), overflow ellipsis på labels
   - Bevarer øvrig funktionalitet og propsAreEqual
 */
 
@@ -346,8 +348,8 @@ function ClientDetailsHeaderSection({
           sx={{
             ...labelStyle,
             borderBottom: "none",
-            width: isMobile ? 140 : 140,
-            minWidth: isMobile ? 140 : 140,
+            width: 140,
+            minWidth: 140,
           }}
         >
           {key}:
@@ -413,8 +415,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 140,
-                          minWidth: isMobile ? 140 : 140,
+                          width: 140,
+                          minWidth: 140,
                         }}
                       >
                         Klientnavn:
@@ -428,8 +430,8 @@ function ClientDetailsHeaderSection({
                           sx={{
                             ...labelStyle,
                             borderBottom: "none",
-                            width: isMobile ? 140 : 140,
-                            minWidth: isMobile ? 140 : 140,
+                            width: 140,
+                            minWidth: 140,
                           }}
                         >
                           Klient ID:
@@ -443,8 +445,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 140,
-                          minWidth: isMobile ? 140 : 140,
+                          width: 140,
+                          minWidth: 140,
                         }}
                       >
                         Skole:
@@ -477,7 +479,7 @@ function ClientDetailsHeaderSection({
                       </TableCell>
                     </TableRow>
 
-                    {/* Lokation er flyttet til paper 2 */}
+                    {/* Lokation er fjernet her (flyttet til Kiosk info) */}
 
                   </TableBody>
                 </Table>
@@ -500,14 +502,14 @@ function ClientDetailsHeaderSection({
                 <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
                   <TableBody>
 
-                    {/* Flyttet Lokation her - over Kiosk URL */}
+                    {/* Lokation - første i dette paper */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 140,
-                          minWidth: isMobile ? 140 : 140,
+                          width: 140,
+                          minWidth: 140,
                         }}
                       >
                         Lokation:
@@ -533,38 +535,14 @@ function ClientDetailsHeaderSection({
                       </TableCell>
                     </TableRow>
 
-                    {/* Kiosk URL will be after the status rows (so status label appears above and value below) */}
+                    {/* Kiosk URL - moved directly under Lokation */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 140,
-                          minWidth: isMobile ? 140 : 140,
-                        }}
-                      >
-                        Kiosk browser status:
-                      </TableCell>
-                      {/* empty cell so the value can appear on next line */}
-                      <TableCell sx={{ borderBottom: "none" }}></TableCell>
-                    </TableRow>
-
-                    {/* value on next line under the value-column */}
-                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell sx={{ borderBottom: "none", width: isMobile ? 140 : 140, minWidth: isMobile ? 140 : 140 }} />
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                      </TableCell>
-                    </TableRow>
-
-                    {/* Kiosk URL */}
-                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell
-                        sx={{
-                          ...labelStyle,
-                          borderBottom: "none",
-                          width: isMobile ? 140 : 140,
-                          minWidth: isMobile ? 140 : 140,
+                          width: 140,
+                          minWidth: 140,
                         }}
                       >
                         Kiosk URL:
@@ -587,6 +565,28 @@ function ClientDetailsHeaderSection({
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
+                      </TableCell>
+                    </TableRow>
+
+                    {/* Kiosk browser status: label on its own row, value on the next row */}
+                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
+                      <TableCell
+                        sx={{
+                          ...labelStyle,
+                          borderBottom: "none",
+                          width: 140,
+                          minWidth: 140,
+                        }}
+                      >
+                        Kiosk browser status:
+                      </TableCell>
+                      <TableCell sx={{ borderBottom: "none" }}></TableCell>
+                    </TableRow>
+
+                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
+                      <TableCell sx={{ borderBottom: "none", width: 140, minWidth: 140 }} />
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
 
