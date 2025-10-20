@@ -25,16 +25,12 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection - komplet komponent
-  Rettelser/forbedringer inkluderet:
-  - Robust color resolution (theme tokens, hex, color names).
-  - Unik keyframe-navn (pulsateStatusBadge) og keyframes animerer KUN transform+opacity.
-  - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
-  - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
-  - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
-  - table-layout: fixed + colgroup for at låse første kolonne til 140px.
-  - ValueCell helper med inline paddingLeft/paddingRight (2px/4px) for tættere venstrestilling.
-  - Konsistent styling for både Select-visning og native input (.MuiSelect-select og .MuiInputBase-input) med mindre venstre-padding.
+  ClientDetailsHeaderSection
+  Ændringer i denne version:
+  - Desktop: left paper = 40%, right paper = 60%.
+  - Locality og Kiosk URL save-knapper får samme "greyed out" (disabled) logik som skole-knappen:
+    de er disabled indtil feltet er dirty (localityDirty / kioskUrlDirty) og indtil saving er færdig.
+  - Bevarer tidligere forbedringer: table-layout: fixed + colgroup, ValueCell med inline padding, konsistent input/select padding, status badges osv.
 */
 
 const COLOR_NAME_MAP = {
@@ -90,8 +86,6 @@ function resolveColor(theme, color) {
   return trimmed;
 }
 
-// StatusBadge - dot + label. animation only transforms and opacity (no background)
-// inline style is used to force the background color so global keyframes/styles can't override it.
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
@@ -331,19 +325,17 @@ function ClientDetailsHeaderSection({
   const inputStyle = {
     width: "100%",
     height: 32,
-    // native input (TextField input)
     "& .MuiInputBase-input": {
       fontSize: isMobile ? 12 : 14,
       height: isMobile ? "30px" : "32px",
       boxSizing: "border-box",
-      paddingLeft: 2, // reduced from 4 -> 2px to move text closer to left
+      paddingLeft: 2,
       paddingRight: 4,
       display: "flex",
       alignItems: "center",
     },
-    // Select display element (when TextField has select)
     "& .MuiSelect-select": {
-      paddingLeft: 2, // reduced from 4 -> 2px
+      paddingLeft: 2,
       paddingRight: 4,
       display: "flex",
       alignItems: "center",
@@ -354,7 +346,7 @@ function ClientDetailsHeaderSection({
   };
 
   // ValueCell helper: applies valueStyle via sx and forces inline paddingLeft/paddingRight so it wins.
-  // Left padding reduced to 2px so value content (and contained inputs) sit closer to the left cell edge.
+  // Left padding reduced to 2px so value content sits closer to the left cell edge.
   function ValueCell({ children, sx = {}, style = {}, ...props }) {
     return (
       <TableCell
@@ -414,8 +406,8 @@ function ClientDetailsHeaderSection({
 
       {/* Papers */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
-        {/* Klient info */}
-        <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
+        {/* Klient info (left) - desktop 40% */}
+        <Box sx={{ width: isMobile ? "100%" : "40%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
@@ -467,7 +459,13 @@ function ClientDetailsHeaderSection({
 
                           <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
 
-                          <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: 56 }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={handleSchoolSave}
+                            disabled={savingSchool || String(selectedSchool) === String(client?.school_id)}
+                            sx={{ minWidth: 56 }}
+                          >
                             {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
@@ -490,7 +488,14 @@ function ClientDetailsHeaderSection({
                             fullWidth
                           />
                           <CopyIconButton value={locality ?? ""} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                          <Button variant="outlined" size="small" onClick={handleLocalitySave} disabled={savingLocality} sx={{ minWidth: 56 }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={handleLocalitySave}
+                            // disabled until dirty (lokation ændret) OR while saving
+                            disabled={savingLocality || !localityDirty}
+                            sx={{ minWidth: 56 }}
+                          >
                             {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
@@ -505,8 +510,8 @@ function ClientDetailsHeaderSection({
           </Card>
         </Box>
 
-        {/* Kiosk info */}
-        <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
+        {/* Kiosk info (right) - desktop 60% */}
+        <Box sx={{ width: isMobile ? "100%" : "60%", pl: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
@@ -537,7 +542,14 @@ function ClientDetailsHeaderSection({
                             fullWidth
                           />
                           <CopyIconButton value={kioskUrl ?? ""} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                          <Button variant="outlined" size="small" onClick={handleKioskUrlSave} disabled={savingKioskUrl} sx={{ minWidth: 56 }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={handleKioskUrlSave}
+                            // disabled until dirty (kiosk URL ændret) OR while saving
+                            disabled={savingKioskUrl || !kioskUrlDirty}
+                            sx={{ minWidth: 56 }}
+                          >
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
@@ -566,7 +578,6 @@ function ClientDetailsHeaderSection({
 }
 
 // Custom shallow comparator for React.memo:
-// Only re-render header when props that affect its UI actually change.
 function propsAreEqual(prev, next) {
   const simpleKeys = [
     "locality",
