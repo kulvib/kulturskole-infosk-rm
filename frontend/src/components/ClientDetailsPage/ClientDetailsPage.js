@@ -20,6 +20,7 @@ import {
   ClientDetailsPage.js (opdateret)
   - Preserves isOnline on merges; header handles local saves directly to backend.
   - Snackbar messages standardized: "Lokation gemt", "Kiosk webadresse gemt", "Skole gemt"
+  - Ændring: Undlader at kalde handleRefresh efter locality/kiosk-opdatering for at undgå at parent genindlæser hele siden.
 */
 
 export default function ClientDetailsPage({
@@ -180,11 +181,10 @@ export default function ClientDetailsPage({
       }
       setLocalityDirty(false);
 
-      if (typeof handleRefresh === "function") {
-        try { await handleRefresh(); } catch (e) { console.debug("handleRefresh after locality save failed:", e); }
-      } else {
-        if (typeof showSnackbar === "function") showSnackbar({ message: "Lokation gemt", severity: "success" });
-      }
+      // NOTE: tidligere kaldte vi handleRefresh her, hvilket typisk får parent til at re-fetch
+      // og dermed får hele siden til at re-render. For at undgå "hele siden" opdateres undlader vi
+      // nu at kalde handleRefresh her og stoler på lokal state-opdatering (optimistisk opdatering).
+      if (typeof showSnackbar === "function") showSnackbar({ message: "Lokation gemt", severity: "success" });
     } catch (err) {
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
     } finally {
@@ -205,10 +205,7 @@ export default function ClientDetailsPage({
         setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
       }
 
-      if (typeof handleRefresh === "function") {
-        try { await handleRefresh(); } catch (e) { console.debug("handleRefresh after kioskUrl save failed:", e); }
-      }
-
+      // Samme note som ovenfor: undlad parent handleRefresh for at undgå full re-fetch/re-render.
       setKioskUrlDirty(false);
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kiosk webadresse gemt", severity: "success" });
     } catch (err) {
