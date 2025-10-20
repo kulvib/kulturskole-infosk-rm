@@ -27,9 +27,23 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 /*
   ClientDetailsHeaderSection.js
 
-  - Local save for skole, lokation og kiosk URL: skriver direkte til backend uden at opdatere parent/clientState.
-  - Inputfelter ændrer kun lokal state i denne komponent; Gem (Save) udfører API-kald og viser snackbar via showSnackbar.
-  - Dette sikrer at en save ikke utilsigtet overskriver client.isOnline eller trigger en fuld-side opdatering.
+  Responsive update:
+  - Desktop (unchanged): paper 1 = 40%, paper 2 = 60% (kept exactly as you liked).
+  - Tablet (between sm and md): papers displayed side-by-side as 50% / 50% with slightly tighter labels.
+  - Mobile (sm and below): papers stack vertically (100% width). Labels are narrower and UI is more compact.
+  - Local dirty-checks for Lokation and Kiosk URL are preserved; "Gem" buttons disabled until inputs change.
+  - "Kiosk info" heading renamed to "Infoskærm status" (kept from previous change).
+  - Table-layout remains 'fixed' to keep deterministic column sizing; label cell width adjusts per breakpoint.
+
+  Behavior changes applied:
+  - If client is explicitly offline (client?.isOnline === false) the StateBadge is hidden and Lokation/Kiosk URL inputs are disabled.
+  - The "Skole" field is only visible to admin users.
+  - Paper 2 (Infoskærm status) is visually greyed-out when client is offline.
+
+  Important: Selecting a school in the dropdown now only writes the change to the backend.
+  It no longer calls a parent updater that might merge/overwrite client state (and thereby affect isOnline).
+  The component keeps the local selected value and shows success/error feedback, but does NOT modify
+  the parent's client state.
 */
 
 const COLOR_NAME_MAP = {
@@ -218,6 +232,7 @@ function ClientDetailsHeaderSection({
   refreshing,
   handleRefresh,
   kioskBrowserData = {},
+  onSchoolUpdated, // optional callback removed from use in this component to avoid parent state overwrite
   showSnackbar,
 }) {
   const navigate = useNavigate();
@@ -309,7 +324,9 @@ function ClientDetailsHeaderSection({
     setSelectedSchoolDirty(String(newVal) !== String(client?.school_id));
   };
 
-  // Save school locally to server only — DO NOT modify parent client state here.
+  // IMPORTANT: When saving a new school selection we only send the change to the backend.
+  // We DO NOT call onSchoolUpdated or otherwise mutate parent client state here, to ensure
+  // that isOnline is never affected by this UI action. Parent may independently refresh if desired.
   const handleSchoolSave = async () => {
     if (!client || !client.id) return;
     if (String(selectedSchool) === String(client.school_id)) {
@@ -319,12 +336,14 @@ function ClientDetailsHeaderSection({
     setSavingSchool(true);
     try {
       const payload = { school_id: selectedSchool };
+      // Only write to backend - do not merge/overwrite parent client state here.
       await apiUpdateClient(client.id, payload);
+      // Show feedback to user; do not pass API response to parent
       if (typeof showSnackbar === "function") {
-        showSnackbar({ message: "Skole gemt", severity: "success" });
+        showSnackbar({ message: "Skole gemt på serveren", severity: "success" });
       }
+      // Mark local as clean (we keep the local selectedSchool value so the UI reflects user's choice)
       setSelectedSchoolDirty(false);
-      // keep local selectedSchool so UI reflects user's choice
     } catch (err) {
       console.error("Fejl ved opdatering af skole:", err);
       if (typeof showSnackbar === "function") {
@@ -355,11 +374,14 @@ function ClientDetailsHeaderSection({
 
   const inputStyle = {
     width: "100%",
+    height: isMobile ? 30 : 32,
     "& .MuiInputBase-input": {
       fontSize: isMobile ? 12 : 14,
+      height: isMobile ? "28px" : "32px",
       boxSizing: "border-box",
       padding: isMobile ? "6px 8px" : "8px 14px"
     },
+    "& .MuiInputBase-root": { height: isMobile ? "28px" : "32px" },
   };
 
   // Wrapper change handlers: update local state AND call parent's handler (preserve API)
@@ -379,49 +401,10 @@ function ClientDetailsHeaderSection({
     }
   };
 
-  const handleLocalitySaveLocal = async () => {
-    if (!client || !client.id) return;
-    if (!localityChanged) return;
-    try {
-      const payload = { locality: localLocality };
-      await apiGetSchools; // noop to satisfy linter if needed
-      // Use the same updateClient endpoint as school if available; fallback to apiUpdateClient
-      // We assume updateClient is available as apiUpdateClient here (imported above)
-      await apiUpdateClient(client.id, payload);
-      if (typeof showSnackbar === "function") {
-        showSnackbar({ message: "Lokation gemt", severity: "success" });
-      }
-      initialLocalityRef.current = localLocality;
-    } catch (err) {
-      console.error("Kunne ikke gemme lokation:", err);
-      if (typeof showSnackbar === "function") {
-        showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
-      }
-    }
-  };
-
-  const handleKioskUrlSaveLocal = async () => {
-    if (!client || !client.id) return;
-    if (!kioskUrlChanged) return;
-    try {
-      // If there's a dedicated pushKioskUrl API use that; otherwise reuse updateClient
-      await apiUpdateClient(client.id, { kiosk_url: localKioskUrl });
-      if (typeof showSnackbar === "function") {
-        showSnackbar({ message: "Kiosk webadresse gemt", severity: "success" });
-      }
-      initialKioskUrlRef.current = localKioskUrl;
-    } catch (err) {
-      console.error("Kunne ikke gemme kiosk URL:", err);
-      if (typeof showSnackbar === "function") {
-        showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
-      }
-    }
-  };
-
   function renderKioskBrowserDataRows(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
-      <TableRow key={key}>
+      <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
         <TableCell
           sx={{
             ...labelStyle,
@@ -447,11 +430,11 @@ function ClientDetailsHeaderSection({
   const isOffline = client?.isOnline === false;
 
   // style for right paper when offline: slightly greyed / desaturated but still interactive (copy buttons still usable)
-  const rightPaperDisabledStyle = isOffline ? { opacity: 0.7, filter: "grayscale(30%)", bgcolor: "#fafafa", overflow: "visible" } : { overflow: "visible" };
+  const rightPaperDisabledStyle = isOffline ? { opacity: 0.7, filter: "grayscale(30%)", bgcolor: "#fafafa" } : {};
 
   // Render
   return (
-    <Box sx={{ width: "100%", overflowX: "hidden" }} data-testid="client-details-header">
+    <Box sx={{ width: "100%" }} data-testid="client-details-header">
       {/* Topbar */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", mb: isMobile ? 0.5 : 1, gap: isMobile ? 1 : 0 }}>
         <Button
@@ -479,10 +462,10 @@ function ClientDetailsHeaderSection({
       </Box>
 
       {/* Papers */}
-      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%", overflow: "visible" }}>
+      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
         {/* Klient info (left) */}
         <Box sx={{ width: leftPaperWidth, pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, boxSizing: "border-box", overflow: "visible" }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Klient info</Typography>
@@ -491,24 +474,24 @@ function ClientDetailsHeaderSection({
                 </Box>
               </Box>
 
-              <TableContainer sx={{ width: "100%", overflow: "visible" }}>
-                <Table size="small" aria-label="klient-info" sx={{ tableLayout: 'fixed', width: '100%', overflow: "visible" }}>
+              <TableContainer>
+                <Table size="small" aria-label="klient-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
                   <TableBody>
-                    <TableRow>
+                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Klientnavn:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
-                      <TableRow>
+                      <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Klient ID:</TableCell>
                         <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
                       </TableRow>
                     )}
 
-                    {/* Skole kun synlig for admin */}
+                    {/* NEW: Skole kun synlig for admin */}
                     {user?.role === "admin" && (
-                      <TableRow>
+                      <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Skole:</TableCell>
                         <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -531,7 +514,13 @@ function ClientDetailsHeaderSection({
 
                             <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
 
-                            <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: isMobile ? 48 : 56 }}>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={handleSchoolSave}
+                              disabled={savingSchool || String(selectedSchool) === String(client?.school_id)}
+                              sx={{ minWidth: isMobile ? 48 : 56 }}
+                            >
                               {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                             </Button>
                           </Box>
@@ -549,7 +538,7 @@ function ClientDetailsHeaderSection({
 
         {/* Infoskærm status (right) */}
         <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, boxSizing: "border-box", overflow: "visible", ...rightPaperDisabledStyle }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", ...rightPaperDisabledStyle }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
@@ -559,12 +548,12 @@ function ClientDetailsHeaderSection({
                 )}
               </Box>
 
-              <TableContainer sx={{ width: "100%", overflow: "visible" }}>
-                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: 'fixed', width: '100%', overflow: "visible" }}>
+              <TableContainer>
+                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
                   <TableBody>
 
                     {/* Lokation */}
-                    <TableRow>
+                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Lokation:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -573,9 +562,9 @@ function ClientDetailsHeaderSection({
                             value={localLocality ?? ""}
                             onChange={onLocalityChange}
                             sx={inputStyle}
-                            disabled={savingLocality || isOffline}
+                            disabled={savingLocality || isOffline} /* NEW: disable editing when offline */
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySaveLocal(); }}
+                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
                             error={!!localityDirty}
                             fullWidth
                           />
@@ -583,8 +572,8 @@ function ClientDetailsHeaderSection({
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={handleLocalitySaveLocal}
-                            disabled={savingLocality || !localityChanged || isOffline}
+                            onClick={handleLocalitySave}
+                            disabled={savingLocality || !localityChanged || isOffline} /* NEW: prevent save when offline */
                             sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
                             {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
@@ -593,8 +582,8 @@ function ClientDetailsHeaderSection({
                       </TableCell>
                     </TableRow>
 
-                    {/* Kiosk URL */}
-                    <TableRow>
+                    {/* Kiosk URL - directly under Lokation */}
+                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Kiosk URL:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -603,9 +592,9 @@ function ClientDetailsHeaderSection({
                             value={localKioskUrl ?? ""}
                             onChange={onKioskUrlChange}
                             sx={inputStyle}
-                            disabled={savingKioskUrl || isOffline}
+                            disabled={savingKioskUrl || isOffline} /* NEW: disable editing when offline */
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSaveLocal(); }}
+                            onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
                             error={!!kioskUrlDirty}
                             fullWidth
                           />
@@ -613,8 +602,8 @@ function ClientDetailsHeaderSection({
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={handleKioskUrlSaveLocal}
-                            disabled={savingKioskUrl || !kioskUrlChanged || isOffline}
+                            onClick={handleKioskUrlSave}
+                            disabled={savingKioskUrl || !kioskUrlChanged || isOffline} /* NEW: prevent save when offline */
                             sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
@@ -623,8 +612,8 @@ function ClientDetailsHeaderSection({
                       </TableCell>
                     </TableRow>
 
-                    {/* Kiosk browser status */}
-                    <TableRow>
+                    {/* Kiosk browser status - label + value same row; label wraps on desktop/tablet as needed */}
+                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell
                         sx={{
                           ...labelStyle,
@@ -658,8 +647,9 @@ function ClientDetailsHeaderSection({
 }
 
 // Custom shallow comparator for React.memo:
-// keep as-is but if you want full re-render behaviour you can remove memo.
+// Only re-render header when props that affect its UI actually change.
 function propsAreEqual(prev, next) {
+  // Compare simple primitive props
   const simpleKeys = [
     "locality",
     "localityDirty",
@@ -670,12 +660,14 @@ function propsAreEqual(prev, next) {
     "liveChromeStatus",
     "liveChromeColor",
     "refreshing",
+    // optional token if parent provides it (useful if you want explicit change detection)
     "liveChromeTimestamp"
   ];
   for (const k of simpleKeys) {
     if (prev[k] !== next[k]) return false;
   }
 
+  // Compare client fields we care about shallowly
   const prevClient = prev.client || {};
   const nextClient = next.client || {};
   const clientKeys = ["id", "name", "isOnline", "school_id", "state", "chrome_status", "chrome_color"];
@@ -683,6 +675,7 @@ function propsAreEqual(prev, next) {
     if (prevClient[k] !== nextClient[k]) return false;
   }
 
+  // Compare schools length and basic identity to detect meaningful changes
   const prevSchools = prev.schools || [];
   const nextSchools = next.schools || [];
   if (prevSchools.length !== nextSchools.length) return false;
@@ -690,6 +683,7 @@ function propsAreEqual(prev, next) {
     if ((prevSchools[i]?.id ?? null) !== (nextSchools[i]?.id ?? null)) return false;
   }
 
+  // Compare kioskBrowserData shallowly by keys/values
   const prevKbd = prev.kioskBrowserData || {};
   const nextKbd = next.kioskBrowserData || {};
   const prevKbdKeys = Object.keys(prevKbd);
@@ -699,6 +693,7 @@ function propsAreEqual(prev, next) {
     if (prevKbd[key] !== nextKbd[key]) return false;
   }
 
+  // If we've reached here, treat props as equal (no re-render needed)
   return true;
 }
 
