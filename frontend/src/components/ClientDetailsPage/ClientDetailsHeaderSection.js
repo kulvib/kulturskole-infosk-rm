@@ -35,9 +35,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   - "Kiosk info" heading renamed to "Infoskærm status" (kept from previous change).
   - Table-layout remains 'fixed' to keep deterministic column sizing; label cell width adjusts per breakpoint.
 
-  Behavior change: If client is explicitly offline (client?.isOnline === false) we:
-  - Hide the StateBadge next to the "Infoskærm status" heading.
-  - Make the Lokation & Kiosk URL inputs + their "Gem" buttons non-editable (disabled).
+  Behavior changes applied:
+  - If client is explicitly offline (client?.isOnline === false) the StateBadge is hidden and Lokation/Kiosk URL inputs are disabled.
+  - The "Skole" field is only visible to admin users.
+  - Paper 2 (Infoskærm status) is visually greyed-out when client is offline.
 */
 
 const COLOR_NAME_MAP = {
@@ -416,6 +417,9 @@ function ClientDetailsHeaderSection({
   // NEW: determine offline state (explicit false means offline)
   const isOffline = client?.isOnline === false;
 
+  // style for right paper when offline: slightly greyed / desaturated but still interactive (copy buttons still usable)
+  const rightPaperDisabledStyle = isOffline ? { opacity: 0.7, filter: "grayscale(30%)", bgcolor: "#fafafa" } : {};
+
   // Render
   return (
     <Box sx={{ width: "100%" }} data-testid="client-details-header">
@@ -473,35 +477,38 @@ function ClientDetailsHeaderSection({
                       </TableRow>
                     )}
 
-                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Skole:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <TextField
-                            select
-                            size="small"
-                            value={selectedSchool ?? ""}
-                            onChange={handleSchoolSelectChange}
-                            disabled={loadingSchools}
-                            sx={{ ...inputStyle }}
-                            fullWidth
-                            SelectProps={{ MenuProps: { disablePortal: true } }}
-                            inputProps={{ "aria-label": "Skole" }}
-                            error={!!selectedSchoolDirty}
-                            onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
-                          >
-                            <MenuItem value=""><em>Ingen skole</em></MenuItem>
-                            {(schoolsList || []).map(s => (<MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>))}
-                          </TextField>
+                    {/* NEW: Skole kun synlig for admin */}
+                    {user?.role === "admin" && (
+                      <TableRow sx={{ height: isMobile ? 36 : 44 }}>
+                        <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Skole:</TableCell>
+                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <TextField
+                              select
+                              size="small"
+                              value={selectedSchool ?? ""}
+                              onChange={handleSchoolSelectChange}
+                              disabled={loadingSchools}
+                              sx={{ ...inputStyle }}
+                              fullWidth
+                              SelectProps={{ MenuProps: { disablePortal: true } }}
+                              inputProps={{ "aria-label": "Skole" }}
+                              error={!!selectedSchoolDirty}
+                              onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
+                            >
+                              <MenuItem value=""><em>Ingen skole</em></MenuItem>
+                              {(schoolsList || []).map(s => (<MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>))}
+                            </TextField>
 
-                          <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                            <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
 
-                          <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: isMobile ? 48 : 56 }}>
-                            {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
-                          </Button>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
+                            <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: isMobile ? 48 : 56 }}>
+                              {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                            </Button>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    )}
 
                   </TableBody>
                 </Table>
@@ -513,7 +520,7 @@ function ClientDetailsHeaderSection({
 
         {/* Infoskærm status (right) */}
         <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", ...rightPaperDisabledStyle }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
