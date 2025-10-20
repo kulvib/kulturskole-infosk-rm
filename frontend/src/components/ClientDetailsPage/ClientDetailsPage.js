@@ -19,6 +19,7 @@ import {
 /*
   ClientDetailsPage.js (opdateret)
   - Videregiver `refreshing` og `onRestartStream` til ClientDetailsLivestreamSection så dens opdateringsknap kan vise spinner.
+  - Videregiver clientState?.isOnline til livestream & actions for at deaktivere UI når klient offline.
   - Rest af filen uændret (poll logic etc. antages at være som i din seneste version).
 */
 
@@ -240,6 +241,7 @@ export default function ClientDetailsPage({
             refreshing={refreshing}
             onRestartStream={onRestartStream}
             streamKey={streamKey}
+            clientOnline={clientState?.isOnline} /* NEW: inform livestream om online-status */
           />
         </Grid>
 
@@ -262,6 +264,7 @@ export default function ClientDetailsPage({
             handleOpenRemoteDesktop={handleOpenRemoteDesktop}
             refreshing={refreshing}
             showSnackbar={showSnackbar}
+            clientOnline={clientState?.isOnline} /* NEW: inform actions om online-status */
           />
         </Grid>
       </Grid>
