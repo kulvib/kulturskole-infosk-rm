@@ -31,6 +31,7 @@ import { useAuth } from "../../auth/authcontext";
 // Ændring: bruger wrapperens showSnackbar hvis den er tilgængelig; fallback til lokal snackbar ellers.
 // Også: nulstil lokal actionLoading når clientId ændrer sig eller når optional prop `refreshing` skifter til false.
 // Rettet: hvis parent sender handleClientAction, benyttes den; ellers fallback til intern clientAction.
+// NYT: respectér clientOnline === false og deaktiver knapper/visuelt nedtonet karton.
 
 function ClientDetailsActionsSection({
   clientId,
@@ -38,7 +39,8 @@ function ClientDetailsActionsSection({
   handleOpenRemoteDesktop,
   refreshing, // optional: hvis wrapper sender refreshing-flag kan vi rydde loading når refresh er færdig
   showSnackbar, // optional: funktion fra wrapper til at vise snackbar centrally
-  handleClientAction: parentHandleClientAction // optional: parent kan håndtere action
+  handleClientAction: parentHandleClientAction, // optional: parent kan håndtere action
+  clientOnline = true // NEW: hvis false => alle handlinger disabled / greyed out
 }) {
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
@@ -92,6 +94,12 @@ function ClientDetailsActionsSection({
 
   // Højere-niveau wrapper der bruger parent's handler hvis tilgængelig, ellers fallback til intern
   const doClientAction = useCallback(async (action) => {
+    // If client explicitly offline, disallow actions
+    if (clientOnline === false) {
+      notify({ message: "Klienten er offline — handling afvist", severity: "warning" });
+      return;
+    }
+
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
       if (typeof parentHandleClientAction === "function") {
@@ -108,11 +116,30 @@ function ClientDetailsActionsSection({
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
-  }, [parentHandleClientAction, internalHandleClientAction, notify]);
+  }, [parentHandleClientAction, internalHandleClientAction, notify, clientOnline]);
 
   // Wrapper for Tooltip så den ikke vises på mobil
   const MaybeTooltip = ({ title, children }) =>
     isMobile ? children : <Tooltip title={title}>{children}</Tooltip>;
+
+  // Tilpasset knapstyle: height: 38px og harmoniske værdier
+  const actionBtnStyle = {
+    minWidth: 0,
+    width: "100%",
+    height: 38,
+    fontSize: "0.95rem",
+    textTransform: "none",
+    fontWeight: 500,
+    lineHeight: 1.18,
+    py: 0.75,
+    px: 1.25,
+    m: 0,
+    whiteSpace: "nowrap",
+    display: "inline-flex",
+    justifyContent: "center",
+    borderRadius: 2.8,
+    boxShadow: 1,
+  };
 
   // --- Admin: 2 rækker af 4 knapper i ønsket rækkefølge ---
   const adminFirstRow = [
@@ -227,7 +254,7 @@ function ClientDetailsActionsSection({
             variant={btn.variant}
             color={btn.color}
             startIcon={btn.icon}
-            disabled={!!btn.loading}
+            disabled={!!btn.loading || clientOnline === false} /* NEW: disable when explicit offline */
             onClick={btn.onClick}
             sx={actionBtnStyle}
             fullWidth
@@ -242,27 +269,11 @@ function ClientDetailsActionsSection({
     </Grid>
   );
 
-  // Tilpasset knapstyle: height: 38px og harmoniske værdier
-  const actionBtnStyle = {
-    minWidth: 0,
-    width: "100%",
-    height: 38,
-    fontSize: "0.95rem",
-    textTransform: "none",
-    fontWeight: 500,
-    lineHeight: 1.18,
-    py: 0.75,
-    px: 1.25,
-    m: 0,
-    whiteSpace: "nowrap",
-    display: "inline-flex",
-    justifyContent: "center",
-    borderRadius: 2.8,
-    boxShadow: 1,
-  };
+  // Visual hint for offline (not blocking pointerEvents so dialogs/controls still work)
+  const cardStyle = clientOnline === false ? { opacity: 0.85 } : {};
 
   return (
-    <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
+    <Card elevation={2} sx={{ borderRadius: 2, mb: 2, ...cardStyle }}>
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
         {user?.role === "admin" ? (
           <>
@@ -305,6 +316,7 @@ function ClientDetailsActionsSection({
               }}
               color="error"
               variant="contained"
+              disabled={clientOnline === false} /* NEW: disallow confirm if offline */
             >
               Ja, sluk klienten
             </Button>
