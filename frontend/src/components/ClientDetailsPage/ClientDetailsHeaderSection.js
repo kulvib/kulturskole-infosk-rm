@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Box,
@@ -25,13 +26,16 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection
-  Ændringer:
-  - Desktop: left paper = 40%, right paper = 60%.
-  - Flyttet "Lokation" til right paper, placeret lige over "Kiosk URL".
-  - Overskrift "Kiosk info" ændret til "Infoskærm status".
-  - Kiosk browser status value er sat på en ny linje (separeret tabelrække under label).
-  - Beholder tidligere forbedringer: table-layout: fixed + colgroup, ValueCell med inline padding, konsistent input/select padding, status badges osv.
+  ClientDetailsHeaderSection - komplet komponent
+  Rettelser/forbedringer inkluderet:
+  - Robust color resolution (theme tokens, hex, color names).
+  - Unik keyframe-navn (pulsateStatusBadge) og keyframes animerer KUN transform+opacity.
+  - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
+  - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
+  - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
+  - table-layout: fixed + colgroup for at låse første kolonne til 140px.
+  - ValueCell helper med inline paddingLeft/paddingRight (2px/4px) for tættere venstrestilling.
+  - Konsistent styling for både Select-visning og native input (.MuiSelect-select og .MuiInputBase-input) med mindre venstre-padding.
 */
 
 const COLOR_NAME_MAP = {
@@ -87,6 +91,8 @@ function resolveColor(theme, color) {
   return trimmed;
 }
 
+// StatusBadge - dot + label. animation only transforms and opacity (no background)
+// inline style is used to force the background color so global keyframes/styles can't override it.
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
@@ -147,9 +153,9 @@ function StateBadge({ state, isMobile = false }) {
 }
 
 function ChromeStatusBadge({ status, color, isMobile = false }) {
-  const text = status || "ukendt";
+  let text = status || "ukendt";
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
       <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />
     </Box>
   );
@@ -326,17 +332,19 @@ function ClientDetailsHeaderSection({
   const inputStyle = {
     width: "100%",
     height: 32,
+    // native input (TextField input)
     "& .MuiInputBase-input": {
       fontSize: isMobile ? 12 : 14,
       height: isMobile ? "30px" : "32px",
       boxSizing: "border-box",
-      paddingLeft: 2,
+      paddingLeft: 2, // reduced from 4 -> 2px to move text closer to left
       paddingRight: 4,
       display: "flex",
       alignItems: "center",
     },
+    // Select display element (when TextField has select)
     "& .MuiSelect-select": {
-      paddingLeft: 2,
+      paddingLeft: 2, // reduced from 4 -> 2px
       paddingRight: 4,
       display: "flex",
       alignItems: "center",
@@ -347,6 +355,7 @@ function ClientDetailsHeaderSection({
   };
 
   // ValueCell helper: applies valueStyle via sx and forces inline paddingLeft/paddingRight so it wins.
+  // Left padding reduced to 2px so value content (and contained inputs) sit closer to the left cell edge.
   function ValueCell({ children, sx = {}, style = {}, ...props }) {
     return (
       <TableCell
@@ -406,8 +415,8 @@ function ClientDetailsHeaderSection({
 
       {/* Papers */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
-        {/* Klient info (left) - desktop 40% */}
-        <Box sx={{ width: isMobile ? "100%" : "40%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
+        {/* Klient info */}
+        <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
@@ -459,47 +468,13 @@ function ClientDetailsHeaderSection({
 
                           <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
 
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={handleSchoolSave}
-                            disabled={savingSchool || String(selectedSchool) === String(client?.school_id)}
-                            sx={{ minWidth: 56 }}
-                          >
+                          <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: 56 }}>
                             {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
                       </ValueCell>
                     </TableRow>
 
-                    {/* Lokation fjernet her - flyttet til Infoskærm status paper */}
-
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-            </CardContent>
-          </Card>
-        </Box>
-
-        {/* Infoskærm status (right) - desktop 60% */}
-        <Box sx={{ width: isMobile ? "100%" : "60%", pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
-                <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
-              </Box>
-
-              <TableContainer>
-                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: "fixed" }}>
-                  <colgroup>
-                    <col style={{ width: 140 }} />
-                    <col />
-                  </colgroup>
-                  <TableBody>
-
-                    {/* Flyttet: Lokation (nu i right paper over Kiosk URL) */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
                       <ValueCell>
@@ -516,20 +491,37 @@ function ClientDetailsHeaderSection({
                             fullWidth
                           />
                           <CopyIconButton value={locality ?? ""} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={handleLocalitySave}
-                            disabled={savingLocality || !localityDirty}
-                            sx={{ minWidth: 56 }}
-                          >
+                          <Button variant="outlined" size="small" onClick={handleLocalitySave} disabled={savingLocality} sx={{ minWidth: 56 }}>
                             {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
                       </ValueCell>
                     </TableRow>
 
-                    {/* Kiosk URL */}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+            </CardContent>
+          </Card>
+        </Box>
+
+        {/* Kiosk info */}
+        <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Kiosk info</Typography>
+                <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
+              </Box>
+
+              <TableContainer>
+                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col style={{ width: 140 }} />
+                    <col />
+                  </colgroup>
+                  <TableBody>
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
                       <ValueCell>
@@ -546,30 +538,18 @@ function ClientDetailsHeaderSection({
                             fullWidth
                           />
                           <CopyIconButton value={kioskUrl ?? ""} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={handleKioskUrlSave}
-                            disabled={savingKioskUrl || !kioskUrlDirty}
-                            sx={{ minWidth: 56 }}
-                          >
+                          <Button variant="outlined" size="small" onClick={handleKioskUrlSave} disabled={savingKioskUrl} sx={{ minWidth: 56 }}>
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
                       </ValueCell>
                     </TableRow>
 
-                    {/* Kiosk browser status: label-række + separat value-række nedenunder */}
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                      <TableCell sx={{ borderBottom: "none" }} />
-                    </TableRow>
-                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell colSpan={2} sx={{ borderBottom: "none", pl: isMobile ? 1 : 2 }}>
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                        </Box>
-                      </TableCell>
+                      <ValueCell>
+                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+                      </ValueCell>
                     </TableRow>
 
                     {renderKioskBrowserDataRows(kioskBrowserData)}
@@ -587,6 +567,7 @@ function ClientDetailsHeaderSection({
 }
 
 // Custom shallow comparator for React.memo:
+// Only re-render header when props that affect its UI actually change.
 function propsAreEqual(prev, next) {
   const simpleKeys = [
     "locality",
