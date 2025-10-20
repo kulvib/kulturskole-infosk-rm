@@ -30,6 +30,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient, pushKiosk
   - Local save for skole, lokation og kiosk URL: skriver direkte til backend uden at opdatere parent/clientState.
   - Inputfelter ændrer kun lokal state i denne komponent; Gem (Save) udfører API-kald og viser snackbar via showSnackbar.
   - Dette sikrer at en save ikke utilsigtet overskriver client.isOnline eller trigger en fuld-side opdatering.
+  - Ændringer: For at sikre at der ALDRIG kommer scrollbars i "papers" har vi:
+    - sat Card height til "auto" (fjernet height: "100%")
+    - tilføjet NO_SCROLL_SX på CardContent/TableContainer for at skjule scrollbars på tværs af browsere
+    - beholdt overflow synligt på relevante wrapper boxes så layout ikke brydes
 */
 
 const COLOR_NAME_MAP = {
@@ -405,6 +409,18 @@ function ClientDetailsHeaderSection({
   // style for right paper when offline: slightly greyed / desaturated but still interactive (copy buttons still usable)
   const rightPaperDisabledStyle = isOffline ? { opacity: 0.7, filter: "grayscale(30%)", bgcolor: "#fafafa" } : {};
 
+  // NO_SCROLL_SX hides scrollbars across browsers (webkit, firefox, ie)
+  const NO_SCROLL_SX = {
+    overflowX: "hidden",
+    overflowY: "hidden",
+    // IE and Edge
+    "-ms-overflow-style": "none",
+    // Firefox
+    scrollbarWidth: "none",
+    // Webkit
+    "&::-webkit-scrollbar": { display: "none" }
+  };
+
   // Render
   return (
     <Box sx={{ width: "100%" }} data-testid="client-details-header">
@@ -438,8 +454,10 @@ function ClientDetailsHeaderSection({
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
         {/* Klient info (left) */}
         <Box sx={{ width: leftPaperWidth, pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+          {/* Card height changed to auto and ensured overflow handling to avoid scrollbars */}
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden" }}>
+            {/* CardContent receives NO_SCROLL_SX to hide any scrollbars in descendants */}
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Klient info</Typography>
                 <Box sx={{ ml: 1 }}>
@@ -447,7 +465,7 @@ function ClientDetailsHeaderSection({
                 </Box>
               </Box>
 
-              <TableContainer>
+              <TableContainer sx={{ width: "100%", ...NO_SCROLL_SX }}>
                 <Table size="small" aria-label="klient-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
@@ -505,8 +523,9 @@ function ClientDetailsHeaderSection({
 
         {/* Infoskærm status (right) */}
         <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", ...rightPaperDisabledStyle }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+          {/* Card height changed to auto and NO_SCROLL_SX applied */}
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden", ...rightPaperDisabledStyle }}>
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
                 {/* Hide state badge if client is explicitly offline */}
@@ -515,7 +534,7 @@ function ClientDetailsHeaderSection({
                 )}
               </Box>
 
-              <TableContainer>
+              <TableContainer sx={{ width: "100%", ...NO_SCROLL_SX }}>
                 <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
                   <TableBody>
 
