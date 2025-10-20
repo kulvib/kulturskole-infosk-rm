@@ -262,11 +262,26 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
 function CopyField({ value, isMobile=false }) {
   const [copied, setCopied] = React.useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!value || value === "ukendt") return;
-    navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 800);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 800);
+    } catch (err) {
+      // ignore copy errors
+    }
   };
 
   return (
@@ -348,20 +363,30 @@ export default function ClientDetailsInfoSection({
   lastSeen,
   calendarDialogOpen,
   setCalendarDialogOpen,
+  clientOnline // optional explicit prop; if omitted we fall back to client?.isOnline
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
+  // Determine offline explicitly: parent can pass clientOnline (false => offline),
+  // otherwise fall back to client?.isOnline === false
+  const isOffline = (typeof clientOnline !== "undefined")
+    ? clientOnline === false
+    : client?.isOnline === false;
+
+  // Visual disabled styles when offline
+  const disabledOverlay = isOffline ? { opacity: 0.65, filter: "grayscale(20%)", bgcolor: "#fafafa" } : {};
+
   return (
     <Grid container spacing={isMobile ? 0.5 : 1}>
       <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", ...disabledOverlay }}>
           <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : undefined }}>
                 Kalender
               </Typography>
-              <Tooltip title="Vis kalender">
+              <Tooltip title={isOffline ? "Klienten er offline" : "Vis kalender"}>
                 <span>
                   <Button
                     size="small"
@@ -376,6 +401,7 @@ export default function ClientDetailsInfoSection({
                       borderRadius: isMobile ? 5 : 8
                     }}
                     onClick={() => setCalendarDialogOpen(true)}
+                    disabled={isOffline}
                   >
                     <ArrowForwardIosIcon sx={{ fontSize: isMobile ? 13 : 16 }} />
                   </Button>
@@ -388,7 +414,7 @@ export default function ClientDetailsInfoSection({
       </Grid>
 
       <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", ...disabledOverlay }}>
           <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
@@ -402,7 +428,7 @@ export default function ClientDetailsInfoSection({
       </Grid>
 
       <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", ...disabledOverlay }}>
           <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
