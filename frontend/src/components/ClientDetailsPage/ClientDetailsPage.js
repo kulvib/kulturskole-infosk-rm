@@ -18,11 +18,12 @@ import {
 
 /*
   ClientDetailsPage.js
-  Ændring:
-  - Når parent sender et nyt `client` prop, merg'es det med lokal state i stedet for blindt at overskrive,
-    med undtagelse hvis klient-id er ændret (skifte af klient). Dette bevarer isOnline hvis backend svarer
-    uden isOnline eller med undefined.
-  - Holder debug-logs ved modtagelse af client og ved API-respons på locality/kiosk save (kan fjernes).
+
+  Ændringer:
+  - Mere debug-logging på indkommende client props og API-respons ved save.
+  - Konservativ merge-logik: undgår at acceptere isOnline === false fra server hvis der ikke
+    er et tydeligt tidsstempel/bevis for offline (fx nyere last_seen eller chrome_last_updated).
+  - Bevarer eksisterende optimistiske lokale opdateringer (undlader automatisk parent refresh).
 */
 
 export default function ClientDetailsPage({
@@ -62,29 +63,87 @@ export default function ClientDetailsPage({
   });
   const pollCountRef = useRef(0);
 
-  // Helper: merge updated client but preserve previous isOnline unless server explicitly returned it
-  function mergeClientPreserveOnline(prev, updated) {
-    if (!updated) return prev;
-    return {
-      ...(prev || {}),
-      ...(updated || {}),
-      // preserve prev.isOnline when updated.isOnline is strictly undefined
-      isOnline: (typeof updated.isOnline === "undefined") ? prev?.isOnline : updated.isOnline
-    };
+  // Utility: parse timestamp-like values into numeric ms or null
+  function parseTimeVal(v) {
+    if (!v && v !== 0) return null;
+    const n = Number(v);
+    if (!isNaN(n)) return n;
+    const d = Date.parse(String(v));
+    return isNaN(d) ? null : d;
   }
 
-  // Når parent prop `client` ændrer sig:
-  // - Hvis vi skifter klient (id ændret eller ingen prev), erstat helt.
-  // - Hvis samme klient, merge med preserveOnline for at undgå utilsigtet 'offline' når backend ikke sender isOnline.
+  // Conservative decision: if server says isOnline === false but there's no newer evidence
+  // (last_seen or chrome_last_updated) than our local state, preserve local isOnline=true.
+  function shouldPreserveOnline(prev, updated) {
+    try {
+      if (!prev) return false;
+      if (!updated) return false;
+      if (typeof prev.isOnline === "undefined") return false;
+      if (prev.isOnline !== true) return false; // we only preserve when prev was online
+      if (updated.isOnline !== false) return false; // only consider the problematic false case
+
+      // If server provides last_seen or chrome_last_updated, compare; if server's timestamp
+      // is older or missing => do not trust the server flip.
+      const prevLastSeen = parseTimeVal(prev.last_seen ?? prev.lastSeen ?? null);
+      const updatedLastSeen = parseTimeVal(updated.last_seen ?? updated.lastSeen ?? null);
+      const prevChromeTs = parseTimeVal(prev.chrome_last_updated ?? prev.chromeLastUpdated ?? null);
+      const updatedChromeTs = parseTimeVal(updated.chrome_last_updated ?? updated.chromeLastUpdated ?? null);
+
+      // If server provided no timestamps at all, preserve local online
+      if (updatedLastSeen === null && updatedChromeTs === null) {
+        console.debug("[merge] preserving isOnline=true because updated has no timestamps", { prev, updated });
+        return true;
+      }
+
+      // If server timestamps are present but not newer than prev -> preserve
+      if (updatedLastSeen !== null && prevLastSeen !== null && updatedLastSeen <= prevLastSeen) {
+        console.debug("[merge] preserving isOnline=true because updated.last_seen is not newer", { prevLastSeen, updatedLastSeen });
+        return true;
+      }
+      if (updatedChromeTs !== null && prevChromeTs !== null && updatedChromeTs <= prevChromeTs) {
+        console.debug("[merge] preserving isOnline=true because updated.chrome_last_updated is not newer", { prevChromeTs, updatedChromeTs });
+        return true;
+      }
+
+      // Otherwise, allow server to set offline
+      return false;
+    } catch (err) {
+      console.debug("[merge] shouldPreserveOnline error:", err);
+      return false;
+    }
+  }
+
+  // Merge helper that preserves previous isOnline when appropriate
+  function mergeClientPreserveOnline(prev, updated) {
+    if (!updated) return prev;
+    const base = { ...(prev || {}), ...(updated || {}) };
+    // If server didn't include isOnline, preserve prev.isOnline
+    if (typeof updated.isOnline === "undefined") {
+      base.isOnline = prev?.isOnline;
+      return base;
+    }
+    // If server explicitly set false but we should preserve, keep prev.isOnline
+    if (updated.isOnline === false && shouldPreserveOnline(prev, updated)) {
+      base.isOnline = prev?.isOnline;
+      return base;
+    }
+    // Otherwise accept server value
+    base.isOnline = updated.isOnline;
+    return base;
+  }
+
+  // When parent prop client changes, merge conservatively for same client id
   useEffect(() => {
     console.debug("[ClientDetailsPage] incoming client prop:", client);
     setClientState(prev => {
       if (!prev || prev.id !== client?.id) {
-        // ny klient eller ingen tidligere state -> accept serverens client fuldt ud
+        // new client or no prev -> take server value
         return client;
       }
-      // samme klient -> merge, bevare lokal isOnline hvis backend ikke leverer den
-      return mergeClientPreserveOnline(prev, client);
+      // same client -> merge conservatively
+      const merged = mergeClientPreserveOnline(prev, client);
+      console.debug("[ClientDetailsPage] merged client (preserveOnline):", { prev, client, merged });
+      return merged;
     });
   }, [client]);
 
@@ -191,16 +250,21 @@ export default function ClientDetailsPage({
       const updated = await updateClient(clientState.id, { locality });
       console.debug("updateClient(locality) response:", updated);
       if (updated) {
-        // merge svar fra API med lokal state - bevar isOnline hvis API ikke returnerede den
-        setClientState(prev => mergeClientPreserveOnline(prev, updated));
+        // merge svar fra API med lokal state - bevar isOnline hvis API ikke returnerede den eller hvis vi vurderer det ikke er troværdigt
+        setClientState(prev => {
+          const merged = mergeClientPreserveOnline(prev, updated);
+          console.debug("[LocalitySave] prev -> updated -> merged:", { prev, updated, merged });
+          return merged;
+        });
       } else {
         setClientState(prev => prev ? ({ ...prev, locality }) : prev);
       }
       setLocalityDirty(false);
 
-      // NB: Vi undlader generelt at kalde handleRefresh her for at undgå at parent genindlæser hele siden.
+      // Vi undlader global handleRefresh her for at undgå full re-fetch
       if (typeof showSnackbar === "function") showSnackbar({ message: "Lokation gemt", severity: "success" });
     } catch (err) {
+      console.debug("handleLocalitySave error:", err);
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
     } finally {
       setSavingLocality(false);
@@ -215,7 +279,11 @@ export default function ClientDetailsPage({
       const updated = await pushKioskUrl(clientState.id, kioskUrl);
       console.debug("pushKioskUrl response:", updated);
       if (updated) {
-        setClientState(prev => mergeClientPreserveOnline(prev, updated));
+        setClientState(prev => {
+          const merged = mergeClientPreserveOnline(prev, updated);
+          console.debug("[KioskUrlSave] prev -> updated -> merged:", { prev, updated, merged });
+          return merged;
+        });
       } else {
         setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
       }
@@ -223,6 +291,7 @@ export default function ClientDetailsPage({
       setKioskUrlDirty(false);
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kiosk webadresse gemt", severity: "success" });
     } catch (err) {
+      console.debug("handleKioskUrlSave error:", err);
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
     } finally {
       setSavingKioskUrl(false);
