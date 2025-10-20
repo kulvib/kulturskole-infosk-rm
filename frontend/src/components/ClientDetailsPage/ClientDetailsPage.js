@@ -19,6 +19,7 @@ import {
 /*
   ClientDetailsPage.js (opdateret)
   - Bevarer client.isOnline ved merge hvis backend ikke eksplicit returnerer isOnline.
+  - Header-sektionen håndterer nu skole-opdatering lokalt og skriver kun til backend; parent modtager ikke længere partial update fra header.
   - Efter save forsøger vi at kalde handleRefresh hvis parent tilbyder det (henter authoritative klient).
 */
 
@@ -166,22 +167,9 @@ export default function ClientDetailsPage({
   const handleOpenTerminal = useCallback(() => { if (!memoizedClientId) return; openTerminal(memoizedClientId); }, [memoizedClientId]);
   const handleOpenRemoteDesktop = useCallback(() => { if (!memoizedClientId) return; openRemoteDesktop(memoizedClientId); }, [memoizedClientId]);
 
-  const handleSchoolUpdated = useCallback(async (updatedClient) => {
-    if (!clientState) return;
-
-    console.debug("handleSchoolUpdated - received:", updatedClient);
-
-    if (updatedClient && updatedClient.id === clientState.id) {
-      // Nyt: altid merge partial updates ind i clientState, men bevar prev.isOnline
-      setClientState(prev => mergeClientPreserveOnline(prev, updatedClient));
-      console.debug("handleSchoolUpdated - merged client update for clientId:", updatedClient.id);
-    } else {
-      if (typeof handleRefresh === "function") {
-        try { await handleRefresh(); } catch {}
-      }
-    }
-    if (typeof showSnackbar === "function") showSnackbar({ message: "Skole opdateret", severity: "success" });
-  }, [clientState, handleRefresh, showSnackbar]);
+  // NOTE:
+  // Header handles school-save itself (only writes to backend) and does NOT call into parent anymore.
+  // Therefore handleSchoolUpdated has been removed.
 
   const handleLocalityChange = (e) => { setLocality(e.target.value); setLocalityDirty(true); };
   const handleLocalitySave = async () => {
@@ -269,7 +257,6 @@ export default function ClientDetailsPage({
             liveChromeColor={liveChromeColor}
             refreshing={refreshing}
             handleRefresh={handleRefresh}
-            onSchoolUpdated={handleSchoolUpdated}
             showSnackbar={showSnackbar}
           />
         </Grid>
