@@ -25,9 +25,11 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection - komplet komponent
-  Ændring: label-teksten flugtes til højre på desktop (left på mobil) og value-teksten er left,
-  så den visuelle afstand mellem label-tekst og value-tekst bliver markant mindre uden at flytte kolonnen.
+  ClientDetailsHeaderSection - ændringer:
+  - Låser label-kolonnens bredde til 140px ved at tilføje <colgroup> med første col = 140px.
+  - Sætter Table's tableLayout til "fixed" så kolonnefordelingen ikke ændrer sig.
+  - Halverer kun den horisontale spacing mellem label og value (labelStyle.pr og valueStyle.pl).
+  Ingen andre layout- eller padding-ændringer er foretaget — kolonneplacering er bevaret.
 */
 
 const COLOR_NAME_MAP = {
@@ -99,19 +101,15 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
-          // use our unique animation name via sx (keeps theme-based style generation)
           animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
-          // keyframes animate only transform+opacity
           "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
-        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
         style={{
           backgroundColor: resolvedBg,
-          // enforce our animation properties inline as well so the element uses our unique keyframes
           animationName: animate ? "pulsateStatusBadge" : "none",
           animationDuration: animate ? "2s" : undefined,
           animationIterationCount: animate ? "infinite" : undefined,
@@ -308,10 +306,11 @@ function ClientDetailsHeaderSection({
     }
   };
 
+  // Halveret spacing (but keep table layout stable via colgroup + fixed layout)
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.5 : 1,
+    pr: isMobile ? 0.25 : 0.5, // halveret theme units (desktop: 1 -> 0.5)
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -319,7 +318,7 @@ function ClientDetailsHeaderSection({
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.5 : 1.5,
+    pl: isMobile ? 0.25 : 0.75, // halveret theme units (desktop: 1.5 -> 0.75)
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -396,7 +395,12 @@ function ClientDetailsHeaderSection({
               </Box>
 
               <TableContainer>
-                <Table size="small" aria-label="klient-info">
+                <Table size="small" aria-label="klient-info" sx={{ tableLayout: "fixed" }}>
+                  {/* Lock first column to 140px to prevent table reflow/column shifting */}
+                  <colgroup>
+                    <col style={{ width: 140 }} />
+                    <col />
+                  </colgroup>
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none", textAlign: isMobile ? "left" : "right" }}>Klientnavn:</TableCell>
@@ -481,7 +485,11 @@ function ClientDetailsHeaderSection({
               </Box>
 
               <TableContainer>
-                <Table size="small" aria-label="kiosk-info">
+                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col style={{ width: 140 }} />
+                    <col />
+                  </colgroup>
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none", textAlign: isMobile ? "left" : "right" }}>Kiosk URL:</TableCell>
