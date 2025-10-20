@@ -312,24 +312,23 @@ function ClientDetailsHeaderSection({
     }
   };
 
-  // <-- Ændringer for at halvere afstand -->
+  // Ændringer: halveret igen afstand (kun desktop) - anvendes i begge papers
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.5 : 0.5, // mindsket padding-right (halveret på desktop)
+    pr: isMobile ? 0.5 : 0.25, // mobil: 0.5 (uændret), desktop: 0.25 (yderligere halveret)
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
-    minWidth: 70, // halveret fra 140 -> 70
+    minWidth: isMobile ? 140 : 35, // mobil bevarer 140, desktop nu 35 (yderligere halveret)
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.5 : 0.75, // mindsket padding-left (halveret fra 1.5 -> 0.75)
+    pl: isMobile ? 0.5 : 0.375, // mobil bevarer 0.5, desktop: 0.375 (yderligere halveret)
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
   };
-  // <-- slut ændringer -->
 
   const inputStyle = {
     width: "100%",
