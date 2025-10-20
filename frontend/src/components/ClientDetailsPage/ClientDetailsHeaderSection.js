@@ -22,14 +22,28 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
-import { getSchools as apiGetSchools, updateClient as apiUpdateClient, pushKioskUrl as apiPushKioskUrl } from "../../api";
+import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
   ClientDetailsHeaderSection.js
 
-  - Gem-logik for skole, lokation og kiosk-URL udføres lokalt i denne komponent.
-  - Header skriver direkte til backend og viser snackbar via showSnackbar.
-  - Header kalder IKKE parent-handlere for disse saves, så parent.clientState ikke overskrives.
+  Responsive update:
+  - Desktop (unchanged): paper 1 = 40%, paper 2 = 60% (kept exactly as you liked).
+  - Tablet (between sm and md): papers displayed side-by-side as 50% / 50% with slightly tighter labels.
+  - Mobile (sm and below): papers stack vertically (100% width). Labels are narrower and UI is more compact.
+  - Local dirty-checks for Lokation and Kiosk URL are preserved; "Gem" buttons disabled until inputs change.
+  - "Kiosk info" heading renamed to "Infoskærm status" (kept from previous change).
+  - Table-layout remains 'fixed' to keep deterministic column sizing; label cell width adjusts per breakpoint.
+
+  Behavior changes applied:
+  - If client is explicitly offline (client?.isOnline === false) the StateBadge is hidden and Lokation/Kiosk URL inputs are disabled.
+  - The "Skole" field is only visible to admin users.
+  - Paper 2 (Infoskærm status) is visually greyed-out when client is offline.
+
+  Important: Selecting a school in the dropdown now only writes the change to the backend.
+  It no longer calls a parent updater that might merge/overwrite client state (and thereby affect isOnline).
+  The component keeps the local selected value and shows success/error feedback, but does NOT modify
+  the parent's client state.
 */
 
 const COLOR_NAME_MAP = {
@@ -52,10 +66,13 @@ function resolveColor(theme, color) {
   if (typeof color !== "string") return String(color);
 
   const trimmed = color.trim();
+
   if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(trimmed) || /^rgba?\(/i.test(trimmed)) {
     return trimmed;
   }
+
   const lower = trimmed.toLowerCase();
+
   if (lower.includes(".")) {
     const [paletteKey, shade] = lower.split(".");
     const pal = theme.palette?.[paletteKey];
@@ -65,12 +82,15 @@ function resolveColor(theme, color) {
       if (typeof pal === "string") return pal;
     }
   }
+
   if (theme.palette?.[lower]) {
     const pal = theme.palette[lower];
     if (typeof pal === "string") return pal;
     if (pal.main) return pal.main;
   }
+
   if (COLOR_NAME_MAP[lower]) return COLOR_NAME_MAP[lower];
+
   return trimmed;
 }
 
@@ -95,7 +115,13 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
-        style={{ backgroundColor: resolvedBg }}
+        style={{
+          backgroundColor: resolvedBg,
+          animationName: animate ? "pulsateStatusBadge" : "none",
+          animationDuration: animate ? "2s" : undefined,
+          animationIterationCount: animate ? "infinite" : undefined,
+          animationTimingFunction: animate ? "ease" : undefined
+        }}
       />
       <Typography variant="body2" sx={{ fontWeight: 400, textTransform: "none", fontSize: isMobile ? 12 : 14 }}>
         {text}
@@ -188,14 +214,25 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   );
 }
 
-export default function ClientDetailsHeaderSection({
+function ClientDetailsHeaderSection({
   client,
   schools = [],
+  locality,
+  localityDirty, // kept for compatibility though we also compute local dirty
+  savingLocality,
+  handleLocalityChange,
+  handleLocalitySave,
+  kioskUrl,
+  kioskUrlDirty, // kept for compatibility though we also compute local dirty
+  savingKioskUrl,
+  handleKioskUrlChange,
+  handleKioskUrlSave,
   liveChromeStatus,
   liveChromeColor,
   refreshing,
   handleRefresh,
   kioskBrowserData = {},
+  onSchoolUpdated, // optional callback removed from use in this component to avoid parent state overwrite
   showSnackbar,
 }) {
   const navigate = useNavigate();
@@ -208,20 +245,23 @@ export default function ClientDetailsHeaderSection({
   const isDesktop = !isMobile && !isTablet;
 
   // Local state for inputs so we can detect "dirty" locally
-  const [localLocality, setLocalLocality] = React.useState(client?.locality ?? "");
-  const [localKioskUrl, setLocalKioskUrl] = React.useState(client?.kiosk_url ?? "");
+  const [localLocality, setLocalLocality] = React.useState(locality ?? "");
+  const [localKioskUrl, setLocalKioskUrl] = React.useState(kioskUrl ?? "");
 
   // Refs to store the initial values to compare against
-  const initialLocalityRef = React.useRef(client?.locality ?? "");
-  const initialKioskUrlRef = React.useRef(client?.kiosk_url ?? "");
+  const initialLocalityRef = React.useRef(locality ?? "");
+  const initialKioskUrlRef = React.useRef(kioskUrl ?? "");
 
   // Sync local state + initial refs when parent props change (e.g., on client switch or after save)
   React.useEffect(() => {
-    setLocalLocality(client?.locality ?? "");
-    initialLocalityRef.current = client?.locality ?? "";
-    setLocalKioskUrl(client?.kiosk_url ?? "");
-    initialKioskUrlRef.current = client?.kiosk_url ?? "";
-  }, [client?.id, client?.locality, client?.kiosk_url]);
+    setLocalLocality(locality ?? "");
+    initialLocalityRef.current = locality ?? "";
+  }, [locality, client?.id]);
+
+  React.useEffect(() => {
+    setLocalKioskUrl(kioskUrl ?? "");
+    initialKioskUrlRef.current = kioskUrl ?? "";
+  }, [kioskUrl, client?.id]);
 
   // Compute dirty flags locally (string compare)
   const localityChanged = String(localLocality ?? "") !== String(initialLocalityRef.current ?? "");
@@ -237,6 +277,7 @@ export default function ClientDetailsHeaderSection({
   // Schools state (prefer prop)
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
   const [loadingSchools, setLoadingSchools] = React.useState(false);
+  const [schoolsError, setSchoolsError] = React.useState(null);
 
   const [selectedSchool, setSelectedSchool] = React.useState(client?.school_id ?? "");
   const [savingSchool, setSavingSchool] = React.useState(false);
@@ -260,13 +301,15 @@ export default function ClientDetailsHeaderSection({
     async function load() {
       if (Array.isArray(schools) && schools.length) return;
       setLoadingSchools(true);
+      setSchoolsError(null);
       try {
         const data = await apiGetSchools();
         if (cancelled) return;
         if (Array.isArray(data)) setSchoolsList(data);
         else if (Array.isArray(data?.schools)) setSchoolsList(data.schools);
-      } catch {
-        // ignore
+      } catch (err) {
+        if (cancelled) return;
+        setSchoolsError(err?.message || "Fejl ved hentning af skoler");
       } finally {
         if (!cancelled) setLoadingSchools(false);
       }
@@ -281,7 +324,9 @@ export default function ClientDetailsHeaderSection({
     setSelectedSchoolDirty(String(newVal) !== String(client?.school_id));
   };
 
-  // Save school locally to backend only (do NOT call parent)
+  // IMPORTANT: When saving a new school selection we only send the change to the backend.
+  // We DO NOT call onSchoolUpdated or otherwise mutate parent client state here, to ensure
+  // that isOnline is never affected by this UI action. Parent may independently refresh if desired.
   const handleSchoolSave = async () => {
     if (!client || !client.id) return;
     if (String(selectedSchool) === String(client.school_id)) {
@@ -290,13 +335,20 @@ export default function ClientDetailsHeaderSection({
     }
     setSavingSchool(true);
     try {
-      await apiUpdateClient(client.id, { school_id: selectedSchool });
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Skole gemt", severity: "success" });
+      const payload = { school_id: selectedSchool };
+      // Only write to backend - do not merge/overwrite parent client state here.
+      await apiUpdateClient(client.id, payload);
+      // Show feedback to user; do not pass API response to parent
+      if (typeof showSnackbar === "function") {
+        showSnackbar({ message: "Skole gemt på serveren", severity: "success" });
+      }
+      // Mark local as clean (we keep the local selectedSchool value so the UI reflects user's choice)
       setSelectedSchoolDirty(false);
-      // keep local selectedSchool value so UI reflects user's choice
     } catch (err) {
       console.error("Fejl ved opdatering af skole:", err);
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke opdatere skole: " + (err?.message || err), severity: "error" });
+      if (typeof showSnackbar === "function") {
+        showSnackbar({ message: "Kunne ikke opdatere skole: " + (err?.message || err), severity: "error" });
+      }
     } finally {
       setSavingSchool(false);
     }
@@ -322,58 +374,45 @@ export default function ClientDetailsHeaderSection({
 
   const inputStyle = {
     width: "100%",
+    height: isMobile ? 30 : 32,
     "& .MuiInputBase-input": {
       fontSize: isMobile ? 12 : 14,
+      height: isMobile ? "28px" : "32px",
       boxSizing: "border-box",
       padding: isMobile ? "6px 8px" : "8px 14px"
     },
+    "& .MuiInputBase-root": { height: isMobile ? "28px" : "32px" },
   };
 
-  // Locality handlers - local state + direct backend save (no parent updates)
+  // Wrapper change handlers: update local state AND call parent's handler (preserve API)
   const onLocalityChange = (e) => {
-    setLocalLocality(e?.target?.value ?? "");
-  };
-
-  const handleLocalitySaveLocal = async () => {
-    if (!client || !client.id) return;
-    if (!localityChanged) return;
-    try {
-      await apiUpdateClient(client.id, { locality: localLocality });
-      initialLocalityRef.current = localLocality;
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Lokation gemt", severity: "success" });
-    } catch (err) {
-      console.error("Kunne ikke gemme lokation:", err);
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
+    const val = e?.target?.value ?? "";
+    setLocalLocality(val);
+    if (typeof handleLocalityChange === "function") {
+      handleLocalityChange(e);
     }
   };
 
-  // Kiosk URL handlers - local state + direct backend save (no parent updates)
   const onKioskUrlChange = (e) => {
-    setLocalKioskUrl(e?.target?.value ?? "");
-  };
-
-  const handleKioskUrlSaveLocal = async () => {
-    if (!client || !client.id) return;
-    if (!kioskUrlChanged) return;
-    try {
-      if (typeof apiPushKioskUrl === "function") {
-        await apiPushKioskUrl(client.id, localKioskUrl);
-      } else {
-        await apiUpdateClient(client.id, { kiosk_url: localKioskUrl });
-      }
-      initialKioskUrlRef.current = localKioskUrl;
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Kiosk webadresse gemt", severity: "success" });
-    } catch (err) {
-      console.error("Kunne ikke gemme kiosk URL:", err);
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
+    const val = e?.target?.value ?? "";
+    setLocalKioskUrl(val);
+    if (typeof handleKioskUrlChange === "function") {
+      handleKioskUrlChange(e);
     }
   };
 
   function renderKioskBrowserDataRows(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
-      <TableRow key={key}>
-        <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>
+      <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
+        <TableCell
+          sx={{
+            ...labelStyle,
+            borderBottom: "none",
+            width: labelCellWidth,
+            minWidth: labelCellWidth,
+          }}
+        >
           {key}:
         </TableCell>
         <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{String(value)}</TableCell>
@@ -387,9 +426,13 @@ export default function ClientDetailsHeaderSection({
     return s ? s.name : String(selectedSchool);
   }, [selectedSchool, schoolsList]);
 
+  // NEW: determine offline state (explicit false means offline)
   const isOffline = client?.isOnline === false;
+
+  // style for right paper when offline: slightly greyed / desaturated but still interactive (copy buttons still usable)
   const rightPaperDisabledStyle = isOffline ? { opacity: 0.7, filter: "grayscale(30%)", bgcolor: "#fafafa" } : {};
 
+  // Render
   return (
     <Box sx={{ width: "100%" }} data-testid="client-details-header">
       {/* Topbar */}
@@ -422,7 +465,7 @@ export default function ClientDetailsHeaderSection({
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
         {/* Klient info (left) */}
         <Box sx={{ width: leftPaperWidth, pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2 }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Klient info</Typography>
@@ -434,20 +477,21 @@ export default function ClientDetailsHeaderSection({
               <TableContainer>
                 <Table size="small" aria-label="klient-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
                   <TableBody>
-                    <TableRow>
+                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Klientnavn:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
-                      <TableRow>
+                      <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Klient ID:</TableCell>
                         <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
                       </TableRow>
                     )}
 
+                    {/* NEW: Skole kun synlig for admin */}
                     {user?.role === "admin" && (
-                      <TableRow>
+                      <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Skole:</TableCell>
                         <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -494,11 +538,11 @@ export default function ClientDetailsHeaderSection({
 
         {/* Infoskærm status (right) */}
         <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, ...rightPaperDisabledStyle }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", ...rightPaperDisabledStyle }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
-                {/* Hide state badge if client is explicitly offline */}
+                {/* NEW: Hide state badge if client is explicitly offline */}
                 {client?.isOnline !== false && (
                   <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
                 )}
@@ -509,7 +553,7 @@ export default function ClientDetailsHeaderSection({
                   <TableBody>
 
                     {/* Lokation */}
-                    <TableRow>
+                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Lokation:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -518,28 +562,28 @@ export default function ClientDetailsHeaderSection({
                             value={localLocality ?? ""}
                             onChange={onLocalityChange}
                             sx={inputStyle}
-                            disabled={isOffline}
+                            disabled={savingLocality || isOffline} /* NEW: disable editing when offline */
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySaveLocal(); }}
-                            error={!!localityChanged}
+                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
+                            error={!!localityDirty}
                             fullWidth
                           />
                           <CopyIconButton value={localLocality ?? ""} disabled={!localLocality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={handleLocalitySaveLocal}
-                            disabled={!localityChanged || isOffline}
+                            onClick={handleLocalitySave}
+                            disabled={savingLocality || !localityChanged || isOffline} /* NEW: prevent save when offline */
                             sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
-                            Gem
+                            {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
                       </TableCell>
                     </TableRow>
 
-                    {/* Kiosk URL */}
-                    <TableRow>
+                    {/* Kiosk URL - directly under Lokation */}
+                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Kiosk URL:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -548,28 +592,28 @@ export default function ClientDetailsHeaderSection({
                             value={localKioskUrl ?? ""}
                             onChange={onKioskUrlChange}
                             sx={inputStyle}
-                            disabled={isOffline}
+                            disabled={savingKioskUrl || isOffline} /* NEW: disable editing when offline */
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSaveLocal(); }}
-                            error={!!kioskUrlChanged}
+                            onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
+                            error={!!kioskUrlDirty}
                             fullWidth
                           />
                           <CopyIconButton value={localKioskUrl ?? ""} disabled={!localKioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={handleKioskUrlSaveLocal}
-                            disabled={!kioskUrlChanged || isOffline}
+                            onClick={handleKioskUrlSave}
+                            disabled={savingKioskUrl || !kioskUrlChanged || isOffline} /* NEW: prevent save when offline */
                             sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
-                            Gem
+                            {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
                       </TableCell>
                     </TableRow>
 
-                    {/* Kiosk browser status */}
-                    <TableRow>
+                    {/* Kiosk browser status - label + value same row; label wraps on desktop/tablet as needed */}
+                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell
                         sx={{
                           ...labelStyle,
@@ -601,3 +645,56 @@ export default function ClientDetailsHeaderSection({
     </Box>
   );
 }
+
+// Custom shallow comparator for React.memo:
+// Only re-render header when props that affect its UI actually change.
+function propsAreEqual(prev, next) {
+  // Compare simple primitive props
+  const simpleKeys = [
+    "locality",
+    "localityDirty",
+    "savingLocality",
+    "kioskUrl",
+    "kioskUrlDirty",
+    "savingKioskUrl",
+    "liveChromeStatus",
+    "liveChromeColor",
+    "refreshing",
+    // optional token if parent provides it (useful if you want explicit change detection)
+    "liveChromeTimestamp"
+  ];
+  for (const k of simpleKeys) {
+    if (prev[k] !== next[k]) return false;
+  }
+
+  // Compare client fields we care about shallowly
+  const prevClient = prev.client || {};
+  const nextClient = next.client || {};
+  const clientKeys = ["id", "name", "isOnline", "school_id", "state", "chrome_status", "chrome_color"];
+  for (const k of clientKeys) {
+    if (prevClient[k] !== nextClient[k]) return false;
+  }
+
+  // Compare schools length and basic identity to detect meaningful changes
+  const prevSchools = prev.schools || [];
+  const nextSchools = next.schools || [];
+  if (prevSchools.length !== nextSchools.length) return false;
+  for (let i = 0; i < prevSchools.length; i++) {
+    if ((prevSchools[i]?.id ?? null) !== (nextSchools[i]?.id ?? null)) return false;
+  }
+
+  // Compare kioskBrowserData shallowly by keys/values
+  const prevKbd = prev.kioskBrowserData || {};
+  const nextKbd = next.kioskBrowserData || {};
+  const prevKbdKeys = Object.keys(prevKbd);
+  const nextKbdKeys = Object.keys(nextKbd);
+  if (prevKbdKeys.length !== nextKbdKeys.length) return false;
+  for (const key of prevKbdKeys) {
+    if (prevKbd[key] !== nextKbd[key]) return false;
+  }
+
+  // If we've reached here, treat props as equal (no re-render needed)
+  return true;
+}
+
+export default React.memo(ClientDetailsHeaderSection, propsAreEqual);
