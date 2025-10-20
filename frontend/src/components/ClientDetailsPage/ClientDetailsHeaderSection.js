@@ -27,12 +27,12 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 /*
   ClientDetailsHeaderSection
   Ændringer:
-  - Desktop: left paper = 40%, right paper = 60%.
-  - Flyttet "Lokation" til right paper, placeret lige over "Kiosk URL".
-  - Overskrift "Kiosk info" ændret til "Infoskærm status".
-  - Kiosk browser status value er sat på en ny linje (separeret tabelrække under label).
-  - Beholder tidligere forbedringer: table-layout: fixed + colgroup, ValueCell med inline padding, konsistent input/select padding, status badges osv.
-  - Ny adfærd: hvis client.isOnline === false vises højre "paper" som greyed out med overlay der blokerer interaktion og viser tooltip/tekst "Klient er offline — redigering deaktiveret".
+  - Når client.isOnline === false:
+    - Højre Card (Infoskærm status) greyed out (lavere opacity).
+    - Et overlay med en synlig inline besked midt i kortet: "Klient er offline — redigering deaktiveret".
+    - Overlay blokerer interaktion (pointer-events) og har role="status" + aria-live for a11y.
+    - Felter (Lokation, Kiosk URL), kopier- og gem-knapper forbliver disabled.
+    - StateBadge skjules når offline (som ønsket).
 */
 
 const COLOR_NAME_MAP = {
@@ -236,7 +236,7 @@ function ClientDetailsHeaderSection({
 
   // Determine offline state
   const clientIsOffline = client?.isOnline === false;
-  const offlineTooltip = "Klient er offline — redigering deaktiveret";
+  const offlineMessage = "Klient er offline — redigering deaktiveret";
 
   // Schools state (prefer prop)
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
@@ -495,7 +495,7 @@ function ClientDetailsHeaderSection({
               borderRadius: isMobile ? 1 : 2,
               height: "100%",
               // subtle global dimming on the card itself if offline
-              opacity: clientIsOffline ? 0.75 : 1,
+              opacity: clientIsOffline ? 0.78 : 1,
               transition: "opacity 200ms ease"
             }}
           >
@@ -581,7 +581,7 @@ function ClientDetailsHeaderSection({
                       <TableCell sx={{ borderBottom: "none" }} />
                     </TableRow>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell colSpan={2} sx={{ borderBottom: "none", pl: isMobile ? 1 : 2, opacity: clientIsOffline ? 0.6 : 1, color: clientIsOffline ? "text.disabled" : "inherit" }}>
+                      <TableCell colSpan={2} sx={{ borderBottom: "none", pl: isMobile ? 1 : 2, opacity: clientIsOffline ? 0.65 : 1, color: clientIsOffline ? "text.disabled" : "inherit" }}>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
                           <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                         </Box>
@@ -594,30 +594,45 @@ function ClientDetailsHeaderSection({
                 </Table>
               </TableContainer>
 
-              {/* Overlay that blocks interaction and shows a tooltip/message when the client is offline */}
+              {/* Inline overlay message that blocks interaction when offline */}
               {clientIsOffline && (
-                <Tooltip title={offlineTooltip}>
+                <Box
+                  role="status"
+                  aria-live="polite"
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "not-allowed",
+                    // capture pointer events to make underlying controls inert
+                    pointerEvents: "auto",
+                    // keep background transparent so underlying dimming (opacity on Card) is visible
+                    backgroundColor: "transparent",
+                    p: 2
+                  }}
+                >
                   <Box
-                    aria-hidden="true"
                     sx={{
-                      position: "absolute",
-                      inset: 0,
-                      zIndex: 10,
-                      display: "flex",
+                      display: "inline-flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "not-allowed",
-                      // allow visual dimming from parent opacity but keep overlay transparent
-                      backgroundColor: "transparent",
-                      // ensure overlay captures pointer events so underlying controls are inert
-                      pointerEvents: "auto"
+                      gap: 1,
+                      bgcolor: "background.paper",
+                      color: "text.secondary",
+                      px: 2,
+                      py: 0.6,
+                      borderRadius: 1,
+                      boxShadow: 1,
+                      border: theme => `1px solid ${theme.palette.divider}`
                     }}
                   >
-                    <Typography variant="body2" sx={{ color: "text.secondary", bgcolor: "transparent", px: 1 }}>
-                      Klient er offline — redigering deaktiveret
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {offlineMessage}
                     </Typography>
                   </Box>
-                </Tooltip>
+                </Box>
               )}
             </CardContent>
           </Card>
