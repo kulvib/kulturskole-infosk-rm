@@ -26,9 +26,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 
 /*
   ClientDetailsHeaderSection - komplet komponent
-  Ændring i denne fil:
-  - Reduceret horisontal afstand mellem label- og value-kolonner.
-  - Bruger nu eksplicit paddingLeft / paddingRight i px og p: 0 for at sikre at ændringen rent faktisk bliver anvendt.
+  Rettelse:
+  - Gendannet labelStyle til den oprindelige (ingen direkte p:0 eller paddingRight override).
+  - Ændret KUN valueStyle til at bruge eksplicit paddingLeft i px (p:0 + paddingLeft),
+    så value-kolonnen står tættere på uden at flytte label-cellen.
 */
 
 const COLOR_NAME_MAP = {
@@ -100,19 +101,15 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
-          // use our unique animation name via sx (keeps theme-based style generation)
           animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
-          // keyframes animate only transform+opacity
           "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
-        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
         style={{
           backgroundColor: resolvedBg,
-          // enforce our animation properties inline as well so the element uses our unique keyframes
           animationName: animate ? "pulsateStatusBadge" : "none",
           animationDuration: animate ? "2s" : undefined,
           animationIterationCount: animate ? "infinite" : undefined,
@@ -309,21 +306,23 @@ function ClientDetailsHeaderSection({
     }
   };
 
-  // Force explicit px paddings so spacing change is applied reliably
+  // Restore labelStyle to original behaviour (DO NOT override p)
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    p: 0,
-    paddingRight: isMobile ? "4px" : "8px", // explicit px
+    pr: isMobile ? 0.25 : 0.5, // <-- GENDANGET til oprindelig (ingen p:0 override)
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
     minWidth: 140,
   };
+
+  // ONLY adjust value cell: force a smaller left padding (in px) and set p:0 so it reliably applies.
+  // This moves the "value" content closer to the label WITHOUT touching the label cell.
   const valueStyle = {
     fontWeight: 400,
-    p: 0,
-    paddingLeft: isMobile ? "4px" : "8px", // explicit px
+    p: 0, // reset cell padding to ensure paddingLeft wins
+    paddingLeft: isMobile ? "6px" : "10px", // <-- just the value cell is tightened
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
