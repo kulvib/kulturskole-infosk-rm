@@ -25,12 +25,11 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection - komplet komponent
-  Ændring i denne fil:
-  - Jeg har bevaret tabelkolonne-placeringen præcis som i dit script (ingen colgroup, ingen tableLayout ændringer).
-  - Den eneste ændring er halvering af den horisontale spacing mellem label- og value-kolonner:
-    labelStyle.pr og valueStyle.pl bruger nu halvdelen af de originale theme-enheder.
-  - Value-kolonnen indhold og placering er uændret.
+  ClientDetailsHeaderSection - ændringer:
+  - Flytter kun VALUE-kolonnerne tættere på LABEL-kolonnen (ingen ændring af label-kolonnen).
+  - Value-celler er venstre-justerede (textAlign: 'left') og vi fjerner den horisontale TableCell-padding (px: 0)
+    så de reducerede pl-værdier træder tydeligt i kraft.
+  - Ingen ændring i kolonne-placering eller minWidth for label-kolonnen.
 */
 
 const COLOR_NAME_MAP = {
@@ -314,15 +313,16 @@ function ClientDetailsHeaderSection({
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5, // HALVERET: desktop 1 -> 0.5, mobil 0.5 -> 0.25
+    pr: isMobile ? 0.5 : 1,
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
     minWidth: 140,
   };
+  // Reduced padding to bring value-column closer to label-column and ensure left alignment.
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.25 : 0.75, // HALVERET: desktop 1.5 -> 0.75, mobil 0.5 -> 0.25
+    pl: isMobile ? 0.5 : 0.75, // reduced from 1.5 -> 0.75 on desktop
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -345,7 +345,7 @@ function ClientDetailsHeaderSection({
     return Object.entries(data).map(([key, value]) => (
       <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{String(value)}</TableCell>
+        <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left", px: 0 }}>{String(value)}</TableCell>
       </TableRow>
     ));
   }
@@ -403,19 +403,19 @@ function ClientDetailsHeaderSection({
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left", px: 0 }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
+                        <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left", px: 0 }}>{client?.id ?? "?"}</TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left", px: 0 }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             select
@@ -445,7 +445,7 @@ function ClientDetailsHeaderSection({
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left", px: 0 }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
@@ -488,7 +488,7 @@ function ClientDetailsHeaderSection({
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left", px: 0 }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
@@ -511,7 +511,7 @@ function ClientDetailsHeaderSection({
 
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left", px: 0 }}>
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
