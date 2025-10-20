@@ -25,13 +25,11 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection - komplet komponent
-  Rettelser/forbedringer inkluderet:
-  - Robust color resolution (theme tokens, hex, color names).
-  - Unik keyframe-navn (pulsateStatusBadge) og keyframes animerer KUN transform+opacity.
-  - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
-  - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
-  - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
+  ClientDetailsHeaderSection
+  Ændringer:
+  - Halveret horizontal spacing mellem label- og value-kolonner på desktop og mobil.
+  - Fjernet TableCell default horisontal padding (padding="none" + px: 0) så spacing træder i kraft.
+  - Ændringer anvendt konsekvent i begge papers og i renderKioskBrowserDataRows.
 */
 
 const COLOR_NAME_MAP = {
@@ -87,8 +85,6 @@ function resolveColor(theme, color) {
   return trimmed;
 }
 
-// StatusBadge - dot + label. animation only transforms and opacity (no background)
-// inline style is used to force the background color so global keyframes/styles can't override it.
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
@@ -103,19 +99,15 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
-          // use our unique animation name via sx (keeps theme-based style generation)
           animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
-          // keyframes animate only transform+opacity
           "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
-        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
         style={{
           backgroundColor: resolvedBg,
-          // enforce our animation properties inline as well so the element uses our unique keyframes
           animationName: animate ? "pulsateStatusBadge" : "none",
           animationDuration: animate ? "2s" : undefined,
           animationIterationCount: animate ? "infinite" : undefined,
@@ -312,10 +304,12 @@ function ClientDetailsHeaderSection({
     }
   };
 
+  // Halveret spacing (desktop og mobil)
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.5 : 1,
+    // halveret: desktop fra 1 -> 0.5, mobil fra 0.5 -> 0.25
+    pr: isMobile ? 0.25 : 0.5,
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -323,7 +317,8 @@ function ClientDetailsHeaderSection({
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.5 : 1.5,
+    // halveret: desktop fra 1.5 -> 0.75, mobil fra 0.5 -> 0.25
+    pl: isMobile ? 0.25 : 0.75,
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -345,8 +340,8 @@ function ClientDetailsHeaderSection({
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
       <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
-        <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{String(value)}</TableCell>
+        <TableCell padding="none" sx={{ ...labelStyle, borderBottom: "none", px: 0 }}>{key}:</TableCell>
+        <TableCell padding="none" align="left" sx={{ ...valueStyle, borderBottom: "none", px: 0, textAlign: "left" }}>{String(value)}</TableCell>
       </TableRow>
     ));
   }
@@ -403,21 +398,23 @@ function ClientDetailsHeaderSection({
                 <Table size="small" aria-label="klient-info">
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
+                      <TableCell padding="none" sx={{ ...labelStyle, borderBottom: "none", px: 0 }}>Klientnavn:</TableCell>
+                      <TableCell padding="none" align="left" sx={{ ...valueStyle, borderBottom: "none", px: 0, textAlign: "left" }}>
+                        {client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}
+                      </TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                        <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
+                        <TableCell padding="none" sx={{ ...labelStyle, borderBottom: "none", px: 0 }}>Klient ID:</TableCell>
+                        <TableCell padding="none" align="left" sx={{ ...valueStyle, borderBottom: "none", px: 0, textAlign: "left" }}>{client?.id ?? "?"}</TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <TableCell padding="none" sx={{ ...labelStyle, borderBottom: "none", px: 0 }}>Skole:</TableCell>
+                      <TableCell padding="none" align="left" sx={{ ...valueStyle, borderBottom: "none", px: 0 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "flex-start" }}>
                           <TextField
                             select
                             size="small"
@@ -445,9 +442,9 @@ function ClientDetailsHeaderSection({
                     </TableRow>
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <TableCell padding="none" sx={{ ...labelStyle, borderBottom: "none", px: 0 }}>Lokation:</TableCell>
+                      <TableCell padding="none" align="left" sx={{ ...valueStyle, borderBottom: "none", px: 0 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "flex-start" }}>
                           <TextField
                             size="small"
                             value={locality ?? ""}
@@ -488,9 +485,9 @@ function ClientDetailsHeaderSection({
                 <Table size="small" aria-label="kiosk-info">
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <TableCell padding="none" sx={{ ...labelStyle, borderBottom: "none", px: 0 }}>Kiosk URL:</TableCell>
+                      <TableCell padding="none" align="left" sx={{ ...valueStyle, borderBottom: "none", px: 0 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "flex-start" }}>
                           <TextField
                             size="small"
                             value={kioskUrl ?? ""}
@@ -511,8 +508,8 @@ function ClientDetailsHeaderSection({
                     </TableRow>
 
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell padding="none" sx={{ ...labelStyle, borderBottom: "none", px: 0 }}>Kiosk browser status:</TableCell>
+                      <TableCell padding="none" align="left" sx={{ ...valueStyle, borderBottom: "none", px: 0 }}>
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
@@ -532,10 +529,7 @@ function ClientDetailsHeaderSection({
 }
 
 // Custom shallow comparator for React.memo:
-// Only re-render header when props that affect its UI actually change.
-// We check a set of primitives and a few client fields that header displays.
 function propsAreEqual(prev, next) {
-  // Compare simple primitive props
   const simpleKeys = [
     "locality",
     "localityDirty",
@@ -546,14 +540,12 @@ function propsAreEqual(prev, next) {
     "liveChromeStatus",
     "liveChromeColor",
     "refreshing",
-    // optional token if parent provides it (useful if you want explicit change detection)
     "liveChromeTimestamp"
   ];
   for (const k of simpleKeys) {
     if (prev[k] !== next[k]) return false;
   }
 
-  // Compare client fields we care about shallowly
   const prevClient = prev.client || {};
   const nextClient = next.client || {};
   const clientKeys = ["id", "name", "isOnline", "school_id", "state", "chrome_status", "chrome_color"];
@@ -561,7 +553,6 @@ function propsAreEqual(prev, next) {
     if (prevClient[k] !== nextClient[k]) return false;
   }
 
-  // Compare schools length and basic identity to detect meaningful changes
   const prevSchools = prev.schools || [];
   const nextSchools = next.schools || [];
   if (prevSchools.length !== nextSchools.length) return false;
@@ -569,7 +560,6 @@ function propsAreEqual(prev, next) {
     if ((prevSchools[i]?.id ?? null) !== (nextSchools[i]?.id ?? null)) return false;
   }
 
-  // Compare kioskBrowserData shallowly by keys/values
   const prevKbd = prev.kioskBrowserData || {};
   const nextKbd = next.kioskBrowserData || {};
   const prevKbdKeys = Object.keys(prevKbd);
@@ -579,7 +569,6 @@ function propsAreEqual(prev, next) {
     if (prevKbd[key] !== nextKbd[key]) return false;
   }
 
-  // If we've reached here, treat props as equal (no re-render needed)
   return true;
 }
 
