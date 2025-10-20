@@ -25,10 +25,11 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  Minimal, targeted change:
-  - VALUE TableCell'er får className="client-value".
-  - Each <Table> gets an sx rule that targets .client-value and sets a small paddingLeft/paddingRight (px),
-    and ensures textAlign: left. This moves the value content closer to the label without changing column layout.
+  ClientDetailsHeaderSection - komplet komponent
+  Ændring: VALUE-kolonner er rykket tættere på LABEL-kolonnen via inline padding overrides.
+  - Inline style på value TableCell: paddingLeft/paddingRight = 4px (vinder over global CSS).
+  - TextField inputer får også reduceret indre padding via InputProps.sx.
+  - Resten af filen beholdes som i dit oprindelige script.
 */
 
 const COLOR_NAME_MAP = {
@@ -52,12 +53,14 @@ function resolveColor(theme, color) {
 
   const trimmed = color.trim();
 
+  // hex or rgb(a)
   if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(trimmed) || /^rgba?\(/i.test(trimmed)) {
     return trimmed;
   }
 
   const lower = trimmed.toLowerCase();
 
+  // theme token like "grey.400" or "success.main"
   if (lower.includes(".")) {
     const [paletteKey, shade] = lower.split(".");
     const pal = theme.palette?.[paletteKey];
@@ -68,17 +71,22 @@ function resolveColor(theme, color) {
     }
   }
 
+  // theme direct key e.g. "success"
   if (theme.palette?.[lower]) {
     const pal = theme.palette[lower];
     if (typeof pal === "string") return pal;
     if (pal.main) return pal.main;
   }
 
+  // map common names to hex
   if (COLOR_NAME_MAP[lower]) return COLOR_NAME_MAP[lower];
 
+  // fallback to the raw trimmed string (may be valid CSS color)
   return trimmed;
 }
 
+// StatusBadge - dot + label. animation only transforms and opacity (no background)
+// inline style is used to force background-color so global keyframes/styles can't override it.
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
@@ -225,6 +233,7 @@ function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
+  // Schools state (prefer prop)
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
   const [loadingSchools, setLoadingSchools] = React.useState(false);
   const [schoolsError, setSchoolsError] = React.useState(null);
@@ -233,6 +242,7 @@ function ClientDetailsHeaderSection({
   const [savingSchool, setSavingSchool] = React.useState(false);
   const [selectedSchoolDirty, setSelectedSchoolDirty] = React.useState(false);
 
+  // Sync props -> state
   React.useEffect(() => {
     if (Array.isArray(schools) && schools.length) {
       setSchoolsList(schools);
@@ -244,6 +254,7 @@ function ClientDetailsHeaderSection({
     setSelectedSchoolDirty(false);
   }, [client?.school_id]);
 
+  // fetch schools if not provided
   React.useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -306,7 +317,7 @@ function ClientDetailsHeaderSection({
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.5 : 0.75, // reduced to bring value content closer
+    pl: 0, // remove theme left padding here because we apply inline px
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -329,7 +340,12 @@ function ClientDetailsHeaderSection({
     return Object.entries(data).map(([key, value]) => (
       <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <TableCell className="client-value" sx={{ ...valueStyle, borderBottom: "none", textAlign: "left", px: 0 }}>{String(value)}</TableCell>
+        <TableCell
+          sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+          style={{ paddingLeft: 4, paddingRight: 4 }}
+        >
+          {String(value)}
+        </TableCell>
       </TableRow>
     ));
   }
@@ -340,8 +356,10 @@ function ClientDetailsHeaderSection({
     return s ? s.name : String(selectedSchool);
   }, [selectedSchool, schoolsList]);
 
+  // Render
   return (
     <Box sx={{ width: "100%" }} data-testid="client-details-header">
+      {/* Topbar */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", mb: isMobile ? 0.5 : 1, gap: isMobile ? 1 : 0 }}>
         <Button
           variant="outlined"
@@ -367,7 +385,9 @@ function ClientDetailsHeaderSection({
         </Tooltip>
       </Box>
 
+      {/* Papers */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
+        {/* Klient info */}
         <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
@@ -379,34 +399,36 @@ function ClientDetailsHeaderSection({
               </Box>
 
               <TableContainer>
-                <Table
-                  size="small"
-                  aria-label="klient-info"
-                  sx={{
-                    // Target the client-value cells only and push them closer to label
-                    "& .client-value": {
-                      paddingLeft: "6px",
-                      paddingRight: "6px",
-                      textAlign: "left"
-                    }
-                  }}
-                >
+                <Table size="small" aria-label="klient-info">
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <TableCell className="client-value" sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
+                        {client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}
+                      </TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <TableCell className="client-value" sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
+                        <TableCell
+                          sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                          style={{ paddingLeft: 4, paddingRight: 4 }}
+                        >
+                          {client?.id ?? "?"}
+                        </TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
-                      <TableCell className="client-value" sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             select
@@ -414,10 +436,18 @@ function ClientDetailsHeaderSection({
                             value={selectedSchool ?? ""}
                             onChange={handleSchoolSelectChange}
                             disabled={loadingSchools}
-                            sx={{ ...inputStyle }}
+                            sx={{ ...inputStyle, mr: 0, ml: 0 }}
                             fullWidth
                             SelectProps={{ MenuProps: { disablePortal: true } }}
                             inputProps={{ "aria-label": "Skole" }}
+                            InputProps={{
+                              sx: {
+                                "& .MuiInputBase-input": {
+                                  paddingLeft: "4px",
+                                  paddingRight: "4px"
+                                }
+                              }
+                            }}
                             error={!!selectedSchoolDirty}
                             onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
                           >
@@ -436,15 +466,26 @@ function ClientDetailsHeaderSection({
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
-                      <TableCell className="client-value" sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
                             value={locality ?? ""}
                             onChange={handleLocalityChange}
-                            sx={inputStyle}
+                            sx={{ ...inputStyle, mr: 0, ml: 0 }}
                             disabled={savingLocality}
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                            InputProps={{
+                              sx: {
+                                "& .MuiInputBase-input": {
+                                  paddingLeft: "4px",
+                                  paddingRight: "4px"
+                                }
+                              }
+                            }}
                             onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
                             error={!!localityDirty}
                             fullWidth
@@ -465,6 +506,7 @@ function ClientDetailsHeaderSection({
           </Card>
         </Box>
 
+        {/* Kiosk info */}
         <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
@@ -474,29 +516,30 @@ function ClientDetailsHeaderSection({
               </Box>
 
               <TableContainer>
-                <Table
-                  size="small"
-                  aria-label="kiosk-info"
-                  sx={{
-                    "& .client-value": {
-                      paddingLeft: "6px",
-                      paddingRight: "6px",
-                      textAlign: "left"
-                    }
-                  }}
-                >
+                <Table size="small" aria-label="kiosk-info">
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
-                      <TableCell className="client-value" sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
                             value={kioskUrl ?? ""}
                             onChange={handleKioskUrlChange}
-                            sx={inputStyle}
+                            sx={{ ...inputStyle, mr: 0, ml: 0 }}
                             disabled={savingKioskUrl}
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                            InputProps={{
+                              sx: {
+                                "& .MuiInputBase-input": {
+                                  paddingLeft: "4px",
+                                  paddingRight: "4px"
+                                }
+                              }
+                            }}
                             onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
                             error={!!kioskUrlDirty}
                             fullWidth
@@ -511,7 +554,10 @@ function ClientDetailsHeaderSection({
 
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                      <TableCell className="client-value" sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
@@ -530,7 +576,11 @@ function ClientDetailsHeaderSection({
   );
 }
 
+// Custom shallow comparator for React.memo:
+// Only re-render header when props that affect its UI actually change.
+// We check a set of primitives and a few client fields that header displays.
 function propsAreEqual(prev, next) {
+  // Compare simple primitive props
   const simpleKeys = [
     "locality",
     "localityDirty",
@@ -541,12 +591,14 @@ function propsAreEqual(prev, next) {
     "liveChromeStatus",
     "liveChromeColor",
     "refreshing",
+    // optional token if parent provides it (useful if you want explicit change detection)
     "liveChromeTimestamp"
   ];
   for (const k of simpleKeys) {
     if (prev[k] !== next[k]) return false;
   }
 
+  // Compare client fields we care about shallowly
   const prevClient = prev.client || {};
   const nextClient = next.client || {};
   const clientKeys = ["id", "name", "isOnline", "school_id", "state", "chrome_status", "chrome_color"];
@@ -554,6 +606,7 @@ function propsAreEqual(prev, next) {
     if (prevClient[k] !== nextClient[k]) return false;
   }
 
+  // Compare schools length and basic identity to detect meaningful changes
   const prevSchools = prev.schools || [];
   const nextSchools = next.schools || [];
   if (prevSchools.length !== nextSchools.length) return false;
@@ -561,6 +614,7 @@ function propsAreEqual(prev, next) {
     if ((prevSchools[i]?.id ?? null) !== (nextSchools[i]?.id ?? null)) return false;
   }
 
+  // Compare kioskBrowserData shallowly by keys/values
   const prevKbd = prev.kioskBrowserData || {};
   const nextKbd = next.kioskBrowserData || {};
   const prevKbdKeys = Object.keys(prevKbd);
@@ -570,6 +624,7 @@ function propsAreEqual(prev, next) {
     if (prevKbd[key] !== nextKbd[key]) return false;
   }
 
+  // If we've reached here, treat props as equal (no re-render needed)
   return true;
 }
 
