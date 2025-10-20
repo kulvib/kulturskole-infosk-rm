@@ -18,9 +18,8 @@ import {
 
 /*
   ClientDetailsPage.js (opdateret)
-  - Videregiver `refreshing` og `onRestartStream` til ClientDetailsLivestreamSection så dens opdateringsknap kan vise spinner.
-  - Videregiver clientState?.isOnline til livestream & actions for at deaktivere UI når klient offline.
-  - Rest af filen uændret (poll logic etc. antages at være som i din seneste version).
+  - Bevarer client.isOnline ved merge hvis backend ikke eksplicit returnerer isOnline.
+  - Efter save forsøger vi at kalde handleRefresh hvis parent tilbyder det (henter authoritative klient).
 */
 
 export default function ClientDetailsPage({
@@ -59,6 +58,16 @@ export default function ClientDetailsPage({
     uptime: client?.uptime ?? null,
   });
   const pollCountRef = useRef(0);
+
+  // Helper: merge updated client but preserve previous isOnline unless server explicitly returned it
+  function mergeClientPreserveOnline(prev, updated) {
+    if (!updated) return prev;
+    return {
+      ...(prev || {}),
+      ...(updated || {}),
+      isOnline: (typeof updated.isOnline === "undefined") ? prev?.isOnline : updated.isOnline
+    };
+  }
 
   useEffect(() => { setClientState(client); }, [client]);
 
@@ -160,7 +169,8 @@ export default function ClientDetailsPage({
   const handleSchoolUpdated = useCallback(async (updatedClient) => {
     if (!clientState) return;
     if (updatedClient && updatedClient.id === clientState.id && Object.keys(updatedClient).length > 1) {
-      setClientState(prev => ({ ...(prev || {}), ...(updatedClient || {}) }));
+      // preserve isOnline unless server included it
+      setClientState(prev => mergeClientPreserveOnline(prev, updatedClient));
     } else {
       if (typeof handleRefresh === "function") {
         try { await handleRefresh(); } catch {}
@@ -172,28 +182,55 @@ export default function ClientDetailsPage({
   const handleLocalityChange = (e) => { setLocality(e.target.value); setLocalityDirty(true); };
   const handleLocalitySave = async () => {
     if (!clientState?.id) return;
+    setSavingLocality(true);
     try {
       const updated = await updateClient(clientState.id, { locality });
-      if (updated) setClientState(prev => ({ ...(prev || {}), ...(updated || {}) }));
-      else setClientState(prev => ({ ...(prev || {}), locality }));
+      // log for debugging (can remove later)
+      console.debug("updateClient(locality) response:", updated);
+      if (updated) {
+        setClientState(prev => mergeClientPreserveOnline(prev, updated));
+      } else {
+        setClientState(prev => prev ? ({ ...prev, locality }) : prev);
+      }
       setLocalityDirty(false);
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Lokation gemt!", severity: "success" });
+
+      // prefer authoritative refresh if parent can do it
+      if (typeof handleRefresh === "function") {
+        try { await handleRefresh(); } catch (e) { console.debug("handleRefresh after locality save failed:", e); }
+      } else {
+        if (typeof showSnackbar === "function") showSnackbar({ message: "Lokation gemt!", severity: "success" });
+      }
     } catch (err) {
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
+    } finally {
+      setSavingLocality(false);
     }
   };
 
   const handleKioskUrlChange = (e) => { setKioskUrl(e.target.value); setKioskUrlDirty(true); };
   const handleKioskUrlSave = async () => {
     if (!clientState?.id) return;
+    setSavingKioskUrl(true);
     try {
-      await pushKioskUrl(clientState.id, kioskUrl);
-      if (typeof handleRefresh === "function") { try { await handleRefresh(); } catch {} }
-      else setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
+      const updated = await pushKioskUrl(clientState.id, kioskUrl);
+      console.debug("pushKioskUrl response:", updated);
+      if (updated) {
+        setClientState(prev => mergeClientPreserveOnline(prev, updated));
+      } else {
+        setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
+      }
+
+      // call authoritative refresh if available
+      if (typeof handleRefresh === "function") {
+        try { await handleRefresh(); } catch (e) { console.debug("handleRefresh after kioskUrl save failed:", e); }
+      }
+
       setKioskUrlDirty(false);
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kiosk webadresse opdateret!", severity: "success" });
     } catch (err) {
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
+    } finally {
+      setSavingKioskUrl(false);
     }
   };
 
