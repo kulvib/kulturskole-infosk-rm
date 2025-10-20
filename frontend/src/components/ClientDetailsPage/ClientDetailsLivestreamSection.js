@@ -18,9 +18,7 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import { useTheme, alpha } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
 
-// This file adjusted to avoid fixed heights that create internal scrollbars.
-// Cards/container elements no longer force height:100% or fixed minHeights.
-
+// Helper functions
 async function fetchLatestProgramDateTime(hlsUrl) {
   try {
     const resp = await fetch(hlsUrl + "?cachebust=" + Date.now());
@@ -77,6 +75,7 @@ function getLagStatus(playerLag, lastSegmentLag) {
   return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#e53935" };
 }
 
+// Formatter der altid viser tal med max 3 decimaler, uden trailing nuller
 function formatLagValue(val) {
   if (val == null) return "-";
   return Number(val).toFixed(3).replace(/(\.\d*?[1-9])0+$|\.0*$/, "$1");
@@ -84,10 +83,10 @@ function formatLagValue(val) {
 
 export default function ClientDetailsLivestreamSection({
   clientId,
-  refreshing: parentRefreshing = false,
+  refreshing: parentRefreshing = false, // sync from parent when provided
   onRestartStream = null,
   streamKey = null,
-  clientOnline = true
+  clientOnline = true // NEW: parent tells us whether client is online; explicit false => offline
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -112,19 +111,25 @@ export default function ClientDetailsLivestreamSection({
   const [autoRefreshed, setAutoRefreshed] = useState(false);
   const [manualRefreshed, setManualRefreshed] = useState(false);
 
+  // Lokal fallback key hvis parent ikke leverer streamKey/onRestartStream
   const [localRefreshKey, setLocalRefreshKey] = useState(0);
+
+  // Intern refreshing state (for immediate local feedback) but synced with parentRefreshing
   const [refreshing, setRefreshing] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
+  // Controls overlay
   const [showControls, setShowControls] = useState(false);
 
+  // Sync internal refreshing with parent prop
   useEffect(() => {
     setRefreshing(Boolean(parentRefreshing));
   }, [parentRefreshing]);
 
+  // Auto-hide controls
   useEffect(() => {
     if (!showControls) return;
     const timeout = setTimeout(() => setShowControls(false), 2200);
@@ -137,13 +142,15 @@ export default function ClientDetailsLivestreamSection({
   function handleVideoPlaying() { setBuffering(false); }
   function handleVideoCanPlay() { setBuffering(false); }
 
+  // effectiveRefreshKey: parent streamKey if provided, otherwise localRefreshKey
   const effectiveRefreshKey = useMemo(() => {
     return (typeof streamKey !== "undefined" && streamKey !== null) ? streamKey : localRefreshKey;
   }, [streamKey, localRefreshKey]);
 
+  // maybeResetSegments - run when effectiveRefreshKey changes
   useEffect(() => {
     if (!clientId) return;
-    if (clientOnline === false) return;
+    if (clientOnline === false) return; // NEW: don't attempt backend polling when offline
     let ignore = false;
 
     async function maybeResetSegments() {
@@ -172,9 +179,11 @@ export default function ClientDetailsLivestreamSection({
     return () => { ignore = true; };
   }, [clientId, effectiveRefreshKey, clientOnline]);
 
+  // Main manifest/polling & playback setup - depends on effectiveRefreshKey to remount
   useEffect(() => {
     if (!clientId) return;
     if (clientOnline === false) {
+      // Ensure we cleanup any existing playback if client just went offline
       if (hlsRef.current) {
         try { hlsRef.current.destroy(); } catch {}
         hlsRef.current = null;
@@ -270,6 +279,7 @@ export default function ClientDetailsLivestreamSection({
       }
     };
 
+    // start polling immediately
     poll();
     pollInterval = setInterval(() => {
       if (stopPolling) return;
@@ -283,9 +293,10 @@ export default function ClientDetailsLivestreamSection({
     };
   }, [clientId, effectiveRefreshKey, clientOnline]);
 
+  // Poll last-segment-info to compute backend lag
   useEffect(() => {
     if (!clientId) return;
-    if (clientOnline === false) return;
+    if (clientOnline === false) return; // don't poll when offline
     if (!isSafari() && !manifestReady) return;
     let stop = false;
     async function pollSegmentLag() {
@@ -315,6 +326,7 @@ export default function ClientDetailsLivestreamSection({
     return () => { stop = true; };
   }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
+  // Player-reported lag (from HLS instance)
   useEffect(() => {
     if (!manifestReady) return;
     if (clientOnline === false) return;
@@ -332,6 +344,7 @@ export default function ClientDetailsLivestreamSection({
     return () => clearInterval(interval);
   }, [manifestReady, effectiveRefreshKey, clientOnline]);
 
+  // Manifest EXT-X-PROGRAM-DATE-TIME based lag
   useEffect(() => {
     if (!clientId || !manifestReady) return;
     if (clientOnline === false) return;
@@ -356,6 +369,7 @@ export default function ClientDetailsLivestreamSection({
     return () => { stop = true; };
   }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
+  // lastLive ticker for UI
   useEffect(() => {
     let interval;
     if (manifestReady) {
@@ -367,11 +381,13 @@ export default function ClientDetailsLivestreamSection({
     return () => clearInterval(interval);
   }, [manifestReady, effectiveRefreshKey]);
 
+  // Auto refresh: call parent's onRestartStream if provided, otherwise use local key
   useEffect(() => {
-    if (clientOnline === false) return;
+    if (clientOnline === false) return; // don't auto-restart when offline
     const interval = setInterval(() => {
       setAutoRefreshed(true);
       if (typeof onRestartStream === "function") {
+        // parent should set its refreshing flag; we synced to it in effect above
         onRestartStream();
       } else {
         setLocalRefreshKey(k => k + 1);
@@ -394,12 +410,16 @@ export default function ClientDetailsLivestreamSection({
     }
   }, [manualRefreshed]);
 
+  // Manual refresh: mark local flag and notify parent to restart stream
   const handleRefreshClick = () => {
     if (clientOnline === false) return;
     setManualRefreshed(true);
+    // optimistic local feedback: if parent does not control refreshing, show local spinner briefly
     if (typeof onRestartStream === "function") {
+      // parent will set its refreshing flag; we've synced to it above
       onRestartStream();
     } else {
+      // fallback to local remounting behaviour and local spinner
       setRefreshing(true);
       setLocalRefreshKey(k => k + 1);
       setTimeout(() => setRefreshing(false), 800);
@@ -450,10 +470,11 @@ export default function ClientDetailsLivestreamSection({
 
   const lagStatus = getLagStatus(sanitizedLag, lastSegmentLag);
 
+  // Visual disabled styles when offline
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
 
   return (
-    <Card elevation={2} sx={{ borderRadius: 2, p: isMobile ? 1 : 2, overflow: "visible", ...disabledOverlay }}>
+    <Card elevation={2} sx={{ borderRadius: 2, p: isMobile ? 1 : 2, ...disabledOverlay }}>
       <Grid
         container
         spacing={isMobile ? 1 : 2}
@@ -474,7 +495,7 @@ export default function ClientDetailsLivestreamSection({
                   bgcolor: clientOnline === false ? "#9e9e9e" : (manifestReady ? "#43a047" : "#e53935"),
                   border: "1px solid #ddd",
                   mr: 1,
-                  animation: manifestReady && clientOnline !== false ? "pulsate 2s infinite" : "none"
+                  animation: (manifestReady && clientOnline !== false) ? "pulsate 2s infinite" : "none"
                 }}
               />
               <Tooltip title={clientOnline === false ? "Klienten er offline" : "Genindlæs stream"}>
@@ -519,8 +540,7 @@ export default function ClientDetailsLivestreamSection({
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              position: "relative",
-              overflow: "visible"
+              position: "relative"
             }}
           >
             <Box
@@ -529,8 +549,7 @@ export default function ClientDetailsLivestreamSection({
                 width: "100%",
                 display: (manifestReady && clientOnline !== false) ? "flex" : "none",
                 alignItems: "center",
-                justifyContent: "center",
-                overflow: "visible"
+                justifyContent: "center"
               }}
               onMouseMove={handleMouseMove}
               onMouseLeave={() => setShowControls(false)}
@@ -550,7 +569,7 @@ export default function ClientDetailsLivestreamSection({
                 style={{
                   width: isMobile ? "100%" : 420,
                   maxWidth: "100%",
-                  height: "auto",
+                  maxHeight: isMobile ? 200 : 320,
                   borderRadius: 8,
                   border: "2px solid #444",
                   boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
@@ -615,10 +634,10 @@ export default function ClientDetailsLivestreamSection({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                minHeight: isMobile ? 100 : 160,
                 width: "100%",
                 bgcolor: clientOnline === false ? "#fafafa" : "transparent",
-                borderRadius: 1,
-                py: 2
+                borderRadius: 1
               }}>
                 {clientOnline === false ? (
                   <Typography variant="body2" sx={{ fontSize: isMobile ? 13 : undefined }}>
