@@ -26,10 +26,11 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 
 /*
   ClientDetailsHeaderSection - komplet komponent
-  Ændring: VALUE-kolonner er rykket tættere på LABEL-kolonnen via inline padding overrides.
-  - Inline style på value TableCell: paddingLeft/paddingRight = 4px (vinder over global CSS).
-  - TextField inputer får også reduceret indre padding via InputProps.sx.
-  - Resten af filen beholdes som i dit oprindelige script.
+  Ændring i denne fil:
+  - Jeg har bevaret tabelkolonne-placeringen præcis som i dit script (ingen colgroup, ingen tableLayout ændringer).
+  - Den eneste ændring er halvering af den horisontale spacing mellem label- og value-kolonner:
+    labelStyle.pr og valueStyle.pl bruger nu halvdelen af de originale theme-enheder.
+  - Value-kolonnen indhold og placering er uændret.
 */
 
 const COLOR_NAME_MAP = {
@@ -101,15 +102,19 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
+          // use our unique animation name via sx (keeps theme-based style generation)
           animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
+          // keyframes animate only transform+opacity
           "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
+        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
         style={{
           backgroundColor: resolvedBg,
+          // enforce our animation properties inline as well so the element uses our unique keyframes
           animationName: animate ? "pulsateStatusBadge" : "none",
           animationDuration: animate ? "2s" : undefined,
           animationIterationCount: animate ? "infinite" : undefined,
@@ -309,7 +314,7 @@ function ClientDetailsHeaderSection({
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.5 : 1,
+    pr: isMobile ? 0.25 : 0.5, // HALVERET: desktop 1 -> 0.5, mobil 0.5 -> 0.25
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -317,7 +322,7 @@ function ClientDetailsHeaderSection({
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: 0, // remove theme left padding here because we apply inline px
+    pl: isMobile ? 0.25 : 0.75, // HALVERET: desktop 1.5 -> 0.75, mobil 0.5 -> 0.25
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -340,12 +345,7 @@ function ClientDetailsHeaderSection({
     return Object.entries(data).map(([key, value]) => (
       <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <TableCell
-          sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-          style={{ paddingLeft: 4, paddingRight: 4 }}
-        >
-          {String(value)}
-        </TableCell>
+        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{String(value)}</TableCell>
       </TableRow>
     ));
   }
@@ -403,32 +403,19 @@ function ClientDetailsHeaderSection({
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <TableCell
-                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                        style={{ paddingLeft: 4, paddingRight: 4 }}
-                      >
-                        {client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}
-                      </TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <TableCell
-                          sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                          style={{ paddingLeft: 4, paddingRight: 4 }}
-                        >
-                          {client?.id ?? "?"}
-                        </TableCell>
+                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
-                      <TableCell
-                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                        style={{ paddingLeft: 4, paddingRight: 4 }}
-                      >
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             select
@@ -436,18 +423,10 @@ function ClientDetailsHeaderSection({
                             value={selectedSchool ?? ""}
                             onChange={handleSchoolSelectChange}
                             disabled={loadingSchools}
-                            sx={{ ...inputStyle, mr: 0, ml: 0 }}
+                            sx={{ ...inputStyle }}
                             fullWidth
                             SelectProps={{ MenuProps: { disablePortal: true } }}
                             inputProps={{ "aria-label": "Skole" }}
-                            InputProps={{
-                              sx: {
-                                "& .MuiInputBase-input": {
-                                  paddingLeft: "4px",
-                                  paddingRight: "4px"
-                                }
-                              }
-                            }}
                             error={!!selectedSchoolDirty}
                             onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
                           >
@@ -466,26 +445,15 @@ function ClientDetailsHeaderSection({
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
-                      <TableCell
-                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                        style={{ paddingLeft: 4, paddingRight: 4 }}
-                      >
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
                             value={locality ?? ""}
                             onChange={handleLocalityChange}
-                            sx={{ ...inputStyle, mr: 0, ml: 0 }}
+                            sx={inputStyle}
                             disabled={savingLocality}
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            InputProps={{
-                              sx: {
-                                "& .MuiInputBase-input": {
-                                  paddingLeft: "4px",
-                                  paddingRight: "4px"
-                                }
-                              }
-                            }}
                             onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
                             error={!!localityDirty}
                             fullWidth
@@ -520,26 +488,15 @@ function ClientDetailsHeaderSection({
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
-                      <TableCell
-                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                        style={{ paddingLeft: 4, paddingRight: 4 }}
-                      >
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
                             value={kioskUrl ?? ""}
                             onChange={handleKioskUrlChange}
-                            sx={{ ...inputStyle, mr: 0, ml: 0 }}
+                            sx={inputStyle}
                             disabled={savingKioskUrl}
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            InputProps={{
-                              sx: {
-                                "& .MuiInputBase-input": {
-                                  paddingLeft: "4px",
-                                  paddingRight: "4px"
-                                }
-                              }
-                            }}
                             onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
                             error={!!kioskUrlDirty}
                             fullWidth
@@ -554,10 +511,7 @@ function ClientDetailsHeaderSection({
 
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                      <TableCell
-                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                        style={{ paddingLeft: 4, paddingRight: 4 }}
-                      >
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
