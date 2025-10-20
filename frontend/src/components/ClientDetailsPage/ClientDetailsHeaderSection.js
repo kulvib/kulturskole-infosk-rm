@@ -32,7 +32,7 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   - Overskrift "Kiosk info" ændret til "Infoskærm status".
   - Kiosk browser status value er sat på en ny linje (separeret tabelrække under label).
   - Beholder tidligere forbedringer: table-layout: fixed + colgroup, ValueCell med inline padding, konsistent input/select padding, status badges osv.
-  - Ny funktionalitet: når klient er offline (client.isOnline === false) skjules StateBadge ved "Infoskærm status", skjules "Kiosk browser status" og Lokation/Kiosk URL input er disabled/greyed out.
+  - Ny adfærd: hvis client.isOnline === false vises højre "paper" som greyed out med overlay der blokerer interaktion og viser tooltip/tekst "Klient er offline — redigering deaktiveret".
 */
 
 const COLOR_NAME_MAP = {
@@ -234,8 +234,9 @@ function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Determine if client is explicitly offline
+  // Determine offline state
   const clientIsOffline = client?.isOnline === false;
+  const offlineTooltip = "Klient er offline — redigering deaktiveret";
 
   // Schools state (prefer prop)
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
@@ -366,9 +367,9 @@ function ClientDetailsHeaderSection({
   function renderKioskBrowserDataRows(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
-      <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
-        <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <ValueCell>{String(value)}</ValueCell>
+      <TableRow key={key} sx={{ height: isMobile ? 28 : 34, opacity: clientIsOffline ? 0.6 : 1 }}>
+        <TableCell sx={{ ...labelStyle, borderBottom: "none", color: clientIsOffline ? "text.disabled" : "inherit" }}>{key}:</TableCell>
+        <ValueCell sx={{ color: clientIsOffline ? "text.disabled" : "inherit" }}>{String(value)}</ValueCell>
       </TableRow>
     ));
   }
@@ -488,11 +489,21 @@ function ClientDetailsHeaderSection({
 
         {/* Infoskærm status (right) - desktop 60% */}
         <Box sx={{ width: isMobile ? "100%" : "60%", pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+          <Card
+            elevation={2}
+            sx={{
+              borderRadius: isMobile ? 1 : 2,
+              height: "100%",
+              // subtle global dimming on the card itself if offline
+              opacity: clientIsOffline ? 0.75 : 1,
+              transition: "opacity 200ms ease"
+            }}
+          >
+            {/* CardContent is positioned relative so we can render an overlay that blocks interaction when offline */}
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, position: "relative" }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
-                {/* Skjul StateBadge hvis klient er offline */}
+                {/* Hide StateBadge when offline (per earlier requirement) */}
                 {clientIsOffline ? null : <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>}
               </Box>
 
@@ -564,29 +575,50 @@ function ClientDetailsHeaderSection({
                       </ValueCell>
                     </TableRow>
 
-                    {/* Kiosk browser status: skjul hvis klient er offline */}
-                    {!clientIsOffline && (
-                      <>
-                        <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                          <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                          <TableCell sx={{ borderBottom: "none" }} />
-                        </TableRow>
-                        <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                          <TableCell colSpan={2} sx={{ borderBottom: "none", pl: isMobile ? 1 : 2 }}>
-                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                              <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                            </Box>
-                          </TableCell>
-                        </TableRow>
+                    {/* Kiosk browser status: label-række + separat value-række nedenunder */}
+                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none", color: clientIsOffline ? "text.disabled" : "inherit" }}>Kiosk browser status:</TableCell>
+                      <TableCell sx={{ borderBottom: "none" }} />
+                    </TableRow>
+                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
+                      <TableCell colSpan={2} sx={{ borderBottom: "none", pl: isMobile ? 1 : 2, opacity: clientIsOffline ? 0.6 : 1, color: clientIsOffline ? "text.disabled" : "inherit" }}>
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                          <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+                        </Box>
+                      </TableCell>
+                    </TableRow>
 
-                        {renderKioskBrowserDataRows(kioskBrowserData)}
-                      </>
-                    )}
+                    {renderKioskBrowserDataRows(kioskBrowserData)}
 
                   </TableBody>
                 </Table>
               </TableContainer>
 
+              {/* Overlay that blocks interaction and shows a tooltip/message when the client is offline */}
+              {clientIsOffline && (
+                <Tooltip title={offlineTooltip}>
+                  <Box
+                    aria-hidden="true"
+                    sx={{
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "not-allowed",
+                      // allow visual dimming from parent opacity but keep overlay transparent
+                      backgroundColor: "transparent",
+                      // ensure overlay captures pointer events so underlying controls are inert
+                      pointerEvents: "auto"
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ color: "text.secondary", bgcolor: "transparent", px: 1 }}>
+                      Klient er offline — redigering deaktiveret
+                    </Typography>
+                  </Box>
+                </Tooltip>
+              )}
             </CardContent>
           </Card>
         </Box>
