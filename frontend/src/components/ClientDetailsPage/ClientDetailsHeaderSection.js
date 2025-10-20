@@ -30,10 +30,8 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient, pushKiosk
   - Local save for skole, lokation og kiosk URL: skriver direkte til backend uden at opdatere parent/clientState.
   - Inputfelter ændrer kun lokal state i denne komponent; Gem (Save) udfører API-kald og viser snackbar via showSnackbar.
   - Dette sikrer at en save ikke utilsigtet overskriver client.isOnline eller trigger en fuld-side opdatering.
-  - Ændringer: For at sikre at der ALDRIG kommer scrollbars i "papers" har vi:
-    - sat Card height til "auto" (fjernet height: "100%")
-    - tilføjet NO_SCROLL_SX på CardContent/TableContainer for at skjule scrollbars på tværs af browsere
-    - beholdt overflow synligt på relevante wrapper boxes så layout ikke brydes
+  - Ændringer: Justeret Select/TextField for 'Skole' så den indre .MuiSelect-select fylder 100% og er vertikalt centreret,
+    så den visuelle ramme matcher andre TextField'er (fx Lokation).
 */
 
 const COLOR_NAME_MAP = {
@@ -231,7 +229,7 @@ function ClientDetailsHeaderSection({
   const initialLocalityRef = React.useRef(client?.locality ?? "");
   const initialKioskUrlRef = React.useRef(client?.kiosk_url ?? "");
 
-  // Sync local state + initial refs when client prop changes (e.g., on client switch)
+  // Re-sync local state + initial refs when client prop changes (e.g., on client switch)
   React.useEffect(() => {
     setLocalLocality(client?.locality ?? "");
     initialLocalityRef.current = client?.locality ?? "";
@@ -451,14 +449,13 @@ function ClientDetailsHeaderSection({
       </Box>
 
       {/* Papers */}
-      {/* NOTE: explicit alignItems: "stretch" sikrer at flex-items kan strækkes på tværs (row-axis = height). */}
-      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%", alignItems: isMobile ? "stretch" : "stretch" }}>
+      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
         {/* Klient info (left) */}
-        <Box sx={{ width: leftPaperWidth, pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0, display: "flex", flexDirection: "column" }}>
-          {/* Card height changed to 100% and made flex-column så den kan fylde wrapperens højde */}
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            {/* CardContent receives NO_SCROLL_SX to hide any scrollbars in descendants and flex:1 for stretch */}
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX, flex: 1, display: "flex", flexDirection: "column" }}>
+        <Box sx={{ width: leftPaperWidth, pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
+          {/* Card height changed to auto and ensured overflow handling to avoid scrollbars */}
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden" }}>
+            {/* CardContent receives NO_SCROLL_SX to hide any scrollbars in descendants */}
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Klient info</Typography>
                 <Box sx={{ ml: 1 }}>
@@ -493,12 +490,34 @@ function ClientDetailsHeaderSection({
                               value={selectedSchool ?? ""}
                               onChange={handleSchoolSelectChange}
                               disabled={loadingSchools}
-                              sx={{ width: "100%", height: isMobile ? 30 : 32, "& .MuiInputBase-input": { fontSize: isMobile ? 12 : 14, height: isMobile ? "28px" : "32px", boxSizing: "border-box", padding: isMobile ? "6px 8px" : "8px 14px" } }}
                               fullWidth
                               SelectProps={{ MenuProps: { disablePortal: true } }}
                               inputProps={{ "aria-label": "Skole" }}
                               error={!!selectedSchoolDirty}
                               onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
+                              sx={{
+                                width: "100%",
+                                height: isMobile ? 30 : 32,
+                                // sikre at input og select-elementet fylder og er vertikalt centreret
+                                "& .MuiInputBase-input": {
+                                  fontSize: isMobile ? 12 : 14,
+                                  height: "100%",            // 100% så det matcher andre TextField'er
+                                  boxSizing: "border-box",
+                                  padding: isMobile ? "6px 8px" : "8px 14px",
+                                  display: "flex",
+                                  alignItems: "center"
+                                },
+                                "& .MuiSelect-select": {
+                                  height: "100%",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  padding: isMobile ? "6px 8px" : "8px 14px"
+                                },
+                                "& .MuiSelect-icon": {
+                                  top: "50%",
+                                  transform: "translateY(-50%)"
+                                }
+                              }}
                             >
                               <MenuItem value=""><em>Ingen skole</em></MenuItem>
                               {(schoolsList || []).map(s => (<MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>))}
@@ -523,10 +542,10 @@ function ClientDetailsHeaderSection({
         </Box>
 
         {/* Infoskærm status (right) */}
-        <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1, display: "flex", flexDirection: "column" }}>
-          {/* Card height changed to 100% and NO_SCROLL_SX applied; kort bruger flex så begge cards kan matches i højde */}
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", ...rightPaperDisabledStyle }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX, flex: 1, display: "flex", flexDirection: "column" }}>
+        <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1 }}>
+          {/* Card height changed to auto and NO_SCROLL_SX applied */}
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden", ...rightPaperDisabledStyle }}>
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
                 {/* Hide state badge if client is explicitly offline */}
