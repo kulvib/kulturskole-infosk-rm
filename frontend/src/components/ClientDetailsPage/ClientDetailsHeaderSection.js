@@ -26,11 +26,12 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 
 /*
   ClientDetailsHeaderSection
-  Ændringer i denne version:
+  Ændringer:
   - Desktop: left paper = 40%, right paper = 60%.
-  - Locality og Kiosk URL save-knapper får samme "greyed out" (disabled) logik som skole-knappen:
-    de er disabled indtil feltet er dirty (localityDirty / kioskUrlDirty) og indtil saving er færdig.
-  - Bevarer tidligere forbedringer: table-layout: fixed + colgroup, ValueCell med inline padding, konsistent input/select padding, status badges osv.
+  - Flyttet "Lokation" til right paper, placeret lige over "Kiosk URL".
+  - Overskrift "Kiosk info" ændret til "Infoskærm status".
+  - Kiosk browser status value er sat på en ny linje (separeret tabelrække under label).
+  - Beholder tidligere forbedringer: table-layout: fixed + colgroup, ValueCell med inline padding, konsistent input/select padding, status badges osv.
 */
 
 const COLOR_NAME_MAP = {
@@ -146,9 +147,9 @@ function StateBadge({ state, isMobile = false }) {
 }
 
 function ChromeStatusBadge({ status, color, isMobile = false }) {
-  let text = status || "ukendt";
+  const text = status || "ukendt";
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+    <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
       <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />
     </Box>
   );
@@ -346,7 +347,6 @@ function ClientDetailsHeaderSection({
   };
 
   // ValueCell helper: applies valueStyle via sx and forces inline paddingLeft/paddingRight so it wins.
-  // Left padding reduced to 2px so value content sits closer to the left cell edge.
   function ValueCell({ children, sx = {}, style = {}, ...props }) {
     return (
       <TableCell
@@ -472,6 +472,34 @@ function ClientDetailsHeaderSection({
                       </ValueCell>
                     </TableRow>
 
+                    {/* Lokation fjernet her - flyttet til Infoskærm status paper */}
+
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+            </CardContent>
+          </Card>
+        </Box>
+
+        {/* Infoskærm status (right) - desktop 60% */}
+        <Box sx={{ width: isMobile ? "100%" : "60%", pl: isMobile ? 0 : 1 }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
+                <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
+              </Box>
+
+              <TableContainer>
+                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col style={{ width: 140 }} />
+                    <col />
+                  </colgroup>
+                  <TableBody>
+
+                    {/* Flyttet: Lokation (nu i right paper over Kiosk URL) */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
                       <ValueCell>
@@ -492,7 +520,6 @@ function ClientDetailsHeaderSection({
                             variant="outlined"
                             size="small"
                             onClick={handleLocalitySave}
-                            // disabled until dirty (lokation ændret) OR while saving
                             disabled={savingLocality || !localityDirty}
                             sx={{ minWidth: 56 }}
                           >
@@ -502,30 +529,7 @@ function ClientDetailsHeaderSection({
                       </ValueCell>
                     </TableRow>
 
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-            </CardContent>
-          </Card>
-        </Box>
-
-        {/* Kiosk info (right) - desktop 60% */}
-        <Box sx={{ width: isMobile ? "100%" : "60%", pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Kiosk info</Typography>
-                <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
-              </Box>
-
-              <TableContainer>
-                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: "fixed" }}>
-                  <colgroup>
-                    <col style={{ width: 140 }} />
-                    <col />
-                  </colgroup>
-                  <TableBody>
+                    {/* Kiosk URL */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
                       <ValueCell>
@@ -546,7 +550,6 @@ function ClientDetailsHeaderSection({
                             variant="outlined"
                             size="small"
                             onClick={handleKioskUrlSave}
-                            // disabled until dirty (kiosk URL ændret) OR while saving
                             disabled={savingKioskUrl || !kioskUrlDirty}
                             sx={{ minWidth: 56 }}
                           >
@@ -556,11 +559,17 @@ function ClientDetailsHeaderSection({
                       </ValueCell>
                     </TableRow>
 
+                    {/* Kiosk browser status: label-række + separat value-række nedenunder */}
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                      <ValueCell>
-                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                      </ValueCell>
+                      <TableCell sx={{ borderBottom: "none" }} />
+                    </TableRow>
+                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
+                      <TableCell colSpan={2} sx={{ borderBottom: "none", pl: isMobile ? 1 : 2 }}>
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                          <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+                        </Box>
+                      </TableCell>
                     </TableRow>
 
                     {renderKioskBrowserDataRows(kioskBrowserData)}
