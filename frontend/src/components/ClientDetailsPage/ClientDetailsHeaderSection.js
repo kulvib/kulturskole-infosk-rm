@@ -25,14 +25,11 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection - complete file
-
-  Strong, deterministic approach:
-  - Locks first (label) column width via <colgroup> and sets tableLayout: "fixed" so column distribution cannot change.
-  - Applies inline paddingLeft/paddingRight on VALUE <TableCell> elements (inline styles override any stylesheet).
-  - Sets TextField input padding inline as well (InputProps.inputProps.style) so the input doesn't add extra spacing.
-  - Keeps labelStyle.minWidth: 140 so label column remains exactly where you had it.
-  - This file updates every value cell and TextField usage to the inline overrides so the visible gap is reduced.
+  ClientDetailsHeaderSection - komplet komponent
+  Ændring: VALUE-kolonner er rykket tættere på LABEL-kolonnen via inline padding overrides.
+  - Inline style på value TableCell: paddingLeft/paddingRight = 4px (vinder over global CSS).
+  - TextField inputer får også reduceret indre padding via InputProps.sx.
+  - Resten af filen beholdes som i dit oprindelige script.
 */
 
 const COLOR_NAME_MAP = {
@@ -55,14 +52,18 @@ function resolveColor(theme, color) {
   if (typeof color !== "string") return String(color);
 
   const trimmed = color.trim();
+
+  // hex or rgb(a)
   if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(trimmed) || /^rgba?\(/i.test(trimmed)) {
     return trimmed;
   }
 
   const lower = trimmed.toLowerCase();
+
+  // theme token like "grey.400" or "success.main"
   if (lower.includes(".")) {
     const [paletteKey, shade] = lower.split(".");
-    const pal = (theme.palette || {})[paletteKey];
+    const pal = theme.palette?.[paletteKey];
     if (pal) {
       if (shade && pal[shade]) return pal[shade];
       if (pal.main) return pal.main;
@@ -70,16 +71,22 @@ function resolveColor(theme, color) {
     }
   }
 
+  // theme direct key e.g. "success"
   if (theme.palette?.[lower]) {
     const pal = theme.palette[lower];
     if (typeof pal === "string") return pal;
     if (pal.main) return pal.main;
   }
 
+  // map common names to hex
   if (COLOR_NAME_MAP[lower]) return COLOR_NAME_MAP[lower];
+
+  // fallback to the raw trimmed string (may be valid CSS color)
   return trimmed;
 }
 
+// StatusBadge - dot + label. animation only transforms and opacity (no background)
+// inline style is used to force background-color so global keyframes/styles can't override it.
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
@@ -150,24 +157,27 @@ function ChromeStatusBadge({ status, color, isMobile = false }) {
 
 function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   const [copied, setCopied] = React.useState(false);
+
   const handleCopy = async () => {
     if (!value) return;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(value);
       } else {
-        const ta = document.createElement("textarea");
-        ta.value = value;
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
         document.execCommand("copy");
-        document.body.removeChild(ta);
+        document.body.removeChild(textarea);
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch (err) {}
+    } catch (err) {
+      // ignore copy errors
+    }
   };
 
   return (
@@ -181,10 +191,12 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
             maxWidth: isMobile ? 20 : 24,
             minHeight: isMobile ? 20 : 24,
             maxHeight: isMobile ? 20 : 24,
-            p: 0, m: 0,
+            p: 0,
+            m: 0,
             display: "flex",
             alignItems: "center",
-            justifyContent: "center"
+            justifyContent: "center",
+            verticalAlign: "middle",
           }}
           disabled={disabled}
         >
@@ -221,6 +233,7 @@ function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
+  // Schools state (prefer prop)
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
   const [loadingSchools, setLoadingSchools] = React.useState(false);
   const [schoolsError, setSchoolsError] = React.useState(null);
@@ -229,8 +242,11 @@ function ClientDetailsHeaderSection({
   const [savingSchool, setSavingSchool] = React.useState(false);
   const [selectedSchoolDirty, setSelectedSchoolDirty] = React.useState(false);
 
+  // Sync props -> state
   React.useEffect(() => {
-    if (Array.isArray(schools) && schools.length) setSchoolsList(schools);
+    if (Array.isArray(schools) && schools.length) {
+      setSchoolsList(schools);
+    }
   }, [schools]);
 
   React.useEffect(() => {
@@ -238,6 +254,7 @@ function ClientDetailsHeaderSection({
     setSelectedSchoolDirty(false);
   }, [client?.school_id]);
 
+  // fetch schools if not provided
   React.useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -272,13 +289,21 @@ function ClientDetailsHeaderSection({
     setSavingSchool(true);
     try {
       const updated = await apiUpdateClient(client.id, { school_id: selectedSchool });
-      if (typeof onSchoolUpdated === "function") onSchoolUpdated(updated || { ...client, school_id: selectedSchool });
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Skole opdateret", severity: "success" });
+      if (typeof onSchoolUpdated === "function") {
+        onSchoolUpdated(updated || { ...client, school_id: selectedSchool });
+      }
+      if (typeof showSnackbar === "function") {
+        showSnackbar({ message: "Skole opdateret", severity: "success" });
+      }
       setSelectedSchoolDirty(false);
     } catch (err) {
       console.error("Fejl ved opdatering af skole:", err);
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke opdatere skole: " + (err?.message || err), severity: "error" });
-    } finally { setSavingSchool(false); }
+      if (typeof showSnackbar === "function") {
+        showSnackbar({ message: "Kunne ikke opdatere skole: " + (err?.message || err), severity: "error" });
+      }
+    } finally {
+      setSavingSchool(false);
+    }
   };
 
   const labelStyle = {
@@ -292,7 +317,7 @@ function ClientDetailsHeaderSection({
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: 0,
+    pl: 0, // remove theme left padding here because we apply inline px
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -305,26 +330,22 @@ function ClientDetailsHeaderSection({
       fontSize: isMobile ? 12 : 14,
       height: isMobile ? "30px" : "32px",
       boxSizing: "border-box",
+      padding: isMobile ? "6px 10px" : "8px 14px"
     },
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
-
-  // helper to render a value cell with the inline overrides
-  const ValueCell = ({ children, textAlign = "left" }) => (
-    <TableCell
-      sx={{ ...valueStyle, borderBottom: "none", textAlign }}
-      style={{ paddingLeft: 4, paddingRight: 4 }}
-    >
-      {children}
-    </TableCell>
-  );
 
   function renderKioskBrowserDataRows(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
       <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <ValueCell>{String(value)}</ValueCell>
+        <TableCell
+          sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+          style={{ paddingLeft: 4, paddingRight: 4 }}
+        >
+          {String(value)}
+        </TableCell>
       </TableRow>
     ));
   }
@@ -335,6 +356,7 @@ function ClientDetailsHeaderSection({
     return s ? s.name : String(selectedSchool);
   }, [selectedSchool, schoolsList]);
 
+  // Render
   return (
     <Box sx={{ width: "100%" }} data-testid="client-details-header">
       {/* Topbar */}
@@ -377,27 +399,36 @@ function ClientDetailsHeaderSection({
               </Box>
 
               <TableContainer>
-                <Table size="small" aria-label="klient-info" sx={{ tableLayout: "fixed" }}>
-                  <colgroup>
-                    <col style={{ width: 140 }} />
-                    <col />
-                  </colgroup>
+                <Table size="small" aria-label="klient-info">
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <ValueCell>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</ValueCell>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
+                        {client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}
+                      </TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <ValueCell>{client?.id ?? "?"}</ValueCell>
+                        <TableCell
+                          sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                          style={{ paddingLeft: 4, paddingRight: 4 }}
+                        >
+                          {client?.id ?? "?"}
+                        </TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
-                      <ValueCell>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             select
@@ -408,7 +439,15 @@ function ClientDetailsHeaderSection({
                             sx={{ ...inputStyle, mr: 0, ml: 0 }}
                             fullWidth
                             SelectProps={{ MenuProps: { disablePortal: true } }}
-                            inputProps={{ "aria-label": "Skole", style: { paddingLeft: 4, paddingRight: 4 } }}
+                            inputProps={{ "aria-label": "Skole" }}
+                            InputProps={{
+                              sx: {
+                                "& .MuiInputBase-input": {
+                                  paddingLeft: "4px",
+                                  paddingRight: "4px"
+                                }
+                              }
+                            }}
                             error={!!selectedSchoolDirty}
                             onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
                           >
@@ -422,12 +461,15 @@ function ClientDetailsHeaderSection({
                             {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
-                      </ValueCell>
+                      </TableCell>
                     </TableRow>
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
-                      <ValueCell>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
@@ -435,7 +477,15 @@ function ClientDetailsHeaderSection({
                             onChange={handleLocalityChange}
                             sx={{ ...inputStyle, mr: 0, ml: 0 }}
                             disabled={savingLocality}
-                            inputProps={{ style: { fontSize: isMobile ? 12 : 14, paddingLeft: 4, paddingRight: 4 } }}
+                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                            InputProps={{
+                              sx: {
+                                "& .MuiInputBase-input": {
+                                  paddingLeft: "4px",
+                                  paddingRight: "4px"
+                                }
+                              }
+                            }}
                             onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
                             error={!!localityDirty}
                             fullWidth
@@ -445,7 +495,7 @@ function ClientDetailsHeaderSection({
                             {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
-                      </ValueCell>
+                      </TableCell>
                     </TableRow>
 
                   </TableBody>
@@ -466,15 +516,14 @@ function ClientDetailsHeaderSection({
               </Box>
 
               <TableContainer>
-                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: "fixed" }}>
-                  <colgroup>
-                    <col style={{ width: 140 }} />
-                    <col />
-                  </colgroup>
+                <Table size="small" aria-label="kiosk-info">
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
-                      <ValueCell>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
@@ -482,7 +531,15 @@ function ClientDetailsHeaderSection({
                             onChange={handleKioskUrlChange}
                             sx={{ ...inputStyle, mr: 0, ml: 0 }}
                             disabled={savingKioskUrl}
-                            inputProps={{ style: { fontSize: isMobile ? 12 : 14, paddingLeft: 4, paddingRight: 4 } }}
+                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                            InputProps={{
+                              sx: {
+                                "& .MuiInputBase-input": {
+                                  paddingLeft: "4px",
+                                  paddingRight: "4px"
+                                }
+                              }
+                            }}
                             onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
                             error={!!kioskUrlDirty}
                             fullWidth
@@ -492,14 +549,17 @@ function ClientDetailsHeaderSection({
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
-                      </ValueCell>
+                      </TableCell>
                     </TableRow>
 
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                      <ValueCell>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                      </ValueCell>
+                      </TableCell>
                     </TableRow>
 
                     {renderKioskBrowserDataRows(kioskBrowserData)}
@@ -516,9 +576,11 @@ function ClientDetailsHeaderSection({
   );
 }
 
+// Custom shallow comparator for React.memo:
+// Only re-render header when props that affect its UI actually change.
+// We check a set of primitives and a few client fields that header displays.
 function propsAreEqual(prev, next) {
-  if (prev === next) return true;
-
+  // Compare simple primitive props
   const simpleKeys = [
     "locality",
     "localityDirty",
@@ -529,12 +591,14 @@ function propsAreEqual(prev, next) {
     "liveChromeStatus",
     "liveChromeColor",
     "refreshing",
+    // optional token if parent provides it (useful if you want explicit change detection)
     "liveChromeTimestamp"
   ];
   for (const k of simpleKeys) {
     if (prev[k] !== next[k]) return false;
   }
 
+  // Compare client fields we care about shallowly
   const prevClient = prev.client || {};
   const nextClient = next.client || {};
   const clientKeys = ["id", "name", "isOnline", "school_id", "state", "chrome_status", "chrome_color"];
@@ -542,6 +606,7 @@ function propsAreEqual(prev, next) {
     if (prevClient[k] !== nextClient[k]) return false;
   }
 
+  // Compare schools length and basic identity to detect meaningful changes
   const prevSchools = prev.schools || [];
   const nextSchools = next.schools || [];
   if (prevSchools.length !== nextSchools.length) return false;
@@ -549,6 +614,7 @@ function propsAreEqual(prev, next) {
     if ((prevSchools[i]?.id ?? null) !== (nextSchools[i]?.id ?? null)) return false;
   }
 
+  // Compare kioskBrowserData shallowly by keys/values
   const prevKbd = prev.kioskBrowserData || {};
   const nextKbd = next.kioskBrowserData || {};
   const prevKbdKeys = Object.keys(prevKbd);
@@ -558,6 +624,7 @@ function propsAreEqual(prev, next) {
     if (prevKbd[key] !== nextKbd[key]) return false;
   }
 
+  // If we've reached here, treat props as equal (no re-render needed)
   return true;
 }
 
