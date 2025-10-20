@@ -25,16 +25,13 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection (JSX)
-  - Left paper 40% / Right paper 60% on desktop, stacked on mobile.
-  - Lokation moved to right paper directly above Kiosk URL.
-  - Title "Kiosk info" changed to "Infoskærm status".
-  - Kiosk browser status value displayed on its own line.
-  - When client.state === "offline" (case-insensitive):
-      * StateBadge and kiosk-browser-status block are hidden.
-      * Lokation and Kiosk URL are non-editable (fields disabled and save buttons disabled).
-  - Keeps previous layout/UX improvements: table-layout: fixed + colgroup, ValueCell with inline padding,
-    consistent input/select padding, copy-to-clipboard, save/delayed spinner handling and React.memo comparator.
+  ClientDetailsHeaderSection
+  Ændringer:
+  - Desktop: left paper = 40%, right paper = 60%.
+  - Flyttet "Lokation" til right paper, placeret lige over "Kiosk URL".
+  - Overskrift "Kiosk info" ændret til "Infoskærm status".
+  - Kiosk browser status value er sat på en ny linje (separeret tabelrække under label).
+  - Beholder tidligere forbedringer: table-layout: fixed + colgroup, ValueCell med inline padding, konsistent input/select padding, status badges osv.
 */
 
 const COLOR_NAME_MAP = {
@@ -235,9 +232,6 @@ function ClientDetailsHeaderSection({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
-
-  // Determine if clientscreen is offline (case-insensitive)
-  const isScreenOffline = String(client?.state ?? "").toLowerCase() === "offline";
 
   // Schools state (prefer prop)
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
@@ -494,12 +488,7 @@ function ClientDetailsHeaderSection({
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
-                {/* Hide the StateBadge (ikon/tekst) when the screen is offline */}
-                {!isScreenOffline && (
-                  <Box sx={{ ml: 1 }}>
-                    <StateBadge state={client?.state} isMobile={isMobile} />
-                  </Box>
-                )}
+                <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
               </Box>
 
               <TableContainer>
@@ -520,8 +509,7 @@ function ClientDetailsHeaderSection({
                             value={locality ?? ""}
                             onChange={handleLocalityChange}
                             sx={inputStyle}
-                            // Disable editing when screen is offline or while saving
-                            disabled={savingLocality || isScreenOffline}
+                            disabled={savingLocality}
                             inputProps={{ "aria-label": "Lokation" }}
                             onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
                             error={!!localityDirty}
@@ -532,8 +520,7 @@ function ClientDetailsHeaderSection({
                             variant="outlined"
                             size="small"
                             onClick={handleLocalitySave}
-                            // disabled until dirty OR while saving OR when offline
-                            disabled={savingLocality || !localityDirty || isScreenOffline}
+                            disabled={savingLocality || !localityDirty}
                             sx={{ minWidth: 56 }}
                           >
                             {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
@@ -552,8 +539,7 @@ function ClientDetailsHeaderSection({
                             value={kioskUrl ?? ""}
                             onChange={handleKioskUrlChange}
                             sx={inputStyle}
-                            // Disable editing when screen is offline or while saving
-                            disabled={savingKioskUrl || isScreenOffline}
+                            disabled={savingKioskUrl}
                             inputProps={{ "aria-label": "Kiosk URL" }}
                             onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
                             error={!!kioskUrlDirty}
@@ -564,8 +550,7 @@ function ClientDetailsHeaderSection({
                             variant="outlined"
                             size="small"
                             onClick={handleKioskUrlSave}
-                            // disabled until dirty OR while saving OR when offline
-                            disabled={savingKioskUrl || !kioskUrlDirty || isScreenOffline}
+                            disabled={savingKioskUrl || !kioskUrlDirty}
                             sx={{ minWidth: 56 }}
                           >
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
@@ -574,23 +559,18 @@ function ClientDetailsHeaderSection({
                       </ValueCell>
                     </TableRow>
 
-                    {/* Kiosk browser status: only show when NOT offline.
-                        Label-row + separate value-row kept previously; now conditional. */}
-                    {!isScreenOffline && (
-                      <>
-                        <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                          <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                          <TableCell sx={{ borderBottom: "none" }} />
-                        </TableRow>
-                        <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                          <TableCell colSpan={2} sx={{ borderBottom: "none", pl: isMobile ? 1 : 2 }}>
-                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                              <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      </>
-                    )}
+                    {/* Kiosk browser status: label-række + separat value-række nedenunder */}
+                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
+                      <TableCell sx={{ borderBottom: "none" }} />
+                    </TableRow>
+                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
+                      <TableCell colSpan={2} sx={{ borderBottom: "none", pl: isMobile ? 1 : 2 }}>
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                          <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+                        </Box>
+                      </TableCell>
+                    </TableRow>
 
                     {renderKioskBrowserDataRows(kioskBrowserData)}
 
