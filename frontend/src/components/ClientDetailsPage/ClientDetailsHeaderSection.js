@@ -32,7 +32,7 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
   - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
   - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
-  - Deterministisk, reduceret afstand mellem label og value på desktop ved hjælp af table-layout: fixed og eksplicit width på label-celler.
+  - Table-layout fixed + eksplicit label width på desktop + overflow: hidden/text-overflow: ellipsis for at undgå overlap.
 */
 
 const COLOR_NAME_MAP = {
@@ -321,6 +321,8 @@ function ClientDetailsHeaderSection({
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   };
   const valueStyle = {
     fontWeight: 400,
@@ -350,8 +352,8 @@ function ClientDetailsHeaderSection({
           sx={{
             ...labelStyle,
             borderBottom: "none",
-            width: isMobile ? 140 : 35,
-            minWidth: isMobile ? 140 : 35,
+            width: isMobile ? 140 : 70,
+            minWidth: isMobile ? 140 : 70,
           }}
         >
           {key}:
@@ -417,8 +419,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 35,
-                          minWidth: isMobile ? 140 : 35,
+                          width: isMobile ? 140 : 70,
+                          minWidth: isMobile ? 140 : 70,
                         }}
                       >
                         Klientnavn:
@@ -432,8 +434,8 @@ function ClientDetailsHeaderSection({
                           sx={{
                             ...labelStyle,
                             borderBottom: "none",
-                            width: isMobile ? 140 : 35,
-                            minWidth: isMobile ? 140 : 35,
+                            width: isMobile ? 140 : 70,
+                            minWidth: isMobile ? 140 : 70,
                           }}
                         >
                           Klient ID:
@@ -447,8 +449,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 35,
-                          minWidth: isMobile ? 140 : 35,
+                          width: isMobile ? 140 : 70,
+                          minWidth: isMobile ? 140 : 70,
                         }}
                       >
                         Skole:
@@ -486,8 +488,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 35,
-                          minWidth: isMobile ? 140 : 35,
+                          width: isMobile ? 140 : 70,
+                          minWidth: isMobile ? 140 : 70,
                         }}
                       >
                         Lokation:
@@ -538,8 +540,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 35,
-                          minWidth: isMobile ? 140 : 35,
+                          width: isMobile ? 140 : 70,
+                          minWidth: isMobile ? 140 : 70,
                         }}
                       >
                         Kiosk URL:
@@ -570,8 +572,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 35,
-                          minWidth: isMobile ? 140 : 35,
+                          width: isMobile ? 140 : 70,
+                          minWidth: isMobile ? 140 : 70,
                         }}
                       >
                         Kiosk browser status:
