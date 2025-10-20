@@ -107,10 +107,10 @@ function ClientPowerShortTable({ markedDays, isMobile=false }) {
   const cellStyle = { whiteSpace: "nowrap", py: 0, px: isMobile ? 1 : 1.625, fontSize: isMobile ? 12 : 14 };
 
   return (
-    <TableContainer sx={isMobile ? { maxWidth: "100%" } : { maxWidth: "100%" }}>
-      <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
+    <TableContainer sx={isMobile ? { maxWidth: "100vw" } : {}}>
+      <Table size="small">
         <TableHead>
-          <TableRow>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Dato</TableCell>
             <TableCell sx={cellStyle}>Status</TableCell>
             <TableCell sx={cellStyle}>Tænd</TableCell>
@@ -121,7 +121,7 @@ function ClientPowerShortTable({ markedDays, isMobile=false }) {
           {days.map((dt) => {
             const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
-              <TableRow key={dt.toISOString().slice(0, 10)}>
+              <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: isMobile ? 22 : 30 }}>
                 <TableCell sx={cellStyle}>{formatDateShort(dt)}</TableCell>
                 <TableCell sx={cellStyle}><StatusText status={status} isMobile={isMobile} /></TableCell>
                 <TableCell sx={cellStyle}>
@@ -205,6 +205,7 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
     pr: isMobile ? 0.25 : 0.5,
     py: 0,
     verticalAlign: "middle",
+    height: isMobile ? 22 : 30,
     fontSize: isMobile ? 12 : 14,
   };
   const valueCellStyle = {
@@ -212,13 +213,14 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
     pl: isMobile ? 0.25 : 0.5,
     py: 0,
     verticalAlign: "middle",
+    height: isMobile ? 22 : 30,
     fontSize: isMobile ? 12 : 14,
   };
   return (
     <TableContainer>
-      <Table size="small" aria-label="systeminfo" sx={{ tableLayout: 'fixed', width: '100%' }}>
+      <Table size="small" aria-label="systeminfo">
         <TableBody>
-          <TableRow>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
@@ -226,7 +228,7 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Oppetid:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
@@ -234,7 +236,7 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Sidst set:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
@@ -242,7 +244,7 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
               </Box>
             </TableCell>
           </TableRow>
-          <TableRow>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Tilføjet:</TableCell>
             <TableCell sx={valueCellStyle}>
               <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
@@ -309,6 +311,7 @@ function NetworkInfoTable({ client, isMobile=false }) {
     pr: isMobile ? 0.25 : 0.5,
     py: 0,
     verticalAlign: "middle",
+    height: isMobile ? 22 : 30,
     fontSize: isMobile ? 12 : 14,
   };
   const valueCellStyle = {
@@ -316,31 +319,32 @@ function NetworkInfoTable({ client, isMobile=false }) {
     pl: isMobile ? 0.25 : 0.5,
     py: 0,
     verticalAlign: "middle",
+    height: isMobile ? 22 : 30,
     fontSize: isMobile ? 12 : 14,
   };
   return (
     <TableContainer>
-      <Table size="small" aria-label="netværksinfo" sx={{ tableLayout: 'fixed', width: '100%' }}>
+      <Table size="small" aria-label="netværksinfo">
         <TableBody>
-          <TableRow>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>IP-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
               <CopyField value={client.wifi_ip_address || "ukendt"} isMobile={isMobile} />
             </TableCell>
           </TableRow>
-          <TableRow>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse WLAN:</TableCell>
             <TableCell sx={valueCellStyle}>
               <CopyField value={client.wifi_mac_address || "ukendt"} isMobile={isMobile} />
             </TableCell>
           </TableRow>
-          <TableRow>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>IP-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
               <CopyField value={client.lan_ip_address || "ukendt"} isMobile={isMobile} />
             </TableCell>
           </TableRow>
-          <TableRow>
+          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse LAN:</TableCell>
             <TableCell sx={valueCellStyle}>
               <CopyField value={client.lan_mac_address || "ukendt"} isMobile={isMobile} />
@@ -364,16 +368,19 @@ export default function ClientDetailsInfoSection({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
+  // Determine offline explicitly: parent can pass clientOnline (false => offline),
+  // otherwise fall back to client?.isOnline === false
   const isOffline = (typeof clientOnline !== "undefined")
     ? clientOnline === false
     : client?.isOnline === false;
 
-  const disabledOverlay = isOffline ? { opacity: 0.75, filter: "grayscale(20%)", bgcolor: "#fafafa", overflow: "visible" } : { overflow: "visible" };
+  // Visual disabled styles when offline
+  const disabledOverlay = isOffline ? { opacity: 0.65, filter: "grayscale(20%)", bgcolor: "#fafafa" } : {};
 
   return (
     <Grid container spacing={isMobile ? 0.5 : 1}>
       <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, boxSizing: "border-box", overflow: "visible", ...disabledOverlay }}>
+        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", ...disabledOverlay }}>
           <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : undefined }}>
@@ -406,12 +413,13 @@ export default function ClientDetailsInfoSection({
       </Grid>
 
       <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, boxSizing: "border-box", overflow: "visible", ...disabledOverlay }}>
+        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", ...disabledOverlay }}>
           <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
                 Systeminfo
               </Typography>
+              {/* StateBadge removed from here (moved to header) */}
             </Box>
             <SystemInfoTable client={client} uptime={uptime} lastSeen={lastSeen} isMobile={isMobile} />
           </CardContent>
@@ -419,12 +427,13 @@ export default function ClientDetailsInfoSection({
       </Grid>
 
       <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, boxSizing: "border-box", overflow: "visible", ...disabledOverlay }}>
+        <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%", ...disabledOverlay }}>
           <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
                 Netværksinfo
               </Typography>
+              {/* OnlineStatusBadge removed from here (moved to header) */}
             </Box>
             <NetworkInfoTable client={client} isMobile={isMobile} />
           </CardContent>
