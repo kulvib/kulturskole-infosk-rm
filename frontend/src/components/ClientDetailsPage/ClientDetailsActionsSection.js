@@ -27,16 +27,20 @@ import { useTheme } from "@mui/material/styles";
 import { clientAction } from "../../api";
 import { useAuth } from "../../auth/authcontext";
 
-// Adjustments: removed fixed heights and made cards/content overflow visible so no internal scrollbars.
+// Denne komponent opdateres ikke via polling eller client-objekt – kun via props ændret af brugerhandlinger!
+// Ændring: bruger wrapperens showSnackbar hvis den er tilgængelig; fallback til lokal snackbar ellers.
+// Også: nulstil lokal actionLoading når clientId ændrer sig eller når optional prop `refreshing` skifter til false.
+// Rettet: hvis parent sender handleClientAction, benyttes den; ellers fallback til intern clientAction.
+// NYT: respectér clientOnline === false og deaktiver knapper/visuelt nedtonet karton.
 
 function ClientDetailsActionsSection({
   clientId,
   handleOpenTerminal,
   handleOpenRemoteDesktop,
-  refreshing,
-  showSnackbar,
-  handleClientAction: parentHandleClientAction,
-  clientOnline = true
+  refreshing, // optional: hvis wrapper sender refreshing-flag kan vi rydde loading når refresh er færdig
+  showSnackbar, // optional: funktion fra wrapper til at vise snackbar centrally
+  handleClientAction: parentHandleClientAction, // optional: parent kan håndtere action
+  clientOnline = true // NEW: hvis false => alle handlinger disabled / greyed out
 }) {
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
@@ -46,10 +50,12 @@ function ClientDetailsActionsSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
+  // Nulstil lokale loading-states når clientId skifter (fx ved navigation) for at undgå fastlåst UI
   useEffect(() => {
     setActionLoading({});
   }, [clientId]);
 
+  // Hvis parent sender refreshing, ryd også loading når refreshing går fra true -> false
   useEffect(() => {
     if (typeof refreshing !== "undefined") {
       if (!refreshing) {
@@ -58,11 +64,13 @@ function ClientDetailsActionsSection({
     }
   }, [refreshing]);
 
+  // Helper: centraliseret notifikation (brug wrapper hvis tilgængelig, ellers lokal snackbar)
   const notify = useCallback((msgObj) => {
     if (typeof showSnackbar === "function") {
       try {
         showSnackbar(msgObj);
       } catch (e) {
+        // Fallback til lokal snackbar hvis wrapper-fejl
         setLocalSnackbar({ open: true, message: msgObj.message || "", severity: msgObj.severity || "success" });
       }
     } else {
@@ -70,6 +78,7 @@ function ClientDetailsActionsSection({
     }
   }, [showSnackbar]);
 
+  // Intern fallback handler (bruges hvis parent ikke leverer handleClientAction)
   const internalHandleClientAction = useCallback(async (action) => {
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
@@ -83,7 +92,9 @@ function ClientDetailsActionsSection({
     }
   }, [clientId, notify]);
 
+  // Højere-niveau wrapper der bruger parent's handler hvis tilgængelig, ellers fallback til intern
   const doClientAction = useCallback(async (action) => {
+    // If client explicitly offline, disallow actions
     if (clientOnline === false) {
       notify({ message: "Klienten er offline — handling afvist", severity: "warning" });
       return;
@@ -92,24 +103,30 @@ function ClientDetailsActionsSection({
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
       if (typeof parentHandleClientAction === "function") {
+        // parent forventes at returnere et Promise
         await parentHandleClientAction(action);
+        // antag at parent selv viser snackbar; hvis ikke, vis success fallback
         notify({ message: 'Handling udført!', severity: 'success' });
       } else {
         await internalHandleClientAction(action);
       }
     } catch (err) {
+      // Sørg for at forwardere fejlmeddelelse via notify (hvis parent ikke gjorde det)
       notify({ message: 'Fejl: ' + (err?.message || 'Kunne ikke udføre handling'), severity: 'error' });
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
   }, [parentHandleClientAction, internalHandleClientAction, notify, clientOnline]);
 
+  // Wrapper for Tooltip så den ikke vises på mobil
   const MaybeTooltip = ({ title, children }) =>
     isMobile ? children : <Tooltip title={title}>{children}</Tooltip>;
 
+  // Tilpasset knapstyle: height: 38px og harmoniske værdier
   const actionBtnStyle = {
     minWidth: 0,
     width: "100%",
+    height: 38,
     fontSize: "0.95rem",
     textTransform: "none",
     fontWeight: 500,
@@ -124,6 +141,7 @@ function ClientDetailsActionsSection({
     boxShadow: 1,
   };
 
+  // --- Admin: 2 rækker af 4 knapper i ønsket rækkefølge ---
   const adminFirstRow = [
     {
       key: "chrome-start",
@@ -208,6 +226,7 @@ function ClientDetailsActionsSection({
     },
   ];
 
+  // --- Bruger: 1 række á 4 knapper, 2. række kun "Genstart klient" ---
   const userFirstRow = [
     adminFirstRow[0],
     adminFirstRow[1],
@@ -228,14 +247,14 @@ function ClientDetailsActionsSection({
   ];
 
   const renderButton = btn => (
-    <Grid item xs={12} sm={6} md={3} key={btn.key} sx={{ overflow: "visible" }}>
+    <Grid item xs={12} sm={6} md={3} key={btn.key}>
       <MaybeTooltip title={btn.tooltip}>
         <span style={{ width: "100%" }}>
           <Button
             variant={btn.variant}
             color={btn.color}
             startIcon={btn.icon}
-            disabled={!!btn.loading || clientOnline === false}
+            disabled={!!btn.loading || clientOnline === false} /* NEW: disable when explicit offline */
             onClick={btn.onClick}
             sx={actionBtnStyle}
             fullWidth
@@ -250,28 +269,29 @@ function ClientDetailsActionsSection({
     </Grid>
   );
 
+  // Visual hint for offline (not blocking pointerEvents so dialogs/controls still work)
   const cardStyle = clientOnline === false ? { opacity: 0.85 } : {};
 
   return (
-    <Card elevation={2} sx={{ borderRadius: 2, mb: 2, boxSizing: "border-box", overflow: "visible", ...cardStyle }}>
+    <Card elevation={2} sx={{ borderRadius: 2, mb: 2, ...cardStyle }}>
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
         {user?.role === "admin" ? (
           <>
-            <Grid container spacing={2} alignItems="center" justifyContent="center" sx={{ overflow: "visible" }}>
+            <Grid container spacing={2} alignItems="center" justifyContent="center">
               {adminFirstRow.map(renderButton)}
             </Grid>
             <Box sx={{ height: 12 }} />
-            <Grid container spacing={2} alignItems="center" justifyContent="center" sx={{ overflow: "visible" }}>
+            <Grid container spacing={2} alignItems="center" justifyContent="center">
               {adminSecondRow.map(renderButton)}
             </Grid>
           </>
         ) : (
           <>
-            <Grid container spacing={2} alignItems="center" justifyContent="center" sx={{ overflow: "visible" }}>
+            <Grid container spacing={2} alignItems="center" justifyContent="center">
               {userFirstRow.map(renderButton)}
             </Grid>
             <Box sx={{ height: 12 }} />
-            <Grid container spacing={2} alignItems="center" justifyContent="center" sx={{ overflow: "visible" }}>
+            <Grid container spacing={2} alignItems="center" justifyContent="center">
               {userSecondRow.map(renderButton)}
             </Grid>
           </>
@@ -296,13 +316,14 @@ function ClientDetailsActionsSection({
               }}
               color="error"
               variant="contained"
-              disabled={clientOnline === false}
+              disabled={clientOnline === false} /* NEW: disallow confirm if offline */
             >
               Ja, sluk klienten
             </Button>
           </DialogActions>
         </Dialog>
 
+        {/* Lokal snackbar fallback hvis wrapper ikke leverer showSnackbar */}
         <Snackbar
           open={localSnackbar.open}
           autoHideDuration={3000}
@@ -322,4 +343,5 @@ function ClientDetailsActionsSection({
   );
 }
 
+// Memoize for kun at re-rendre på prop-skift
 export default React.memo(ClientDetailsActionsSection);
