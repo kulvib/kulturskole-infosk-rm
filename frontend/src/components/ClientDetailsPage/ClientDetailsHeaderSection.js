@@ -25,11 +25,13 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection - opdateret:
-  - Label-kolonnen gendannet til oprindelig placering (minWidth 140 osv).
-  - Halveret spacing mellem label og value (theme spacing enheder halveret).
-  - TableCell padding er IKKE ændret (bevarer MUI default) så kolonne-placeringen ikke forskydes.
-  - Ændringer anvendt konsekvent i begge "papers".
+  ClientDetailsHeaderSection - komplet komponent
+  Rettelser/forbedringer inkluderet:
+  - Robust color resolution (theme tokens, hex, color names).
+  - Unik keyframe-navn (pulsateStatusBadge) og keyframes animerer KUN transform+opacity.
+  - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
+  - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
+  - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
 */
 
 const COLOR_NAME_MAP = {
@@ -85,6 +87,8 @@ function resolveColor(theme, color) {
   return trimmed;
 }
 
+// StatusBadge - dot + label. animation only transforms and opacity (no background)
+// inline style is used to force background-color so global keyframes/styles can't override it.
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
@@ -99,15 +103,19 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
+          // use our unique animation name via sx (keeps theme-based style generation)
           animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
+          // keyframes animate only transform+opacity
           "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
+        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
         style={{
           backgroundColor: resolvedBg,
+          // enforce our animation properties inline as well so the element uses our unique keyframes
           animationName: animate ? "pulsateStatusBadge" : "none",
           animationDuration: animate ? "2s" : undefined,
           animationIterationCount: animate ? "infinite" : undefined,
@@ -304,19 +312,18 @@ function ClientDetailsHeaderSection({
     }
   };
 
-  // Halveret spacing: reducerede theme spacing-enheder men beholdt TableCell default padding
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5, // halveret i forhold til original (original desk:1 -> nu 0.5)
+    pr: isMobile ? 0.25 : 0.5, // HALVERET: desktop 1 -> 0.5, mobil 0.5 -> 0.25
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
-    minWidth: 140, // gendannet til original
+    minWidth: 140,
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.25 : 0.75, // halveret i forhold til original (original desk:1.5 -> nu 0.75)
+    pl: isMobile ? 0.25 : 0.75, // HALVERET: desktop 1.5 -> 0.75, mobil 0.5 -> 0.25
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -528,6 +535,7 @@ function ClientDetailsHeaderSection({
 // Only re-render header when props that affect its UI actually change.
 // We check a set of primitives and a few client fields that header displays.
 function propsAreEqual(prev, next) {
+  // Compare simple primitive props
   const simpleKeys = [
     "locality",
     "localityDirty",
@@ -538,12 +546,14 @@ function propsAreEqual(prev, next) {
     "liveChromeStatus",
     "liveChromeColor",
     "refreshing",
+    // optional token if parent provides it (useful if you want explicit change detection)
     "liveChromeTimestamp"
   ];
   for (const k of simpleKeys) {
     if (prev[k] !== next[k]) return false;
   }
 
+  // Compare client fields we care about shallowly
   const prevClient = prev.client || {};
   const nextClient = next.client || {};
   const clientKeys = ["id", "name", "isOnline", "school_id", "state", "chrome_status", "chrome_color"];
@@ -551,6 +561,7 @@ function propsAreEqual(prev, next) {
     if (prevClient[k] !== nextClient[k]) return false;
   }
 
+  // Compare schools length and basic identity to detect meaningful changes
   const prevSchools = prev.schools || [];
   const nextSchools = next.schools || [];
   if (prevSchools.length !== nextSchools.length) return false;
@@ -558,6 +569,7 @@ function propsAreEqual(prev, next) {
     if ((prevSchools[i]?.id ?? null) !== (nextSchools[i]?.id ?? null)) return false;
   }
 
+  // Compare kioskBrowserData shallowly by keys/values
   const prevKbd = prev.kioskBrowserData || {};
   const nextKbd = next.kioskBrowserData || {};
   const prevKbdKeys = Object.keys(prevKbd);
@@ -567,6 +579,7 @@ function propsAreEqual(prev, next) {
     if (prevKbd[key] !== nextKbd[key]) return false;
   }
 
+  // If we've reached here, treat props as equal (no re-render needed)
   return true;
 }
 
