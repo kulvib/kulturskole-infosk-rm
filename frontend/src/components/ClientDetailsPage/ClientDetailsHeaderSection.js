@@ -34,6 +34,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   - Local dirty-checks for Lokation and Kiosk URL are preserved; "Gem" buttons disabled until inputs change.
   - "Kiosk info" heading renamed to "Infoskærm status" (kept from previous change).
   - Table-layout remains 'fixed' to keep deterministic column sizing; label cell width adjusts per breakpoint.
+
+  Behavior change: If client is explicitly offline (client?.isOnline === false) we:
+  - Hide the StateBadge next to the "Infoskærm status" heading.
+  - Make the Lokation & Kiosk URL inputs + their "Gem" buttons non-editable (disabled).
 */
 
 const COLOR_NAME_MAP = {
@@ -409,6 +413,9 @@ function ClientDetailsHeaderSection({
     return s ? s.name : String(selectedSchool);
   }, [selectedSchool, schoolsList]);
 
+  // NEW: determine offline state (explicit false means offline)
+  const isOffline = client?.isOnline === false;
+
   // Render
   return (
     <Box sx={{ width: "100%" }} data-testid="client-details-header">
@@ -510,7 +517,10 @@ function ClientDetailsHeaderSection({
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
-                <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
+                {/* NEW: Hide state badge if client is explicitly offline */}
+                {client?.isOnline !== false && (
+                  <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
+                )}
               </Box>
 
               <TableContainer>
@@ -527,7 +537,7 @@ function ClientDetailsHeaderSection({
                             value={localLocality ?? ""}
                             onChange={onLocalityChange}
                             sx={inputStyle}
-                            disabled={savingLocality}
+                            disabled={savingLocality || isOffline} /* NEW: disable editing when offline */
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
                             onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
                             error={!!localityDirty}
@@ -538,7 +548,7 @@ function ClientDetailsHeaderSection({
                             variant="outlined"
                             size="small"
                             onClick={handleLocalitySave}
-                            disabled={savingLocality || !localityChanged}
+                            disabled={savingLocality || !localityChanged || isOffline} /* NEW: prevent save when offline */
                             sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
                             {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
@@ -557,7 +567,7 @@ function ClientDetailsHeaderSection({
                             value={localKioskUrl ?? ""}
                             onChange={onKioskUrlChange}
                             sx={inputStyle}
-                            disabled={savingKioskUrl}
+                            disabled={savingKioskUrl || isOffline} /* NEW: disable editing when offline */
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
                             onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
                             error={!!kioskUrlDirty}
@@ -568,7 +578,7 @@ function ClientDetailsHeaderSection({
                             variant="outlined"
                             size="small"
                             onClick={handleKioskUrlSave}
-                            disabled={savingKioskUrl || !kioskUrlChanged}
+                            disabled={savingKioskUrl || !kioskUrlChanged || isOffline} /* NEW: prevent save when offline */
                             sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
