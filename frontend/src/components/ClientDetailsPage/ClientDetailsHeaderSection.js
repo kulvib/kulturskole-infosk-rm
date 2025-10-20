@@ -25,14 +25,14 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection - komplet komponent
-  Endelig kraftig override for at rykke VALUE-kolonner tættere på LABEL-kolonnen.
+  ClientDetailsHeaderSection - complete file
 
-  Hvad jeg gør:
-  - Beholder labelStyle.minWidth:140 og øvrige label-styles som før (kolonneplacering uændret).
-  - Sætter inline style={{ paddingLeft: 4, paddingRight: 4 }} på alle VALUE <TableCell> (inline vinder).
-  - For TextField: sætter InputProps.inputProps.style med paddingLeft/paddingRight = 4px (inline på native input).
-  - Beholder rest af komponenten uberørt.
+  Strong, deterministic approach:
+  - Locks first (label) column width via <colgroup> and sets tableLayout: "fixed" so column distribution cannot change.
+  - Applies inline paddingLeft/paddingRight on VALUE <TableCell> elements (inline styles override any stylesheet).
+  - Sets TextField input padding inline as well (InputProps.inputProps.style) so the input doesn't add extra spacing.
+  - Keeps labelStyle.minWidth: 140 so label column remains exactly where you had it.
+  - This file updates every value cell and TextField usage to the inline overrides so the visible gap is reduced.
 */
 
 const COLOR_NAME_MAP = {
@@ -55,7 +55,6 @@ function resolveColor(theme, color) {
   if (typeof color !== "string") return String(color);
 
   const trimmed = color.trim();
-
   if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(trimmed) || /^rgba?\(/i.test(trimmed)) {
     return trimmed;
   }
@@ -63,18 +62,20 @@ function resolveColor(theme, color) {
   const lower = trimmed.toLowerCase();
   if (lower.includes(".")) {
     const [paletteKey, shade] = lower.split(".");
-    const pal = theme.palette?.[paletteKey];
+    const pal = (theme.palette || {})[paletteKey];
     if (pal) {
       if (shade && pal[shade]) return pal[shade];
       if (pal.main) return pal.main;
       if (typeof pal === "string") return pal;
     }
   }
+
   if (theme.palette?.[lower]) {
     const pal = theme.palette[lower];
     if (typeof pal === "string") return pal;
     if (pal.main) return pal.main;
   }
+
   if (COLOR_NAME_MAP[lower]) return COLOR_NAME_MAP[lower];
   return trimmed;
 }
@@ -82,6 +83,7 @@ function resolveColor(theme, color) {
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
+
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
       <Box
@@ -307,17 +309,22 @@ function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
+  // helper to render a value cell with the inline overrides
+  const ValueCell = ({ children, textAlign = "left" }) => (
+    <TableCell
+      sx={{ ...valueStyle, borderBottom: "none", textAlign }}
+      style={{ paddingLeft: 4, paddingRight: 4 }}
+    >
+      {children}
+    </TableCell>
+  );
+
   function renderKioskBrowserDataRows(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
       <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <TableCell
-          sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-          style={{ paddingLeft: 4, paddingRight: 4 }}
-        >
-          {String(value)}
-        </TableCell>
+        <ValueCell>{String(value)}</ValueCell>
       </TableRow>
     ));
   }
@@ -328,7 +335,6 @@ function ClientDetailsHeaderSection({
     return s ? s.name : String(selectedSchool);
   }, [selectedSchool, schoolsList]);
 
-  // Render
   return (
     <Box sx={{ width: "100%" }} data-testid="client-details-header">
       {/* Topbar */}
@@ -371,36 +377,27 @@ function ClientDetailsHeaderSection({
               </Box>
 
               <TableContainer>
-                <Table size="small" aria-label="klient-info">
+                <Table size="small" aria-label="klient-info" sx={{ tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col style={{ width: 140 }} />
+                    <col />
+                  </colgroup>
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <TableCell
-                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                        style={{ paddingLeft: 4, paddingRight: 4 }}
-                      >
-                        {client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}
-                      </TableCell>
+                      <ValueCell>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</ValueCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <TableCell
-                          sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                          style={{ paddingLeft: 4, paddingRight: 4 }}
-                        >
-                          {client?.id ?? "?"}
-                        </TableCell>
+                        <ValueCell>{client?.id ?? "?"}</ValueCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
-                      <TableCell
-                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                        style={{ paddingLeft: 4, paddingRight: 4 }}
-                      >
+                      <ValueCell>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             select
@@ -425,15 +422,12 @@ function ClientDetailsHeaderSection({
                             {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
-                      </TableCell>
+                      </ValueCell>
                     </TableRow>
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
-                      <TableCell
-                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                        style={{ paddingLeft: 4, paddingRight: 4 }}
-                      >
+                      <ValueCell>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
@@ -451,7 +445,7 @@ function ClientDetailsHeaderSection({
                             {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
-                      </TableCell>
+                      </ValueCell>
                     </TableRow>
 
                   </TableBody>
@@ -472,14 +466,15 @@ function ClientDetailsHeaderSection({
               </Box>
 
               <TableContainer>
-                <Table size="small" aria-label="kiosk-info">
+                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col style={{ width: 140 }} />
+                    <col />
+                  </colgroup>
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
-                      <TableCell
-                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                        style={{ paddingLeft: 4, paddingRight: 4 }}
-                      >
+                      <ValueCell>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
@@ -497,17 +492,14 @@ function ClientDetailsHeaderSection({
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
-                      </TableCell>
+                      </ValueCell>
                     </TableRow>
 
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                      <TableCell
-                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
-                        style={{ paddingLeft: 4, paddingRight: 4 }}
-                      >
+                      <ValueCell>
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                      </TableCell>
+                      </ValueCell>
                     </TableRow>
 
                     {renderKioskBrowserDataRows(kioskBrowserData)}
@@ -524,9 +516,6 @@ function ClientDetailsHeaderSection({
   );
 }
 
-// Custom shallow comparator for React.memo:
-// Only re-render header when props that affect its UI actually change.
-// We check a set of primitives and a few client fields that header displays.
 function propsAreEqual(prev, next) {
   if (prev === next) return true;
 
