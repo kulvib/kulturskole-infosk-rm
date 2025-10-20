@@ -28,10 +28,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   ClientDetailsHeaderSection - komplet komponent
   Ændringer:
   - Desktop: paper 1 = 40%, paper 2 = 60%
-  - Lokation er placeret i paper 2 (øverst)
-  - Kiosk URL ligger direkte under Lokation
-  - Kiosk browser status: label på egen række og value på separat række under label
-  - Table-layout fixed, label width 140px (desktop), overflow ellipsis på labels
+  - Lokation i paper 2 (øverst)
+  - Kiosk URL direkte under Lokation
+  - Kiosk browser status label og value vises i samme række, men label får lokal override så hele teksten vises (wrap hvis nødvendig)
+  - Table-layout fixed, label width 140px (desktop), overflow/ellipsis generelt bevaret for øvrige labels
   - Bevarer øvrig funktionalitet og propsAreEqual
 */
 
@@ -104,15 +104,19 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
+          // use our unique animation name via sx (keeps theme-based style generation)
           animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
+          // keyframes animate only transform+opacity
           "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
+        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
         style={{
           backgroundColor: resolvedBg,
+          // enforce our animation properties inline as well so the element uses our unique keyframes
           animationName: animate ? "pulsateStatusBadge" : "none",
           animationDuration: animate ? "2s" : undefined,
           animationIterationCount: animate ? "infinite" : undefined,
@@ -568,11 +572,16 @@ function ClientDetailsHeaderSection({
                       </TableCell>
                     </TableRow>
 
-                    {/* Kiosk browser status: label on its own row, value on the next row */}
+                    {/* Kiosk browser status - label + value on same row.
+                        We override label's whiteSpace/overflow to ensure full label text is visible (wrap if necessary). */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell
                         sx={{
                           ...labelStyle,
+                          // override to ensure full label visible
+                          whiteSpace: isMobile ? "nowrap" : "normal",
+                          overflow: isMobile ? "hidden" : "visible",
+                          textOverflow: isMobile ? "ellipsis" : "clip",
                           borderBottom: "none",
                           width: 140,
                           minWidth: 140,
@@ -580,11 +589,6 @@ function ClientDetailsHeaderSection({
                       >
                         Kiosk browser status:
                       </TableCell>
-                      <TableCell sx={{ borderBottom: "none" }}></TableCell>
-                    </TableRow>
-
-                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell sx={{ borderBottom: "none", width: 140, minWidth: 140 }} />
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
