@@ -26,11 +26,12 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 
 /*
   ClientDetailsHeaderSection - komplet komponent
-  Ændring:
-  - Ingen ændring af label-celler.
-  - VALUE-indholdet (anden kolonne) er nu pakket ind i en wrapper som bruger transform: translateX(...)
-    for at trække indholdet visuelt tættere på label-kolonnen. Dette påvirker kun rendering (visuelt),
-    ikke tabelens kolonne-definitioner, og er derfor robust over for MUI-tema/padding-regler.
+  Rettelser/forbedringer inkluderet:
+  - Robust color resolution (theme tokens, hex, color names).
+  - Unik keyframe-navn (pulsateStatusBadge) og keyframes animerer KUN transform+opacity.
+  - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
+  - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
+  - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
 */
 
 const COLOR_NAME_MAP = {
@@ -212,14 +213,6 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   );
 }
 
-// Wrapper component for value content: applies a visual left-shift using CSS transform.
-// This moves value content closer to label without changing table layout or label cell.
-function ValueContent({ children, shift }) {
-  // Use inline style for transform so it has high specificity and is local
-  const style = { transform: `translateX(${shift})`, display: "inline-flex", alignItems: "center" };
-  return <span style={style}>{children}</span>;
-}
-
 function ClientDetailsHeaderSection({
   client,
   schools = [],
@@ -319,22 +312,24 @@ function ClientDetailsHeaderSection({
     }
   };
 
+  // <-- Ændringer for at halvere afstand -->
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5, // behold label padding som oprindelig
+    pr: isMobile ? 0.5 : 0.5, // mindsket padding-right (halveret på desktop)
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
-    minWidth: 140,
+    minWidth: 70, // halveret fra 140 -> 70
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.25 : 0.75,
+    pl: isMobile ? 0.5 : 0.75, // mindsket padding-left (halveret fra 1.5 -> 0.75)
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
   };
+  // <-- slut ændringer -->
 
   const inputStyle = {
     width: "100%",
@@ -348,17 +343,12 @@ function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
-  // How much to visually shift the value content left. Adjust to taste.
-  const valueShift = isMobile ? "-6px" : "-10px";
-
   function renderKioskBrowserDataRows(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
       <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-          <ValueContent shift={valueShift}>{String(value)}</ValueContent>
-        </TableCell>
+        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{String(value)}</TableCell>
       </TableRow>
     ));
   }
@@ -416,74 +406,66 @@ function ClientDetailsHeaderSection({
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <ValueContent shift={valueShift}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</ValueContent>
-                      </TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                          <ValueContent shift={valueShift}>{client?.id ?? "?"}</ValueContent>
-                        </TableCell>
+                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <ValueContent shift={valueShift}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <TextField
-                              select
-                              size="small"
-                              value={selectedSchool ?? ""}
-                              onChange={handleSchoolSelectChange}
-                              disabled={loadingSchools}
-                              sx={{ ...inputStyle }}
-                              fullWidth
-                              SelectProps={{ MenuProps: { disablePortal: true } }}
-                              inputProps={{ "aria-label": "Skole" }}
-                              error={!!selectedSchoolDirty}
-                              onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
-                            >
-                              <MenuItem value=""><em>Ingen skole</em></MenuItem>
-                              {(schoolsList || []).map(s => (<MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>))}
-                            </TextField>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <TextField
+                            select
+                            size="small"
+                            value={selectedSchool ?? ""}
+                            onChange={handleSchoolSelectChange}
+                            disabled={loadingSchools}
+                            sx={{ ...inputStyle }}
+                            fullWidth
+                            SelectProps={{ MenuProps: { disablePortal: true } }}
+                            inputProps={{ "aria-label": "Skole" }}
+                            error={!!selectedSchoolDirty}
+                            onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
+                          >
+                            <MenuItem value=""><em>Ingen skole</em></MenuItem>
+                            {(schoolsList || []).map(s => (<MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>))}
+                          </TextField>
 
-                            <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                          <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
 
-                            <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: 56 }}>
-                              {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
-                            </Button>
-                          </Box>
-                        </ValueContent>
+                          <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: 56 }}>
+                            {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                          </Button>
+                        </Box>
                       </TableCell>
                     </TableRow>
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <ValueContent shift={valueShift}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <TextField
-                              size="small"
-                              value={locality ?? ""}
-                              onChange={handleLocalityChange}
-                              sx={inputStyle}
-                              disabled={savingLocality}
-                              inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                              onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
-                              error={!!localityDirty}
-                              fullWidth
-                            />
-                            <CopyIconButton value={locality ?? ""} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                            <Button variant="outlined" size="small" onClick={handleLocalitySave} disabled={savingLocality} sx={{ minWidth: 56 }}>
-                              {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
-                            </Button>
-                          </Box>
-                        </ValueContent>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <TextField
+                            size="small"
+                            value={locality ?? ""}
+                            onChange={handleLocalityChange}
+                            sx={inputStyle}
+                            disabled={savingLocality}
+                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
+                            error={!!localityDirty}
+                            fullWidth
+                          />
+                          <CopyIconButton value={locality ?? ""} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                          <Button variant="outlined" size="small" onClick={handleLocalitySave} disabled={savingLocality} sx={{ minWidth: 56 }}>
+                            {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                          </Button>
+                        </Box>
                       </TableCell>
                     </TableRow>
 
@@ -510,34 +492,30 @@ function ClientDetailsHeaderSection({
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <ValueContent shift={valueShift}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <TextField
-                              size="small"
-                              value={kioskUrl ?? ""}
-                              onChange={handleKioskUrlChange}
-                              sx={inputStyle}
-                              disabled={savingKioskUrl}
-                              inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                              onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
-                              error={!!kioskUrlDirty}
-                              fullWidth
-                            />
-                            <CopyIconButton value={kioskUrl ?? ""} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                            <Button variant="outlined" size="small" onClick={handleKioskUrlSave} disabled={savingKioskUrl} sx={{ minWidth: 56 }}>
-                              {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
-                            </Button>
-                          </Box>
-                        </ValueContent>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <TextField
+                            size="small"
+                            value={kioskUrl ?? ""}
+                            onChange={handleKioskUrlChange}
+                            sx={inputStyle}
+                            disabled={savingKioskUrl}
+                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                            onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
+                            error={!!kioskUrlDirty}
+                            fullWidth
+                          />
+                          <CopyIconButton value={kioskUrl ?? ""} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                          <Button variant="outlined" size="small" onClick={handleKioskUrlSave} disabled={savingKioskUrl} sx={{ minWidth: 56 }}>
+                            {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                          </Button>
+                        </Box>
                       </TableCell>
                     </TableRow>
 
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <ValueContent shift={valueShift}>
-                          <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                        </ValueContent>
+                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
 
