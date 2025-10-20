@@ -85,7 +85,8 @@ export default function ClientDetailsLivestreamSection({
   clientId,
   refreshing: parentRefreshing = false, // sync from parent when provided
   onRestartStream = null,
-  streamKey = null
+  streamKey = null,
+  clientOnline = true // NEW: parent tells us whether client is online; explicit false => offline
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -149,6 +150,7 @@ export default function ClientDetailsLivestreamSection({
   // maybeResetSegments - run when effectiveRefreshKey changes
   useEffect(() => {
     if (!clientId) return;
+    if (clientOnline === false) return; // NEW: don't attempt backend polling when offline
     let ignore = false;
 
     async function maybeResetSegments() {
@@ -175,11 +177,28 @@ export default function ClientDetailsLivestreamSection({
     }
     maybeResetSegments();
     return () => { ignore = true; };
-  }, [clientId, effectiveRefreshKey]);
+  }, [clientId, effectiveRefreshKey, clientOnline]);
 
   // Main manifest/polling & playback setup - depends on effectiveRefreshKey to remount
   useEffect(() => {
     if (!clientId) return;
+    if (clientOnline === false) {
+      // Ensure we cleanup any existing playback if client just went offline
+      if (hlsRef.current) {
+        try { hlsRef.current.destroy(); } catch {}
+        hlsRef.current = null;
+      }
+      if (videoRef.current) {
+        try {
+          videoRef.current.removeAttribute("src");
+          videoRef.current.load();
+        } catch {}
+      }
+      setManifestReady(false);
+      setError("");
+      return;
+    }
+
     const video = videoRef.current;
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
 
@@ -272,11 +291,12 @@ export default function ClientDetailsLivestreamSection({
       clearInterval(pollInterval);
       cleanup();
     };
-  }, [clientId, effectiveRefreshKey]);
+  }, [clientId, effectiveRefreshKey, clientOnline]);
 
   // Poll last-segment-info to compute backend lag
   useEffect(() => {
     if (!clientId) return;
+    if (clientOnline === false) return; // don't poll when offline
     if (!isSafari() && !manifestReady) return;
     let stop = false;
     async function pollSegmentLag() {
@@ -304,11 +324,12 @@ export default function ClientDetailsLivestreamSection({
     }
     pollSegmentLag();
     return () => { stop = true; };
-  }, [clientId, manifestReady, effectiveRefreshKey]);
+  }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
   // Player-reported lag (from HLS instance)
   useEffect(() => {
     if (!manifestReady) return;
+    if (clientOnline === false) return;
     let interval;
     interval = setInterval(() => {
       const hls = hlsRef.current;
@@ -321,11 +342,12 @@ export default function ClientDetailsLivestreamSection({
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [manifestReady, effectiveRefreshKey]);
+  }, [manifestReady, effectiveRefreshKey, clientOnline]);
 
   // Manifest EXT-X-PROGRAM-DATE-TIME based lag
   useEffect(() => {
     if (!clientId || !manifestReady) return;
+    if (clientOnline === false) return;
     let stop = false;
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
     async function pollManifestProgramDateTime() {
@@ -345,7 +367,7 @@ export default function ClientDetailsLivestreamSection({
     }
     pollManifestProgramDateTime();
     return () => { stop = true; };
-  }, [clientId, manifestReady, effectiveRefreshKey]);
+  }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
   // lastLive ticker for UI
   useEffect(() => {
@@ -361,6 +383,7 @@ export default function ClientDetailsLivestreamSection({
 
   // Auto refresh: call parent's onRestartStream if provided, otherwise use local key
   useEffect(() => {
+    if (clientOnline === false) return; // don't auto-restart when offline
     const interval = setInterval(() => {
       setAutoRefreshed(true);
       if (typeof onRestartStream === "function") {
@@ -371,7 +394,7 @@ export default function ClientDetailsLivestreamSection({
       }
     }, 60000);
     return () => clearInterval(interval);
-  }, [onRestartStream]);
+  }, [onRestartStream, clientOnline]);
 
   useEffect(() => {
     if (autoRefreshed) {
@@ -389,6 +412,7 @@ export default function ClientDetailsLivestreamSection({
 
   // Manual refresh: mark local flag and notify parent to restart stream
   const handleRefreshClick = () => {
+    if (clientOnline === false) return;
     setManualRefreshed(true);
     // optimistic local feedback: if parent does not control refreshing, show local spinner briefly
     if (typeof onRestartStream === "function") {
@@ -446,8 +470,11 @@ export default function ClientDetailsLivestreamSection({
 
   const lagStatus = getLagStatus(sanitizedLag, lastSegmentLag);
 
+  // Visual disabled styles when offline
+  const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
+
   return (
-    <Card elevation={2} sx={{ borderRadius: 2, p: isMobile ? 1 : 2 }}>
+    <Card elevation={2} sx={{ borderRadius: 2, p: isMobile ? 1 : 2, ...disabledOverlay }}>
       <Grid
         container
         spacing={isMobile ? 1 : 2}
@@ -471,13 +498,13 @@ export default function ClientDetailsLivestreamSection({
                   animation: manifestReady ? "pulsate 2s infinite" : "none"
                 }}
               />
-              <Tooltip title="Genindlæs stream">
+              <Tooltip title={clientOnline === false ? "Klienten er offline" : "Genindlæs stream"}>
                 <span>
                   <IconButton
                     aria-label="refresh"
                     onClick={handleRefreshClick}
                     size={isMobile ? "small" : "medium"}
-                    disabled={refreshing || !clientId}
+                    disabled={refreshing || !clientId || clientOnline === false}
                   >
                     {refreshing ? <CircularProgress size={isMobile ? 20 : 18} color="inherit" /> : <RefreshIcon sx={{ fontSize: isMobile ? 26 : undefined }} />}
                   </IconButton>
@@ -485,20 +512,20 @@ export default function ClientDetailsLivestreamSection({
               </Tooltip>
             </Box>
             <Typography variant="body2" sx={{ color: lagStatus.color, fontSize: isMobile ? 13 : undefined }}>
-              {lagStatus.text || "Ingen status"}
+              {clientOnline === false ? "Klienten er offline — stream ikke tilgængelig" : (lagStatus.text || "Ingen status")}
             </Typography>
             <Box>
-              {manualRefreshed && (
+              {manualRefreshed && clientOnline !== false && (
                 <Alert severity="info" sx={{ mb: 1, fontSize: isMobile ? 12 : undefined }}>
                   Stream blev genstartet manuelt
                 </Alert>
               )}
-              {autoRefreshed && (
+              {autoRefreshed && clientOnline !== false && (
                 <Alert severity="info" sx={{ mb: 1, fontSize: isMobile ? 12 : undefined }}>
                   Stream blev automatisk genstartet
                 </Alert>
               )}
-              {error && (
+              {error && clientOnline !== false && (
                 <Alert severity="error" sx={{ mb: 1, fontSize: isMobile ? 12 : undefined }}>
                   {error}
                 </Alert>
@@ -520,7 +547,7 @@ export default function ClientDetailsLivestreamSection({
               sx={{
                 position: "relative",
                 width: "100%",
-                display: manifestReady ? "flex" : "none",
+                display: (manifestReady && clientOnline !== false) ? "flex" : "none",
                 alignItems: "center",
                 justifyContent: "center"
               }}
@@ -553,7 +580,7 @@ export default function ClientDetailsLivestreamSection({
                 tabIndex={-1}
                 key={effectiveRefreshKey}
               />
-              {manifestReady && (
+              {manifestReady && clientOnline !== false && (
                 <IconButton
                   onClick={handleFullscreen}
                   aria-label="Fuld skærm"
@@ -602,18 +629,31 @@ export default function ClientDetailsLivestreamSection({
                 </Box>
               )}
             </Box>
-            {!manifestReady && (
+            {!manifestReady || clientOnline === false ? (
               <Box sx={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 minHeight: isMobile ? 100 : 160,
-                width: "100%"
+                width: "100%",
+                bgcolor: clientOnline === false ? "#fafafa" : "transparent",
+                borderRadius: 1
               }}>
-                <CircularProgress size={isMobile ? 24 : 32} />
-                <Typography variant="body2" sx={{ ml: 2, fontSize: isMobile ? 13 : undefined }}>Forbinder til stream …</Typography>
+                {clientOnline === false ? (
+                  <>
+                    <CircularProgress size={isMobile ? 20 : 32} />
+                    <Typography variant="body2" sx={{ ml: 2, fontSize: isMobile ? 13 : undefined }}>
+                      Klienten er offline — livestream deaktiveret
+                    </Typography>
+                  </>
+                ) : (
+                  <>
+                    <CircularProgress size={isMobile ? 24 : 32} />
+                    <Typography variant="body2" sx={{ ml: 2, fontSize: isMobile ? 13 : undefined }}>Forbinder til stream …</Typography>
+                  </>
+                )}
               </Box>
-            )}
+            ) : null}
           </Box>
         </Grid>
         {/* Kolonne 3 - kun for admin */}
@@ -623,7 +663,7 @@ export default function ClientDetailsLivestreamSection({
               <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
                 Klient ID: {clientId}
               </Typography>
-              {(manifestProgramDateTime || lastSegmentTimestamp) && (
+              {(manifestProgramDateTime || lastSegmentTimestamp) && clientOnline !== false && (
                 <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
                   Sidste manifest hentet:{" "}
                   {manifestProgramDateTime
@@ -633,7 +673,7 @@ export default function ClientDetailsLivestreamSection({
                       : ""}
                 </Typography>
               )}
-              {lastFetched && (
+              {lastFetched && clientOnline !== false && (
                 <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
                   Sidste kontakt til serveren: {formatDateTimeWithDay(lastFetched)}
                 </Typography>
@@ -685,7 +725,7 @@ export default function ClientDetailsLivestreamSection({
                   </Tooltip>
                   , lagType=<b>{lagType}</b>
                 </Typography>
-                {!isSafari() && (
+                {!isSafari() && clientOnline !== false && (
                   <Typography
                     variant="caption"
                     sx={{
@@ -699,7 +739,7 @@ export default function ClientDetailsLivestreamSection({
                     Segment: <b>{currentSegment}</b>
                   </Typography>
                 )}
-                {isSafari() && (
+                {isSafari() && clientOnline !== false && (
                   <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
                     <span role="img" aria-label="advarsel" style={{ fontSize: "1.2em", marginRight: 4 }}>⚠️</span>
                     <Typography
