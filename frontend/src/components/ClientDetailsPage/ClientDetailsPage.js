@@ -59,7 +59,7 @@ export default function ClientDetailsPage({
   });
   const pollCountRef = useRef(0);
 
-  // Helper: merge updated client but preserve previous isOnline unless server explicitly returned it
+  // Helper: merge updated client but preserve previous isOnline unless server explicitly provided it
   function mergeClientPreserveOnline(prev, updated) {
     if (!updated) return prev;
     return {
@@ -168,9 +168,13 @@ export default function ClientDetailsPage({
 
   const handleSchoolUpdated = useCallback(async (updatedClient) => {
     if (!clientState) return;
-    if (updatedClient && updatedClient.id === clientState.id && Object.keys(updatedClient).length > 1) {
-      // preserve isOnline unless server included it
+
+    console.debug("handleSchoolUpdated - received:", updatedClient);
+
+    if (updatedClient && updatedClient.id === clientState.id) {
+      // Nyt: altid merge partial updates ind i clientState, men bevar prev.isOnline
       setClientState(prev => mergeClientPreserveOnline(prev, updatedClient));
+      console.debug("handleSchoolUpdated - merged client update for clientId:", updatedClient.id);
     } else {
       if (typeof handleRefresh === "function") {
         try { await handleRefresh(); } catch {}
@@ -290,7 +294,6 @@ export default function ClientDetailsPage({
             lastSeen={lastSeen}
             calendarDialogOpen={calendarDialogOpen}
             setCalendarDialogOpen={setCalendarDialogOpen}
-            clientOnline={clientState?.isOnline} /* NEW: inform info section about online-status */
           />
         </Grid>
 
