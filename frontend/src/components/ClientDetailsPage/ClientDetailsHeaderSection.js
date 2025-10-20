@@ -32,7 +32,7 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
   - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
   - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
-  - Lokal input-state for Lokation og Kiosk URL for at undgå "ét-tegn-ad-gangen"-problemet.
+  - NOTE: Kun logikken for Lokation og Kiosk URL er ændret (lokal state + handlers). Layout er IKKE ændret.
 */
 
 const COLOR_NAME_MAP = {
@@ -240,7 +240,7 @@ function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Local input state to avoid single-character typing issues
+  // Local input state for Lokation and Kiosk URL (prevents single-char typing issue)
   const [localLocality, setLocalLocality] = React.useState(locality ?? "");
   const [localKioskUrl, setLocalKioskUrl] = React.useState(kioskUrl ?? "");
 
@@ -253,7 +253,7 @@ function ClientDetailsHeaderSection({
   const [savingSchool, setSavingSchool] = React.useState(false);
   const [selectedSchoolDirty, setSelectedSchoolDirty] = React.useState(false);
 
-  // Sync props -> local state only when props change (prevents overwriting while typing)
+  // Sync props -> local input state only when props change (prevents overwriting while typing)
   React.useEffect(() => {
     setLocalLocality(locality ?? "");
   }, [locality]);
