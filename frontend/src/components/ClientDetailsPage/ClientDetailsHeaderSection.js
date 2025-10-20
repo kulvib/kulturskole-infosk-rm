@@ -317,16 +317,16 @@ function ClientDetailsHeaderSection({
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.5 : 0.25, // reduced on desktop only
+    pr: isMobile ? 0.5 : 1, // restored desktop padding to original
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.5 : 0.375, // reduced on desktop only
+    pl: isMobile ? 0.5 : 1.5, // restored desktop padding to original
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -352,8 +352,8 @@ function ClientDetailsHeaderSection({
           sx={{
             ...labelStyle,
             borderBottom: "none",
-            width: isMobile ? 140 : 70,
-            minWidth: isMobile ? 140 : 70,
+            width: 140,
+            minWidth: 140,
           }}
         >
           {key}:
@@ -419,8 +419,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 70,
-                          minWidth: isMobile ? 140 : 70,
+                          width: 140,
+                          minWidth: 140,
                         }}
                       >
                         Klientnavn:
@@ -434,8 +434,8 @@ function ClientDetailsHeaderSection({
                           sx={{
                             ...labelStyle,
                             borderBottom: "none",
-                            width: isMobile ? 140 : 70,
-                            minWidth: isMobile ? 140 : 70,
+                            width: 140,
+                            minWidth: 140,
                           }}
                         >
                           Klient ID:
@@ -449,8 +449,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 70,
-                          minWidth: isMobile ? 140 : 70,
+                          width: 140,
+                          minWidth: 140,
                         }}
                       >
                         Skole:
@@ -488,8 +488,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 70,
-                          minWidth: isMobile ? 140 : 70,
+                          width: 140,
+                          minWidth: 140,
                         }}
                       >
                         Lokation:
@@ -540,8 +540,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 70,
-                          minWidth: isMobile ? 140 : 70,
+                          width: 140,
+                          minWidth: 140,
                         }}
                       >
                         Kiosk URL:
@@ -572,8 +572,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: isMobile ? 140 : 70,
-                          minWidth: isMobile ? 140 : 70,
+                          width: 140,
+                          minWidth: 140,
                         }}
                       >
                         Kiosk browser status:
