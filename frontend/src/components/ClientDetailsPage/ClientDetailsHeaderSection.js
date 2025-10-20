@@ -26,11 +26,15 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 
 /*
   ClientDetailsHeaderSection - komplet komponent
-  Ændringer (kun disse):
-  - Låser label-kolonnens placering ved at sætte tableLayout: "fixed" og tilføje <colgroup> med første col = 140px på begge tabeller.
-  - Introducerer ValueCell helper (inline style={{ paddingLeft: 4, paddingRight: 4 }}) og bruger den for alle value TableCell'er.
-  - Sørger for at TextField's native input får samme inline padding via inputProps.style (paddingLeft/paddingRight = 4).
-  - Ingen andre ændringer i funktionalitet eller struktur.
+  Rettelser/forbedringer inkluderet:
+  - Robust color resolution (theme tokens, hex, color names).
+  - Unik keyframe-navn (pulsateStatusBadge) og keyframes animerer KUN transform+opacity.
+  - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
+  - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
+  - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
+  - Implementeret: table-layout: fixed + colgroup for at låse første kolonne til 140px.
+  - Implementeret: ValueCell helper med inline paddingLeft/paddingRight (4px).
+  - Implementeret: inline padding på TextField native input via inputProps.style.
 */
 
 const COLOR_NAME_MAP = {
@@ -102,15 +106,19 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
+          // use our unique animation name via sx (keeps theme-based style generation)
           animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
+          // keyframes animate only transform+opacity
           "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
+        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
         style={{
           backgroundColor: resolvedBg,
+          // enforce our animation properties inline as well so the element uses our unique keyframes
           animationName: animate ? "pulsateStatusBadge" : "none",
           animationDuration: animate ? "2s" : undefined,
           animationIterationCount: animate ? "infinite" : undefined,
@@ -314,7 +322,7 @@ function ClientDetailsHeaderSection({
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
-    minWidth: 140,
+    // minWidth previously used to influence layout; now the first column is locked by colgroup.
   };
   const valueStyle = {
     fontWeight: 400,
@@ -336,16 +344,18 @@ function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
-  // Helper ValueCell - only change: inline padding to bring value closer to label
-  const ValueCell = ({ children, sxProps = {}, ...rest }) => (
-    <TableCell
-      sx={{ ...valueStyle, borderBottom: "none", textAlign: "left", ...sxProps }}
-      style={{ paddingLeft: 4, paddingRight: 4 }}
-      {...rest}
-    >
-      {children}
-    </TableCell>
-  );
+  // ValueCell helper: applies valueStyle via sx and forces inline paddingLeft/paddingRight (4px) so it wins.
+  function ValueCell({ children, sx = {}, style = {}, ...props }) {
+    return (
+      <TableCell
+        sx={{ ...valueStyle, borderBottom: "none", ...sx }}
+        style={{ paddingLeft: 4, paddingRight: 4, ...style }}
+        {...props}
+      >
+        {children}
+      </TableCell>
+    );
+  }
 
   function renderKioskBrowserDataRows(data) {
     if (!data || typeof data !== "object") return null;
@@ -437,7 +447,7 @@ function ClientDetailsHeaderSection({
                             sx={{ ...inputStyle }}
                             fullWidth
                             SelectProps={{ MenuProps: { disablePortal: true } }}
-                            inputProps={{ "aria-label": "Skole", style: { paddingLeft: 4, paddingRight: 4 } }}
+                            inputProps={{ "aria-label": "Skole", style: { paddingLeft: 4, paddingRight: 4, fontSize: isMobile ? 12 : 14 } }}
                             error={!!selectedSchoolDirty}
                             onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
                           >
@@ -464,7 +474,7 @@ function ClientDetailsHeaderSection({
                             onChange={handleLocalityChange}
                             sx={inputStyle}
                             disabled={savingLocality}
-                            inputProps={{ style: { fontSize: isMobile ? 12 : 14, paddingLeft: 4, paddingRight: 4 } }}
+                            inputProps={{ style: { paddingLeft: 4, paddingRight: 4, fontSize: isMobile ? 12 : 14 } }}
                             onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
                             error={!!localityDirty}
                             fullWidth
@@ -511,7 +521,7 @@ function ClientDetailsHeaderSection({
                             onChange={handleKioskUrlChange}
                             sx={inputStyle}
                             disabled={savingKioskUrl}
-                            inputProps={{ style: { fontSize: isMobile ? 12 : 14, paddingLeft: 4, paddingRight: 4 } }}
+                            inputProps={{ style: { paddingLeft: 4, paddingRight: 4, fontSize: isMobile ? 12 : 14 } }}
                             onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
                             error={!!kioskUrlDirty}
                             fullWidth
