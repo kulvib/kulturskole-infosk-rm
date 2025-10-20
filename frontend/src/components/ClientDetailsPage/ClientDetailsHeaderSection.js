@@ -88,7 +88,7 @@ function resolveColor(theme, color) {
 }
 
 // StatusBadge - dot + label. animation only transforms and opacity (no background)
-// inline style is used to force background-color so global keyframes/styles can't override it.
+// inline style is used to force the background color wins over any global keyframe that would overwrite it.
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
@@ -315,7 +315,7 @@ function ClientDetailsHeaderSection({
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.5 : 1,
+    pr: isMobile ? 0.5 : 0.5, // reduced: desktop pr = 0.5 (4px)
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -323,7 +323,7 @@ function ClientDetailsHeaderSection({
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.5 : 1.5,
+    pl: isMobile ? 0.5 : 0.75, // reduced: desktop pl = 0.75 (6px) => total ~10px
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -389,7 +389,7 @@ function ClientDetailsHeaderSection({
       {/* Papers */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
         {/* Klient info */}
-        <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 0.5, mb: isMobile ? 1 : 0 }}>
+        <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
@@ -476,7 +476,7 @@ function ClientDetailsHeaderSection({
         </Box>
 
         {/* Kiosk info */}
-        <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 0.5 }}>
+        <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
