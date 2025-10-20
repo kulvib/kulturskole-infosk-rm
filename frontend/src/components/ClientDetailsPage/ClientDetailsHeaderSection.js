@@ -25,13 +25,14 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection
-  Ændringer / noter:
-  - Når client.isOnline === false: højre "paper" greyed out + inline overlay besked "Klient er offline — redigering deaktiveret".
-  - Løst issue hvor man kun kunne indtaste ét tegn ad gangen ved at bruge lokal state for Lokation og Kiosk URL.
-  - Lokale states synkroniseres med props når props ændrer sig.
-  - onChange forbliver kompatibel med parent ved at kalde handleLocalityChange/handleKioskUrlChange med event (hvis de er givet).
-  - Ved Gem (knap eller Enter) kaldes handleLocalitySave(handleLocalitySave(localValue)) / handleKioskUrlSave(localValue) hvis funktionen er givet.
+  ClientDetailsHeaderSection - komplet komponent
+  Rettelser/forbedringer inkluderet:
+  - Robust color resolution (theme tokens, hex, color names).
+  - Unik keyframe-navn (pulsateStatusBadge) og keyframes animerer KUN transform+opacity.
+  - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
+  - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
+  - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
+  - Lokal input-state for Lokation og Kiosk URL for at undgå "ét-tegn-ad-gangen"-problemet.
 */
 
 const COLOR_NAME_MAP = {
@@ -55,12 +56,14 @@ function resolveColor(theme, color) {
 
   const trimmed = color.trim();
 
+  // hex or rgb(a)
   if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(trimmed) || /^rgba?\(/i.test(trimmed)) {
     return trimmed;
   }
 
   const lower = trimmed.toLowerCase();
 
+  // theme token like "grey.400" or "success.main"
   if (lower.includes(".")) {
     const [paletteKey, shade] = lower.split(".");
     const pal = theme.palette?.[paletteKey];
@@ -71,17 +74,22 @@ function resolveColor(theme, color) {
     }
   }
 
+  // theme direct key e.g. "success"
   if (theme.palette?.[lower]) {
     const pal = theme.palette[lower];
     if (typeof pal === "string") return pal;
     if (pal.main) return pal.main;
   }
 
+  // map common names to hex
   if (COLOR_NAME_MAP[lower]) return COLOR_NAME_MAP[lower];
 
+  // fallback to the raw trimmed string (may be valid CSS color)
   return trimmed;
 }
 
+// StatusBadge - dot + label. animation only transforms and opacity (no background)
+// inline style is used to force background-color so global keyframes/styles can't override it.
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
@@ -96,15 +104,19 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
+          // use our unique animation name via sx (keeps theme-based style generation)
           animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
+          // keyframes animate only transform+opacity
           "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
+        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
         style={{
           backgroundColor: resolvedBg,
+          // enforce our animation properties inline as well so the element uses our unique keyframes
           animationName: animate ? "pulsateStatusBadge" : "none",
           animationDuration: animate ? "2s" : undefined,
           animationIterationCount: animate ? "infinite" : undefined,
@@ -142,9 +154,9 @@ function StateBadge({ state, isMobile = false }) {
 }
 
 function ChromeStatusBadge({ status, color, isMobile = false }) {
-  const text = status || "ukendt";
+  let text = status || "ukendt";
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
       <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />
     </Box>
   );
@@ -228,11 +240,7 @@ function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Determine offline state
-  const clientIsOffline = client?.isOnline === false;
-  const offlineMessage = "Klient er offline — redigering deaktiveret";
-
-  // Local state for inputs to avoid "single-character typing" issue
+  // Local input state to avoid single-character typing issues
   const [localLocality, setLocalLocality] = React.useState(locality ?? "");
   const [localKioskUrl, setLocalKioskUrl] = React.useState(kioskUrl ?? "");
 
@@ -254,7 +262,7 @@ function ClientDetailsHeaderSection({
     setLocalKioskUrl(kioskUrl ?? "");
   }, [kioskUrl]);
 
-  // Sync schools prop -> state
+  // Sync props -> state
   React.useEffect(() => {
     if (Array.isArray(schools) && schools.length) {
       setSchoolsList(schools);
@@ -325,6 +333,7 @@ function ClientDetailsHeaderSection({
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
+    minWidth: 140,
   };
   const valueStyle = {
     fontWeight: 400,
@@ -341,40 +350,17 @@ function ClientDetailsHeaderSection({
       fontSize: isMobile ? 12 : 14,
       height: isMobile ? "30px" : "32px",
       boxSizing: "border-box",
-      paddingLeft: 2,
-      paddingRight: 4,
-      display: "flex",
-      alignItems: "center",
-    },
-    "& .MuiSelect-select": {
-      paddingLeft: 2,
-      paddingRight: 4,
-      display: "flex",
-      alignItems: "center",
-      height: isMobile ? "30px" : "32px",
-      boxSizing: "border-box",
+      padding: isMobile ? "6px 10px" : "8px 14px"
     },
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
-  function ValueCell({ children, sx = {}, style = {}, ...props }) {
-    return (
-      <TableCell
-        sx={{ ...valueStyle, borderBottom: "none", ...sx }}
-        style={{ paddingLeft: 2, paddingRight: 4, ...style }}
-        {...props}
-      >
-        {children}
-      </TableCell>
-    );
-  }
-
   function renderKioskBrowserDataRows(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
-      <TableRow key={key} sx={{ height: isMobile ? 28 : 34, opacity: clientIsOffline ? 0.6 : 1 }}>
-        <TableCell sx={{ ...labelStyle, borderBottom: "none", color: clientIsOffline ? "text.disabled" : "inherit" }}>{key}:</TableCell>
-        <ValueCell sx={{ color: clientIsOffline ? "text.disabled" : "inherit" }}>{String(value)}</ValueCell>
+      <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
+        <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
+        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{String(value)}</TableCell>
       </TableRow>
     ));
   }
@@ -390,7 +376,6 @@ function ClientDetailsHeaderSection({
     const v = e.target.value;
     setLocalLocality(v);
     if (typeof handleLocalityChange === "function") {
-      // call parent onChange with the event for backward compatibility
       try { handleLocalityChange(e); } catch (err) { /* ignore */ }
     }
   };
@@ -405,21 +390,13 @@ function ClientDetailsHeaderSection({
 
   const onLocalitySave = async () => {
     if (typeof handleLocalitySave === "function") {
-      try {
-        await handleLocalitySave(localLocality);
-      } catch (err) {
-        // swallow - parent handles snackbar/error
-      }
+      try { await handleLocalitySave(localLocality); } catch (err) { /* ignore */ }
     }
   };
 
   const onKioskUrlSave = async () => {
     if (typeof handleKioskUrlSave === "function") {
-      try {
-        await handleKioskUrlSave(localKioskUrl);
-      } catch (err) {
-        // swallow
-      }
+      try { await handleKioskUrlSave(localKioskUrl); } catch (err) { /* ignore */ }
     }
   };
 
@@ -454,8 +431,8 @@ function ClientDetailsHeaderSection({
 
       {/* Papers */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
-        {/* Klient info (left) - desktop 40% */}
-        <Box sx={{ width: isMobile ? "100%" : "40%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
+        {/* Klient info */}
+        <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
@@ -466,27 +443,23 @@ function ClientDetailsHeaderSection({
               </Box>
 
               <TableContainer>
-                <Table size="small" aria-label="klient-info" sx={{ tableLayout: "fixed" }}>
-                  <colgroup>
-                    <col style={{ width: 140 }} />
-                    <col />
-                  </colgroup>
+                <Table size="small" aria-label="klient-info">
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <ValueCell>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</ValueCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <ValueCell>{client?.id ?? "?"}</ValueCell>
+                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
-                      <ValueCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             select
@@ -507,17 +480,34 @@ function ClientDetailsHeaderSection({
 
                           <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
 
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={handleSchoolSave}
-                            disabled={savingSchool || String(selectedSchool) === String(client?.school_id)}
-                            sx={{ minWidth: 56 }}
-                          >
+                          <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: 56 }}>
                             {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
-                      </ValueCell>
+                      </TableCell>
+                    </TableRow>
+
+                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <TextField
+                            size="small"
+                            value={localLocality}
+                            onChange={onLocalityChange}
+                            sx={inputStyle}
+                            disabled={savingLocality}
+                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
+                            onKeyDown={e => { if (e.key === "Enter") onLocalitySave(); }}
+                            error={!!localityDirty}
+                            fullWidth
+                          />
+                          <CopyIconButton value={localLocality ?? ""} disabled={!localLocality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                          <Button variant="outlined" size="small" onClick={onLocalitySave} disabled={savingLocality} sx={{ minWidth: 56 }}>
+                            {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
+                          </Button>
+                        </Box>
+                      </TableCell>
                     </TableRow>
 
                   </TableBody>
@@ -528,101 +518,45 @@ function ClientDetailsHeaderSection({
           </Card>
         </Box>
 
-        {/* Infoskærm status (right) - desktop 60% */}
-        <Box sx={{ width: isMobile ? "100%" : "60%", pl: isMobile ? 0 : 1 }}>
-          <Card
-            elevation={2}
-            sx={{
-              borderRadius: isMobile ? 1 : 2,
-              height: "100%",
-              opacity: clientIsOffline ? 0.78 : 1,
-              transition: "opacity 200ms ease"
-            }}
-          >
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, position: "relative" }}>
+        {/* Kiosk info */}
+        <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
-                {clientIsOffline ? null : <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>}
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Kiosk info</Typography>
+                <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
               </Box>
 
               <TableContainer>
-                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: "fixed" }}>
-                  <colgroup>
-                    <col style={{ width: 140 }} />
-                    <col />
-                  </colgroup>
+                <Table size="small" aria-label="kiosk-info">
                   <TableBody>
-
-                    {/* Lokation */}
-                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
-                      <ValueCell>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <TextField
-                            size="small"
-                            value={localLocality}
-                            onChange={onLocalityChange}
-                            sx={inputStyle}
-                            disabled={savingLocality || clientIsOffline}
-                            inputProps={{ "aria-label": "Lokation" }}
-                            onKeyDown={e => { if (e.key === "Enter") onLocalitySave(); }}
-                            error={!!localityDirty}
-                            fullWidth
-                          />
-                          <CopyIconButton value={localLocality ?? ""} disabled={!localLocality || clientIsOffline} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={onLocalitySave}
-                            disabled={savingLocality || !localityDirty || clientIsOffline}
-                            sx={{ minWidth: 56 }}
-                          >
-                            {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
-                          </Button>
-                        </Box>
-                      </ValueCell>
-                    </TableRow>
-
-                    {/* Kiosk URL */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
-                      <ValueCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
                             value={localKioskUrl}
                             onChange={onKioskUrlChange}
                             sx={inputStyle}
-                            disabled={savingKioskUrl || clientIsOffline}
-                            inputProps={{ "aria-label": "Kiosk URL" }}
+                            disabled={savingKioskUrl}
+                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
                             onKeyDown={e => { if (e.key === "Enter") onKioskUrlSave(); }}
                             error={!!kioskUrlDirty}
                             fullWidth
                           />
-                          <CopyIconButton value={localKioskUrl ?? ""} disabled={!localKioskUrl || clientIsOffline} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={onKioskUrlSave}
-                            disabled={savingKioskUrl || !kioskUrlDirty || clientIsOffline}
-                            sx={{ minWidth: 56 }}
-                          >
+                          <CopyIconButton value={localKioskUrl ?? ""} disabled={!localKioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                          <Button variant="outlined" size="small" onClick={onKioskUrlSave} disabled={savingKioskUrl} sx={{ minWidth: 56 }}>
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
-                      </ValueCell>
+                      </TableCell>
                     </TableRow>
 
-                    {/* Kiosk browser status (greyed when offline) */}
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none", color: clientIsOffline ? "text.disabled" : "inherit" }}>Kiosk browser status:</TableCell>
-                      <TableCell sx={{ borderBottom: "none" }} />
-                    </TableRow>
-                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell colSpan={2} sx={{ borderBottom: "none", pl: isMobile ? 1 : 2, opacity: clientIsOffline ? 0.65 : 1, color: clientIsOffline ? "text.disabled" : "inherit" }}>
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
-                        </Box>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
 
@@ -632,44 +566,6 @@ function ClientDetailsHeaderSection({
                 </Table>
               </TableContainer>
 
-              {/* Inline overlay message that blocks interaction when offline */}
-              {clientIsOffline && (
-                <Box
-                  role="status"
-                  aria-live="polite"
-                  sx={{
-                    position: "absolute",
-                    inset: 0,
-                    zIndex: 10,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "not-allowed",
-                    pointerEvents: "auto",
-                    backgroundColor: "transparent",
-                    p: 2
-                  }}
-                >
-                  <Box
-                    sx={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 1,
-                      bgcolor: "background.paper",
-                      color: "text.secondary",
-                      px: 2,
-                      py: 0.6,
-                      borderRadius: 1,
-                      boxShadow: 1,
-                      border: theme => `1px solid ${theme.palette.divider}`
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {offlineMessage}
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
             </CardContent>
           </Card>
         </Box>
@@ -679,7 +575,10 @@ function ClientDetailsHeaderSection({
 }
 
 // Custom shallow comparator for React.memo:
+// Only re-render header when props that affect its UI actually change.
+// We check a set of primitives and a few client fields that header displays.
 function propsAreEqual(prev, next) {
+  // Compare simple primitive props
   const simpleKeys = [
     "locality",
     "localityDirty",
@@ -690,12 +589,14 @@ function propsAreEqual(prev, next) {
     "liveChromeStatus",
     "liveChromeColor",
     "refreshing",
+    // optional token if parent provides it (useful if you want explicit change detection)
     "liveChromeTimestamp"
   ];
   for (const k of simpleKeys) {
     if (prev[k] !== next[k]) return false;
   }
 
+  // Compare client fields we care about shallowly
   const prevClient = prev.client || {};
   const nextClient = next.client || {};
   const clientKeys = ["id", "name", "isOnline", "school_id", "state", "chrome_status", "chrome_color"];
@@ -703,6 +604,7 @@ function propsAreEqual(prev, next) {
     if (prevClient[k] !== nextClient[k]) return false;
   }
 
+  // Compare schools length and basic identity to detect meaningful changes
   const prevSchools = prev.schools || [];
   const nextSchools = next.schools || [];
   if (prevSchools.length !== nextSchools.length) return false;
@@ -710,6 +612,7 @@ function propsAreEqual(prev, next) {
     if ((prevSchools[i]?.id ?? null) !== (nextSchools[i]?.id ?? null)) return false;
   }
 
+  // Compare kioskBrowserData shallowly by keys/values
   const prevKbd = prev.kioskBrowserData || {};
   const nextKbd = next.kioskBrowserData || {};
   const prevKbdKeys = Object.keys(prevKbd);
@@ -719,6 +622,7 @@ function propsAreEqual(prev, next) {
     if (prevKbd[key] !== nextKbd[key]) return false;
   }
 
+  // If we've reached here, treat props as equal (no re-render needed)
   return true;
 }
 
