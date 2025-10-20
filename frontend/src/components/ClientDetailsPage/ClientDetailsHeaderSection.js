@@ -39,6 +39,11 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   - If client is explicitly offline (client?.isOnline === false) the StateBadge is hidden and Lokation/Kiosk URL inputs are disabled.
   - The "Skole" field is only visible to admin users.
   - Paper 2 (Infoskærm status) is visually greyed-out when client is offline.
+
+  Important: Selecting a school in the dropdown now only writes the change to the backend.
+  It no longer calls a parent updater that might merge/overwrite client state (and thereby affect isOnline).
+  The component keeps the local selected value and shows success/error feedback, but does NOT modify
+  the parent's client state.
 */
 
 const COLOR_NAME_MAP = {
@@ -227,7 +232,7 @@ function ClientDetailsHeaderSection({
   refreshing,
   handleRefresh,
   kioskBrowserData = {},
-  onSchoolUpdated,
+  onSchoolUpdated, // optional callback removed from use in this component to avoid parent state overwrite
   showSnackbar,
 }) {
   const navigate = useNavigate();
@@ -319,22 +324,25 @@ function ClientDetailsHeaderSection({
     setSelectedSchoolDirty(String(newVal) !== String(client?.school_id));
   };
 
+  // IMPORTANT: When saving a new school selection we only send the change to the backend.
+  // We DO NOT call onSchoolUpdated or otherwise mutate parent client state here, to ensure
+  // that isOnline is never affected by this UI action. Parent may independently refresh if desired.
   const handleSchoolSave = async () => {
     if (!client || !client.id) return;
-    if (String(selectedSchool) === String(client.school_id)) return;
+    if (String(selectedSchool) === String(client.school_id)) {
+      setSelectedSchoolDirty(false);
+      return;
+    }
     setSavingSchool(true);
     try {
-      // Sørg for at payload-formatet er klart (server forventer måske number/string afhængigt af backend)
       const payload = { school_id: selectedSchool };
-      const updated = await apiUpdateClient(client.id, payload);
-      console.debug("handleSchoolSave - apiUpdateClient response:", updated);
-      if (typeof onSchoolUpdated === "function") {
-        // send hvad serveren returnerede (kan være partial) — parent merger sikkert
-        onSchoolUpdated(updated || { ...client, school_id: selectedSchool });
-      }
+      // Only write to backend - do not merge/overwrite parent client state here.
+      await apiUpdateClient(client.id, payload);
+      // Show feedback to user; do not pass API response to parent
       if (typeof showSnackbar === "function") {
-        showSnackbar({ message: "Skole opdateret", severity: "success" });
+        showSnackbar({ message: "Skole gemt på serveren", severity: "success" });
       }
+      // Mark local as clean (we keep the local selectedSchool value so the UI reflects user's choice)
       setSelectedSchoolDirty(false);
     } catch (err) {
       console.error("Fejl ved opdatering af skole:", err);
@@ -506,7 +514,13 @@ function ClientDetailsHeaderSection({
 
                             <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
 
-                            <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: isMobile ? 48 : 56 }}>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={handleSchoolSave}
+                              disabled={savingSchool || String(selectedSchool) === String(client?.school_id)}
+                              sx={{ minWidth: isMobile ? 48 : 56 }}
+                            >
                               {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                             </Button>
                           </Box>
