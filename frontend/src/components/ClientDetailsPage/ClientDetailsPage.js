@@ -15,10 +15,9 @@ import {
 } from "../../api";
 
 /*
-  ClientDetailsPage.js (opdateret)
-  - Header håndterer nu skole/lokation/kiosk-url saves lokalt (skriver direkte til backend).
-  - Parent (ClientDetailsPage) modtager ikke længere partial updates fra header og påvirkes derfor ikke ved save.
-  - Bevarer mergeClientPreserveOnline til andre opdateringer der returnerer client-objekt.
+  ClientDetailsPage.js
+  - Defensive overflowX hidden on root to avoid page-level horizontal scrollbar caused by unexpected children.
+  - Removed fixed heights in children; page will grow vertically with content (no internal scrollbars).
 */
 
 export default function ClientDetailsPage({
@@ -52,7 +51,6 @@ export default function ClientDetailsPage({
   });
   const pollCountRef = useRef(0);
 
-  // Helper: merge updated client but preserve previous isOnline unless server explicitly provided it
   function mergeClientPreserveOnline(prev, updated) {
     if (!updated) return prev;
     return {
@@ -168,12 +166,22 @@ export default function ClientDetailsPage({
   if (!clientState) return null;
 
   return (
-    <Box sx={{ maxWidth: 1500, mx: "auto", mt: 3 }}>
+    <Box sx={{ maxWidth: 1500, mx: "auto", mt: 3, overflowX: "hidden" }}>
       <Grid container spacing={2}>
         <Grid item xs={12}>
           <ClientDetailsHeaderSection
             client={clientState}
             schools={schools}
+            locality={clientState.locality}
+            localityDirty={false}
+            savingLocality={false}
+            handleLocalityChange={() => {}}
+            handleLocalitySave={() => {}}
+            kioskUrl={clientState.kiosk_url}
+            kioskUrlDirty={false}
+            savingKioskUrl={false}
+            handleKioskUrlChange={() => {}}
+            handleKioskUrlSave={() => {}}
             liveChromeStatus={liveChromeStatus}
             liveChromeColor={liveChromeColor}
             refreshing={refreshing}
@@ -202,6 +210,7 @@ export default function ClientDetailsPage({
             lastSeen={lastSeen}
             calendarDialogOpen={calendarDialogOpen}
             setCalendarDialogOpen={setCalendarDialogOpen}
+            clientOnline={clientState?.isOnline}
           />
         </Grid>
 
