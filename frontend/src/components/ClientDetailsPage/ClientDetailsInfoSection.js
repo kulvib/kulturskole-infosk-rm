@@ -386,7 +386,7 @@ export default function ClientDetailsInfoSection({
               <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, fontSize: isMobile ? 16 : undefined }}>
                 Kalender
               </Typography>
-              <Tooltip title={isOffline ? "Klienten er offline" : "Vis kalender"}>
+              <Tooltip title="Vis kalender">
                 <span>
                   <Button
                     size="small"
@@ -401,7 +401,6 @@ export default function ClientDetailsInfoSection({
                       borderRadius: isMobile ? 5 : 8
                     }}
                     onClick={() => setCalendarDialogOpen(true)}
-                    disabled={isOffline}
                   >
                     <ArrowForwardIosIcon sx={{ fontSize: isMobile ? 13 : 16 }} />
                   </Button>
