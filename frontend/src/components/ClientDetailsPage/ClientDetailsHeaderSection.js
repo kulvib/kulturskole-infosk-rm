@@ -25,15 +25,15 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection - komplet komponent
-  Ændringer i denne version:
-  - Paper 1 = 40%, Paper 2 = 60% (desktop). Mobil: stacked 100%.
-  - Lokation flyttet til Paper 2 over Kiosk URL.
-  - Kiosk browser status vises i samme række som label og value; label brækker (wrap) på desktop så hele teksten kan ses.
-  - Lokale input-states (localLocality, localKioskUrl) med initial refs for at beregne dirty-flag.
-  - Gem-knapper for Lokation og Kiosk URL er disabled hvis feltet ikke er ændret eller hvis der gemmes.
-  - Table-layout: fixed; label width 140px på desktop; overflow/ellipsis bevaret generelt.
-  - Overskrift ændret til "Infoskærm status".
+  ClientDetailsHeaderSection.js
+
+  Responsive update:
+  - Desktop (unchanged): paper 1 = 40%, paper 2 = 60% (kept exactly as you liked).
+  - Tablet (between sm and md): papers displayed side-by-side as 50% / 50% with slightly tighter labels.
+  - Mobile (sm and below): papers stack vertically (100% width). Labels are narrower and UI is more compact.
+  - Local dirty-checks for Lokation and Kiosk URL are preserved; "Gem" buttons disabled until inputs change.
+  - "Kiosk info" heading renamed to "Infoskærm status" (kept from previous change).
+  - Table-layout remains 'fixed' to keep deterministic column sizing; label cell width adjusts per breakpoint.
 */
 
 const COLOR_NAME_MAP = {
@@ -228,7 +228,11 @@ function ClientDetailsHeaderSection({
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
   const { user } = useAuth();
+
+  // preserve desktop unchanged: if neither mobile nor tablet, we are on desktop
+  const isDesktop = !isMobile && !isTablet;
 
   // Local state for inputs so we can detect "dirty" locally
   const [localLocality, setLocalLocality] = React.useState(locality ?? "");
@@ -252,6 +256,13 @@ function ClientDetailsHeaderSection({
   // Compute dirty flags locally (string compare)
   const localityChanged = String(localLocality ?? "") !== String(initialLocalityRef.current ?? "");
   const kioskUrlChanged = String(localKioskUrl ?? "") !== String(initialKioskUrlRef.current ?? "");
+
+  // Papers width per breakpoint (desktop must remain as before)
+  const leftPaperWidth = isDesktop ? "40%" : isTablet ? "50%" : "100%";
+  const rightPaperWidth = isDesktop ? "60%" : isTablet ? "50%" : "100%";
+
+  // Label width (adjusted per breakpoint)
+  const labelCellWidth = isDesktop ? 140 : isTablet ? 120 : 100;
 
   // Schools state (prefer prop)
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
@@ -346,14 +357,14 @@ function ClientDetailsHeaderSection({
 
   const inputStyle = {
     width: "100%",
-    height: 32,
+    height: isMobile ? 30 : 32,
     "& .MuiInputBase-input": {
       fontSize: isMobile ? 12 : 14,
-      height: isMobile ? "30px" : "32px",
+      height: isMobile ? "28px" : "32px",
       boxSizing: "border-box",
-      padding: isMobile ? "6px 10px" : "8px 14px"
+      padding: isMobile ? "6px 8px" : "8px 14px"
     },
-    "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
+    "& .MuiInputBase-root": { height: isMobile ? "28px" : "32px" },
   };
 
   // Wrapper change handlers: update local state AND call parent's handler (preserve API)
@@ -381,8 +392,8 @@ function ClientDetailsHeaderSection({
           sx={{
             ...labelStyle,
             borderBottom: "none",
-            width: 140,
-            minWidth: 140,
+            width: labelCellWidth,
+            minWidth: labelCellWidth,
           }}
         >
           {key}:
@@ -429,8 +440,8 @@ function ClientDetailsHeaderSection({
 
       {/* Papers */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
-        {/* Klient info - 40% på desktop */}
-        <Box sx={{ width: isMobile ? "100%" : "40%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
+        {/* Klient info (left) */}
+        <Box sx={{ width: leftPaperWidth, pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
@@ -444,19 +455,19 @@ function ClientDetailsHeaderSection({
                 <Table size="small" aria-label="klient-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none", width: 140, minWidth: 140 }}>Klientnavn:</TableCell>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Klientnavn:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                        <TableCell sx={{ ...labelStyle, borderBottom: "none", width: 140, minWidth: 140 }}>Klient ID:</TableCell>
+                        <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Klient ID:</TableCell>
                         <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none", width: 140, minWidth: 140 }}>Skole:</TableCell>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Skole:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
@@ -478,14 +489,12 @@ function ClientDetailsHeaderSection({
 
                           <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
 
-                          <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: 56 }}>
+                          <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: isMobile ? 48 : 56 }}>
                             {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
                       </TableCell>
                     </TableRow>
-
-                    {/* Lokation er fjernet her (flyttet til Kiosk info) */}
 
                   </TableBody>
                 </Table>
@@ -495,8 +504,8 @@ function ClientDetailsHeaderSection({
           </Card>
         </Box>
 
-        {/* Infoskærm status - 60% på desktop */}
-        <Box sx={{ width: isMobile ? "100%" : "60%", pl: isMobile ? 0 : 1 }}>
+        {/* Infoskærm status (right) */}
+        <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
@@ -508,9 +517,9 @@ function ClientDetailsHeaderSection({
                 <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
                   <TableBody>
 
-                    {/* Lokation - første i dette paper */}
+                    {/* Lokation */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none", width: 140, minWidth: 140 }}>Lokation:</TableCell>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Lokation:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
@@ -530,7 +539,7 @@ function ClientDetailsHeaderSection({
                             size="small"
                             onClick={handleLocalitySave}
                             disabled={savingLocality || !localityChanged}
-                            sx={{ minWidth: 56 }}
+                            sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
                             {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
@@ -540,7 +549,7 @@ function ClientDetailsHeaderSection({
 
                     {/* Kiosk URL - directly under Lokation */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none", width: 140, minWidth: 140 }}>Kiosk URL:</TableCell>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Kiosk URL:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
@@ -560,7 +569,7 @@ function ClientDetailsHeaderSection({
                             size="small"
                             onClick={handleKioskUrlSave}
                             disabled={savingKioskUrl || !kioskUrlChanged}
-                            sx={{ minWidth: 56 }}
+                            sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
@@ -568,8 +577,7 @@ function ClientDetailsHeaderSection({
                       </TableCell>
                     </TableRow>
 
-                    {/* Kiosk browser status - label + value on same row.
-                        We override label's whiteSpace/overflow to ensure full label text is visible (wrap if necessary on desktop) */}
+                    {/* Kiosk browser status - label + value same row; label wraps on desktop/tablet as needed */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell
                         sx={{
@@ -578,8 +586,8 @@ function ClientDetailsHeaderSection({
                           overflow: isMobile ? "hidden" : "visible",
                           textOverflow: isMobile ? "ellipsis" : "clip",
                           borderBottom: "none",
-                          width: 140,
-                          minWidth: 140,
+                          width: labelCellWidth,
+                          minWidth: labelCellWidth,
                         }}
                       >
                         Kiosk browser status:
@@ -605,7 +613,6 @@ function ClientDetailsHeaderSection({
 
 // Custom shallow comparator for React.memo:
 // Only re-render header when props that affect its UI actually change.
-// We check a set of primitives and a few client fields that header displays.
 function propsAreEqual(prev, next) {
   // Compare simple primitive props
   const simpleKeys = [
