@@ -17,10 +17,12 @@ import {
 } from "../../api";
 
 /*
-  ClientDetailsPage.js (opdateret)
-  - Preserves isOnline on merges; header handles local saves directly to backend.
-  - Snackbar messages standardized: "Lokation gemt", "Kiosk webadresse gemt", "Skole gemt"
-  - Ændring: Undlader at kalde handleRefresh efter locality/kiosk-opdatering for at undgå at parent genindlæser hele siden.
+  ClientDetailsPage.js
+  Ændring:
+  - Når parent sender et nyt `client` prop, merg'es det med lokal state i stedet for blindt at overskrive,
+    med undtagelse hvis klient-id er ændret (skifte af klient). Dette bevarer isOnline hvis backend svarer
+    uden isOnline eller med undefined.
+  - Holder debug-logs ved modtagelse af client og ved API-respons på locality/kiosk save (kan fjernes).
 */
 
 export default function ClientDetailsPage({
@@ -66,11 +68,25 @@ export default function ClientDetailsPage({
     return {
       ...(prev || {}),
       ...(updated || {}),
+      // preserve prev.isOnline when updated.isOnline is strictly undefined
       isOnline: (typeof updated.isOnline === "undefined") ? prev?.isOnline : updated.isOnline
     };
   }
 
-  useEffect(() => { setClientState(client); }, [client]);
+  // Når parent prop `client` ændrer sig:
+  // - Hvis vi skifter klient (id ændret eller ingen prev), erstat helt.
+  // - Hvis samme klient, merge med preserveOnline for at undgå utilsigtet 'offline' når backend ikke sender isOnline.
+  useEffect(() => {
+    console.debug("[ClientDetailsPage] incoming client prop:", client);
+    setClientState(prev => {
+      if (!prev || prev.id !== client?.id) {
+        // ny klient eller ingen tidligere state -> accept serverens client fuldt ud
+        return client;
+      }
+      // samme klient -> merge, bevare lokal isOnline hvis backend ikke leverer den
+      return mergeClientPreserveOnline(prev, client);
+    });
+  }, [client]);
 
   useEffect(() => {
     if (!clientState) return;
@@ -175,15 +191,14 @@ export default function ClientDetailsPage({
       const updated = await updateClient(clientState.id, { locality });
       console.debug("updateClient(locality) response:", updated);
       if (updated) {
+        // merge svar fra API med lokal state - bevar isOnline hvis API ikke returnerede den
         setClientState(prev => mergeClientPreserveOnline(prev, updated));
       } else {
         setClientState(prev => prev ? ({ ...prev, locality }) : prev);
       }
       setLocalityDirty(false);
 
-      // NOTE: tidligere kaldte vi handleRefresh her, hvilket typisk får parent til at re-fetch
-      // og dermed får hele siden til at re-render. For at undgå "hele siden" opdateres undlader vi
-      // nu at kalde handleRefresh her og stoler på lokal state-opdatering (optimistisk opdatering).
+      // NB: Vi undlader generelt at kalde handleRefresh her for at undgå at parent genindlæser hele siden.
       if (typeof showSnackbar === "function") showSnackbar({ message: "Lokation gemt", severity: "success" });
     } catch (err) {
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
@@ -205,7 +220,6 @@ export default function ClientDetailsPage({
         setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
       }
 
-      // Samme note som ovenfor: undlad parent handleRefresh for at undgå full re-fetch/re-render.
       setKioskUrlDirty(false);
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kiosk webadresse gemt", severity: "success" });
     } catch (err) {
