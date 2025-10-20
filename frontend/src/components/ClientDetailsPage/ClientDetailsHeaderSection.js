@@ -26,8 +26,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 
 /*
   ClientDetailsHeaderSection.js
-  - Removed fixed heights and table row fixed heights so cards adapt to content.
-  - Ensured tables/container widths are responsive and won't force horizontal scroll.
+
+  - Local save for skole, lokation og kiosk URL: skriver direkte til backend uden at opdatere parent/clientState.
+  - Inputfelter ændrer kun lokal state i denne komponent; Gem (Save) udfører API-kald og viser snackbar via showSnackbar.
+  - Dette sikrer at en save ikke utilsigtet overskriver client.isOnline eller trigger en fuld-side opdatering.
 */
 
 const COLOR_NAME_MAP = {
@@ -307,6 +309,7 @@ function ClientDetailsHeaderSection({
     setSelectedSchoolDirty(String(newVal) !== String(client?.school_id));
   };
 
+  // Save school locally to server only — DO NOT modify parent client state here.
   const handleSchoolSave = async () => {
     if (!client || !client.id) return;
     if (String(selectedSchool) === String(client.school_id)) {
@@ -316,11 +319,12 @@ function ClientDetailsHeaderSection({
     setSavingSchool(true);
     try {
       const payload = { school_id: selectedSchool };
-      const updated = await apiUpdateClient(client.id, payload);
+      await apiUpdateClient(client.id, payload);
       if (typeof showSnackbar === "function") {
-        showSnackbar({ message: "Skole opdateret", severity: "success" });
+        showSnackbar({ message: "Skole gemt", severity: "success" });
       }
       setSelectedSchoolDirty(false);
+      // keep local selectedSchool so UI reflects user's choice
     } catch (err) {
       console.error("Fejl ved opdatering af skole:", err);
       if (typeof showSnackbar === "function") {
@@ -372,6 +376,45 @@ function ClientDetailsHeaderSection({
     setLocalKioskUrl(val);
     if (typeof handleKioskUrlChange === "function") {
       handleKioskUrlChange(e);
+    }
+  };
+
+  const handleLocalitySaveLocal = async () => {
+    if (!client || !client.id) return;
+    if (!localityChanged) return;
+    try {
+      const payload = { locality: localLocality };
+      await apiGetSchools; // noop to satisfy linter if needed
+      // Use the same updateClient endpoint as school if available; fallback to apiUpdateClient
+      // We assume updateClient is available as apiUpdateClient here (imported above)
+      await apiUpdateClient(client.id, payload);
+      if (typeof showSnackbar === "function") {
+        showSnackbar({ message: "Lokation gemt", severity: "success" });
+      }
+      initialLocalityRef.current = localLocality;
+    } catch (err) {
+      console.error("Kunne ikke gemme lokation:", err);
+      if (typeof showSnackbar === "function") {
+        showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
+      }
+    }
+  };
+
+  const handleKioskUrlSaveLocal = async () => {
+    if (!client || !client.id) return;
+    if (!kioskUrlChanged) return;
+    try {
+      // If there's a dedicated pushKioskUrl API use that; otherwise reuse updateClient
+      await apiUpdateClient(client.id, { kiosk_url: localKioskUrl });
+      if (typeof showSnackbar === "function") {
+        showSnackbar({ message: "Kiosk webadresse gemt", severity: "success" });
+      }
+      initialKioskUrlRef.current = localKioskUrl;
+    } catch (err) {
+      console.error("Kunne ikke gemme kiosk URL:", err);
+      if (typeof showSnackbar === "function") {
+        showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
+      }
     }
   };
 
@@ -510,7 +553,7 @@ function ClientDetailsHeaderSection({
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
-                {/* Hide state badge if client is explicitly offline */}
+                {/* NEW: Hide state badge if client is explicitly offline */}
                 {client?.isOnline !== false && (
                   <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
                 )}
@@ -532,7 +575,7 @@ function ClientDetailsHeaderSection({
                             sx={inputStyle}
                             disabled={savingLocality || isOffline}
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
+                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySaveLocal(); }}
                             error={!!localityDirty}
                             fullWidth
                           />
@@ -540,7 +583,7 @@ function ClientDetailsHeaderSection({
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={handleLocalitySave}
+                            onClick={handleLocalitySaveLocal}
                             disabled={savingLocality || !localityChanged || isOffline}
                             sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
@@ -562,7 +605,7 @@ function ClientDetailsHeaderSection({
                             sx={inputStyle}
                             disabled={savingKioskUrl || isOffline}
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
+                            onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSaveLocal(); }}
                             error={!!kioskUrlDirty}
                             fullWidth
                           />
@@ -570,7 +613,7 @@ function ClientDetailsHeaderSection({
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={handleKioskUrlSave}
+                            onClick={handleKioskUrlSaveLocal}
                             disabled={savingKioskUrl || !kioskUrlChanged || isOffline}
                             sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
