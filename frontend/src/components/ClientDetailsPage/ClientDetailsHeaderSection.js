@@ -324,8 +324,12 @@ function ClientDetailsHeaderSection({
     if (String(selectedSchool) === String(client.school_id)) return;
     setSavingSchool(true);
     try {
-      const updated = await apiUpdateClient(client.id, { school_id: selectedSchool });
+      // Sørg for at payload-formatet er klart (server forventer måske number/string afhængigt af backend)
+      const payload = { school_id: selectedSchool };
+      const updated = await apiUpdateClient(client.id, payload);
+      console.debug("handleSchoolSave - apiUpdateClient response:", updated);
       if (typeof onSchoolUpdated === "function") {
+        // send hvad serveren returnerede (kan være partial) — parent merger sikkert
         onSchoolUpdated(updated || { ...client, school_id: selectedSchool });
       }
       if (typeof showSnackbar === "function") {
