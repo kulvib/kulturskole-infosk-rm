@@ -26,8 +26,8 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 
 /*
   ClientDetailsHeaderSection - komplet komponent
-  Ændring: kun fjernet TableCell default padding på VALUE-kolonner (padding="none") så
-  den effektive afstand mellem label og value bliver reduceret. Label-kolonnen er uændret.
+  Ændring: label-teksten flugtes til højre på desktop (left på mobil) og value-teksten er left,
+  så den visuelle afstand mellem label-tekst og value-tekst bliver markant mindre uden at flytte kolonnen.
 */
 
 const COLOR_NAME_MAP = {
@@ -311,7 +311,7 @@ function ClientDetailsHeaderSection({
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5, // HALVERET: desktop 1 -> 0.5, mobil 0.5 -> 0.25
+    pr: isMobile ? 0.5 : 1,
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -319,7 +319,7 @@ function ClientDetailsHeaderSection({
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.25 : 0.75, // HALVERET: desktop 1.5 -> 0.75, mobil 0.5 -> 0.25
+    pl: isMobile ? 0.5 : 1.5,
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -341,8 +341,8 @@ function ClientDetailsHeaderSection({
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
       <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
-        <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <TableCell padding="none" sx={{ ...valueStyle, borderBottom: "none" }}>{String(value)}</TableCell>
+        <TableCell sx={{ ...labelStyle, borderBottom: "none", textAlign: isMobile ? "left" : "right" }}>{key}:</TableCell>
+        <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}>{String(value)}</TableCell>
       </TableRow>
     ));
   }
@@ -399,20 +399,20 @@ function ClientDetailsHeaderSection({
                 <Table size="small" aria-label="klient-info">
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <TableCell padding="none" sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none", textAlign: isMobile ? "left" : "right" }}>Klientnavn:</TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                        <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <TableCell padding="none" sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
+                        <TableCell sx={{ ...labelStyle, borderBottom: "none", textAlign: isMobile ? "left" : "right" }}>Klient ID:</TableCell>
+                        <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}>{client?.id ?? "?"}</TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
-                      <TableCell padding="none" sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none", textAlign: isMobile ? "left" : "right" }}>Skole:</TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             select
@@ -441,8 +441,8 @@ function ClientDetailsHeaderSection({
                     </TableRow>
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
-                      <TableCell padding="none" sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none", textAlign: isMobile ? "left" : "right" }}>Lokation:</TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
@@ -484,8 +484,8 @@ function ClientDetailsHeaderSection({
                 <Table size="small" aria-label="kiosk-info">
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
-                      <TableCell padding="none" sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none", textAlign: isMobile ? "left" : "right" }}>Kiosk URL:</TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
@@ -507,8 +507,8 @@ function ClientDetailsHeaderSection({
                     </TableRow>
 
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                      <TableCell padding="none" sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell sx={{ ...labelStyle, borderBottom: "none", textAlign: isMobile ? "left" : "right" }}>Kiosk browser status:</TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}>
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
