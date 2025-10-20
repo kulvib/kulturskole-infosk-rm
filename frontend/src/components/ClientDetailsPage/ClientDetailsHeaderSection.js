@@ -28,8 +28,8 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   ClientDetailsHeaderSection - komplet komponent
   Ændring i denne fil:
   - Jeg har bevaret tabelkolonne-placeringen præcis som i dit script (ingen colgroup, ingen tableLayout ændringer).
-  - Den eneste ændring er halvering af den horisontale spacing mellem label- og value-kolonner:
-    labelStyle.pr og valueStyle.pl bruger nu halvdelen af de originale theme-enheder.
+  - Den eneste ændring er at mindske den horisontale spacing mellem label- og value-kolonner yderligere:
+    labelStyle.pr og valueStyle.pl bruger nu mindre theme-enheder så value-kolonnen står tættere på label-kolonnen.
   - Value-kolonnen indhold og placering er uændret.
 */
 
@@ -311,10 +311,11 @@ function ClientDetailsHeaderSection({
     }
   };
 
+  // Reduced horizontal spacing between label and value columns (local to this component)
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5, // HALVERET: desktop 1 -> 0.5, mobil 0.5 -> 0.25
+    pr: isMobile ? 0.125 : 0.25, // MINDRE: mobil 0.125, desktop 0.25
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -322,7 +323,7 @@ function ClientDetailsHeaderSection({
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.25 : 0.75, // HALVERET: desktop 1.5 -> 0.75, mobil 0.5 -> 0.25
+    pl: isMobile ? 0.125 : 0.5, // MINDRE: mobil 0.125, desktop 0.5
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
