@@ -6,8 +6,6 @@ import ClientDetailsActionsSection from "./ClientDetailsActionsSection";
 import ClientDetailsLivestreamSection from "./ClientDetailsLivestreamSection";
 import ClientCalendarDialog from "../CalendarPage/ClientCalendarDialog";
 import {
-  updateClient,
-  pushKioskUrl,
   clientAction as apiClientAction,
   openTerminal,
   openRemoteDesktop,
@@ -18,9 +16,9 @@ import {
 
 /*
   ClientDetailsPage.js (opdateret)
-  - Bevarer client.isOnline ved merge hvis backend ikke eksplicit returnerer isOnline.
-  - Header-sektionen håndterer nu skole-opdatering lokalt og skriver kun til backend; parent modtager ikke længere partial update fra header.
-  - Efter save forsøger vi at kalde handleRefresh hvis parent tilbyder det (henter authoritative klient).
+  - Header håndterer nu skole/lokation/kiosk-url saves lokalt (skriver direkte til backend).
+  - Parent (ClientDetailsPage) modtager ikke længere partial updates fra header og påvirkes derfor ikke ved save.
+  - Bevarer mergeClientPreserveOnline til andre opdateringer der returnerer client-objekt.
 */
 
 export default function ClientDetailsPage({
@@ -34,12 +32,6 @@ export default function ClientDetailsPage({
   showSnackbar
 }) {
   const [clientState, setClientState] = useState(client);
-  const [locality, setLocality] = useState("");
-  const [localityDirty, setLocalityDirty] = useState(false);
-  const [savingLocality, setSavingLocality] = useState(false);
-  const [kioskUrl, setKioskUrl] = useState("");
-  const [kioskUrlDirty, setKioskUrlDirty] = useState(false);
-  const [savingKioskUrl, setSavingKioskUrl] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
 
@@ -74,8 +66,6 @@ export default function ClientDetailsPage({
 
   useEffect(() => {
     if (!clientState) return;
-    if (!localityDirty) setLocality(clientState.locality || "");
-    if (!kioskUrlDirty) setKioskUrl(clientState.kiosk_url || "");
     setLiveChromeStatus(clientState.chrome_status ?? "unknown");
     setLiveChromeColor(clientState.chrome_color ?? null);
     setLastSeen(clientState.last_seen ?? null);
@@ -167,65 +157,6 @@ export default function ClientDetailsPage({
   const handleOpenTerminal = useCallback(() => { if (!memoizedClientId) return; openTerminal(memoizedClientId); }, [memoizedClientId]);
   const handleOpenRemoteDesktop = useCallback(() => { if (!memoizedClientId) return; openRemoteDesktop(memoizedClientId); }, [memoizedClientId]);
 
-  // NOTE:
-  // Header handles school-save itself (only writes to backend) and does NOT call into parent anymore.
-  // Therefore handleSchoolUpdated has been removed.
-
-  const handleLocalityChange = (e) => { setLocality(e.target.value); setLocalityDirty(true); };
-  const handleLocalitySave = async () => {
-    if (!clientState?.id) return;
-    setSavingLocality(true);
-    try {
-      const updated = await updateClient(clientState.id, { locality });
-      // log for debugging (can remove later)
-      console.debug("updateClient(locality) response:", updated);
-      if (updated) {
-        setClientState(prev => mergeClientPreserveOnline(prev, updated));
-      } else {
-        setClientState(prev => prev ? ({ ...prev, locality }) : prev);
-      }
-      setLocalityDirty(false);
-
-      // prefer authoritative refresh if parent can do it
-      if (typeof handleRefresh === "function") {
-        try { await handleRefresh(); } catch (e) { console.debug("handleRefresh after locality save failed:", e); }
-      } else {
-        if (typeof showSnackbar === "function") showSnackbar({ message: "Lokation gemt!", severity: "success" });
-      }
-    } catch (err) {
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
-    } finally {
-      setSavingLocality(false);
-    }
-  };
-
-  const handleKioskUrlChange = (e) => { setKioskUrl(e.target.value); setKioskUrlDirty(true); };
-  const handleKioskUrlSave = async () => {
-    if (!clientState?.id) return;
-    setSavingKioskUrl(true);
-    try {
-      const updated = await pushKioskUrl(clientState.id, kioskUrl);
-      console.debug("pushKioskUrl response:", updated);
-      if (updated) {
-        setClientState(prev => mergeClientPreserveOnline(prev, updated));
-      } else {
-        setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
-      }
-
-      // call authoritative refresh if available
-      if (typeof handleRefresh === "function") {
-        try { await handleRefresh(); } catch (e) { console.debug("handleRefresh after kioskUrl save failed:", e); }
-      }
-
-      setKioskUrlDirty(false);
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Kiosk webadresse opdateret!", severity: "success" });
-    } catch (err) {
-      if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
-    } finally {
-      setSavingKioskUrl(false);
-    }
-  };
-
   useEffect(() => {
     if (memoizedClientId) {
       apiClientAction(memoizedClientId, "livestream_start").catch(() => {});
@@ -243,33 +174,23 @@ export default function ClientDetailsPage({
           <ClientDetailsHeaderSection
             client={clientState}
             schools={schools}
-            locality={locality}
-            localityDirty={localityDirty}
-            savingLocality={savingLocality}
-            handleLocalityChange={handleLocalityChange}
-            handleLocalitySave={handleLocalitySave}
-            kioskUrl={kioskUrl}
-            kioskUrlDirty={kioskUrlDirty}
-            savingKioskUrl={savingKioskUrl}
-            handleKioskUrlChange={handleKioskUrlChange}
-            handleKioskUrlSave={handleKioskUrlSave}
             liveChromeStatus={liveChromeStatus}
             liveChromeColor={liveChromeColor}
             refreshing={refreshing}
             handleRefresh={handleRefresh}
+            kioskBrowserData={clientState?.kiosk_browser_data || {}}
             showSnackbar={showSnackbar}
           />
         </Grid>
 
         <Grid item xs={12}>
-          {/* Her videregives refreshing og onRestartStream så livestream-sektionen kan vise spinner */}
           <ClientDetailsLivestreamSection
             clientId={clientState?.id}
             key={streamKey}
             refreshing={refreshing}
             onRestartStream={onRestartStream}
             streamKey={streamKey}
-            clientOnline={clientState?.isOnline} /* NEW: inform livestream om online-status */
+            clientOnline={clientState?.isOnline}
           />
         </Grid>
 
@@ -292,7 +213,7 @@ export default function ClientDetailsPage({
             handleOpenRemoteDesktop={handleOpenRemoteDesktop}
             refreshing={refreshing}
             showSnackbar={showSnackbar}
-            clientOnline={clientState?.isOnline} /* NEW: inform actions om online-status */
+            clientOnline={clientState?.isOnline}
           />
         </Grid>
       </Grid>
