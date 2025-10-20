@@ -492,10 +492,10 @@ export default function ClientDetailsLivestreamSection({
                   width: isMobile ? 8 : 10,
                   height: isMobile ? 8 : 10,
                   borderRadius: "50%",
-                  bgcolor: manifestReady ? "#43a047" : "#e53935",
+                  bgcolor: clientOnline === false ? "#9e9e9e" : (manifestReady ? "#43a047" : "#e53935"),
                   border: "1px solid #ddd",
                   mr: 1,
-                  animation: manifestReady ? "pulsate 2s infinite" : "none"
+                  animation: (manifestReady && clientOnline !== false) ? "pulsate 2s infinite" : "none"
                 }}
               />
               <Tooltip title={clientOnline === false ? "Klienten er offline" : "Genindlæs stream"}>
@@ -506,7 +506,7 @@ export default function ClientDetailsLivestreamSection({
                     size={isMobile ? "small" : "medium"}
                     disabled={refreshing || !clientId || clientOnline === false}
                   >
-                    {refreshing ? <CircularProgress size={isMobile ? 20 : 18} color="inherit" /> : <RefreshIcon sx={{ fontSize: isMobile ? 26 : undefined }} />}
+                    { (refreshing && clientOnline !== false) ? <CircularProgress size={isMobile ? 20 : 18} color="inherit" /> : <RefreshIcon sx={{ fontSize: isMobile ? 26 : undefined }} /> }
                   </IconButton>
                 </span>
               </Tooltip>
@@ -640,12 +640,9 @@ export default function ClientDetailsLivestreamSection({
                 borderRadius: 1
               }}>
                 {clientOnline === false ? (
-                  <>
-                    <CircularProgress size={isMobile ? 20 : 32} />
-                    <Typography variant="body2" sx={{ ml: 2, fontSize: isMobile ? 13 : undefined }}>
-                      Klienten er offline — livestream deaktiveret
-                    </Typography>
-                  </>
+                  <Typography variant="body2" sx={{ fontSize: isMobile ? 13 : undefined }}>
+                    Klienten er offline — livestream deaktiveret
+                  </Typography>
                 ) : (
                   <>
                     <CircularProgress size={isMobile ? 24 : 32} />
