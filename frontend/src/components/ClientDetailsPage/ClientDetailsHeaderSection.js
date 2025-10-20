@@ -26,13 +26,12 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 
 /*
   ClientDetailsHeaderSection
-  Ændringer:
-  - Når client.isOnline === false:
-    - Højre Card (Infoskærm status) greyed out (lavere opacity).
-    - Et overlay med en synlig inline besked midt i kortet: "Klient er offline — redigering deaktiveret".
-    - Overlay blokerer interaktion (pointer-events) og har role="status" + aria-live for a11y.
-    - Felter (Lokation, Kiosk URL), kopier- og gem-knapper forbliver disabled.
-    - StateBadge skjules når offline (som ønsket).
+  Ændringer / noter:
+  - Når client.isOnline === false: højre "paper" greyed out + inline overlay besked "Klient er offline — redigering deaktiveret".
+  - Løst issue hvor man kun kunne indtaste ét tegn ad gangen ved at bruge lokal state for Lokation og Kiosk URL.
+  - Lokale states synkroniseres med props når props ændrer sig.
+  - onChange forbliver kompatibel med parent ved at kalde handleLocalityChange/handleKioskUrlChange med event (hvis de er givet).
+  - Ved Gem (knap eller Enter) kaldes handleLocalitySave(handleLocalitySave(localValue)) / handleKioskUrlSave(localValue) hvis funktionen er givet.
 */
 
 const COLOR_NAME_MAP = {
@@ -56,14 +55,12 @@ function resolveColor(theme, color) {
 
   const trimmed = color.trim();
 
-  // hex or rgb(a)
   if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(trimmed) || /^rgba?\(/i.test(trimmed)) {
     return trimmed;
   }
 
   const lower = trimmed.toLowerCase();
 
-  // theme token like "grey.400" or "success.main"
   if (lower.includes(".")) {
     const [paletteKey, shade] = lower.split(".");
     const pal = theme.palette?.[paletteKey];
@@ -74,17 +71,14 @@ function resolveColor(theme, color) {
     }
   }
 
-  // theme direct key e.g. "success"
   if (theme.palette?.[lower]) {
     const pal = theme.palette[lower];
     if (typeof pal === "string") return pal;
     if (pal.main) return pal.main;
   }
 
-  // map common names to hex
   if (COLOR_NAME_MAP[lower]) return COLOR_NAME_MAP[lower];
 
-  // fallback to the raw trimmed string (may be valid CSS color)
   return trimmed;
 }
 
@@ -238,6 +232,10 @@ function ClientDetailsHeaderSection({
   const clientIsOffline = client?.isOnline === false;
   const offlineMessage = "Klient er offline — redigering deaktiveret";
 
+  // Local state for inputs to avoid "single-character typing" issue
+  const [localLocality, setLocalLocality] = React.useState(locality ?? "");
+  const [localKioskUrl, setLocalKioskUrl] = React.useState(kioskUrl ?? "");
+
   // Schools state (prefer prop)
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
   const [loadingSchools, setLoadingSchools] = React.useState(false);
@@ -247,7 +245,16 @@ function ClientDetailsHeaderSection({
   const [savingSchool, setSavingSchool] = React.useState(false);
   const [selectedSchoolDirty, setSelectedSchoolDirty] = React.useState(false);
 
-  // Sync props -> state
+  // Sync props -> local state only when props change (prevents overwriting while typing)
+  React.useEffect(() => {
+    setLocalLocality(locality ?? "");
+  }, [locality]);
+
+  React.useEffect(() => {
+    setLocalKioskUrl(kioskUrl ?? "");
+  }, [kioskUrl]);
+
+  // Sync schools prop -> state
   React.useEffect(() => {
     if (Array.isArray(schools) && schools.length) {
       setSchoolsList(schools);
@@ -327,7 +334,6 @@ function ClientDetailsHeaderSection({
     fontSize: isMobile ? 12 : 14,
   };
 
-  // inputStyle: ensures both native input and Select-display element share same (reduced) left padding, height and vertical alignment.
   const inputStyle = {
     width: "100%",
     height: 32,
@@ -351,7 +357,6 @@ function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
-  // ValueCell helper: applies valueStyle via sx and forces inline paddingLeft/paddingRight so it wins.
   function ValueCell({ children, sx = {}, style = {}, ...props }) {
     return (
       <TableCell
@@ -379,6 +384,44 @@ function ClientDetailsHeaderSection({
     const s = (schoolsList || []).find(x => String(x.id) === String(selectedSchool));
     return s ? s.name : String(selectedSchool);
   }, [selectedSchool, schoolsList]);
+
+  // Handlers for local inputs (preserve parent onChange if provided)
+  const onLocalityChange = (e) => {
+    const v = e.target.value;
+    setLocalLocality(v);
+    if (typeof handleLocalityChange === "function") {
+      // call parent onChange with the event for backward compatibility
+      try { handleLocalityChange(e); } catch (err) { /* ignore */ }
+    }
+  };
+
+  const onKioskUrlChange = (e) => {
+    const v = e.target.value;
+    setLocalKioskUrl(v);
+    if (typeof handleKioskUrlChange === "function") {
+      try { handleKioskUrlChange(e); } catch (err) { /* ignore */ }
+    }
+  };
+
+  const onLocalitySave = async () => {
+    if (typeof handleLocalitySave === "function") {
+      try {
+        await handleLocalitySave(localLocality);
+      } catch (err) {
+        // swallow - parent handles snackbar/error
+      }
+    }
+  };
+
+  const onKioskUrlSave = async () => {
+    if (typeof handleKioskUrlSave === "function") {
+      try {
+        await handleKioskUrlSave(localKioskUrl);
+      } catch (err) {
+        // swallow
+      }
+    }
+  };
 
   // Render
   return (
@@ -477,8 +520,6 @@ function ClientDetailsHeaderSection({
                       </ValueCell>
                     </TableRow>
 
-                    {/* Lokation fjernet her - flyttet til Infoskærm status paper */}
-
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -494,16 +535,13 @@ function ClientDetailsHeaderSection({
             sx={{
               borderRadius: isMobile ? 1 : 2,
               height: "100%",
-              // subtle global dimming on the card itself if offline
               opacity: clientIsOffline ? 0.78 : 1,
               transition: "opacity 200ms ease"
             }}
           >
-            {/* CardContent is positioned relative so we can render an overlay that blocks interaction when offline */}
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, position: "relative" }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
-                {/* Hide StateBadge when offline (per earlier requirement) */}
                 {clientIsOffline ? null : <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>}
               </Box>
 
@@ -515,27 +553,27 @@ function ClientDetailsHeaderSection({
                   </colgroup>
                   <TableBody>
 
-                    {/* Lokation (nu i right paper over Kiosk URL) */}
+                    {/* Lokation */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
                       <ValueCell>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
-                            value={locality ?? ""}
-                            onChange={handleLocalityChange}
+                            value={localLocality}
+                            onChange={onLocalityChange}
                             sx={inputStyle}
                             disabled={savingLocality || clientIsOffline}
                             inputProps={{ "aria-label": "Lokation" }}
-                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
+                            onKeyDown={e => { if (e.key === "Enter") onLocalitySave(); }}
                             error={!!localityDirty}
                             fullWidth
                           />
-                          <CopyIconButton value={locality ?? ""} disabled={!locality || clientIsOffline} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                          <CopyIconButton value={localLocality ?? ""} disabled={!localLocality || clientIsOffline} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={handleLocalitySave}
+                            onClick={onLocalitySave}
                             disabled={savingLocality || !localityDirty || clientIsOffline}
                             sx={{ minWidth: 56 }}
                           >
@@ -552,20 +590,20 @@ function ClientDetailsHeaderSection({
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
-                            value={kioskUrl ?? ""}
-                            onChange={handleKioskUrlChange}
+                            value={localKioskUrl}
+                            onChange={onKioskUrlChange}
                             sx={inputStyle}
                             disabled={savingKioskUrl || clientIsOffline}
                             inputProps={{ "aria-label": "Kiosk URL" }}
-                            onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
+                            onKeyDown={e => { if (e.key === "Enter") onKioskUrlSave(); }}
                             error={!!kioskUrlDirty}
                             fullWidth
                           />
-                          <CopyIconButton value={kioskUrl ?? ""} disabled={!kioskUrl || clientIsOffline} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                          <CopyIconButton value={localKioskUrl ?? ""} disabled={!localKioskUrl || clientIsOffline} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={handleKioskUrlSave}
+                            onClick={onKioskUrlSave}
                             disabled={savingKioskUrl || !kioskUrlDirty || clientIsOffline}
                             sx={{ minWidth: 56 }}
                           >
@@ -575,7 +613,7 @@ function ClientDetailsHeaderSection({
                       </ValueCell>
                     </TableRow>
 
-                    {/* Kiosk browser status: label-række + separat value-række nedenunder */}
+                    {/* Kiosk browser status (greyed when offline) */}
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none", color: clientIsOffline ? "text.disabled" : "inherit" }}>Kiosk browser status:</TableCell>
                       <TableCell sx={{ borderBottom: "none" }} />
@@ -607,9 +645,7 @@ function ClientDetailsHeaderSection({
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "not-allowed",
-                    // capture pointer events to make underlying controls inert
                     pointerEvents: "auto",
-                    // keep background transparent so underlying dimming (opacity on Card) is visible
                     backgroundColor: "transparent",
                     p: 2
                   }}
