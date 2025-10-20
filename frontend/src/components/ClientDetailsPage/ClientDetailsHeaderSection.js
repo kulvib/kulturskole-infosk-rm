@@ -25,11 +25,11 @@ import { useAuth } from "../../auth/authcontext";
 import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "../../api";
 
 /*
-  ClientDetailsHeaderSection - komplet komponent
-  Rettelse:
-  - Gendannet labelStyle til den oprindelige (ingen direkte p:0 eller paddingRight override).
-  - Ændret KUN valueStyle til at bruge eksplicit paddingLeft i px (p:0 + paddingLeft),
-    så value-kolonnen står tættere på uden at flytte label-cellen.
+  ClientDetailsHeaderSection
+  Rettelse (sidste forsøg):
+  - BEVARER label-cellen uændret.
+  - FLYTTER KUN selve indholdet i value-kolonnen tættere ved at wrappe indholdet i en Box med negativ margin-left.
+  - Dette ændrer ikke label-placeringen og er lokal for denne komponent.
 */
 
 const COLOR_NAME_MAP = {
@@ -85,8 +85,6 @@ function resolveColor(theme, color) {
   return trimmed;
 }
 
-// StatusBadge - dot + label. animation only transforms and opacity (no background)
-// inline style is used to force background-color so global keyframes/styles can't override it.
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
   const resolvedBg = React.useMemo(() => resolveColor(theme, color), [color, theme]);
@@ -306,23 +304,21 @@ function ClientDetailsHeaderSection({
     }
   };
 
-  // Restore labelStyle to original behaviour (DO NOT override p)
+  // Keep labelStyle unchanged (do not override p)
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5, // <-- GENDANGET til oprindelig (ingen p:0 override)
+    pr: isMobile ? 0.25 : 0.5,
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
     minWidth: 140,
   };
 
-  // ONLY adjust value cell: force a smaller left padding (in px) and set p:0 so it reliably applies.
-  // This moves the "value" content closer to the label WITHOUT touching the label cell.
+  // valueStyle used for TableCell base styling; we will SHIFT the CONTENT using a wrapping Box
   const valueStyle = {
     fontWeight: 400,
-    p: 0, // reset cell padding to ensure paddingLeft wins
-    paddingLeft: isMobile ? "6px" : "10px", // <-- just the value cell is tightened
+    pl: isMobile ? 0.25 : 0.75,
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -340,12 +336,17 @@ function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
+  // amount to shift the value CONTENT left (negative margin) - adjust numbers to taste
+  const valueShift = isMobile ? "-6px" : "-10px";
+
   function renderKioskBrowserDataRows(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
       <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{String(value)}</TableCell>
+        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+          <Box sx={{ ml: valueShift, display: "inline-flex", alignItems: "center" }}>{String(value)}</Box>
+        </TableCell>
       </TableRow>
     ));
   }
@@ -403,20 +404,24 @@ function ClientDetailsHeaderSection({
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                        <Box sx={{ ml: valueShift }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</Box>
+                      </TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
+                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                          <Box sx={{ ml: valueShift }}>{client?.id ?? "?"}</Box>
+                        </TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Box sx={{ ml: valueShift, display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             select
                             size="small"
@@ -446,7 +451,7 @@ function ClientDetailsHeaderSection({
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Box sx={{ ml: valueShift, display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
                             value={locality ?? ""}
@@ -489,7 +494,7 @@ function ClientDetailsHeaderSection({
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Box sx={{ ml: valueShift, display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
                             value={kioskUrl ?? ""}
@@ -512,7 +517,7 @@ function ClientDetailsHeaderSection({
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
                       <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+                        <Box sx={{ ml: valueShift }}><ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} /></Box>
                       </TableCell>
                     </TableRow>
 
@@ -531,10 +536,7 @@ function ClientDetailsHeaderSection({
 }
 
 // Custom shallow comparator for React.memo:
-// Only re-render header when props that affect its UI actually change.
-// We check a set of primitives and a few client fields that header displays.
 function propsAreEqual(prev, next) {
-  // Compare simple primitive props
   const simpleKeys = [
     "locality",
     "localityDirty",
@@ -545,14 +547,12 @@ function propsAreEqual(prev, next) {
     "liveChromeStatus",
     "liveChromeColor",
     "refreshing",
-    // optional token if parent provides it (useful if you want explicit change detection)
     "liveChromeTimestamp"
   ];
   for (const k of simpleKeys) {
     if (prev[k] !== next[k]) return false;
   }
 
-  // Compare client fields we care about shallowly
   const prevClient = prev.client || {};
   const nextClient = next.client || {};
   const clientKeys = ["id", "name", "isOnline", "school_id", "state", "chrome_status", "chrome_color"];
@@ -560,7 +560,6 @@ function propsAreEqual(prev, next) {
     if (prevClient[k] !== nextClient[k]) return false;
   }
 
-  // Compare schools length and basic identity to detect meaningful changes
   const prevSchools = prev.schools || [];
   const nextSchools = next.schools || [];
   if (prevSchools.length !== nextSchools.length) return false;
@@ -568,7 +567,6 @@ function propsAreEqual(prev, next) {
     if ((prevSchools[i]?.id ?? null) !== (nextSchools[i]?.id ?? null)) return false;
   }
 
-  // Compare kioskBrowserData shallowly by keys/values
   const prevKbd = prev.kioskBrowserData || {};
   const nextKbd = next.kioskBrowserData || {};
   const prevKbdKeys = Object.keys(prevKbd);
@@ -578,7 +576,6 @@ function propsAreEqual(prev, next) {
     if (prevKbd[key] !== nextKbd[key]) return false;
   }
 
-  // If we've reached here, treat props as equal (no re-render needed)
   return true;
 }
 
