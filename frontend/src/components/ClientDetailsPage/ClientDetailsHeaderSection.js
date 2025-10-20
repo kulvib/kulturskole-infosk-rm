@@ -26,13 +26,11 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 
 /*
   ClientDetailsHeaderSection - komplet komponent
-  Rettelser/forbedringer inkluderet:
-  - Robust color resolution (theme tokens, hex, color names).
-  - Unik keyframe-navn (pulsateStatusBadge) og keyframes animerer KUN transform+opacity.
-  - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
-  - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
-  - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
-  - Table-layout fixed + eksplicit label width på desktop + overflow: hidden/text-overflow: ellipsis for at undgå overlap.
+  Ændringer:
+  - Desktop: paper 1 = 40%, paper 2 = 60%
+  - Flyttet "Lokation" til paper 2 over "Kiosk URL"
+  - "Kiosk browser status" value vises én linje under label (separeret TableRow)
+  - Bevarer øvrig funktionalitet og propsAreEqual
 */
 
 const COLOR_NAME_MAP = {
@@ -104,19 +102,15 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
-          // use our unique animation name via sx (keeps theme-based style generation)
           animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
-          // keyframes animate only transform+opacity
           "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
-        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
         style={{
           backgroundColor: resolvedBg,
-          // enforce our animation properties inline as well so the element uses our unique keyframes
           animationName: animate ? "pulsateStatusBadge" : "none",
           animationDuration: animate ? "2s" : undefined,
           animationIterationCount: animate ? "infinite" : undefined,
@@ -317,7 +311,7 @@ function ClientDetailsHeaderSection({
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
-    pr: isMobile ? 0.5 : 1, // restored desktop padding to original
+    pr: isMobile ? 0.5 : 1,
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -326,7 +320,7 @@ function ClientDetailsHeaderSection({
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.5 : 1.5, // restored desktop padding to original
+    pl: isMobile ? 0.5 : 1.5,
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -352,8 +346,8 @@ function ClientDetailsHeaderSection({
           sx={{
             ...labelStyle,
             borderBottom: "none",
-            width: 140,
-            minWidth: 140,
+            width: isMobile ? 140 : 140,
+            minWidth: isMobile ? 140 : 140,
           }}
         >
           {key}:
@@ -400,8 +394,8 @@ function ClientDetailsHeaderSection({
 
       {/* Papers */}
       <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
-        {/* Klient info */}
-        <Box sx={{ width: isMobile ? "100%" : "50%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
+        {/* Klient info - 40% på desktop */}
+        <Box sx={{ width: isMobile ? "100%" : "40%", pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
           <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
             <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
@@ -419,8 +413,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: 140,
-                          minWidth: 140,
+                          width: isMobile ? 140 : 140,
+                          minWidth: isMobile ? 140 : 140,
                         }}
                       >
                         Klientnavn:
@@ -434,8 +428,8 @@ function ClientDetailsHeaderSection({
                           sx={{
                             ...labelStyle,
                             borderBottom: "none",
-                            width: 140,
-                            minWidth: 140,
+                            width: isMobile ? 140 : 140,
+                            minWidth: isMobile ? 140 : 140,
                           }}
                         >
                           Klient ID:
@@ -449,8 +443,8 @@ function ClientDetailsHeaderSection({
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: 140,
-                          minWidth: 140,
+                          width: isMobile ? 140 : 140,
+                          minWidth: isMobile ? 140 : 140,
                         }}
                       >
                         Skole:
@@ -483,13 +477,37 @@ function ClientDetailsHeaderSection({
                       </TableCell>
                     </TableRow>
 
+                    {/* Lokation er flyttet til paper 2 */}
+
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+            </CardContent>
+          </Card>
+        </Box>
+
+        {/* Kiosk info - 60% på desktop */}
+        <Box sx={{ width: isMobile ? "100%" : "60%", pl: isMobile ? 0 : 1 }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Kiosk info</Typography>
+                <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
+              </Box>
+
+              <TableContainer>
+                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
+                  <TableBody>
+
+                    {/* Flyttet Lokation her - over Kiosk URL */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: 140,
-                          minWidth: 140,
+                          width: isMobile ? 140 : 140,
+                          minWidth: isMobile ? 140 : 140,
                         }}
                       >
                         Lokation:
@@ -515,33 +533,38 @@ function ClientDetailsHeaderSection({
                       </TableCell>
                     </TableRow>
 
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-            </CardContent>
-          </Card>
-        </Box>
-
-        {/* Kiosk info */}
-        <Box sx={{ width: isMobile ? "100%" : "50%", pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "100%" }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Kiosk info</Typography>
-                <Box sx={{ ml: 1 }}><StateBadge state={client?.state} isMobile={isMobile} /></Box>
-              </Box>
-
-              <TableContainer>
-                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
-                  <TableBody>
+                    {/* Kiosk URL will be after the status rows (so status label appears above and value below) */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell
                         sx={{
                           ...labelStyle,
                           borderBottom: "none",
-                          width: 140,
-                          minWidth: 140,
+                          width: isMobile ? 140 : 140,
+                          minWidth: isMobile ? 140 : 140,
+                        }}
+                      >
+                        Kiosk browser status:
+                      </TableCell>
+                      {/* empty cell so the value can appear on next line */}
+                      <TableCell sx={{ borderBottom: "none" }}></TableCell>
+                    </TableRow>
+
+                    {/* value on next line under the value-column */}
+                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
+                      <TableCell sx={{ borderBottom: "none", width: isMobile ? 140 : 140, minWidth: isMobile ? 140 : 140 }} />
+                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
+                      </TableCell>
+                    </TableRow>
+
+                    {/* Kiosk URL */}
+                    <TableRow sx={{ height: isMobile ? 36 : 44 }}>
+                      <TableCell
+                        sx={{
+                          ...labelStyle,
+                          borderBottom: "none",
+                          width: isMobile ? 140 : 140,
+                          minWidth: isMobile ? 140 : 140,
                         }}
                       >
                         Kiosk URL:
@@ -564,22 +587,6 @@ function ClientDetailsHeaderSection({
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
-                      </TableCell>
-                    </TableRow>
-
-                    <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell
-                        sx={{
-                          ...labelStyle,
-                          borderBottom: "none",
-                          width: 140,
-                          minWidth: 140,
-                        }}
-                      >
-                        Kiosk browser status:
-                      </TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
 
