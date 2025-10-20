@@ -1,3 +1,12 @@
+/*
+  Updated ClientDetailsHeaderSection.js
+
+  Ændring:
+  - Justerede 'Skole' TextField's sx så Select-feltets indre input har samme højde og paddings som 'Lokation' TextField.
+  - Brug samme højde (isMobile ? 30 : 32) og indre input-højde (isMobile ? "28px" : "32px") så visuel ramme matcher Lokation.
+  - Beholder tidligere Select-specifikke overrides (.MuiSelect-select og .MuiSelect-icon) men sørger for at deres højde/padding stemmer overens med Lokation.
+*/
+
 import React from "react";
 import {
   Box,
@@ -501,14 +510,14 @@ function ClientDetailsHeaderSection({
                                 // sikre at input og select-elementet fylder og er vertikalt centreret
                                 "& .MuiInputBase-input": {
                                   fontSize: isMobile ? 12 : 14,
-                                  height: "100%",            // 100% så det matcher andre TextField'er
+                                  height: isMobile ? "28px" : "32px",
                                   boxSizing: "border-box",
                                   padding: isMobile ? "6px 8px" : "8px 14px",
                                   display: "flex",
                                   alignItems: "center"
                                 },
                                 "& .MuiSelect-select": {
-                                  height: "100%",
+                                  height: isMobile ? "28px" : "32px",
                                   display: "flex",
                                   alignItems: "center",
                                   padding: isMobile ? "6px 8px" : "8px 14px"
