@@ -30,13 +30,15 @@ import { useAuth } from "../../auth/authcontext";
 // Denne komponent opdateres ikke via polling eller client-objekt – kun via props ændret af brugerhandlinger!
 // Ændring: bruger wrapperens showSnackbar hvis den er tilgængelig; fallback til lokal snackbar ellers.
 // Også: nulstil lokal actionLoading når clientId ændrer sig eller når optional prop `refreshing` skifter til false.
+// Rettet: hvis parent sender handleClientAction, benyttes den; ellers fallback til intern clientAction.
 
 function ClientDetailsActionsSection({
   clientId,
   handleOpenTerminal,
   handleOpenRemoteDesktop,
   refreshing, // optional: hvis wrapper sender refreshing-flag kan vi rydde loading når refresh er færdig
-  showSnackbar // optional: funktion fra wrapper til at vise snackbar centrally
+  showSnackbar, // optional: funktion fra wrapper til at vise snackbar centrally
+  handleClientAction: parentHandleClientAction // optional: parent kan håndtere action
 }) {
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
@@ -74,37 +76,39 @@ function ClientDetailsActionsSection({
     }
   }, [showSnackbar]);
 
-  // Tilpasset knapstyle: height: 38px og harmoniske værdier
-  const actionBtnStyle = {
-    minWidth: 0,
-    width: "100%",
-    height: 38,
-    fontSize: "0.95rem",
-    textTransform: "none",
-    fontWeight: 500,
-    lineHeight: 1.18,
-    py: 0.75,
-    px: 1.25,
-    m: 0,
-    whiteSpace: "nowrap",
-    display: "inline-flex",
-    justifyContent: "center",
-    borderRadius: 2.8,
-    boxShadow: 1,
-  };
-
-  // Main action handler
-  const handleClientAction = useCallback(async (action) => {
+  // Intern fallback handler (bruges hvis parent ikke leverer handleClientAction)
+  const internalHandleClientAction = useCallback(async (action) => {
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
       await clientAction(clientId, action);
       notify({ message: 'Handling udført!', severity: 'success' });
     } catch (err) {
       notify({ message: 'Fejl: ' + (err?.message || 'Kunne ikke udføre handling'), severity: 'error' });
+      throw err;
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
   }, [clientId, notify]);
+
+  // Højere-niveau wrapper der bruger parent's handler hvis tilgængelig, ellers fallback til intern
+  const doClientAction = useCallback(async (action) => {
+    setActionLoading(prev => ({ ...prev, [action]: true }));
+    try {
+      if (typeof parentHandleClientAction === "function") {
+        // parent forventes at returnere et Promise
+        await parentHandleClientAction(action);
+        // antag at parent selv viser snackbar; hvis ikke, vis success fallback
+        notify({ message: 'Handling udført!', severity: 'success' });
+      } else {
+        await internalHandleClientAction(action);
+      }
+    } catch (err) {
+      // Sørg for at forwardere fejlmeddelelse via notify (hvis parent ikke gjorde det)
+      notify({ message: 'Fejl: ' + (err?.message || 'Kunne ikke udføre handling'), severity: 'error' });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [action]: false }));
+    }
+  }, [parentHandleClientAction, internalHandleClientAction, notify]);
 
   // Wrapper for Tooltip så den ikke vises på mobil
   const MaybeTooltip = ({ title, children }) =>
@@ -118,7 +122,7 @@ function ClientDetailsActionsSection({
       icon: <ChromeReaderModeIcon />,
       color: "primary",
       variant: "outlined",
-      onClick: () => handleClientAction("chrome-start"),
+      onClick: () => doClientAction("chrome-start"),
       loading: actionLoading["chrome-start"],
       tooltip: "Start kiosk browser",
     },
@@ -128,7 +132,7 @@ function ClientDetailsActionsSection({
       icon: <PowerSettingsNewIcon />,
       color: "secondary",
       variant: "outlined",
-      onClick: () => handleClientAction("chrome-shutdown"),
+      onClick: () => doClientAction("chrome-shutdown"),
       loading: actionLoading["chrome-shutdown"],
       tooltip: "Luk kiosk browser",
     },
@@ -138,7 +142,7 @@ function ClientDetailsActionsSection({
       icon: <NightlightIcon />,
       color: "info",
       variant: "outlined",
-      onClick: () => handleClientAction("sleep"),
+      onClick: () => doClientAction("sleep"),
       loading: actionLoading["sleep"],
       tooltip: "Sæt klient i dvale",
     },
@@ -148,7 +152,7 @@ function ClientDetailsActionsSection({
       icon: <WbSunnyIcon />,
       color: "success",
       variant: "outlined",
-      onClick: () => handleClientAction("wakeup"),
+      onClick: () => doClientAction("wakeup"),
       loading: actionLoading["wakeup"],
       tooltip: "Væk klient fra dvale",
     },
@@ -179,7 +183,7 @@ function ClientDetailsActionsSection({
       icon: <RestartAltIcon />,
       color: "warning",
       variant: "contained",
-      onClick: () => handleClientAction("restart"),
+      onClick: () => doClientAction("restart"),
       loading: actionLoading["restart"],
       tooltip: "Genstart klient",
     },
@@ -209,7 +213,7 @@ function ClientDetailsActionsSection({
       icon: <RestartAltIcon />,
       color: "warning",
       variant: "contained",
-      onClick: () => handleClientAction("restart"),
+      onClick: () => doClientAction("restart"),
       loading: actionLoading["restart"],
       tooltip: "Genstart klient",
     }
@@ -237,6 +241,25 @@ function ClientDetailsActionsSection({
       </MaybeTooltip>
     </Grid>
   );
+
+  // Tilpasset knapstyle: height: 38px og harmoniske værdier
+  const actionBtnStyle = {
+    minWidth: 0,
+    width: "100%",
+    height: 38,
+    fontSize: "0.95rem",
+    textTransform: "none",
+    fontWeight: 500,
+    lineHeight: 1.18,
+    py: 0.75,
+    px: 1.25,
+    m: 0,
+    whiteSpace: "nowrap",
+    display: "inline-flex",
+    justifyContent: "center",
+    borderRadius: 2.8,
+    boxShadow: 1,
+  };
 
   return (
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2 }}>
@@ -278,7 +301,7 @@ function ClientDetailsActionsSection({
             <Button
               onClick={async () => {
                 setShutdownDialogOpen(false);
-                await handleClientAction("shutdown");
+                await doClientAction("shutdown");
               }}
               color="error"
               variant="contained"
