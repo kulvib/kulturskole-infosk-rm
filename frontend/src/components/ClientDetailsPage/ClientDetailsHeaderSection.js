@@ -32,9 +32,9 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
   - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
   - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
-  - Implementeret: table-layout: fixed + colgroup for at låse første kolonne til 140px.
-  - Implementeret: ValueCell helper med inline paddingLeft/paddingRight (4px).
-  - Implementeret: konsistent styling for både Select-visning og native input (.MuiSelect-select og .MuiInputBase-input).
+  - table-layout: fixed + colgroup for at låse første kolonne til 140px.
+  - ValueCell helper med inline paddingLeft/paddingRight (2px/4px) for tættere venstrestilling.
+  - Konsistent styling for både Select-visning og native input (.MuiSelect-select og .MuiInputBase-input) med mindre venstre-padding.
 */
 
 const COLOR_NAME_MAP = {
@@ -106,19 +106,15 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
-          // use our unique animation name via sx (keeps theme-based style generation)
           animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
-          // keyframes animate only transform+opacity
           "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
-        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
         style={{
           backgroundColor: resolvedBg,
-          // enforce our animation properties inline as well so the element uses our unique keyframes
           animationName: animate ? "pulsateStatusBadge" : "none",
           animationDuration: animate ? "2s" : undefined,
           animationIterationCount: animate ? "infinite" : undefined,
@@ -322,7 +318,6 @@ function ClientDetailsHeaderSection({
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
-    // minWidth removed; colgroup locks first column now
   };
   const valueStyle = {
     fontWeight: 400,
@@ -332,7 +327,7 @@ function ClientDetailsHeaderSection({
     fontSize: isMobile ? 12 : 14,
   };
 
-  // inputStyle: ensures both native input and Select-display element share same padding, height and vertical alignment.
+  // inputStyle: ensures both native input and Select-display element share same (reduced) left padding, height and vertical alignment.
   const inputStyle = {
     width: "100%",
     height: 32,
@@ -341,14 +336,14 @@ function ClientDetailsHeaderSection({
       fontSize: isMobile ? 12 : 14,
       height: isMobile ? "30px" : "32px",
       boxSizing: "border-box",
-      paddingLeft: 4,
+      paddingLeft: 2, // reduced from 4 -> 2px to move text closer to left
       paddingRight: 4,
       display: "flex",
       alignItems: "center",
     },
     // Select display element (when TextField has select)
     "& .MuiSelect-select": {
-      paddingLeft: 4,
+      paddingLeft: 2, // reduced from 4 -> 2px
       paddingRight: 4,
       display: "flex",
       alignItems: "center",
@@ -358,12 +353,13 @@ function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
-  // ValueCell helper: applies valueStyle via sx and forces inline paddingLeft/paddingRight (4px) so it wins.
+  // ValueCell helper: applies valueStyle via sx and forces inline paddingLeft/paddingRight so it wins.
+  // Left padding reduced to 2px so value content (and contained inputs) sit closer to the left cell edge.
   function ValueCell({ children, sx = {}, style = {}, ...props }) {
     return (
       <TableCell
         sx={{ ...valueStyle, borderBottom: "none", ...sx }}
-        style={{ paddingLeft: 4, paddingRight: 4, ...style }}
+        style={{ paddingLeft: 2, paddingRight: 4, ...style }}
         {...props}
       >
         {children}
@@ -571,9 +567,7 @@ function ClientDetailsHeaderSection({
 
 // Custom shallow comparator for React.memo:
 // Only re-render header when props that affect its UI actually change.
-// We check a set of primitives and a few client fields that header displays.
 function propsAreEqual(prev, next) {
-  // Compare simple primitive props
   const simpleKeys = [
     "locality",
     "localityDirty",
@@ -584,14 +578,12 @@ function propsAreEqual(prev, next) {
     "liveChromeStatus",
     "liveChromeColor",
     "refreshing",
-    // optional token if parent provides it (useful if you want explicit change detection)
     "liveChromeTimestamp"
   ];
   for (const k of simpleKeys) {
     if (prev[k] !== next[k]) return false;
   }
 
-  // Compare client fields we care about shallowly
   const prevClient = prev.client || {};
   const nextClient = next.client || {};
   const clientKeys = ["id", "name", "isOnline", "school_id", "state", "chrome_status", "chrome_color"];
@@ -599,7 +591,6 @@ function propsAreEqual(prev, next) {
     if (prevClient[k] !== nextClient[k]) return false;
   }
 
-  // Compare schools length and basic identity to detect meaningful changes
   const prevSchools = prev.schools || [];
   const nextSchools = next.schools || [];
   if (prevSchools.length !== nextSchools.length) return false;
@@ -607,7 +598,6 @@ function propsAreEqual(prev, next) {
     if ((prevSchools[i]?.id ?? null) !== (nextSchools[i]?.id ?? null)) return false;
   }
 
-  // Compare kioskBrowserData shallowly by keys/values
   const prevKbd = prev.kioskBrowserData || {};
   const nextKbd = next.kioskBrowserData || {};
   const prevKbdKeys = Object.keys(prevKbd);
@@ -617,7 +607,6 @@ function propsAreEqual(prev, next) {
     if (prevKbd[key] !== nextKbd[key]) return false;
   }
 
-  // If we've reached here, treat props as equal (no re-render needed)
   return true;
 }
 
