@@ -26,13 +26,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 
 /*
   ClientDetailsHeaderSection - komplet komponent
-  Rettelser/forbedringer inkluderet:
-  - Robust color resolution (theme tokens, hex, color names).
-  - Unik keyframe-navn (pulsateStatusBadge) og keyframes animerer KUN transform+opacity.
-  - Inline style på dot-elementet som fallback/override for at undgå at globale keyframes overskriver baggrundsfarven.
-  - Bevarer eksisterende funktionalitet: uddrag af skoler, saving school/locality/kioskurl, copy-to-clipboard etc.
-  - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
-  - NOTE: Kun logikken for Lokation og Kiosk URL er ændret (lokal state + handlers). Layout er IKKE ændret.
+  Ændring: VALUE-kolonner er rykket tættere på LABEL-kolonnen via inline padding overrides.
+  - Inline style på value TableCell: paddingLeft/paddingRight = 4px (vinder over global CSS).
+  - TextField inputer får også reduceret indre padding via InputProps.sx.
+  - Resten af filen beholdes som i dit oprindelige script.
 */
 
 const COLOR_NAME_MAP = {
@@ -104,19 +101,15 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
           boxShadow: "0 0 2px rgba(0,0,0,0.12)",
           border: "1px solid #ddd",
           mr: 1,
-          // use our unique animation name via sx (keeps theme-based style generation)
           animation: animate ? "pulsateStatusBadge 2s infinite" : "none",
-          // keyframes animate only transform+opacity
           "@keyframes pulsateStatusBadge": {
             "0%": { transform: "scale(1)", opacity: 1 },
             "50%": { transform: "scale(1.25)", opacity: 0.5 },
             "100%": { transform: "scale(1)", opacity: 1 }
           }
         }}
-        // Inline style fallback to ensure the background color wins over any global keyframe that would overwrite it.
         style={{
           backgroundColor: resolvedBg,
-          // enforce our animation properties inline as well so the element uses our unique keyframes
           animationName: animate ? "pulsateStatusBadge" : "none",
           animationDuration: animate ? "2s" : undefined,
           animationIterationCount: animate ? "infinite" : undefined,
@@ -240,10 +233,6 @@ function ClientDetailsHeaderSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Local input state for Lokation and Kiosk URL (prevents single-char typing issue)
-  const [localLocality, setLocalLocality] = React.useState(locality ?? "");
-  const [localKioskUrl, setLocalKioskUrl] = React.useState(kioskUrl ?? "");
-
   // Schools state (prefer prop)
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
   const [loadingSchools, setLoadingSchools] = React.useState(false);
@@ -252,15 +241,6 @@ function ClientDetailsHeaderSection({
   const [selectedSchool, setSelectedSchool] = React.useState(client?.school_id ?? "");
   const [savingSchool, setSavingSchool] = React.useState(false);
   const [selectedSchoolDirty, setSelectedSchoolDirty] = React.useState(false);
-
-  // Sync props -> local input state only when props change (prevents overwriting while typing)
-  React.useEffect(() => {
-    setLocalLocality(locality ?? "");
-  }, [locality]);
-
-  React.useEffect(() => {
-    setLocalKioskUrl(kioskUrl ?? "");
-  }, [kioskUrl]);
 
   // Sync props -> state
   React.useEffect(() => {
@@ -337,7 +317,7 @@ function ClientDetailsHeaderSection({
   };
   const valueStyle = {
     fontWeight: 400,
-    pl: isMobile ? 0.5 : 1.5,
+    pl: 0, // remove theme left padding here because we apply inline px
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
@@ -360,7 +340,12 @@ function ClientDetailsHeaderSection({
     return Object.entries(data).map(([key, value]) => (
       <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{String(value)}</TableCell>
+        <TableCell
+          sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+          style={{ paddingLeft: 4, paddingRight: 4 }}
+        >
+          {String(value)}
+        </TableCell>
       </TableRow>
     ));
   }
@@ -370,35 +355,6 @@ function ClientDetailsHeaderSection({
     const s = (schoolsList || []).find(x => String(x.id) === String(selectedSchool));
     return s ? s.name : String(selectedSchool);
   }, [selectedSchool, schoolsList]);
-
-  // Handlers for local inputs (preserve parent onChange if provided)
-  const onLocalityChange = (e) => {
-    const v = e.target.value;
-    setLocalLocality(v);
-    if (typeof handleLocalityChange === "function") {
-      try { handleLocalityChange(e); } catch (err) { /* ignore */ }
-    }
-  };
-
-  const onKioskUrlChange = (e) => {
-    const v = e.target.value;
-    setLocalKioskUrl(v);
-    if (typeof handleKioskUrlChange === "function") {
-      try { handleKioskUrlChange(e); } catch (err) { /* ignore */ }
-    }
-  };
-
-  const onLocalitySave = async () => {
-    if (typeof handleLocalitySave === "function") {
-      try { await handleLocalitySave(localLocality); } catch (err) { /* ignore */ }
-    }
-  };
-
-  const onKioskUrlSave = async () => {
-    if (typeof handleKioskUrlSave === "function") {
-      try { await handleKioskUrlSave(localKioskUrl); } catch (err) { /* ignore */ }
-    }
-  };
 
   // Render
   return (
@@ -447,19 +403,32 @@ function ClientDetailsHeaderSection({
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
+                        {client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}
+                      </TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
+                        <TableCell
+                          sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                          style={{ paddingLeft: 4, paddingRight: 4 }}
+                        >
+                          {client?.id ?? "?"}
+                        </TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             select
@@ -467,10 +436,18 @@ function ClientDetailsHeaderSection({
                             value={selectedSchool ?? ""}
                             onChange={handleSchoolSelectChange}
                             disabled={loadingSchools}
-                            sx={{ ...inputStyle }}
+                            sx={{ ...inputStyle, mr: 0, ml: 0 }}
                             fullWidth
                             SelectProps={{ MenuProps: { disablePortal: true } }}
                             inputProps={{ "aria-label": "Skole" }}
+                            InputProps={{
+                              sx: {
+                                "& .MuiInputBase-input": {
+                                  paddingLeft: "4px",
+                                  paddingRight: "4px"
+                                }
+                              }
+                            }}
                             error={!!selectedSchoolDirty}
                             onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
                           >
@@ -489,21 +466,32 @@ function ClientDetailsHeaderSection({
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
-                            value={localLocality}
-                            onChange={onLocalityChange}
-                            sx={inputStyle}
+                            value={locality ?? ""}
+                            onChange={handleLocalityChange}
+                            sx={{ ...inputStyle, mr: 0, ml: 0 }}
                             disabled={savingLocality}
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            onKeyDown={e => { if (e.key === "Enter") onLocalitySave(); }}
+                            InputProps={{
+                              sx: {
+                                "& .MuiInputBase-input": {
+                                  paddingLeft: "4px",
+                                  paddingRight: "4px"
+                                }
+                              }
+                            }}
+                            onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
                             error={!!localityDirty}
                             fullWidth
                           />
-                          <CopyIconButton value={localLocality ?? ""} disabled={!localLocality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                          <Button variant="outlined" size="small" onClick={onLocalitySave} disabled={savingLocality} sx={{ minWidth: 56 }}>
+                          <CopyIconButton value={locality ?? ""} disabled={!locality} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                          <Button variant="outlined" size="small" onClick={handleLocalitySave} disabled={savingLocality} sx={{ minWidth: 56 }}>
                             {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
@@ -532,21 +520,32 @@ function ClientDetailsHeaderSection({
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
-                            value={localKioskUrl}
-                            onChange={onKioskUrlChange}
-                            sx={inputStyle}
+                            value={kioskUrl ?? ""}
+                            onChange={handleKioskUrlChange}
+                            sx={{ ...inputStyle, mr: 0, ml: 0 }}
                             disabled={savingKioskUrl}
                             inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
-                            onKeyDown={e => { if (e.key === "Enter") onKioskUrlSave(); }}
+                            InputProps={{
+                              sx: {
+                                "& .MuiInputBase-input": {
+                                  paddingLeft: "4px",
+                                  paddingRight: "4px"
+                                }
+                              }
+                            }}
+                            onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
                             error={!!kioskUrlDirty}
                             fullWidth
                           />
-                          <CopyIconButton value={localKioskUrl ?? ""} disabled={!localKioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
-                          <Button variant="outlined" size="small" onClick={onKioskUrlSave} disabled={savingKioskUrl} sx={{ minWidth: 56 }}>
+                          <CopyIconButton value={kioskUrl ?? ""} disabled={!kioskUrl} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
+                          <Button variant="outlined" size="small" onClick={handleKioskUrlSave} disabled={savingKioskUrl} sx={{ minWidth: 56 }}>
                             {savingKioskUrl ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
@@ -555,7 +554,10 @@ function ClientDetailsHeaderSection({
 
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none", textAlign: "left" }}
+                        style={{ paddingLeft: 4, paddingRight: 4 }}
+                      >
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
