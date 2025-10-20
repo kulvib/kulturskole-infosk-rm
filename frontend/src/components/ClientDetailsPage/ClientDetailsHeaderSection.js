@@ -29,8 +29,11 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient, pushKiosk
 
   - Local save for skole, lokation og kiosk URL: skriver direkte til backend uden at opdatere parent/clientState.
   - Inputfelter ændrer kun lokal state i denne komponent; Gem (Save) udfører API-kald og viser snackbar via showSnackbar.
-  - Scrollbars må aldrig forekomme i "papers" eller deres table-containere: derfor er overflow sat til 'visible'
-    og tekstfelter/tabeller er konfigureret til at wrappe/word-break i stedet for at fremkalde scroll.
+  - Dette sikrer at en save ikke utilsigtet overskriver client.isOnline eller trigger en fuld-side opdatering.
+  - Ændringer: For at sikre at der ALDRIG kommer scrollbars i "papers" har vi:
+    - sat Card height til "auto" (fjernet height: "100%")
+    - tilføjet NO_SCROLL_SX på CardContent/TableContainer for at skjule scrollbars på tværs af browsere
+    - beholdt overflow synligt på relevante wrapper boxes så layout ikke brydes
 */
 
 const COLOR_NAME_MAP = {
@@ -244,8 +247,8 @@ function ClientDetailsHeaderSection({
   const leftPaperWidth = isDesktop ? "40%" : isTablet ? "50%" : "100%";
   const rightPaperWidth = isDesktop ? "60%" : isTablet ? "50%" : "100%";
 
-  // Label width (adjusted per breakpoint) - only suggestive; do NOT force minWidth that can cause overflow
-  const labelSuggestWidth = isDesktop ? 140 : isTablet ? 120 : 100;
+  // Label width (adjusted per breakpoint)
+  const labelCellWidth = isDesktop ? 140 : isTablet ? 120 : 100;
 
   // Schools state (prefer prop)
   const [schoolsList, setSchoolsList] = React.useState(Array.isArray(schools) ? schools : []);
@@ -377,31 +380,19 @@ function ClientDetailsHeaderSection({
         <TableCell
           sx={{
             fontWeight: 600,
-            // allow wrapping on small screens, keep nowrap on larger where possible
-            whiteSpace: isMobile ? "normal" : "nowrap",
+            whiteSpace: "nowrap",
             pr: isMobile ? 0.5 : 1,
             py: 0,
             verticalAlign: "middle",
             fontSize: isMobile ? 12 : 14,
             borderBottom: "none",
-            // do not set minWidth/width to avoid forcing scroll
-            wordBreak: "break-word",
-            overflowWrap: "anywhere"
+            width: labelCellWidth,
+            minWidth: labelCellWidth,
           }}
         >
           {key}:
         </TableCell>
-        <TableCell sx={{
-          fontWeight: 400,
-          pl: isMobile ? 0.5 : 1.5,
-          py: 0,
-          verticalAlign: "middle",
-          fontSize: isMobile ? 12 : 14,
-          borderBottom: "none",
-          whiteSpace: "normal",
-          wordBreak: "break-word",
-          overflowWrap: "anywhere"
-        }}>{String(value)}</TableCell>
+        <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none" }}>{String(value)}</TableCell>
       </TableRow>
     ));
   }
@@ -412,11 +403,23 @@ function ClientDetailsHeaderSection({
     return s ? s.name : String(selectedSchool);
   }, [selectedSchool, schoolsList]);
 
-  // determine offline state (explicit false means offline)
+  // NEW: determine offline state (explicit false means offline)
   const isOffline = client?.isOnline === false;
 
   // style for right paper when offline: slightly greyed / desaturated but still interactive (copy buttons still usable)
   const rightPaperDisabledStyle = isOffline ? { opacity: 0.7, filter: "grayscale(30%)", bgcolor: "#fafafa" } : {};
+
+  // NO_SCROLL_SX hides scrollbars across browsers (webkit, firefox, ie)
+  const NO_SCROLL_SX = {
+    overflowX: "hidden",
+    overflowY: "hidden",
+    // IE and Edge
+    "-ms-overflow-style": "none",
+    // Firefox
+    scrollbarWidth: "none",
+    // Webkit
+    "&::-webkit-scrollbar": { display: "none" }
+  };
 
   // Render
   return (
@@ -448,12 +451,13 @@ function ClientDetailsHeaderSection({
       </Box>
 
       {/* Papers */}
-      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%", alignItems: "flex-start" }}>
+      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
         {/* Klient info (left) */}
         <Box sx={{ width: leftPaperWidth, pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
-          {/* Card set to auto height and visible overflow so it grows with content (no internal scrollbars) */}
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "visible" }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+          {/* Card height changed to auto and ensured overflow handling to avoid scrollbars */}
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden" }}>
+            {/* CardContent receives NO_SCROLL_SX to hide any scrollbars in descendants */}
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Klient info</Typography>
                 <Box sx={{ ml: 1 }}>
@@ -461,105 +465,34 @@ function ClientDetailsHeaderSection({
                 </Box>
               </Box>
 
-              {/* TableContainer should not force scrollbars; overflow visible and table layout flexible */}
-              <TableContainer sx={{ width: "100%", overflow: "visible" }}>
-                <Table size="small" aria-label="klient-info" sx={{ tableLayout: 'auto', width: '100%' }}>
+              <TableContainer sx={{ width: "100%", ...NO_SCROLL_SX }}>
+                <Table size="small" aria-label="klient-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                      <TableCell sx={{
-                        fontWeight: 600,
-                        whiteSpace: isMobile ? "normal" : "nowrap",
-                        pr: isMobile ? 0.5 : 1,
-                        py: 0,
-                        verticalAlign: "middle",
-                        fontSize: isMobile ? 12 : 14,
-                        overflow: "visible",
-                        textOverflow: "ellipsis",
-                        borderBottom: "none",
-                        // do not force minWidth to avoid scrollbars; use suggestive width instead
-                        minWidth: 0,
-                        wordBreak: "break-word",
-                        overflowWrap: "anywhere"
-                      }}>
-                        Klientnavn:
-                      </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 400,
-                        pl: isMobile ? 0.5 : 1.5,
-                        py: 0,
-                        verticalAlign: "middle",
-                        fontSize: isMobile ? 12 : 14,
-                        borderBottom: "none",
-                        whiteSpace: "normal",
-                        wordBreak: "break-word",
-                        overflowWrap: "anywhere"
-                      }}>
-                        {client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}
-                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap", pr: isMobile ? 0.5 : 1, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, overflow: "hidden", textOverflow: "ellipsis", borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Klientnavn:</TableCell>
+                      <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
-                        <TableCell sx={{
-                          fontWeight: 600,
-                          whiteSpace: isMobile ? "normal" : "nowrap",
-                          pr: isMobile ? 0.5 : 1,
-                          py: 0,
-                          verticalAlign: "middle",
-                          fontSize: isMobile ? 12 : 14,
-                          borderBottom: "none",
-                          minWidth: 0,
-                          wordBreak: "break-word",
-                          overflowWrap: "anywhere"
-                        }}>Klient ID:</TableCell>
-                        <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere" }}>{client?.id ?? "?"}</TableCell>
+                        <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap", pr: isMobile ? 0.5 : 1, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Klient ID:</TableCell>
+                        <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
                       </TableRow>
                     )}
 
                     {/* Skole kun synlig for admin */}
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                        <TableCell sx={{
-                          fontWeight: 600,
-                          whiteSpace: isMobile ? "normal" : "nowrap",
-                          pr: isMobile ? 0.5 : 1,
-                          py: 0,
-                          verticalAlign: "middle",
-                          fontSize: isMobile ? 12 : 14,
-                          borderBottom: "none",
-                          minWidth: 0,
-                          wordBreak: "break-word",
-                          overflowWrap: "anywhere"
-                        }}>Skole:</TableCell>
-                        <TableCell sx={{
-                          fontWeight: 400,
-                          pl: isMobile ? 0.5 : 1.5,
-                          py: 0,
-                          verticalAlign: "middle",
-                          fontSize: isMobile ? 12 : 14,
-                          borderBottom: "none",
-                          whiteSpace: "normal",
-                          wordBreak: "break-word",
-                          overflowWrap: "anywhere"
-                        }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                        <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap", pr: isMobile ? 0.5 : 1, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Skole:</TableCell>
+                        <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none" }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                             <TextField
                               select
                               size="small"
                               value={selectedSchool ?? ""}
                               onChange={handleSchoolSelectChange}
                               disabled={loadingSchools}
-                              sx={{
-                                width: "100%",
-                                "& .MuiInputBase-input": {
-                                  fontSize: isMobile ? 12 : 14,
-                                  boxSizing: "border-box",
-                                  padding: isMobile ? "6px 8px" : "8px 14px",
-                                  whiteSpace: "normal",
-                                  wordBreak: "break-word",
-                                  overflowWrap: "anywhere"
-                                }
-                              }}
+                              sx={{ width: "100%", height: isMobile ? 30 : 32, "& .MuiInputBase-input": { fontSize: isMobile ? 12 : 14, height: isMobile ? "28px" : "32px", boxSizing: "border-box", padding: isMobile ? "6px 8px" : "8px 14px" } }}
                               fullWidth
                               SelectProps={{ MenuProps: { disablePortal: true } }}
                               inputProps={{ "aria-label": "Skole" }}
@@ -590,8 +523,9 @@ function ClientDetailsHeaderSection({
 
         {/* Infoskærm status (right) */}
         <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1 }}>
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "visible", ...rightPaperDisabledStyle }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
+          {/* Card height changed to auto and NO_SCROLL_SX applied */}
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden", ...rightPaperDisabledStyle }}>
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
                 {/* Hide state badge if client is explicitly offline */}
@@ -600,53 +534,22 @@ function ClientDetailsHeaderSection({
                 )}
               </Box>
 
-              <TableContainer sx={{ width: "100%", overflow: "visible" }}>
-                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: 'auto', width: '100%' }}>
+              <TableContainer sx={{ width: "100%", ...NO_SCROLL_SX }}>
+                <Table size="small" aria-label="kiosk-info" sx={{ tableLayout: 'fixed', width: '100%' }}>
                   <TableBody>
 
                     {/* Lokation */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{
-                        fontWeight: 600,
-                        whiteSpace: isMobile ? "normal" : "nowrap",
-                        pr: isMobile ? 0.5 : 1,
-                        py: 0,
-                        verticalAlign: "middle",
-                        fontSize: isMobile ? 12 : 14,
-                        borderBottom: "none",
-                        minWidth: 0,
-                        wordBreak: "break-word",
-                        overflowWrap: "anywhere"
-                      }}>Lokation:</TableCell>
-                      <TableCell sx={{
-                        fontWeight: 400,
-                        pl: isMobile ? 0.5 : 1.5,
-                        py: 0,
-                        verticalAlign: "middle",
-                        fontSize: isMobile ? 12 : 14,
-                        borderBottom: "none",
-                        whiteSpace: "normal",
-                        wordBreak: "break-word",
-                        overflowWrap: "anywhere"
-                      }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                      <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap", pr: isMobile ? 0.5 : 1, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Lokation:</TableCell>
+                      <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
                             value={localLocality ?? ""}
                             onChange={onLocalityChange}
-                            sx={{
-                              width: "100%",
-                              "& .MuiInputBase-input": {
-                                fontSize: isMobile ? 12 : 14,
-                                boxSizing: "border-box",
-                                padding: isMobile ? "6px 8px" : "8px 14px",
-                                whiteSpace: "normal",
-                                wordBreak: "break-word",
-                                overflowWrap: "anywhere"
-                              }
-                            }}
+                            sx={{ width: "100%", height: isMobile ? 30 : 32, "& .MuiInputBase-input": { fontSize: isMobile ? 12 : 14, height: isMobile ? "28px" : "32px", boxSizing: "border-box", padding: isMobile ? "6px 8px" : "8px 14px" } }}
                             disabled={isOffline}
-                            inputProps={{ style: { fontSize: isMobile ? 12 : 14, whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere" } }}
+                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
                             onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
                             error={!!localityChanged}
                             fullWidth
@@ -667,47 +570,16 @@ function ClientDetailsHeaderSection({
 
                     {/* Kiosk URL */}
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
-                      <TableCell sx={{
-                        fontWeight: 600,
-                        whiteSpace: isMobile ? "normal" : "nowrap",
-                        pr: isMobile ? 0.5 : 1,
-                        py: 0,
-                        verticalAlign: "middle",
-                        fontSize: isMobile ? 12 : 14,
-                        borderBottom: "none",
-                        minWidth: 0,
-                        wordBreak: "break-word",
-                        overflowWrap: "anywhere"
-                      }}>Kiosk URL:</TableCell>
-                      <TableCell sx={{
-                        fontWeight: 400,
-                        pl: isMobile ? 0.5 : 1.5,
-                        py: 0,
-                        verticalAlign: "middle",
-                        fontSize: isMobile ? 12 : 14,
-                        borderBottom: "none",
-                        whiteSpace: "normal",
-                        wordBreak: "break-word",
-                        overflowWrap: "anywhere"
-                      }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                      <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap", pr: isMobile ? 0.5 : 1, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Kiosk URL:</TableCell>
+                      <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
                             value={localKioskUrl ?? ""}
                             onChange={onKioskUrlChange}
-                            sx={{
-                              width: "100%",
-                              "& .MuiInputBase-input": {
-                                fontSize: isMobile ? 12 : 14,
-                                boxSizing: "border-box",
-                                padding: isMobile ? "6px 8px" : "8px 14px",
-                                whiteSpace: "normal",
-                                wordBreak: "break-word",
-                                overflowWrap: "anywhere"
-                              }
-                            }}
+                            sx={{ width: "100%", height: isMobile ? 30 : 32, "& .MuiInputBase-input": { fontSize: isMobile ? 12 : 14, height: isMobile ? "28px" : "32px", boxSizing: "border-box", padding: isMobile ? "6px 8px" : "8px 14px" } }}
                             disabled={isOffline}
-                            inputProps={{ style: { fontSize: isMobile ? 12 : 14, whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere" } }}
+                            inputProps={{ style: { fontSize: isMobile ? 12 : 14 } }}
                             onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
                             error={!!kioskUrlChanged}
                             fullWidth
@@ -731,18 +603,17 @@ function ClientDetailsHeaderSection({
                       <TableCell
                         sx={{
                           fontWeight: 600,
-                          whiteSpace: isMobile ? "normal" : "nowrap",
-                          overflow: "visible",
-                          textOverflow: "clip",
+                          whiteSpace: isMobile ? "nowrap" : "normal",
+                          overflow: isMobile ? "hidden" : "visible",
+                          textOverflow: isMobile ? "ellipsis" : "clip",
                           borderBottom: "none",
-                          minWidth: 0,
-                          wordBreak: "break-word",
-                          overflowWrap: "anywhere"
+                          width: labelCellWidth,
+                          minWidth: labelCellWidth,
                         }}
                       >
                         Kiosk browser status:
                       </TableCell>
-                      <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none", whiteSpace: "normal", wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                      <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none" }}>
                         <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
