@@ -34,7 +34,7 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
   - Wrapped with React.memo and a custom props comparator to avoid unnecessary rerenders of the header when unrelated props change.
   - Implementeret: table-layout: fixed + colgroup for at låse første kolonne til 140px.
   - Implementeret: ValueCell helper med inline paddingLeft/paddingRight (4px).
-  - Implementeret: inline padding på TextField native input via inputProps.style.
+  - Implementeret: konsistent styling for både Select-visning og native input (.MuiSelect-select og .MuiInputBase-input).
 */
 
 const COLOR_NAME_MAP = {
@@ -322,7 +322,7 @@ function ClientDetailsHeaderSection({
     py: 0,
     verticalAlign: "middle",
     fontSize: isMobile ? 12 : 14,
-    // minWidth previously used to influence layout; now the first column is locked by colgroup.
+    // minWidth removed; colgroup locks first column now
   };
   const valueStyle = {
     fontWeight: 400,
@@ -332,14 +332,28 @@ function ClientDetailsHeaderSection({
     fontSize: isMobile ? 12 : 14,
   };
 
+  // inputStyle: ensures both native input and Select-display element share same padding, height and vertical alignment.
   const inputStyle = {
     width: "100%",
     height: 32,
+    // native input (TextField input)
     "& .MuiInputBase-input": {
       fontSize: isMobile ? 12 : 14,
       height: isMobile ? "30px" : "32px",
       boxSizing: "border-box",
-      padding: isMobile ? "6px 10px" : "8px 14px"
+      paddingLeft: 4,
+      paddingRight: 4,
+      display: "flex",
+      alignItems: "center",
+    },
+    // Select display element (when TextField has select)
+    "& .MuiSelect-select": {
+      paddingLeft: 4,
+      paddingRight: 4,
+      display: "flex",
+      alignItems: "center",
+      height: isMobile ? "30px" : "32px",
+      boxSizing: "border-box",
     },
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
@@ -447,7 +461,7 @@ function ClientDetailsHeaderSection({
                             sx={{ ...inputStyle }}
                             fullWidth
                             SelectProps={{ MenuProps: { disablePortal: true } }}
-                            inputProps={{ "aria-label": "Skole", style: { paddingLeft: 4, paddingRight: 4, fontSize: isMobile ? 12 : 14 } }}
+                            inputProps={{ "aria-label": "Skole" }}
                             error={!!selectedSchoolDirty}
                             onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
                           >
@@ -474,7 +488,7 @@ function ClientDetailsHeaderSection({
                             onChange={handleLocalityChange}
                             sx={inputStyle}
                             disabled={savingLocality}
-                            inputProps={{ style: { paddingLeft: 4, paddingRight: 4, fontSize: isMobile ? 12 : 14 } }}
+                            inputProps={{ "aria-label": "Lokation" }}
                             onKeyDown={e => { if (e.key === "Enter") handleLocalitySave(); }}
                             error={!!localityDirty}
                             fullWidth
@@ -521,7 +535,7 @@ function ClientDetailsHeaderSection({
                             onChange={handleKioskUrlChange}
                             sx={inputStyle}
                             disabled={savingKioskUrl}
-                            inputProps={{ style: { paddingLeft: 4, paddingRight: 4, fontSize: isMobile ? 12 : 14 } }}
+                            inputProps={{ "aria-label": "Kiosk URL" }}
                             onKeyDown={e => { if (e.key === "Enter") handleKioskUrlSave(); }}
                             error={!!kioskUrlDirty}
                             fullWidth
