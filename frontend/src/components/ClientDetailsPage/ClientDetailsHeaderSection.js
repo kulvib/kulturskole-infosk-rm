@@ -26,10 +26,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient } from "..
 
 /*
   ClientDetailsHeaderSection
-  Rettelse (sidste forsøg):
-  - BEVARER label-cellen uændret.
-  - FLYTTER KUN selve indholdet i value-kolonnen tættere ved at wrappe indholdet i en Box med negativ margin-left.
-  - Dette ændrer ikke label-placeringen og er lokal for denne komponent.
+  Rettelse:
+  - Ingen ændring af label-celler.
+  - Tilføjet INLINE style={{ paddingLeft: ... }} til alle value-tablecells (2. kolonne).
+    Inline style har høj specificitet og bør tvinge paddingen til at ændre sig.
 */
 
 const COLOR_NAME_MAP = {
@@ -304,7 +304,6 @@ function ClientDetailsHeaderSection({
     }
   };
 
-  // Keep labelStyle unchanged (do not override p)
   const labelStyle = {
     fontWeight: 600,
     whiteSpace: "nowrap",
@@ -315,7 +314,7 @@ function ClientDetailsHeaderSection({
     minWidth: 140,
   };
 
-  // valueStyle used for TableCell base styling; we will SHIFT the CONTENT using a wrapping Box
+  // valueStyle left as sx but we add inline style on each TableCell below
   const valueStyle = {
     fontWeight: 400,
     pl: isMobile ? 0.25 : 0.75,
@@ -336,16 +335,16 @@ function ClientDetailsHeaderSection({
     "& .MuiInputBase-root": { height: isMobile ? "30px" : "32px" },
   };
 
-  // amount to shift the value CONTENT left (negative margin) - adjust numbers to taste
-  const valueShift = isMobile ? "-6px" : "-10px";
-
   function renderKioskBrowserDataRows(data) {
     if (!data || typeof data !== "object") return null;
     return Object.entries(data).map(([key, value]) => (
       <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>{key}:</TableCell>
-        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-          <Box sx={{ ml: valueShift, display: "inline-flex", alignItems: "center" }}>{String(value)}</Box>
+        <TableCell
+          sx={{ ...valueStyle, borderBottom: "none" }}
+          style={{ paddingLeft: isMobile ? 6 : 10 }}
+        >
+          {String(value)}
         </TableCell>
       </TableRow>
     ));
@@ -357,7 +356,6 @@ function ClientDetailsHeaderSection({
     return s ? s.name : String(selectedSchool);
   }, [selectedSchool, schoolsList]);
 
-  // Render
   return (
     <Box sx={{ width: "100%" }} data-testid="client-details-header">
       {/* Topbar */}
@@ -404,24 +402,33 @@ function ClientDetailsHeaderSection({
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klientnavn:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ ml: valueShift }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</Box>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none" }}
+                        style={{ paddingLeft: isMobile ? 6 : 10 }}
+                      >
+                        {client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}
                       </TableCell>
                     </TableRow>
 
                     {user?.role === "admin" && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Klient ID:</TableCell>
-                        <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                          <Box sx={{ ml: valueShift }}>{client?.id ?? "?"}</Box>
+                        <TableCell
+                          sx={{ ...valueStyle, borderBottom: "none" }}
+                          style={{ paddingLeft: isMobile ? 6 : 10 }}
+                        >
+                          {client?.id ?? "?"}
                         </TableCell>
                       </TableRow>
                     )}
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Skole:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ ml: valueShift, display: "flex", alignItems: "center", gap: 1 }}>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none" }}
+                        style={{ paddingLeft: isMobile ? 6 : 10 }}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             select
                             size="small"
@@ -450,8 +457,11 @@ function ClientDetailsHeaderSection({
 
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Lokation:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ ml: valueShift, display: "flex", alignItems: "center", gap: 1 }}>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none" }}
+                        style={{ paddingLeft: isMobile ? 6 : 10 }}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
                             value={locality ?? ""}
@@ -493,8 +503,11 @@ function ClientDetailsHeaderSection({
                   <TableBody>
                     <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk URL:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ ml: valueShift, display: "flex", alignItems: "center", gap: 1 }}>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none" }}
+                        style={{ paddingLeft: isMobile ? 6 : 10 }}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <TextField
                             size="small"
                             value={kioskUrl ?? ""}
@@ -516,8 +529,11 @@ function ClientDetailsHeaderSection({
 
                     <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                       <TableCell sx={{ ...labelStyle, borderBottom: "none" }}>Kiosk browser status:</TableCell>
-                      <TableCell sx={{ ...valueStyle, borderBottom: "none" }}>
-                        <Box sx={{ ml: valueShift }}><ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} /></Box>
+                      <TableCell
+                        sx={{ ...valueStyle, borderBottom: "none" }}
+                        style={{ paddingLeft: isMobile ? 6 : 10 }}
+                      >
+                        <ChromeStatusBadge status={liveChromeStatus} color={liveChromeColor} isMobile={isMobile} />
                       </TableCell>
                     </TableRow>
 
@@ -536,6 +552,8 @@ function ClientDetailsHeaderSection({
 }
 
 // Custom shallow comparator for React.memo:
+// Only re-render header when props that affect its UI actually change.
+// We check a set of primitives and a few client fields that header displays.
 function propsAreEqual(prev, next) {
   const simpleKeys = [
     "locality",
