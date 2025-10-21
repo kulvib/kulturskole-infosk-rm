@@ -27,15 +27,11 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient, pushKiosk
 /*
   ClientDetailsHeaderSection.js
 
-  Ændringer:
-  - Tilføjet spinner / saving-flag til "Gem"-knapperne for Lokation og Kiosk URL (paper 2).
-  - Skole-gem-knap bruger allerede savingSchool og viser spinner; lokation/kiosk har nu tilsvarende savingLocality/savingKiosk.
-  - Disabled-logik: knapper er disabled når saving er true, når feltet ikke er dirty eller når client er offline.
-  - Snackbar-tekster ved succesfuldt gem ændret til:
-      "Skole gemt"
-      "Lokation gemt"
-      "Kiosk webadresse gemt"
-  Ingen øvrige ændringer i indhold, labels eller forretningslogik.
+  - Styling og UX-ændringer: Ens højde på begge Cards, select-height fixes, spinnere på gem-knapper.
+  - Robust dirty-logik for skole-select via initialSelectedSchoolRef.
+  - Snackbar-tekster præciseret: "Skole gemt", "Lokation gemt", "Kiosk webadresse gemt".
+  - StateBadge håndterer "sleep" og "sleeping" (starter med "sleep") som blå (#1976d2).
+  Ingen øvrige forretningslogiske ændringer.
 */
 
 const COLOR_NAME_MAP = {
@@ -132,16 +128,38 @@ function StateBadge({ state, isMobile = false }) {
   let color = "grey.400";
   let text = state || "ukendt";
   let animate = false;
+
   if (state) {
-    switch (state.toLowerCase()) {
-      case "normal": color = "#43a047"; animate = true; break;
-      case "sleep": color = "#1976d2"; animate = true; break;
-      case "maintenance": color = "#ffa000"; animate = true; break;
-      case "error": color = "#e53935"; animate = true; break;
-      case "offline": color = "#757575"; animate = false; break;
-      default: color = "grey.400"; animate = false;
+    const s = String(state).toLowerCase().trim();
+    // Hvis state er "sleep", "sleeping" eller lignende (starter med "sleep"), brug blå
+    if (s.startsWith("sleep")) {
+      color = "#1976d2";
+      animate = true;
+    } else {
+      switch (s) {
+        case "normal":
+          color = "#43a047";
+          animate = true;
+          break;
+        case "maintenance":
+          color = "#ffa000";
+          animate = true;
+          break;
+        case "error":
+          color = "#e53935";
+          animate = true;
+          break;
+        case "offline":
+          color = "#757575";
+          animate = false;
+          break;
+        default:
+          color = "grey.400";
+          animate = false;
+      }
     }
   }
+
   return <StatusBadge color={color} text={String(text).toLowerCase()} animate={animate} isMobile={isMobile} />;
 }
 
@@ -233,18 +251,6 @@ function ClientDetailsHeaderSection({
   const initialLocalityRef = React.useRef(client?.locality ?? "");
   const initialKioskUrlRef = React.useRef(client?.kiosk_url ?? "");
 
-  // Re-sync local state + initial refs when client prop changes (e.g., on client switch)
-  React.useEffect(() => {
-    setLocalLocality(client?.locality ?? "");
-    initialLocalityRef.current = client?.locality ?? "";
-    setLocalKioskUrl(client?.kiosk_url ?? "");
-    initialKioskUrlRef.current = client?.kiosk_url ?? "";
-  }, [client?.id, client?.locality, client?.kiosk_url]);
-
-  // Compute dirty flags locally (string compare)
-  const localityChanged = String(localLocality ?? "") !== String(initialLocalityRef.current ?? "");
-  const kioskUrlChanged = String(localKioskUrl ?? "") !== String(initialKioskUrlRef.current ?? "");
-
   // Papers width per breakpoint (desktop must remain as before)
   const leftPaperWidth = isDesktop ? "40%" : isTablet ? "50%" : "100%";
   const rightPaperWidth = isDesktop ? "60%" : isTablet ? "50%" : "100%";
@@ -261,6 +267,9 @@ function ClientDetailsHeaderSection({
   const [savingSchool, setSavingSchool] = React.useState(false);
   const [selectedSchoolDirty, setSelectedSchoolDirty] = React.useState(false);
 
+  // ref baseline for school dirty-check (robust against parent updates)
+  const initialSelectedSchoolRef = React.useRef(client?.school_id ?? "");
+
   // New: saving flags for paper 2
   const [savingLocality, setSavingLocality] = React.useState(false);
   const [savingKiosk, setSavingKiosk] = React.useState(false);
@@ -272,10 +281,24 @@ function ClientDetailsHeaderSection({
     }
   }, [schools]);
 
+  // sync selectedSchool and baseline ref when parent client.school_id changes
   React.useEffect(() => {
     setSelectedSchool(client?.school_id ?? "");
+    initialSelectedSchoolRef.current = client?.school_id ?? "";
     setSelectedSchoolDirty(false);
   }, [client?.school_id]);
+
+  // Re-sync local state + initial refs when client prop changes (e.g., on client switch)
+  React.useEffect(() => {
+    setLocalLocality(client?.locality ?? "");
+    initialLocalityRef.current = client?.locality ?? "";
+    setLocalKioskUrl(client?.kiosk_url ?? "");
+    initialKioskUrlRef.current = client?.kiosk_url ?? "";
+  }, [client?.id, client?.locality, client?.kiosk_url]);
+
+  // Compute dirty flags locally (string compare)
+  const localityChanged = String(localLocality ?? "") !== String(initialLocalityRef.current ?? "");
+  const kioskUrlChanged = String(localKioskUrl ?? "") !== String(initialKioskUrlRef.current ?? "");
 
   // fetch schools if not provided
   React.useEffect(() => {
@@ -303,13 +326,14 @@ function ClientDetailsHeaderSection({
   const handleSchoolSelectChange = (e) => {
     const newVal = e.target.value;
     setSelectedSchool(newVal);
-    setSelectedSchoolDirty(String(newVal) !== String(client?.school_id));
+    // sammenlign mod lokal baseline ref (ikke direkte client.prop) for at undgå race-conditions
+    setSelectedSchoolDirty(String(newVal) !== String(initialSelectedSchoolRef.current));
   };
 
   // Save school locally to server only — DO NOT modify parent client state here.
   const handleSchoolSave = async () => {
     if (!client || !client.id) return;
-    if (String(selectedSchool) === String(client.school_id)) {
+    if (String(selectedSchool) === String(initialSelectedSchoolRef.current)) {
       setSelectedSchoolDirty(false);
       return;
     }
@@ -320,6 +344,8 @@ function ClientDetailsHeaderSection({
       if (typeof showSnackbar === "function") {
         showSnackbar({ message: "Skole gemt", severity: "success" });
       }
+      // opdater baseline så fremtidige ændringer sammenlignes korrekt
+      initialSelectedSchoolRef.current = selectedSchool;
       setSelectedSchoolDirty(false);
       // keep local selectedSchool so UI reflects user's choice
     } catch (err) {
