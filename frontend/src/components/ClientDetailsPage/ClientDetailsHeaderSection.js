@@ -28,12 +28,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient, pushKiosk
   ClientDetailsHeaderSection.js
 
   Ændringer:
-  - Udelukkende styling (sx) for at sikre at begge Cards ("papers") får samme højde i horisontalt layout.
-  - Venstre/højre wrapper-boxes er display:flex + flexDirection:column.
-  - Cards er display:flex, flexDirection:column og flex:1.
-  - CardContent er display:flex, flexDirection:column og flex:1.
-  - Skole TextField får .MuiOutlinedInput-root højde så den synlige ramme matcher andre TextField'er.
-  Ingen JSX-tekst, labels, funktionalitet eller dataflow er ændret.
+  - Udelukkende styling/UX-logik og én lille disabled-logik-ændring for Skole "Gem"-knappen:
+    disabled prop for skole-gem er ændret til at bruge local dirty-flag (selectedSchoolDirty) + savingSchool,
+    så knappen reagerer straks og ikke venter på at parent props opdateres.
+  Ingen andre funktionelle ændringer eller tekst/labels er ændret.
 */
 
 const COLOR_NAME_MAP = {
@@ -531,7 +529,7 @@ function ClientDetailsHeaderSection({
 
                             <CopyIconButton value={getSelectedSchoolName()} disabled={!getSelectedSchoolName()} iconSize={isMobile ? 13 : 15} isMobile={isMobile} />
 
-                            <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || String(selectedSchool) === String(client?.school_id)} sx={{ minWidth: isMobile ? 48 : 56 }}>
+                            <Button variant="outlined" size="small" onClick={handleSchoolSave} disabled={savingSchool || !selectedSchoolDirty} sx={{ minWidth: isMobile ? 48 : 56 }}>
                               {savingSchool ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                             </Button>
                           </Box>
