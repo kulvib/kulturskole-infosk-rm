@@ -467,23 +467,50 @@ export default function CalendarPage() {
     }
   };
 
-  const handleSaveDateTime = async ({ date, clientId }) => {
-    try {
-      const data = await getMarkedDays(selectedSeason, clientId);
+  // Modificeret: DateTimeEditDialog sender nu den opdaterede dag (day) tilbage.
+  // Vi opdaterer lokal state direkte med den dag for at undgå race / autosave-overskrivning.
+  const handleSaveDateTime = ({ date, clientId, day }) => {
+    if (!clientId || !date) return;
+    const normDate = date;
+    if (day) {
       dispatchMarkedDays({
-        type: "set",
-        clientId: clientId,
-        days: mapRawDays(data.markedDays || {})
+        type: "updateDay",
+        clientId,
+        date: normDate,
+        dayData: day,
       });
       lastDialogSavedMarkedDays.current = {
         ...lastDialogSavedMarkedDays.current,
-        [clientId]: mapRawDays(data.markedDays || {})
+        [clientId]: {
+          ...(lastDialogSavedMarkedDays.current[clientId] || {}),
+          [normDate]: day
+        }
       };
       lastDialogSavedTimestamp.current = Date.now();
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
-    } catch {
-      setSnackbar({ open: true, message: "Kunne ikke hente nyeste tider", severity: "error" });
+      return;
     }
+
+    // Fallback: hvis dialogen af en eller anden grund ikke returnerede day, hent hele markedDays fra server.
+    (async () => {
+      try {
+        const data = await getMarkedDays(selectedSeason, clientId);
+        const mapped = mapRawDays(data.markedDays || {});
+        dispatchMarkedDays({
+          type: "set",
+          clientId: clientId,
+          days: mapped
+        });
+        lastDialogSavedMarkedDays.current = {
+          ...lastDialogSavedMarkedDays.current,
+          [clientId]: mapped
+        };
+        lastDialogSavedTimestamp.current = Date.now();
+        setSnackbar({ open: true, message: "Gemt!", severity: "success" });
+      } catch {
+        setSnackbar({ open: true, message: "Kunne ikke hente nyeste tider", severity: "error" });
+      }
+    })();
   };
 
   const schoolYearMonths = useMemo(() => getSchoolYearMonths(selectedSeason), [selectedSeason]);
@@ -586,6 +613,8 @@ export default function CalendarPage() {
   const sortedSchools = useMemo(() => [...schools].sort((a, b) => a.name.localeCompare(b.name)), [schools]);
 
   // ----------- RENDER -----------
+  const editDialogClientObj = clients.find(c => c.id === editDialogClient);
+
   return (
     <Box sx={{
       maxWidth: { xs: "100%", sm: 1000, md: 1500 },
@@ -873,6 +902,7 @@ export default function CalendarPage() {
         clientId={editDialogClient}
         onSaved={handleSaveDateTime}
         localMarkedDays={markedDays[editDialogClient]}
+        schoolId={editDialogClientObj?.schoolId || editDialogClientObj?.school_id}
       />
       <ClientCalendarDialog
         open={calendarDialogOpen}
