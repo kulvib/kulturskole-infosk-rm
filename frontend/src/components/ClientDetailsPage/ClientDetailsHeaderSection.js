@@ -28,10 +28,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient, pushKiosk
   ClientDetailsHeaderSection.js
 
   Ændringer:
-  - Udelukkende styling/UX-logik og én lille disabled-logik-ændring for Skole "Gem"-knappen:
-    disabled prop for skole-gem er ændret til at bruge local dirty-flag (selectedSchoolDirty) + savingSchool,
-    så knappen reagerer straks og ikke venter på at parent props opdateres.
-  Ingen andre funktionelle ændringer eller tekst/labels er ændret.
+  - Tilføjet spinner / saving-flag til "Gem"-knapperne for Lokation og Kiosk URL (paper 2).
+  - Skole-gem-knap bruger allerede savingSchool og viser spinner; lokation/kiosk har nu tilsvarende savingLocality/savingKiosk.
+  - Disabled-logik: knapper er disabled når saving er true, når feltet ikke er dirty eller når client er offline.
+  Ingen øvrige ændringer i indhold, labels eller forretningslogik.
 */
 
 const COLOR_NAME_MAP = {
@@ -257,6 +257,10 @@ function ClientDetailsHeaderSection({
   const [savingSchool, setSavingSchool] = React.useState(false);
   const [selectedSchoolDirty, setSelectedSchoolDirty] = React.useState(false);
 
+  // New: saving flags for paper 2
+  const [savingLocality, setSavingLocality] = React.useState(false);
+  const [savingKiosk, setSavingKiosk] = React.useState(false);
+
   // Sync props -> state
   React.useEffect(() => {
     if (Array.isArray(schools) && schools.length) {
@@ -333,6 +337,7 @@ function ClientDetailsHeaderSection({
   const handleLocalitySave = async () => {
     if (!client || !client.id) return;
     if (!localityChanged) return;
+    setSavingLocality(true);
     try {
       const payload = { locality: localLocality };
       await apiUpdateClient(client.id, payload);
@@ -345,6 +350,8 @@ function ClientDetailsHeaderSection({
       if (typeof showSnackbar === "function") {
         showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
       }
+    } finally {
+      setSavingLocality(false);
     }
   };
 
@@ -357,6 +364,7 @@ function ClientDetailsHeaderSection({
   const handleKioskUrlSave = async () => {
     if (!client || !client.id) return;
     if (!kioskUrlChanged) return;
+    setSavingKiosk(true);
     try {
       await apiPushKioskUrl(client.id, localKioskUrl);
       if (typeof showSnackbar === "function") {
@@ -368,6 +376,8 @@ function ClientDetailsHeaderSection({
       if (typeof showSnackbar === "function") {
         showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
       }
+    } finally {
+      setSavingKiosk(false);
     }
   };
 
@@ -583,10 +593,10 @@ function ClientDetailsHeaderSection({
                             variant="outlined"
                             size="small"
                             onClick={handleLocalitySave}
-                            disabled={!localityChanged || isOffline}
+                            disabled={!localityChanged || isOffline || savingLocality}
                             sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
-                            Gem
+                            {savingLocality ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
                       </TableCell>
@@ -613,10 +623,10 @@ function ClientDetailsHeaderSection({
                             variant="outlined"
                             size="small"
                             onClick={handleKioskUrlSave}
-                            disabled={!kioskUrlChanged || isOffline}
+                            disabled={!kioskUrlChanged || isOffline || savingKiosk}
                             sx={{ minWidth: isMobile ? 48 : 56 }}
                           >
-                            Gem
+                            {savingKiosk ? <CircularProgress size={isMobile ? 13 : 16} /> : "Gem"}
                           </Button>
                         </Box>
                       </TableCell>
