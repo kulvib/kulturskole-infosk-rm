@@ -1,12 +1,3 @@
-/*
-  Updated ClientDetailsHeaderSection.js
-
-  Ændring:
-  - Justerede 'Skole' TextField's sx så Select-feltets indre input har samme højde og paddings som 'Lokation' TextField.
-  - Brug samme højde (isMobile ? 30 : 32) og indre input-højde (isMobile ? "28px" : "32px") så visuel ramme matcher Lokation.
-  - Beholder tidligere Select-specifikke overrides (.MuiSelect-select og .MuiSelect-icon) men sørger for at deres højde/padding stemmer overens med Lokation.
-*/
-
 import React from "react";
 import {
   Box,
@@ -39,8 +30,8 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient, pushKiosk
   - Local save for skole, lokation og kiosk URL: skriver direkte til backend uden at opdatere parent/clientState.
   - Inputfelter ændrer kun lokal state i denne komponent; Gem (Save) udfører API-kald og viser snackbar via showSnackbar.
   - Dette sikrer at en save ikke utilsigtet overskriver client.isOnline eller trigger en fuld-side opdatering.
-  - Ændringer: Justeret Select/TextField for 'Skole' så den indre .MuiSelect-select fylder 100% og er vertikalt centreret,
-    så den visuelle ramme matcher andre TextField'er (fx Lokation).
+  - Ændringer: Udelukkende stylingjusteringer for at sikre at begge Cards ("papers") har samme højde i horisontalt layout.
+    Ingen JSX-tekst, labels eller forretningslogik er ændret.
 */
 
 const COLOR_NAME_MAP = {
@@ -458,13 +449,13 @@ function ClientDetailsHeaderSection({
       </Box>
 
       {/* Papers */}
-      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", width: "100%", alignItems: isMobile ? "stretch" : "stretch" }}>
         {/* Klient info (left) */}
-        <Box sx={{ width: leftPaperWidth, pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0 }}>
+        <Box sx={{ width: leftPaperWidth, pr: isMobile ? 0 : 1, mb: isMobile ? 1 : 0, display: "flex", flexDirection: "column" }}>
           {/* Card height changed to auto and ensured overflow handling to avoid scrollbars */}
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden" }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden", display: "flex", flexDirection: "column", flex: 1 }}>
             {/* CardContent receives NO_SCROLL_SX to hide any scrollbars in descendants */}
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX }}>
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX, display: "flex", flexDirection: "column", flex: 1 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Klient info</Typography>
                 <Box sx={{ ml: 1 }}>
@@ -551,10 +542,10 @@ function ClientDetailsHeaderSection({
         </Box>
 
         {/* Infoskærm status (right) */}
-        <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1 }}>
+        <Box sx={{ width: rightPaperWidth, pl: isMobile ? 0 : 1, display: "flex", flexDirection: "column" }}>
           {/* Card height changed to auto and NO_SCROLL_SX applied */}
-          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden", ...rightPaperDisabledStyle }}>
-            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX }}>
+          <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2, height: "auto", overflow: "hidden", ...rightPaperDisabledStyle, display: "flex", flexDirection: "column", flex: 1 }}>
+            <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2, ...NO_SCROLL_SX, display: "flex", flexDirection: "column", flex: 1 }}>
               <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>Infoskærm status</Typography>
                 {/* Hide state badge if client is explicitly offline */}
