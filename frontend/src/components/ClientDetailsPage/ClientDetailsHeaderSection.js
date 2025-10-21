@@ -27,11 +27,13 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient, pushKiosk
 /*
   ClientDetailsHeaderSection.js
 
-  - Local save for skole, lokation og kiosk URL: skriver direkte til backend uden at opdatere parent/clientState.
-  - Inputfelter ændrer kun lokal state i denne komponent; Gem (Save) udfører API-kald og viser snackbar via showSnackbar.
-  - Dette sikrer at en save ikke utilsigtet overskriver client.isOnline eller trigger en fuld-side opdatering.
-  - Ændringer: Udelukkende stylingjusteringer for at sikre at begge Cards ("papers") har samme højde i horisontalt layout.
-    Ingen JSX-tekst, labels eller forretningslogik er ændret.
+  Ændringer:
+  - Udelukkende styling (sx) for at sikre at begge Cards ("papers") får samme højde i horisontalt layout.
+  - Venstre/højre wrapper-boxes er display:flex + flexDirection:column.
+  - Cards er display:flex, flexDirection:column og flex:1.
+  - CardContent er display:flex, flexDirection:column og flex:1.
+  - Skole TextField får .MuiOutlinedInput-root højde så den synlige ramme matcher andre TextField'er.
+  Ingen JSX-tekst, labels, funktionalitet eller dataflow er ændret.
 */
 
 const COLOR_NAME_MAP = {
@@ -497,8 +499,12 @@ function ClientDetailsHeaderSection({
                               onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
                               sx={{
                                 width: "100%",
-                                height: isMobile ? 30 : 32,
-                                // sikre at input og select-elementet fylder og er vertikalt centreret
+                                // Sørg for at den synlige ramme (.MuiOutlinedInput-root) har samme højde som andre TextField'er
+                                "& .MuiOutlinedInput-root": {
+                                  height: isMobile ? 30 : 32,
+                                  padding: 0,
+                                  boxSizing: "border-box"
+                                },
                                 "& .MuiInputBase-input": {
                                   fontSize: isMobile ? 12 : 14,
                                   height: isMobile ? "28px" : "32px",
@@ -508,7 +514,7 @@ function ClientDetailsHeaderSection({
                                   alignItems: "center"
                                 },
                                 "& .MuiSelect-select": {
-                                  height: isMobile ? "28px" : "32px",
+                                  height: "100%",
                                   display: "flex",
                                   alignItems: "center",
                                   padding: isMobile ? "6px 8px" : "8px 14px"
