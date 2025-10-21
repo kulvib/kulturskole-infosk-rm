@@ -218,20 +218,32 @@ export default function DateTimeEditDialog({
         }
       );
       if (!res.ok) throw new Error();
-      setSnackbar({ open: true, message: "Gemt!", severity: "success" });
-      if (onSaved) onSaved({ date: normDate, clientId });
 
-      // Opdater input felter med evt. backend rettelser:
-      const resGet2 = await fetch(
-        `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
-        token ? { headers: { Authorization: "Bearer " + token } } : undefined
-      );
-      if (resGet2.ok) {
-        const data2 = await resGet2.json();
-        const dayObj2 = findDayObj(data2.markedDays || {}, normDate);
-        setOnTime(dayObj2.onTime || "");
-        setOffTime(dayObj2.offTime || "");
+      // EFTER POST: hent den nyeste server-tilstand og opdater inputfelter,
+      // og returner den opdaterede dag via onSaved så caller får præcis hvad der blev gemt.
+      let returnedDay = updatedDays[updateKey];
+      try {
+        const resGet2 = await fetch(
+          `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
+          token ? { headers: { Authorization: "Bearer " + token } } : undefined
+        );
+        if (resGet2.ok) {
+          const data2 = await resGet2.json();
+          const dayObj2 = findDayObj(data2.markedDays || {}, normDate);
+          if (dayObj2 && (dayObj2.onTime || dayObj2.offTime || dayObj2.status)) {
+            returnedDay = dayObj2;
+            setOnTime(dayObj2.onTime || "");
+            setOffTime(dayObj2.offTime || "");
+          }
+        }
+      } catch (e) {
+        // ignore fetch2 error, we still have updatedDays
       }
+
+      // Send den præcise dag tilbage til CalendarPage, så den kan opdatere sin lokale state
+      if (onSaved) onSaved({ date: normDate, clientId, day: returnedDay });
+
+      setSnackbar({ open: true, message: "Gemt!", severity: "success" });
 
       closeTimer.current = setTimeout(() => {
         setSnackbar({ open: false, message: "", severity: "success" });
