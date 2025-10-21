@@ -31,6 +31,10 @@ import { getSchools as apiGetSchools, updateClient as apiUpdateClient, pushKiosk
   - Tilføjet spinner / saving-flag til "Gem"-knapperne for Lokation og Kiosk URL (paper 2).
   - Skole-gem-knap bruger allerede savingSchool og viser spinner; lokation/kiosk har nu tilsvarende savingLocality/savingKiosk.
   - Disabled-logik: knapper er disabled når saving er true, når feltet ikke er dirty eller når client er offline.
+  - Snackbar-tekster ved succesfuldt gem ændret til:
+      "Skole gemt"
+      "Lokation gemt"
+      "Kiosk webadresse gemt"
   Ingen øvrige ændringer i indhold, labels eller forretningslogik.
 */
 
@@ -314,7 +318,7 @@ function ClientDetailsHeaderSection({
       const payload = { school_id: selectedSchool };
       await apiUpdateClient(client.id, payload);
       if (typeof showSnackbar === "function") {
-        showSnackbar({ message: "Skole gemt på serveren", severity: "success" });
+        showSnackbar({ message: "Skole gemt", severity: "success" });
       }
       setSelectedSchoolDirty(false);
       // keep local selectedSchool so UI reflects user's choice
@@ -342,7 +346,7 @@ function ClientDetailsHeaderSection({
       const payload = { locality: localLocality };
       await apiUpdateClient(client.id, payload);
       if (typeof showSnackbar === "function") {
-        showSnackbar({ message: "Lokation gemt på serveren", severity: "success" });
+        showSnackbar({ message: "Lokation gemt", severity: "success" });
       }
       initialLocalityRef.current = localLocality;
     } catch (err) {
@@ -368,7 +372,7 @@ function ClientDetailsHeaderSection({
     try {
       await apiPushKioskUrl(client.id, localKioskUrl);
       if (typeof showSnackbar === "function") {
-        showSnackbar({ message: "Kiosk webadresse gemt på serveren", severity: "success" });
+        showSnackbar({ message: "Kiosk webadresse gemt", severity: "success" });
       }
       initialKioskUrlRef.current = localKioskUrl;
     } catch (err) {
