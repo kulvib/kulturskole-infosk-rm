@@ -149,7 +149,7 @@ def get_last_segment_info(client_id: str, response: Response):
     }
     return result
 
-@router.get("/api/hls/{client_id}/health")
+@router.get("/hls/{client_id}/health")
 def health_check(client_id: str, response: Response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
