@@ -18,10 +18,36 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import { useTheme, alpha } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
 
+// --- Retry utility med exponential backoff ---
+async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const resp = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(5000) // 5 sekunder timeout
+      });
+      if (resp.ok || attempt === maxAttempts) {
+        return resp;
+      }
+      // Non-ok response, men ikke sidste attempt - retry
+      lastError = new Error(`HTTP ${resp.status}`);
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxAttempts) {
+        // Exponential backoff: 500ms, 1s, 2s, 4s, 8s
+        const delay = Math.min(500 * Math.pow(2, attempt - 1), 8000);
+        await new Promise(res => setTimeout(res, delay));
+      }
+    }
+  }
+  throw lastError || new Error("All retry attempts failed");
+}
+
 // Helper functions
 async function fetchLatestProgramDateTime(hlsUrl) {
   try {
-    const resp = await fetch(hlsUrl + "?cachebust=" + Date.now());
+    const resp = await fetchWithRetry(hlsUrl + "?cachebust=" + Date.now());
     if (!resp.ok) return null;
     const manifest = await resp.text();
     const lines = manifest.split('\n');
@@ -32,7 +58,8 @@ async function fetchLatestProgramDateTime(hlsUrl) {
       }
     }
     return lastDateTime;
-  } catch {
+  } catch (e) {
+    console.warn("[fetchLatestProgramDateTime] Fejl:", e);
     return null;
   }
 }
@@ -75,7 +102,6 @@ function getLagStatus(playerLag, lastSegmentLag) {
   return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#e53935" };
 }
 
-// Formatter der altid viser tal med max 3 decimaler, uden trailing nuller
 function formatLagValue(val) {
   if (val == null) return "-";
   return Number(val).toFixed(3).replace(/(\.\d*?[1-9])0+$|\.0*$/, "$1");
@@ -83,13 +109,16 @@ function formatLagValue(val) {
 
 export default function ClientDetailsLivestreamSection({
   clientId,
-  refreshing: parentRefreshing = false, // sync from parent when provided
+  refreshing: parentRefreshing = false,
   onRestartStream = null,
   streamKey = null,
-  clientOnline = true // NEW: parent tells us whether client is online; explicit false => offline
+  clientOnline = true
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
+  const playbackCheckIntervalRef = useRef(null);
+  const lastPlaybackPositionRef = useRef(0);
+  const stallDetectionCountRef = useRef(0);
 
   const [manifestReady, setManifestReady] = useState(false);
   const [error, setError] = useState("");
@@ -103,25 +132,19 @@ export default function ClientDetailsLivestreamSection({
   const [manifestProgramLag, setManifestProgramLag] = useState(null);
 
   const [lastFetched, setLastFetched] = useState(null);
-
   const [buffering, setBuffering] = useState(false);
-
   const [currentSegment, setCurrentSegment] = useState("-");
 
   const [autoRefreshed, setAutoRefreshed] = useState(false);
   const [manualRefreshed, setManualRefreshed] = useState(false);
 
-  // Lokal fallback key hvis parent ikke leverer streamKey/onRestartStream
   const [localRefreshKey, setLocalRefreshKey] = useState(0);
-
-  // Intern refreshing state (for immediate local feedback) but synced with parentRefreshing
   const [refreshing, setRefreshing] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
-  // Controls overlay
   const [showControls, setShowControls] = useState(false);
 
   // Sync internal refreshing with parent prop
@@ -142,20 +165,85 @@ export default function ClientDetailsLivestreamSection({
   function handleVideoPlaying() { setBuffering(false); }
   function handleVideoCanPlay() { setBuffering(false); }
 
-  // effectiveRefreshKey: parent streamKey if provided, otherwise localRefreshKey
   const effectiveRefreshKey = useMemo(() => {
     return (typeof streamKey !== "undefined" && streamKey !== null) ? streamKey : localRefreshKey;
   }, [streamKey, localRefreshKey]);
 
+  // Stall detection: Hvis video ikke fremadskrider i 8+ sekunder
+  useEffect(() => {
+    if (!manifestReady || clientOnline === false) return;
+    
+    playbackCheckIntervalRef.current = setInterval(() => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      const currentPosition = video.currentTime;
+      
+      // Hvis positionen ikke ændres (og vi ikke bufferer), er der stall
+      if (currentPosition === lastPlaybackPositionRef.current && !buffering && video.duration && currentPosition > 0) {
+        stallDetectionCountRef.current++;
+        
+        if (stallDetectionCountRef.current >= 8) { // 8 checks á 1 sekund = ~8 sekunder stall
+          console.warn("[Stall Detection] Video er stalled. Restart igang...");
+          setError("Video er stoppet. Genstartes ...");
+          stallDetectionCountRef.current = 0;
+          
+          // Restart stream
+          if (typeof onRestartStream === "function") {
+            onRestartStream();
+          } else {
+            setLocalRefreshKey(k => k + 1);
+          }
+        }
+      } else {
+        stallDetectionCountRef.current = 0;
+      }
+      
+      lastPlaybackPositionRef.current = currentPosition;
+    }, 1000);
+
+    return () => {
+      if (playbackCheckIntervalRef.current) {
+        clearInterval(playbackCheckIntervalRef.current);
+      }
+    };
+  }, [manifestReady, clientOnline, onRestartStream, buffering]);
+
+  // Online/offline event listener
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log("[Network] Online status gendannet. Genstartes...");
+      if (typeof onRestartStream === "function") {
+        onRestartStream();
+      } else {
+        setLocalRefreshKey(k => k + 1);
+      }
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [onRestartStream]);
+
+  // Health check - kald health endpoint hvis backend har det
+  const checkStreamHealth = async (clientIdParam) => {
+    try {
+      const resp = await fetchWithRetry(`/api/hls/${clientIdParam}/health?nocache=${Date.now()}`);
+      const data = await resp.json();
+      return data.online && data.has_segments;
+    } catch {
+      return false;
+    }
+  };
+
   // maybeResetSegments - run when effectiveRefreshKey changes
   useEffect(() => {
     if (!clientId) return;
-    if (clientOnline === false) return; // NEW: don't attempt backend polling when offline
+    if (clientOnline === false) return;
     let ignore = false;
 
     async function maybeResetSegments() {
       try {
-        const resp = await fetch(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
+        const resp = await fetchWithRetry(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
         let doReset = false;
         if (!resp.ok) {
           doReset = true;
@@ -171,19 +259,20 @@ export default function ClientDetailsLivestreamSection({
           }
         }
         if (!ignore && doReset) {
-          await fetch(`/api/hls/${clientId}/reset`, { method: "POST" });
+          await fetchWithRetry(`/api/hls/${clientId}/reset`, { method: "POST" });
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn("[maybeResetSegments] Fejl:", e);
+      }
     }
     maybeResetSegments();
     return () => { ignore = true; };
   }, [clientId, effectiveRefreshKey, clientOnline]);
 
-  // Main manifest/polling & playback setup - depends on effectiveRefreshKey to remount
+  // Main manifest/polling & playback setup
   useEffect(() => {
     if (!clientId) return;
     if (clientOnline === false) {
-      // Ensure we cleanup any existing playback if client just went offline
       if (hlsRef.current) {
         try { hlsRef.current.destroy(); } catch {}
         hlsRef.current = null;
@@ -206,22 +295,42 @@ export default function ClientDetailsLivestreamSection({
     let manifestChecked = false;
     let stopPolling = false;
     let pollInterval;
+    let retryCount = 0;
 
     const startPlayback = () => {
       setError("");
       setManifestReady(true);
       setLastLive(new Date());
+      retryCount = 0;
+      
       if (video && video.canPlayType && video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = hlsUrl;
       } else if (Hls.isSupported()) {
-        hls = new Hls();
+        hls = new Hls({
+          // HLS.js config for better stability
+          maxBufferLength: 30, // Aggressive buffering
+          maxMaxBufferLength: 60,
+          startLevel: undefined, // Auto bitrate selection
+          abrBandWidthFactor: 0.95,
+          abrBandWidthUpFactor: 0.7,
+        });
         hlsRef.current = hls;
         hls.loadSource(hlsUrl);
         hls.attachMedia(video);
 
         hls.on(Hls.Events.ERROR, (event, data) => {
+          console.warn("[HLS Error]", data);
           if (data.fatal) {
-            setError("Streamen blev afbrudt. Prøver igen ...");
+            switch(data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                setError("Netværksfejl. Prøver igen...");
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                setError("Mediefejl. Prøver igen...");
+                break;
+              default:
+                setError("Streamen blev afbrudt. Prøver igen...");
+            }
             setManifestReady(false);
             cleanup();
           }
@@ -255,9 +364,13 @@ export default function ClientDetailsLivestreamSection({
 
     const poll = async () => {
       try {
-        const resp = await fetch(hlsUrl, { method: "HEAD" });
+        // Kald health endpoint først hvis den eksisterer
+        const isHealthy = await checkStreamHealth(clientId);
+        
+        const resp = await fetchWithRetry(hlsUrl, { method: "HEAD" });
         if (resp.ok) {
           setLastFetched(new Date());
+          retryCount = 0;
           if (!manifestChecked) {
             manifestChecked = true;
             setError("");
@@ -265,15 +378,18 @@ export default function ClientDetailsLivestreamSection({
             startPlayback();
           }
         } else {
-          throw new Error("404");
+          throw new Error(`HTTP ${resp.status}`);
         }
       } catch (e) {
+        retryCount++;
+        console.warn(`[Poll] Attempt ${retryCount}`, e);
+        
         if (manifestChecked) {
-          setError("Streamen blev afbrudt eller forsvandt. Prøver igen ...");
+          setError("Streamen blev afbrudt eller forsvandt. Prøver igen...");
           setManifestReady(false);
           cleanup();
         } else {
-          setError("Kan ikke finde klientstream endnu.");
+          setError("Kan ikke finde klientstream endnu. Prøver igen...");
         }
         manifestChecked = false;
       }
@@ -281,10 +397,18 @@ export default function ClientDetailsLivestreamSection({
 
     // start polling immediately
     poll();
+    
+    // Adaptive polling: hurtigere når der er fejl
+    const getPollInterval = () => {
+      if (!manifestReady) return 250;
+      if (retryCount > 0) return Math.min(1000 + retryCount * 500, 5000);
+      return 5000;
+    };
+
     pollInterval = setInterval(() => {
       if (stopPolling) return;
       poll();
-    }, manifestReady ? 5000 : 250);
+    }, getPollInterval());
 
     return () => {
       stopPolling = true;
@@ -296,13 +420,14 @@ export default function ClientDetailsLivestreamSection({
   // Poll last-segment-info to compute backend lag
   useEffect(() => {
     if (!clientId) return;
-    if (clientOnline === false) return; // don't poll when offline
+    if (clientOnline === false) return;
     if (!isSafari() && !manifestReady) return;
     let stop = false;
+    
     async function pollSegmentLag() {
       while (!stop) {
         try {
-          const resp = await fetch(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
+          const resp = await fetchWithRetry(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
           if (resp.ok) {
             const data = await resp.json();
             if (data.timestamp) {
@@ -315,7 +440,8 @@ export default function ClientDetailsLivestreamSection({
               setLastSegmentLag(null);
             }
           }
-        } catch {
+        } catch (e) {
+          console.warn("[pollSegmentLag] Fejl:", e);
           setLastSegmentTimestamp(null);
           setLastSegmentLag(null);
         }
@@ -350,6 +476,7 @@ export default function ClientDetailsLivestreamSection({
     if (clientOnline === false) return;
     let stop = false;
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
+    
     async function pollManifestProgramDateTime() {
       while (!stop) {
         const dtStr = await fetchLatestProgramDateTime(hlsUrl);
@@ -383,11 +510,10 @@ export default function ClientDetailsLivestreamSection({
 
   // Auto refresh: call parent's onRestartStream if provided, otherwise use local key
   useEffect(() => {
-    if (clientOnline === false) return; // don't auto-restart when offline
+    if (clientOnline === false) return;
     const interval = setInterval(() => {
       setAutoRefreshed(true);
       if (typeof onRestartStream === "function") {
-        // parent should set its refreshing flag; we synced to it in effect above
         onRestartStream();
       } else {
         setLocalRefreshKey(k => k + 1);
@@ -414,12 +540,9 @@ export default function ClientDetailsLivestreamSection({
   const handleRefreshClick = () => {
     if (clientOnline === false) return;
     setManualRefreshed(true);
-    // optimistic local feedback: if parent does not control refreshing, show local spinner briefly
     if (typeof onRestartStream === "function") {
-      // parent will set its refreshing flag; we've synced to it above
       onRestartStream();
     } else {
-      // fallback to local remounting behaviour and local spinner
       setRefreshing(true);
       setLocalRefreshKey(k => k + 1);
       setTimeout(() => setRefreshing(false), 800);
@@ -469,8 +592,6 @@ export default function ClientDetailsLivestreamSection({
   }
 
   const lagStatus = getLagStatus(sanitizedLag, lastSegmentLag);
-
-  // Visual disabled styles when offline
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
 
   return (
