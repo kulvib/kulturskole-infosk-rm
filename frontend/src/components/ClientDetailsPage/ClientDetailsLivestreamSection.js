@@ -172,23 +172,16 @@ export default function ClientDetailsLivestreamSection({
   // Stall detection: Hvis video ikke fremadskrider i 8+ sekunder
   useEffect(() => {
     if (!manifestReady || clientOnline === false) return;
-    
     playbackCheckIntervalRef.current = setInterval(() => {
       const video = videoRef.current;
       if (!video) return;
-
       const currentPosition = video.currentTime;
-      
-      // Hvis positionen ikke ændres (og vi ikke bufferer), er der stall
       if (currentPosition === lastPlaybackPositionRef.current && !buffering && video.duration && currentPosition > 0) {
         stallDetectionCountRef.current++;
-        
-        if (stallDetectionCountRef.current >= 8) { // 8 checks á 1 sekund = ~8 sekunder stall
+        if (stallDetectionCountRef.current >= 8) {
           console.warn("[Stall Detection] Video er stalled. Restart igang...");
           setError("Video er stoppet. Genstartes ...");
           stallDetectionCountRef.current = 0;
-          
-          // Restart stream
           if (typeof onRestartStream === "function") {
             onRestartStream();
           } else {
@@ -198,7 +191,6 @@ export default function ClientDetailsLivestreamSection({
       } else {
         stallDetectionCountRef.current = 0;
       }
-      
       lastPlaybackPositionRef.current = currentPosition;
     }, 1000);
 
@@ -219,7 +211,6 @@ export default function ClientDetailsLivestreamSection({
         setLocalRefreshKey(k => k + 1);
       }
     };
-
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
   }, [onRestartStream]);
@@ -240,7 +231,6 @@ export default function ClientDetailsLivestreamSection({
     if (!clientId) return;
     if (clientOnline === false) return;
     let ignore = false;
-
     async function maybeResetSegments() {
       try {
         const resp = await fetchWithRetry(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
@@ -302,17 +292,17 @@ export default function ClientDetailsLivestreamSection({
       setManifestReady(true);
       setLastLive(new Date());
       retryCount = 0;
-      
+
+      // --- Hls.js config til Chrome/live ---
       if (video && video.canPlayType && video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = hlsUrl;
       } else if (Hls.isSupported()) {
         hls = new Hls({
-          // HLS.js config for better stability
-          maxBufferLength: 30, // Aggressive buffering
-          maxMaxBufferLength: 60,
-          startLevel: undefined, // Auto bitrate selection
-          abrBandWidthFactor: 0.95,
-          abrBandWidthUpFactor: 0.7,
+          liveSyncDurationCount: 1,
+          maxBufferLength: 8,
+          maxMaxBufferLength: 15,
+          enableWorker: true,
+          startLevel: -1
         });
         hlsRef.current = hls;
         hls.loadSource(hlsUrl);
@@ -337,7 +327,7 @@ export default function ClientDetailsLivestreamSection({
         });
 
         hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
-          if (data && data.frag && typeof data.frag.sn === "number") {
+          if (data && data.frag && data.frag.sn !== undefined) {
             setCurrentSegment(data.frag.sn);
           }
         });
@@ -364,9 +354,7 @@ export default function ClientDetailsLivestreamSection({
 
     const poll = async () => {
       try {
-        // Kald health endpoint først hvis den eksisterer
         const isHealthy = await checkStreamHealth(clientId);
-        
         const resp = await fetchWithRetry(hlsUrl, { method: "HEAD" });
         if (resp.ok) {
           setLastFetched(new Date());
@@ -383,7 +371,6 @@ export default function ClientDetailsLivestreamSection({
       } catch (e) {
         retryCount++;
         console.warn(`[Poll] Attempt ${retryCount}`, e);
-        
         if (manifestChecked) {
           setError("Streamen blev afbrudt eller forsvandt. Prøver igen...");
           setManifestReady(false);
@@ -395,20 +382,11 @@ export default function ClientDetailsLivestreamSection({
       }
     };
 
-    // start polling immediately
     poll();
-    
-    // Adaptive polling: hurtigere når der er fejl
-    const getPollInterval = () => {
-      if (!manifestReady) return 250;
-      if (retryCount > 0) return Math.min(1000 + retryCount * 500, 5000);
-      return 5000;
-    };
-
     pollInterval = setInterval(() => {
       if (stopPolling) return;
       poll();
-    }, getPollInterval());
+    }, 5000);
 
     return () => {
       stopPolling = true;
@@ -423,7 +401,6 @@ export default function ClientDetailsLivestreamSection({
     if (clientOnline === false) return;
     if (!isSafari() && !manifestReady) return;
     let stop = false;
-    
     async function pollSegmentLag() {
       while (!stop) {
         try {
@@ -476,7 +453,6 @@ export default function ClientDetailsLivestreamSection({
     if (clientOnline === false) return;
     let stop = false;
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
-    
     async function pollManifestProgramDateTime() {
       while (!stop) {
         const dtStr = await fetchLatestProgramDateTime(hlsUrl);
@@ -507,20 +483,6 @@ export default function ClientDetailsLivestreamSection({
     }
     return () => clearInterval(interval);
   }, [manifestReady, effectiveRefreshKey]);
-
-  // Auto refresh: call parent's onRestartStream if provided, otherwise use local key
-  useEffect(() => {
-    if (clientOnline === false) return;
-    const interval = setInterval(() => {
-      setAutoRefreshed(true);
-      if (typeof onRestartStream === "function") {
-        onRestartStream();
-      } else {
-        setLocalRefreshKey(k => k + 1);
-      }
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [onRestartStream, clientOnline]);
 
   useEffect(() => {
     if (autoRefreshed) {
@@ -574,20 +536,6 @@ export default function ClientDetailsLivestreamSection({
 
   let sanitizedLag = lagToShow;
   if (sanitizedLag != null && sanitizedLag < 0) {
-    console.warn(
-      "[Lag warning] Negativ lag opdaget! Dette bør ikke ske.",
-      {
-        sanitizedLag,
-        lagToShow,
-        lagType,
-        playerLag,
-        manifestProgramLag,
-        lastSegmentLag,
-        clientTime: new Date().toISOString(),
-        manifestProgramDateTime,
-        lastSegmentTimestamp,
-      }
-    );
     sanitizedLag = 0;
   }
 
@@ -596,18 +544,12 @@ export default function ClientDetailsLivestreamSection({
 
   return (
     <Card elevation={2} sx={{ borderRadius: 2, p: isMobile ? 1 : 2, ...disabledOverlay }}>
-      <Grid
-        container
-        spacing={isMobile ? 1 : 2}
-        alignItems="flex-start"
-      >
+      <Grid container spacing={isMobile ? 1 : 2} alignItems="flex-start">
         {/* Kolonne 1 */}
         <Grid item xs={12} md={3} minWidth={0}>
           <Stack spacing={1}>
             <Box sx={{ display: "flex", alignItems: "center" }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
-                Stream
-              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>Stream</Typography>
               <Box
                 sx={{
                   width: isMobile ? 8 : 10,
