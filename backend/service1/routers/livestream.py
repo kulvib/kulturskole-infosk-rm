@@ -5,7 +5,6 @@ import traceback
 import re
 from datetime import datetime
 
-# --- Central HLS_DIR-definition her ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SERVICE1_HLS_DIR = os.path.join(BASE_DIR, "..", "service1", "hls")
 ROOT_HLS_DIR = os.path.join(BASE_DIR, "..", "hls")
@@ -18,12 +17,10 @@ os.makedirs(HLS_DIR, exist_ok=True)
 router = APIRouter()
 
 def extract_num(filename, prefix="segment_"):
-    # Matcher både segment_00001.ts og segment_00001_20250920T095400Z.ts
     m = re.match(rf"{re.escape(prefix)}(\d+)(?:_([0-9TtZz]+))?\.(mp4|ts)$", filename)
     return int(m.group(1)) if m else -1
 
 def extract_program_date_time(filename):
-    # Matcher segment_00001_20250920T095400Z.ts
     m = re.match(r"segment_\d+_([0-9TtZz]+)\.(mp4|ts)$", filename)
     if not m:
         return None
@@ -34,7 +31,7 @@ def extract_program_date_time(filename):
     except Exception:
         return None
 
-def update_manifest(client_dir, keep_n=4, segment_duration=6):
+def update_manifest(client_dir, keep_n=6, segment_duration=6):
     seg_types = [".ts", ".mp4"]
     for ext in seg_types:
         segs = sorted(
@@ -89,7 +86,7 @@ async def upload_hls_file(
 async def cleanup_hls_files(
     client_id: str = Body(...),
     keep_files: List[str] = Body(...),
-    keep_n: int = 4,
+    keep_n: int = 6,
     segment_duration: int = 6,
 ):
     try:
@@ -119,7 +116,6 @@ async def cleanup_hls_files(
 
 @router.get("/hls/{client_id}/last-segment-info")
 def get_last_segment_info(client_id: str, response: Response):
-    # Tilføj cache-control headers
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
@@ -137,7 +133,6 @@ def get_last_segment_info(client_id: str, response: Response):
     seg_path = os.path.join(client_dir, last_segment)
     if not os.path.exists(seg_path):
         return {"error": "segment missing", "is_healthy": False}
-    # Prøv at parse program-date-time fra filnavn
     dt = extract_program_date_time(last_segment)
     if dt:
         timestamp_iso = dt.isoformat() + "Z"
@@ -156,14 +151,12 @@ def get_last_segment_info(client_id: str, response: Response):
 
 @router.get("/api/hls/{client_id}/health")
 def health_check(client_id: str, response: Response):
-    """Hurtig health-check endpoint uden at læse hele manifestet"""
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
-    
+
     client_dir = os.path.join(HLS_DIR, client_id)
     manifest_path = os.path.join(client_dir, "index.m3u8")
-    
     if not os.path.exists(manifest_path):
         return {
             "online": False,
@@ -171,12 +164,9 @@ def health_check(client_id: str, response: Response):
             "last_update": None,
             "message": "Manifest ikke fundet"
         }
-    
     try:
-        # Tjek om der er segmenter
-        manifest_dir_files = os.listdir(client_dir)
-        has_segments = any(f.startswith("segment_") and (f.endswith(".ts") or f.endswith(".mp4")) for f in manifest_dir_files)
-        
+        files = os.listdir(client_dir)
+        has_segments = any(f.startswith("segment_") and (f.endswith(".ts") or f.endswith(".mp4")) for f in files)
         if has_segments:
             manifest_mtime = os.path.getmtime(manifest_path)
             last_update = datetime.utcfromtimestamp(manifest_mtime).isoformat() + "Z"
@@ -205,7 +195,6 @@ def health_check(client_id: str, response: Response):
 @router.post("/hls/{client_id}/reset")
 def reset_hls(client_id: str, response: Response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    
     client_dir = os.path.join(HLS_DIR, client_id)
     print(f"[RESET] Prøver at nulstille {client_dir}")
     if not os.path.exists(client_dir):
@@ -215,14 +204,12 @@ def reset_hls(client_id: str, response: Response):
             "success": True,
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-    
     try:
         for f in os.listdir(client_dir):
             try:
                 os.remove(os.path.join(client_dir, f))
             except Exception as e:
                 print(f"[RESET] Kunne ikke slette {f}: {e}")
-        
         print("[RESET] Nulstilling færdig.")
         return {
             "message": "reset done",
@@ -237,7 +224,6 @@ def reset_hls(client_id: str, response: Response):
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
 
-# --- WebRTC signalering (samme som før) ---
 class Room:
     def __init__(self):
         self.broadcaster: WebSocket = None
