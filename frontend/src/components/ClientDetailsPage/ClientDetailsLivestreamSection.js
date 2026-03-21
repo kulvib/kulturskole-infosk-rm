@@ -42,7 +42,6 @@ async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
   throw lastError || new Error("All retry attempts failed");
 }
 
-// Helper functions
 function isSafari() {
   return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 }
@@ -77,7 +76,6 @@ function formatLagValue(val) {
   return Number(val).toFixed(3).replace(/(\.\d*?[1-9])0+$|\.0*$/, "$1");
 }
 
-// --- KOMPONENT ---
 export default function ClientDetailsLivestreamSection({
   clientId,
   refreshing: parentRefreshing = false,
@@ -103,11 +101,12 @@ export default function ClientDetailsLivestreamSection({
   const [localRefreshKey, setLocalRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Giver et unikt key til video for _hvert_ refresh
   const effectiveRefreshKey = useMemo(() => {
     return (typeof streamKey !== "undefined" && streamKey !== null) ? streamKey : localRefreshKey;
   }, [streamKey, localRefreshKey]);
 
-  // HLS.js lifecycle (kun afhængighed af clientId/effectiveRefreshKey)
+  // HLS.js lifecycle
   useEffect(() => {
     if (!clientId || !clientOnline) return;
     setManifestReady(false);
@@ -117,15 +116,14 @@ export default function ClientDetailsLivestreamSection({
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
 
     let hls;
+    let fatalErrorTimeout = null;
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Safari: native HLS
       video.src = hlsUrl;
       video.muted = true;
       video.autoplay = true;
       video.playsInline = true;
       setManifestReady(true);
     } else if (Hls.isSupported()) {
-      // Chrome, Edge, Firefox (via Hls.js)
       hls = new Hls({
         liveSyncDurationCount: 1,
         maxBufferLength: 8,
@@ -140,9 +138,20 @@ export default function ClientDetailsLivestreamSection({
       hls.on(Hls.Events.ERROR, (event, data) => {
         console.warn("[HLS Error]", data);
         if (data.fatal) {
-          setError("Fatal streamfejl. Prøv at genindlæse siden eller genstarte streamen.");
+          setError("Fatal streamfejl. Prøver automatisk at genstarte om lidt …");
           hls.destroy();
           hlsRef.current = null;
+          // Nulstil src for video og tvungent re-mount
+          if (videoRef.current) {
+            try {
+              videoRef.current.pause();
+              videoRef.current.removeAttribute("src");
+              videoRef.current.load();
+            } catch {}
+          }
+          setManifestReady(false);
+          // Automatisk reload efter 1 sekund
+          fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 1000);
         } else {
           setError(data.details || "Ukendt HLS-fejl");
         }
@@ -157,18 +166,21 @@ export default function ClientDetailsLivestreamSection({
       video.playsInline = true;
     }
     return () => {
+      if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
       if (videoRef.current) {
         try {
+          videoRef.current.pause();
           videoRef.current.removeAttribute("src");
           videoRef.current.load();
         } catch {}
       }
       setManifestReady(false);
     };
+    // eslint-disable-next-line
   }, [clientId, effectiveRefreshKey, clientOnline]);
 
   // Manual refresh
@@ -179,6 +191,7 @@ export default function ClientDetailsLivestreamSection({
     setTimeout(() => setRefreshing(false), 800);
   };
 
+  // Fullscreen
   const handleFullscreen = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -198,7 +211,7 @@ export default function ClientDetailsLivestreamSection({
   function handleVideoPlaying() { setBuffering(false); }
   function handleVideoCanPlay() { setBuffering(false); }
 
-  // LAG/BACKEND POLLING (DISSE ER UFORANDREDE, du kan finpudse)
+  // LAG/BACKEND POLLING
   useEffect(() => {
     if (!clientId || !manifestReady) return;
     if (clientOnline === false) return;
@@ -258,7 +271,6 @@ export default function ClientDetailsLivestreamSection({
   return (
     <Card elevation={2} sx={{ borderRadius: 2, p: isMobile ? 1 : 2, ...disabledOverlay }}>
       <Grid container spacing={isMobile ? 1 : 2} alignItems="flex-start">
-        {/* Kolonne 1 */}
         <Grid item xs={12} md={3} minWidth={0}>
           <Stack spacing={1}>
             <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -282,7 +294,9 @@ export default function ClientDetailsLivestreamSection({
                     size={isMobile ? "small" : "medium"}
                     disabled={refreshing || !clientId || clientOnline === false}
                   >
-                    { (refreshing && clientOnline !== false) ? <CircularProgress size={isMobile ? 20 : 18} color="inherit" /> : <RefreshIcon sx={{ fontSize: isMobile ? 26 : undefined }} /> }
+                    {(refreshing && clientOnline !== false)
+                      ? <CircularProgress size={isMobile ? 20 : 18} color="inherit" />
+                      : <RefreshIcon sx={{ fontSize: isMobile ? 26 : undefined }} />}
                   </IconButton>
                 </span>
               </Tooltip>
@@ -299,7 +313,6 @@ export default function ClientDetailsLivestreamSection({
             </Box>
           </Stack>
         </Grid>
-        {/* Kolonne 2 */}
         <Grid item xs={12} md={5} minWidth={0}>
           <Box
             sx={{
