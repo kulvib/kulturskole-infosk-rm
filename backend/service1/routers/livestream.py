@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form, Body
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form, Body, Response
 from typing import Dict, List
 import traceback
 import re
@@ -118,20 +118,25 @@ async def cleanup_hls_files(
         raise HTTPException(status_code=500, detail=f"Fejl i cleanup: {e}")
 
 @router.get("/hls/{client_id}/last-segment-info")
-def get_last_segment_info(client_id: str):
+def get_last_segment_info(client_id: str, response: Response):
+    # Tilføj cache-control headers
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
     client_dir = os.path.join(HLS_DIR, client_id)
     manifest_path = os.path.join(client_dir, "index.m3u8")
     if not os.path.exists(manifest_path):
-        return {"error": "no manifest"}
+        return {"error": "no manifest", "is_healthy": False}
     with open(manifest_path, "r") as m3u:
         lines = m3u.readlines()
     segment_files = [line.strip() for line in lines if line.strip().startswith("segment_")]
     if not segment_files:
-        return {"error": "no segments"}
+        return {"error": "no segments", "is_healthy": False}
     last_segment = segment_files[-1]
     seg_path = os.path.join(client_dir, last_segment)
     if not os.path.exists(seg_path):
-        return {"error": "segment missing"}
+        return {"error": "segment missing", "is_healthy": False}
     # Prøv at parse program-date-time fra filnavn
     dt = extract_program_date_time(last_segment)
     if dt:
@@ -143,25 +148,94 @@ def get_last_segment_info(client_id: str):
     result = {
         "segment": last_segment,
         "timestamp": timestamp_iso,
-        "epoch": dt.timestamp() if dt else None
+        "epoch": dt.timestamp() if dt else None,
+        "segment_count": len(segment_files),
+        "is_healthy": True
     }
     return result
 
+@router.get("/api/hls/{client_id}/health")
+def health_check(client_id: str, response: Response):
+    """Hurtig health-check endpoint uden at læse hele manifestet"""
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
+    client_dir = os.path.join(HLS_DIR, client_id)
+    manifest_path = os.path.join(client_dir, "index.m3u8")
+    
+    if not os.path.exists(manifest_path):
+        return {
+            "online": False,
+            "has_segments": False,
+            "last_update": None,
+            "message": "Manifest ikke fundet"
+        }
+    
+    try:
+        # Tjek om der er segmenter
+        manifest_dir_files = os.listdir(client_dir)
+        has_segments = any(f.startswith("segment_") and (f.endswith(".ts") or f.endswith(".mp4")) for f in manifest_dir_files)
+        
+        if has_segments:
+            manifest_mtime = os.path.getmtime(manifest_path)
+            last_update = datetime.utcfromtimestamp(manifest_mtime).isoformat() + "Z"
+            return {
+                "online": True,
+                "has_segments": True,
+                "last_update": last_update,
+                "message": "Stream er aktiv"
+            }
+        else:
+            return {
+                "online": True,
+                "has_segments": False,
+                "last_update": None,
+                "message": "Manifest eksisterer, men ingen segmenter endnu"
+            }
+    except Exception as e:
+        print(f"[HEALTH] Fejl ved health-check for {client_id}: {e}")
+        return {
+            "online": False,
+            "has_segments": False,
+            "last_update": None,
+            "message": f"Fejl: {str(e)}"
+        }
+
 @router.post("/hls/{client_id}/reset")
-def reset_hls(client_id: str):
+def reset_hls(client_id: str, response: Response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    
     client_dir = os.path.join(HLS_DIR, client_id)
     print(f"[RESET] Prøver at nulstille {client_dir}")
     if not os.path.exists(client_dir):
         print("[RESET] Mappen findes ikke.")
-        return {"message": "already cleaned"}
-    for f in os.listdir(client_dir):
-        try:
-            os.remove(os.path.join(client_dir, f))
-        except Exception as e:
-            print(f"[RESET] Kunne ikke slette {f}: {e}")
-            raise HTTPException(status_code=400, detail=f"Could not delete {f}: {e}")
-    print("[RESET] Nulstilling færdig.")
-    return {"message": "reset done"}
+        return {
+            "message": "already cleaned",
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+    
+    try:
+        for f in os.listdir(client_dir):
+            try:
+                os.remove(os.path.join(client_dir, f))
+            except Exception as e:
+                print(f"[RESET] Kunne ikke slette {f}: {e}")
+        
+        print("[RESET] Nulstilling færdig.")
+        return {
+            "message": "reset done",
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+    except Exception as e:
+        print(f"[RESET] Fejl under reset: {e}")
+        return {
+            "message": f"reset failed: {e}",
+            "success": False,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
 
 # --- WebRTC signalering (samme som før) ---
 class Room:
