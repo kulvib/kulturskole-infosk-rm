@@ -69,24 +69,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- STATIC MOUNT TIL HLS ---
-app.mount("/hls", StaticFiles(directory=HLS_DIR), name="hls")
-print(f"### main.py: Static mount for HLS på {HLS_DIR} ###")
-
 # --- EKSTRA CORS + NO-CACHE FOR HLS STATIC FILES ---
 from starlette.responses import Response
 
 class HLSCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
+        
         if request.url.path.startswith("/hls/"):
+            # CORS headers for HLS
             response.headers["Access-Control-Allow-Origin"] = "*"
-            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS, HEAD"
             response.headers["Access-Control-Allow-Headers"] = "*"
-            response.headers["Cache-Control"] = "no-store"
+            
+            # Cache-Control headers
+            if request.url.path.endswith(".m3u8"):
+                # Manifest skal ALDRIG caches
+                response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+                response.headers["Pragma"] = "no-cache"
+                response.headers["Expires"] = "0"
+            else:
+                # Segments kan caches kort (30 sekunder)
+                response.headers["Cache-Control"] = "public, max-age=30, must-revalidate"
+        
         return response
 
 app.add_middleware(HLSCORSMiddleware)
+
+# --- STATIC MOUNT TIL HLS ---
+app.mount("/hls", StaticFiles(directory=HLS_DIR), name="hls")
+print(f"### main.py: Static mount for HLS på {HLS_DIR} ###")
 
 # Routers
 app.include_router(clients.router, prefix="/api")
