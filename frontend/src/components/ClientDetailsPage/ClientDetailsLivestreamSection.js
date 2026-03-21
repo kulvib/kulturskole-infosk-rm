@@ -25,17 +25,15 @@ async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
     try {
       const resp = await fetch(url, {
         ...options,
-        signal: AbortSignal.timeout(5000) // 5 sekunder timeout
+        signal: AbortSignal.timeout(5000)
       });
       if (resp.ok || attempt === maxAttempts) {
         return resp;
       }
-      // Non-ok response, men ikke sidste attempt - retry
       lastError = new Error(`HTTP ${resp.status}`);
     } catch (err) {
       lastError = err;
       if (attempt < maxAttempts) {
-        // Exponential backoff: 500ms, 1s, 2s, 4s, 8s
         const delay = Math.min(500 * Math.pow(2, attempt - 1), 8000);
         await new Promise(res => setTimeout(res, delay));
       }
@@ -147,12 +145,72 @@ export default function ClientDetailsLivestreamSection({
 
   const [showControls, setShowControls] = useState(false);
 
+  // --- HLS.js lifecycle: kun afhængig af clientId eller manual refresh! ---
+  useEffect(() => {
+    if (!clientId || !clientOnline) return;
+    const video = videoRef.current;
+    if (!video) return;
+
+    let hls;
+    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
+
+    // Init for Safari
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = hlsUrl;
+    } else if (Hls.isSupported()) {
+      hls = new Hls({
+        liveSyncDurationCount: 1,
+        maxBufferLength: 8,
+        maxMaxBufferLength: 15,
+        enableWorker: true,
+        startLevel: -1 // Autovalg
+      });
+      hlsRef.current = hls;
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.warn("[HLS Error]", data);
+        if (data.fatal) {
+          setError("Fatal streamfejl. Prøv at genindlæse siden eller genstarte streamen.");
+          hls.destroy();
+          hlsRef.current = null;
+        }
+      });
+
+      hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
+        if (data && data.frag && typeof data.frag.sn === "number") {
+          setCurrentSegment(data.frag.sn);
+        }
+      });
+    }
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    setManifestReady(true);
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      if (videoRef.current) {
+        try {
+          videoRef.current.removeAttribute("src");
+          videoRef.current.load();
+        } catch {}
+      }
+      setManifestReady(false);
+    };
+  }, [clientId /*, evt. manualRefreshKey hvis du vil tilbyde reload-knap */]);
+
+  // Resten af dine hooks og polling/lag/stat/debug er OK! Fortsæt nedenfor:
+
   // Sync internal refreshing with parent prop
   useEffect(() => {
     setRefreshing(Boolean(parentRefreshing));
   }, [parentRefreshing]);
 
-  // Auto-hide controls
   useEffect(() => {
     if (!showControls) return;
     const timeout = setTimeout(() => setShowControls(false), 2200);
@@ -169,7 +227,7 @@ export default function ClientDetailsLivestreamSection({
     return (typeof streamKey !== "undefined" && streamKey !== null) ? streamKey : localRefreshKey;
   }, [streamKey, localRefreshKey]);
 
-  // Stall detection: Hvis video ikke fremadskrider i 8+ sekunder
+  // --- Stall detection osv. ---
   useEffect(() => {
     if (!manifestReady || clientOnline === false) return;
     playbackCheckIntervalRef.current = setInterval(() => {
@@ -179,7 +237,6 @@ export default function ClientDetailsLivestreamSection({
       if (currentPosition === lastPlaybackPositionRef.current && !buffering && video.duration && currentPosition > 0) {
         stallDetectionCountRef.current++;
         if (stallDetectionCountRef.current >= 8) {
-          console.warn("[Stall Detection] Video er stalled. Restart igang...");
           setError("Video er stoppet. Genstartes ...");
           stallDetectionCountRef.current = 0;
           if (typeof onRestartStream === "function") {
@@ -201,10 +258,8 @@ export default function ClientDetailsLivestreamSection({
     };
   }, [manifestReady, clientOnline, onRestartStream, buffering]);
 
-  // Online/offline event listener
   useEffect(() => {
     const handleOnline = () => {
-      console.log("[Network] Online status gendannet. Genstartes...");
       if (typeof onRestartStream === "function") {
         onRestartStream();
       } else {
@@ -226,11 +281,11 @@ export default function ClientDetailsLivestreamSection({
     }
   };
 
-  // maybeResetSegments - run when effectiveRefreshKey changes
   useEffect(() => {
     if (!clientId) return;
     if (clientOnline === false) return;
     let ignore = false;
+
     async function maybeResetSegments() {
       try {
         const resp = await fetchWithRetry(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
@@ -259,142 +314,6 @@ export default function ClientDetailsLivestreamSection({
     return () => { ignore = true; };
   }, [clientId, effectiveRefreshKey, clientOnline]);
 
-  // Main manifest/polling & playback setup
-  useEffect(() => {
-    if (!clientId) return;
-    if (clientOnline === false) {
-      if (hlsRef.current) {
-        try { hlsRef.current.destroy(); } catch {}
-        hlsRef.current = null;
-      }
-      if (videoRef.current) {
-        try {
-          videoRef.current.removeAttribute("src");
-          videoRef.current.load();
-        } catch {}
-      }
-      setManifestReady(false);
-      setError("");
-      return;
-    }
-
-    const video = videoRef.current;
-    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
-
-    let hls;
-    let manifestChecked = false;
-    let stopPolling = false;
-    let pollInterval;
-    let retryCount = 0;
-
-    const startPlayback = () => {
-      setError("");
-      setManifestReady(true);
-      setLastLive(new Date());
-      retryCount = 0;
-
-      // --- Hls.js config til Chrome/live ---
-      if (video && video.canPlayType && video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = hlsUrl;
-      } else if (Hls.isSupported()) {
-        hls = new Hls({
-          liveSyncDurationCount: 1,
-          maxBufferLength: 8,
-          maxMaxBufferLength: 15,
-          enableWorker: true,
-          startLevel: -1
-        });
-        hlsRef.current = hls;
-        hls.loadSource(hlsUrl);
-        hls.attachMedia(video);
-
-        hls.on(Hls.Events.ERROR, (event, data) => {
-          console.warn("[HLS Error]", data);
-          if (data.fatal) {
-            switch(data.type) {
-              case Hls.ErrorTypes.NETWORK_ERROR:
-                setError("Netværksfejl. Prøver igen...");
-                break;
-              case Hls.ErrorTypes.MEDIA_ERROR:
-                setError("Mediefejl. Prøver igen...");
-                break;
-              default:
-                setError("Streamen blev afbrudt. Prøver igen...");
-            }
-            setManifestReady(false);
-            cleanup();
-          }
-        });
-
-        hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
-          if (data && data.frag && data.frag.sn !== undefined) {
-            setCurrentSegment(data.frag.sn);
-          }
-        });
-      }
-      if (video) {
-        video.muted = true;
-        video.autoplay = true;
-        video.playsInline = true;
-      }
-    };
-
-    const cleanup = () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-      if (videoRef.current) {
-        try {
-          videoRef.current.removeAttribute("src");
-          videoRef.current.load();
-        } catch {}
-      }
-    };
-
-    const poll = async () => {
-      try {
-        const isHealthy = await checkStreamHealth(clientId);
-        const resp = await fetchWithRetry(hlsUrl, { method: "HEAD" });
-        if (resp.ok) {
-          setLastFetched(new Date());
-          retryCount = 0;
-          if (!manifestChecked) {
-            manifestChecked = true;
-            setError("");
-            setManifestReady(true);
-            startPlayback();
-          }
-        } else {
-          throw new Error(`HTTP ${resp.status}`);
-        }
-      } catch (e) {
-        retryCount++;
-        console.warn(`[Poll] Attempt ${retryCount}`, e);
-        if (manifestChecked) {
-          setError("Streamen blev afbrudt eller forsvandt. Prøver igen...");
-          setManifestReady(false);
-          cleanup();
-        } else {
-          setError("Kan ikke finde klientstream endnu. Prøver igen...");
-        }
-        manifestChecked = false;
-      }
-    };
-
-    poll();
-    pollInterval = setInterval(() => {
-      if (stopPolling) return;
-      poll();
-    }, 5000);
-
-    return () => {
-      stopPolling = true;
-      clearInterval(pollInterval);
-      cleanup();
-    };
-  }, [clientId, effectiveRefreshKey, clientOnline]);
-
   // Poll last-segment-info to compute backend lag
   useEffect(() => {
     if (!clientId) return;
@@ -418,7 +337,6 @@ export default function ClientDetailsLivestreamSection({
             }
           }
         } catch (e) {
-          console.warn("[pollSegmentLag] Fejl:", e);
           setLastSegmentTimestamp(null);
           setLastSegmentLag(null);
         }
@@ -447,7 +365,6 @@ export default function ClientDetailsLivestreamSection({
     return () => clearInterval(interval);
   }, [manifestReady, effectiveRefreshKey, clientOnline]);
 
-  // Manifest EXT-X-PROGRAM-DATE-TIME based lag
   useEffect(() => {
     if (!clientId || !manifestReady) return;
     if (clientOnline === false) return;
@@ -472,7 +389,6 @@ export default function ClientDetailsLivestreamSection({
     return () => { stop = true; };
   }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
-  // lastLive ticker for UI
   useEffect(() => {
     let interval;
     if (manifestReady) {
@@ -498,7 +414,6 @@ export default function ClientDetailsLivestreamSection({
     }
   }, [manualRefreshed]);
 
-  // Manual refresh: mark local flag and notify parent to restart stream
   const handleRefreshClick = () => {
     if (clientOnline === false) return;
     setManualRefreshed(true);
