@@ -18,7 +18,7 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import { useTheme, alpha } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
 
-// --- Retry utility med exponential backoff ---
+// Helper: Retry utility
 async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -43,25 +43,9 @@ async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
 }
 
 // Helper functions
-async function fetchLatestProgramDateTime(hlsUrl) {
-  try {
-    const resp = await fetchWithRetry(hlsUrl + "?cachebust=" + Date.now());
-    if (!resp.ok) return null;
-    const manifest = await resp.text();
-    const lines = manifest.split('\n');
-    let lastDateTime = null;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].startsWith('#EXT-X-PROGRAM-DATE-TIME:')) {
-        lastDateTime = lines[i].substring(25);
-      }
-    }
-    return lastDateTime;
-  } catch (e) {
-    console.warn("[fetchLatestProgramDateTime] Fejl:", e);
-    return null;
-  }
+function isSafari() {
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 }
-
 function formatDateTimeWithDay(date) {
   if (!date) return "";
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
@@ -75,17 +59,6 @@ function formatDateTimeWithDay(date) {
   const sec = d.getSeconds().toString().padStart(2, "0");
   return `${dayName} ${day}.${month} ${year}, kl. ${hour}:${min}:${sec}`;
 }
-
-function formatLag(lagSeconds) {
-  if (lagSeconds < 1.5) return "";
-  if (lagSeconds < 60) return `${Math.round(lagSeconds)} sekunder`;
-  return `${Math.round(lagSeconds / 60)} minutter`;
-}
-
-function isSafari() {
-  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-}
-
 function getLagStatus(playerLag, lastSegmentLag) {
   let lag;
   if (isSafari()) {
@@ -95,16 +68,16 @@ function getLagStatus(playerLag, lastSegmentLag) {
   }
   if (lag == null) return { text: "", color: "#888" };
   if (lag < 2) return { text: "Live", color: "#43a047" };
-  if (lag < 10) return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#43a047" };
-  if (lag < 30) return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#f90" };
-  return { text: `Stream er ${formatLag(lag)} forsinket`, color: "#e53935" };
+  if (lag < 10) return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#43a047" };
+  if (lag < 30) return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#f90" };
+  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#e53935" };
 }
-
 function formatLagValue(val) {
   if (val == null) return "-";
   return Number(val).toFixed(3).replace(/(\.\d*?[1-9])0+$|\.0*$/, "$1");
 }
 
+// --- KOMPONENT ---
 export default function ClientDetailsLivestreamSection({
   clientId,
   refreshing: parentRefreshing = false,
@@ -114,81 +87,75 @@ export default function ClientDetailsLivestreamSection({
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
-  const playbackCheckIntervalRef = useRef(null);
-  const lastPlaybackPositionRef = useRef(0);
-  const stallDetectionCountRef = useRef(0);
-
   const [manifestReady, setManifestReady] = useState(false);
   const [error, setError] = useState("");
-  const [lastLive, setLastLive] = useState(null);
-
-  const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
-  const [lastSegmentLag, setLastSegmentLag] = useState(null);
-
-  const [playerLag, setPlayerLag] = useState(null);
-  const [manifestProgramDateTime, setManifestProgramDateTime] = useState(null);
-  const [manifestProgramLag, setManifestProgramLag] = useState(null);
-
-  const [lastFetched, setLastFetched] = useState(null);
   const [buffering, setBuffering] = useState(false);
   const [currentSegment, setCurrentSegment] = useState("-");
-
-  const [autoRefreshed, setAutoRefreshed] = useState(false);
-  const [manualRefreshed, setManualRefreshed] = useState(false);
-
-  const [localRefreshKey, setLocalRefreshKey] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
+  const [lastFetched, setLastFetched] = useState(null);
+  const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
+  const [lastSegmentLag, setLastSegmentLag] = useState(null);
+  const [playerLag, setPlayerLag] = useState(null);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
-
   const [showControls, setShowControls] = useState(false);
+  const [localRefreshKey, setLocalRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // --- HLS.js lifecycle: kun afhængig af clientId eller manual refresh! ---
+  const effectiveRefreshKey = useMemo(() => {
+    return (typeof streamKey !== "undefined" && streamKey !== null) ? streamKey : localRefreshKey;
+  }, [streamKey, localRefreshKey]);
+
+  // HLS.js lifecycle (kun afhængighed af clientId/effectiveRefreshKey)
   useEffect(() => {
     if (!clientId || !clientOnline) return;
+    setManifestReady(false);
+    setError("");
     const video = videoRef.current;
     if (!video) return;
-
-    let hls;
     const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
 
-    // Init for Safari
+    let hls;
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Safari: native HLS
       video.src = hlsUrl;
+      video.muted = true;
+      video.autoplay = true;
+      video.playsInline = true;
+      setManifestReady(true);
     } else if (Hls.isSupported()) {
+      // Chrome, Edge, Firefox (via Hls.js)
       hls = new Hls({
         liveSyncDurationCount: 1,
         maxBufferLength: 8,
         maxMaxBufferLength: 15,
         enableWorker: true,
-        startLevel: -1 // Autovalg
+        startLevel: -1
       });
       hlsRef.current = hls;
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
-
+      hls.on(Hls.Events.MANIFEST_PARSED, () => setManifestReady(true));
       hls.on(Hls.Events.ERROR, (event, data) => {
         console.warn("[HLS Error]", data);
         if (data.fatal) {
           setError("Fatal streamfejl. Prøv at genindlæse siden eller genstarte streamen.");
           hls.destroy();
           hlsRef.current = null;
+        } else {
+          setError(data.details || "Ukendt HLS-fejl");
         }
       });
-
       hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
         if (data && data.frag && typeof data.frag.sn === "number") {
           setCurrentSegment(data.frag.sn);
         }
       });
+      video.muted = true;
+      video.autoplay = true;
+      video.playsInline = true;
     }
-    video.muted = true;
-    video.autoplay = true;
-    video.playsInline = true;
-    setManifestReady(true);
-
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
@@ -202,125 +169,41 @@ export default function ClientDetailsLivestreamSection({
       }
       setManifestReady(false);
     };
-  }, [clientId /*, evt. manualRefreshKey hvis du vil tilbyde reload-knap */]);
+  }, [clientId, effectiveRefreshKey, clientOnline]);
 
-  // Resten af dine hooks og polling/lag/stat/debug er OK! Fortsæt nedenfor:
+  // Manual refresh
+  const handleRefreshClick = () => {
+    if (!clientOnline) return;
+    setRefreshing(true);
+    setLocalRefreshKey(k => k + 1);
+    setTimeout(() => setRefreshing(false), 800);
+  };
 
-  // Sync internal refreshing with parent prop
-  useEffect(() => {
-    setRefreshing(Boolean(parentRefreshing));
-  }, [parentRefreshing]);
+  const handleFullscreen = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.requestFullscreen) video.requestFullscreen();
+    else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+    else if (video.msRequestFullscreen) video.msRequestFullscreen();
+  };
 
+  // UI/UX handlers
   useEffect(() => {
     if (!showControls) return;
     const timeout = setTimeout(() => setShowControls(false), 2200);
     return () => clearTimeout(timeout);
   }, [showControls]);
-
   const handleMouseMove = () => setShowControls(true);
-
   function handleVideoWaiting() { setBuffering(true); }
   function handleVideoPlaying() { setBuffering(false); }
   function handleVideoCanPlay() { setBuffering(false); }
 
-  const effectiveRefreshKey = useMemo(() => {
-    return (typeof streamKey !== "undefined" && streamKey !== null) ? streamKey : localRefreshKey;
-  }, [streamKey, localRefreshKey]);
-
-  // --- Stall detection osv. ---
+  // LAG/BACKEND POLLING (DISSE ER UFORANDREDE, du kan finpudse)
   useEffect(() => {
-    if (!manifestReady || clientOnline === false) return;
-    playbackCheckIntervalRef.current = setInterval(() => {
-      const video = videoRef.current;
-      if (!video) return;
-      const currentPosition = video.currentTime;
-      if (currentPosition === lastPlaybackPositionRef.current && !buffering && video.duration && currentPosition > 0) {
-        stallDetectionCountRef.current++;
-        if (stallDetectionCountRef.current >= 8) {
-          setError("Video er stoppet. Genstartes ...");
-          stallDetectionCountRef.current = 0;
-          if (typeof onRestartStream === "function") {
-            onRestartStream();
-          } else {
-            setLocalRefreshKey(k => k + 1);
-          }
-        }
-      } else {
-        stallDetectionCountRef.current = 0;
-      }
-      lastPlaybackPositionRef.current = currentPosition;
-    }, 1000);
-
-    return () => {
-      if (playbackCheckIntervalRef.current) {
-        clearInterval(playbackCheckIntervalRef.current);
-      }
-    };
-  }, [manifestReady, clientOnline, onRestartStream, buffering]);
-
-  useEffect(() => {
-    const handleOnline = () => {
-      if (typeof onRestartStream === "function") {
-        onRestartStream();
-      } else {
-        setLocalRefreshKey(k => k + 1);
-      }
-    };
-    window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
-  }, [onRestartStream]);
-
-  // Health check - kald health endpoint hvis backend har det
-  const checkStreamHealth = async (clientIdParam) => {
-    try {
-      const resp = await fetchWithRetry(`/api/hls/${clientIdParam}/health?nocache=${Date.now()}`);
-      const data = await resp.json();
-      return data.online && data.has_segments;
-    } catch {
-      return false;
-    }
-  };
-
-  useEffect(() => {
-    if (!clientId) return;
+    if (!clientId || !manifestReady) return;
     if (clientOnline === false) return;
-    let ignore = false;
-
-    async function maybeResetSegments() {
-      try {
-        const resp = await fetchWithRetry(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
-        let doReset = false;
-        if (!resp.ok) {
-          doReset = true;
-        } else {
-          const data = await resp.json();
-          if (!data.timestamp || data.error) {
-            doReset = true;
-          } else {
-            const segTime = new Date(data.timestamp).getTime();
-            if (Date.now() - segTime > 5 * 60 * 1000) {
-              doReset = true;
-            }
-          }
-        }
-        if (!ignore && doReset) {
-          await fetchWithRetry(`/api/hls/${clientId}/reset`, { method: "POST" });
-        }
-      } catch (e) {
-        console.warn("[maybeResetSegments] Fejl:", e);
-      }
-    }
-    maybeResetSegments();
-    return () => { ignore = true; };
-  }, [clientId, effectiveRefreshKey, clientOnline]);
-
-  // Poll last-segment-info to compute backend lag
-  useEffect(() => {
-    if (!clientId) return;
-    if (clientOnline === false) return;
-    if (!isSafari() && !manifestReady) return;
     let stop = false;
-    async function pollSegmentLag() {
+    async function pollLastSegment() {
       while (!stop) {
         try {
           const resp = await fetchWithRetry(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
@@ -343,7 +226,7 @@ export default function ClientDetailsLivestreamSection({
         await new Promise(res => setTimeout(res, 2000));
       }
     }
-    pollSegmentLag();
+    pollLastSegment();
     return () => { stop = true; };
   }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
@@ -365,95 +248,10 @@ export default function ClientDetailsLivestreamSection({
     return () => clearInterval(interval);
   }, [manifestReady, effectiveRefreshKey, clientOnline]);
 
-  useEffect(() => {
-    if (!clientId || !manifestReady) return;
-    if (clientOnline === false) return;
-    let stop = false;
-    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
-    async function pollManifestProgramDateTime() {
-      while (!stop) {
-        const dtStr = await fetchLatestProgramDateTime(hlsUrl);
-        if (dtStr) {
-          setManifestProgramDateTime(dtStr);
-          const segTime = new Date(dtStr).getTime();
-          const now = Date.now();
-          setManifestProgramLag((now - segTime) / 1000);
-        } else {
-          setManifestProgramDateTime(null);
-          setManifestProgramLag(null);
-        }
-        await new Promise(res => setTimeout(res, 2000));
-      }
-    }
-    pollManifestProgramDateTime();
-    return () => { stop = true; };
-  }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
-
-  useEffect(() => {
-    let interval;
-    if (manifestReady) {
-      setLastLive(new Date());
-      interval = setInterval(() => {
-        setLastLive(new Date());
-      }, 5000);
-    }
-    return () => clearInterval(interval);
-  }, [manifestReady, effectiveRefreshKey]);
-
-  useEffect(() => {
-    if (autoRefreshed) {
-      const timeout = setTimeout(() => setAutoRefreshed(false), 5000);
-      return () => clearTimeout(timeout);
-    }
-  }, [autoRefreshed]);
-
-  useEffect(() => {
-    if (manualRefreshed) {
-      const timeout = setTimeout(() => setManualRefreshed(false), 5000);
-      return () => clearTimeout(timeout);
-    }
-  }, [manualRefreshed]);
-
-  const handleRefreshClick = () => {
-    if (clientOnline === false) return;
-    setManualRefreshed(true);
-    if (typeof onRestartStream === "function") {
-      onRestartStream();
-    } else {
-      setRefreshing(true);
-      setLocalRefreshKey(k => k + 1);
-      setTimeout(() => setRefreshing(false), 800);
-    }
-  };
-
-  const handleFullscreen = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (video.requestFullscreen) {
-      video.requestFullscreen();
-    } else if (video.webkitRequestFullscreen) {
-      video.webkitRequestFullscreen();
-    } else if (video.msRequestFullscreen) {
-      video.msRequestFullscreen();
-    }
-  };
-
-  let lagToShow = playerLag;
-  let lagType = "player";
-  if (lagToShow == null && manifestProgramLag != null) {
-    lagToShow = manifestProgramLag;
-    lagType = "manifest";
-  }
-  if (lagToShow == null && lastSegmentLag != null) {
-    lagToShow = lastSegmentLag;
-    lagType = "backend";
-  }
-
+  let lagToShow = playerLag ?? lastSegmentLag;
+  let lagType = playerLag != null ? "player" : "backend";
   let sanitizedLag = lagToShow;
-  if (sanitizedLag != null && sanitizedLag < 0) {
-    sanitizedLag = 0;
-  }
-
+  if (sanitizedLag != null && sanitizedLag < 0) sanitizedLag = 0;
   const lagStatus = getLagStatus(sanitizedLag, lastSegmentLag);
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
 
@@ -493,16 +291,6 @@ export default function ClientDetailsLivestreamSection({
               {clientOnline === false ? "Klienten er offline — stream ikke tilgængelig" : (lagStatus.text || "Ingen status")}
             </Typography>
             <Box>
-              {manualRefreshed && clientOnline !== false && (
-                <Alert severity="info" sx={{ mb: 1, fontSize: isMobile ? 12 : undefined }}>
-                  Stream blev genstartet manuelt
-                </Alert>
-              )}
-              {autoRefreshed && clientOnline !== false && (
-                <Alert severity="info" sx={{ mb: 1, fontSize: isMobile ? 12 : undefined }}>
-                  Stream blev automatisk genstartet
-                </Alert>
-              )}
               {error && clientOnline !== false && (
                 <Alert severity="error" sx={{ mb: 1, fontSize: isMobile ? 12 : undefined }}>
                   {error}
@@ -638,14 +426,9 @@ export default function ClientDetailsLivestreamSection({
               <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
                 Klient ID: {clientId}
               </Typography>
-              {(manifestProgramDateTime || lastSegmentTimestamp) && clientOnline !== false && (
+              {lastSegmentTimestamp && clientOnline !== false && (
                 <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
-                  Sidste manifest hentet:{" "}
-                  {manifestProgramDateTime
-                    ? formatDateTimeWithDay(new Date(manifestProgramDateTime))
-                    : lastSegmentTimestamp
-                      ? formatDateTimeWithDay(new Date(lastSegmentTimestamp))
-                      : ""}
+                  Sidste segment: {formatDateTimeWithDay(new Date(lastSegmentTimestamp))}
                 </Typography>
               )}
               {lastFetched && clientOnline !== false && (
@@ -689,10 +472,6 @@ export default function ClientDetailsLivestreamSection({
                 >
                   <Tooltip title={`Råværdi: ${playerLag ?? "-"}`}>
                     <span>playerLag=<b>{formatLagValue(playerLag)}</b></span>
-                  </Tooltip>
-                  ,{" "}
-                  <Tooltip title={`Råværdi: ${manifestProgramLag ?? "-"}`}>
-                    <span>manifestProgramLag=<b>{formatLagValue(manifestProgramLag)}</b></span>
                   </Tooltip>
                   ,{" "}
                   <Tooltip title={`Råværdi: ${lastSegmentLag ?? "-"}`}>
