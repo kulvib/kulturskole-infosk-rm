@@ -3,10 +3,11 @@ print("### main.py starter ###")
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from sqlmodel import Session, select
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+from starlette.staticfiles import StaticFiles
 
 print("### main.py: Pre-router-import ###")
 
@@ -70,8 +71,6 @@ app.add_middleware(
 )
 
 # --- EKSTRA CORS + NO-CACHE FOR HLS STATIC FILES ---
-from starlette.responses import Response
-
 class HLSCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
@@ -84,20 +83,30 @@ class HLSCORSMiddleware(BaseHTTPMiddleware):
             
             # Cache-Control headers
             if request.url.path.endswith(".m3u8"):
-                # Manifest skal ALDRIG caches
                 response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
                 response.headers["Pragma"] = "no-cache"
                 response.headers["Expires"] = "0"
             else:
-                # Segments kan caches kort (30 sekunder)
                 response.headers["Cache-Control"] = "public, max-age=30, must-revalidate"
-        
         return response
 
 app.add_middleware(HLSCORSMiddleware)
 
-# --- STATIC MOUNT TIL HLS ---
-app.mount("/hls", StaticFiles(directory=HLS_DIR), name="hls")
+# --- STATIC MOUNT TIL HLS MED KORREKT CONTENT-TYPE ---
+from starlette.staticfiles import StaticFiles
+
+class CustomStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if path.endswith('.m3u8'):
+            response.headers["Content-Type"] = "application/vnd.apple.mpegurl"
+        elif path.endswith('.ts'):
+            response.headers["Content-Type"] = "video/mp2t"
+        elif path.endswith('.mp4'):
+            response.headers["Content-Type"] = "video/mp4"
+        return response
+
+app.mount("/hls", CustomStaticFiles(directory=HLS_DIR), name="hls")
 print(f"### main.py: Static mount for HLS på {HLS_DIR} ###")
 
 # Routers
