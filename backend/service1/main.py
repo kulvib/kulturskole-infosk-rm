@@ -1,6 +1,7 @@
 print("### main.py starter ###")
 
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -38,19 +39,12 @@ from models import User
 print("### main.py: Efter alle imports ###")
 
 ADMIN_PASSWORD = _ADMIN_PASSWORD
-ALLOWED_ORIGINS = os.getenv(
-    "ALLOWED_ORIGINS",
-    "https://infoskaerm-frontend.netlify.app"
-).split(",")
-
-app = FastAPI(
-    title="Kulturskole Infoskaerm Backend",
-    version="1.0.0",
-    # Deaktiver den offentlige /docs og /redoc i produktion
-    docs_url=None if os.getenv("ENVIRONMENT") == "production" else "/docs",
-    redoc_url=None if os.getenv("ENVIRONMENT") == "production" else "/redoc",
-    openapi_url=None if os.getenv("ENVIRONMENT") == "production" else "/openapi.json",
-)
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv(
+        "ALLOWED_ORIGINS",
+        "https://infoskaerm-frontend.netlify.app"
+    ).split(",")
+]
 
 
 def ensure_admin_user():
@@ -62,7 +56,7 @@ def ensure_admin_user():
                 hashed_password=get_password_hash(ADMIN_PASSWORD),
                 role="admin",
                 is_active=True,
-                email=os.getenv("ADMIN_EMAIL", "admin@example.com"),  # Fra .env
+                email=os.getenv("ADMIN_EMAIL", "admin@example.com"),
             )
             session.add(admin)
             session.commit()
@@ -71,11 +65,22 @@ def ensure_admin_user():
             print("Admin-bruger eksisterer allerede")
 
 
-@app.on_event("startup")
-def on_startup():
+# Moderne lifespan-håndtering (erstatter deprecated @app.on_event)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     create_db_and_tables()
     ensure_admin_user()
+    yield
 
+
+app = FastAPI(
+    title="Kulturskole Infoskaerm Backend",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url=None if os.getenv("ENVIRONMENT") == "production" else "/docs",
+    redoc_url=None if os.getenv("ENVIRONMENT") == "production" else "/redoc",
+    openapi_url=None if os.getenv("ENVIRONMENT") == "production" else "/openapi.json",
+)
 
 # CORS
 app.add_middleware(
@@ -87,16 +92,14 @@ app.add_middleware(
 )
 
 
-# HLS middleware – begrænset CORS (ikke wildcard for alle routes)
+# HLS middleware
 class HLSCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         if request.url.path.startswith("/hls/"):
             origin = request.headers.get("origin", "")
-            # Tillad kun kendte origins for HLS
-            allowed = [o.strip() for o in ALLOWED_ORIGINS]
-            if origin in allowed or not origin:
-                response.headers["Access-Control-Allow-Origin"] = origin or "*"
+            if origin in ALLOWED_ORIGINS or not origin:
+                response.headers["Access-Control-Allow-Origin"] = origin or ALLOWED_ORIGINS[0]
             response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS, HEAD"
             response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
             if request.url.path.endswith(".m3u8"):
