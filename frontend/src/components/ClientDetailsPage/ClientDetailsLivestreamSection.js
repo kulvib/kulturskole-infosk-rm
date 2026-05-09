@@ -18,6 +18,8 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import { useTheme, alpha } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
 
+const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
+
 // Helper: Retry utility
 async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
   let lastError;
@@ -45,6 +47,7 @@ async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
 function isSafari() {
   return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 }
+
 function formatDateTimeWithDay(date) {
   if (!date) return "";
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
@@ -58,6 +61,7 @@ function formatDateTimeWithDay(date) {
   const sec = d.getSeconds().toString().padStart(2, "0");
   return `${dayName} ${day}.${month} ${year}, kl. ${hour}:${min}:${sec}`;
 }
+
 function getLagStatus(playerLag, lastSegmentLag) {
   let lag;
   if (isSafari()) {
@@ -71,6 +75,7 @@ function getLagStatus(playerLag, lastSegmentLag) {
   if (lag < 30) return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#f90" };
   return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#e53935" };
 }
+
 function formatLagValue(val) {
   if (val == null) return "-";
   return Number(val).toFixed(3).replace(/(\.\d*?[1-9])0+$|\.0*$/, "$1");
@@ -113,11 +118,13 @@ export default function ClientDetailsLivestreamSection({
     setError("");
     const video = videoRef.current;
     if (!video) return;
-    const hlsUrl = `https://kulturskole-infosk-rm.onrender.com/hls/${clientId}/index.m3u8`;
+    const hlsUrl = `${API_BASE}/hls/${clientId}/index.m3u8`;
 
     let hls;
     let fatalErrorTimeout = null;
+
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Safari / native HLS
       video.src = hlsUrl;
       video.muted = true;
       video.autoplay = true;
@@ -125,11 +132,14 @@ export default function ClientDetailsLivestreamSection({
       setManifestReady(true);
     } else if (Hls.isSupported()) {
       hls = new Hls({
-        liveSyncDurationCount: 1,
-        maxBufferLength: 8,
-        maxMaxBufferLength: 15,
+        liveSyncDurationCount: 3,         // 3 × 4s = 12s bagud — stabilt
+        liveMaxLatencyDurationCount: 6,   // max 24s bagud før den springer frem
+        maxBufferLength: 20,              // var 8 — for lavt
+        maxMaxBufferLength: 40,           // var 15 — for lavt
+        liveBackBufferLength: 8,          // behold 8s bag afspilningspunkt
         enableWorker: true,
-        startLevel: -1
+        startLevel: -1,
+        lowLatencyMode: false,            // slå fra — segmentbaseret HLS er ikke LL-HLS
       });
       hlsRef.current = hls;
       hls.loadSource(hlsUrl);
@@ -141,7 +151,6 @@ export default function ClientDetailsLivestreamSection({
           setError("Fatal streamfejl. Prøver automatisk at genstarte om lidt …");
           hls.destroy();
           hlsRef.current = null;
-          // Nulstil src for video og tvungent re-mount
           if (videoRef.current) {
             try {
               videoRef.current.pause();
@@ -150,7 +159,6 @@ export default function ClientDetailsLivestreamSection({
             } catch {}
           }
           setManifestReady(false);
-          // Automatisk reload efter 1 sekund
           fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 1000);
         } else {
           setError(data.details || "Ukendt HLS-fejl");
@@ -165,6 +173,7 @@ export default function ClientDetailsLivestreamSection({
       video.autoplay = true;
       video.playsInline = true;
     }
+
     return () => {
       if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
       if (hlsRef.current) {
@@ -206,6 +215,7 @@ export default function ClientDetailsLivestreamSection({
     const timeout = setTimeout(() => setShowControls(false), 2200);
     return () => clearTimeout(timeout);
   }, [showControls]);
+
   const handleMouseMove = () => setShowControls(true);
   function handleVideoWaiting() { setBuffering(true); }
   function handleVideoPlaying() { setBuffering(false); }
@@ -219,14 +229,16 @@ export default function ClientDetailsLivestreamSection({
     async function pollLastSegment() {
       while (!stop) {
         try {
-          const resp = await fetchWithRetry(`/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`);
+          const resp = await fetchWithRetry(
+            `${API_BASE}/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`
+          );
           if (resp.ok) {
             const data = await resp.json();
+            setLastFetched(new Date());
             if (data.timestamp) {
               setLastSegmentTimestamp(data.timestamp);
               const segTime = new Date(data.timestamp).getTime();
-              const now = Date.now();
-              setLastSegmentLag((now - segTime) / 1000);
+              setLastSegmentLag((Date.now() - segTime) / 1000);
             } else {
               setLastSegmentTimestamp(null);
               setLastSegmentLag(null);
@@ -313,6 +325,7 @@ export default function ClientDetailsLivestreamSection({
             </Box>
           </Stack>
         </Grid>
+
         <Grid item xs={12} md={5} minWidth={0}>
           <Box
             sx={{
@@ -408,6 +421,7 @@ export default function ClientDetailsLivestreamSection({
                 </Box>
               )}
             </Box>
+
             {!manifestReady || clientOnline === false ? (
               <Box sx={{
                 display: "flex",
@@ -425,13 +439,16 @@ export default function ClientDetailsLivestreamSection({
                 ) : (
                   <>
                     <CircularProgress size={isMobile ? 24 : 32} />
-                    <Typography variant="body2" sx={{ ml: 2, fontSize: isMobile ? 13 : undefined }}>Forbinder til stream …</Typography>
+                    <Typography variant="body2" sx={{ ml: 2, fontSize: isMobile ? 13 : undefined }}>
+                      Forbinder til stream …
+                    </Typography>
                   </>
                 )}
               </Box>
             ) : null}
           </Box>
         </Grid>
+
         {/* Kolonne 3 - kun for admin */}
         {user?.role === "admin" && (
           <Grid item xs={12} md={4} minWidth={0}>
@@ -457,7 +474,7 @@ export default function ClientDetailsLivestreamSection({
                   p: 1,
                   mt: 1,
                   mb: 1,
-                  display: 'inline-block'
+                  display: "inline-block"
                 }}
               >
                 <Typography
@@ -527,6 +544,7 @@ export default function ClientDetailsLivestreamSection({
           </Grid>
         )}
       </Grid>
+
       <style>
         {`
           @keyframes pulsate {
