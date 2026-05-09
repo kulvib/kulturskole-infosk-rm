@@ -1,11 +1,14 @@
 import os
 import re
-from fastapi import APIRouter, HTTPException, Depends, status
+import time
+import threading
+from collections import defaultdict
+from fastapi import APIRouter, HTTPException, Depends, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from sqlmodel import Session, select
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from dotenv import load_dotenv
 
@@ -24,13 +27,46 @@ if not SECRET_KEY or len(SECRET_KEY) < 32:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-MIN_PASSWORD_LENGTH = 8
+# Kodeordskrav — samme grænse som main.py
+MIN_PASSWORD_LENGTH = 12
 PASSWORD_REGEX = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$')
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
+
+# ---------------------------------------------------------------------------
+# Simpel in-memory rate limiter til login-endpoint
+# Maks 10 forsøg per IP per 60 sekunder
+# ---------------------------------------------------------------------------
+_rate_lock = threading.Lock()
+_login_attempts: dict[str, list[float]] = defaultdict(list)
+RATE_LIMIT_MAX = 10
+RATE_LIMIT_WINDOW = 60  # sekunder
+
+
+def _check_rate_limit(ip: str):
+    now = time.time()
+    with _rate_lock:
+        attempts = _login_attempts[ip]
+        # Fjern gamle forsøg uden for vinduet
+        _login_attempts[ip] = [t for t in attempts if now - t < RATE_LIMIT_WINDOW]
+        if len(_login_attempts[ip]) >= RATE_LIMIT_MAX:
+            raise HTTPException(
+                status_code=429,
+                detail=f"For mange loginforsøg. Prøv igen om {RATE_LIMIT_WINDOW} sekunder."
+            )
+        _login_attempts[ip].append(now)
+
+
+def _clear_rate_limit(ip: str):
+    """Nulstil tæller ved succesfuldt login."""
+    with _rate_lock:
+        _login_attempts.pop(ip, None)
+
+
+# ---------------------------------------------------------------------------
 
 def validate_password_strength(password: str):
     """Kaster HTTPException hvis kodeordet ikke opfylder kravene."""
@@ -63,7 +99,7 @@ def authenticate_user(username: str, password: str, session: Session):
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (
+    expire = datetime.now(timezone.utc) + (
         expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
@@ -72,9 +108,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 @router.post("/token")
 def login_for_access_token(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_session)
 ):
+    # Rate limiting baseret på klientens IP
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip)
+
     user = authenticate_user(form_data.username, form_data.password, session)
     if not user:
         raise HTTPException(
@@ -87,6 +128,9 @@ def login_for_access_token(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Brugerkontoen er deaktiveret"
         )
+
+    _clear_rate_limit(client_ip)
+
     access_token = create_access_token(data={
         "sub": user.username,
         "role": getattr(user, "role", "admin")
