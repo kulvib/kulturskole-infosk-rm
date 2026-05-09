@@ -1,4 +1,5 @@
 import os
+import re
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
@@ -12,19 +13,46 @@ from db import get_session
 from models import User
 
 load_dotenv()
-SECRET_KEY = os.getenv("SECRET_KEY", "fallback-key")
+
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+if not SECRET_KEY or len(SECRET_KEY) < 32:
+    raise RuntimeError(
+        "SECRET_KEY mangler eller er for kort (minimum 32 tegn). "
+        "Sæt SECRET_KEY i din .env-fil."
+    )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+MIN_PASSWORD_LENGTH = 8
+PASSWORD_REGEX = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$')
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
-def get_password_hash(password):
+
+def validate_password_strength(password: str):
+    """Kaster HTTPException hvis kodeordet ikke opfylder kravene."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Kodeord skal være mindst {MIN_PASSWORD_LENGTH} tegn langt."
+        )
+    if not PASSWORD_REGEX.match(password):
+        raise HTTPException(
+            status_code=400,
+            detail="Kodeord skal indeholde mindst ét stort bogstav, ét lille bogstav og ét tal."
+        )
+
+
+def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
-def verify_password(plain_password, hashed_password):
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def authenticate_user(username: str, password: str, session: Session):
     user = session.exec(select(User).where(User.username == username)).first()
@@ -32,12 +60,15 @@ def authenticate_user(username: str, password: str, session: Session):
         return None
     return user
 
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.utcnow() + (
+        expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 
 @router.post("/token")
 def login_for_access_token(
@@ -48,8 +79,13 @@ def login_for_access_token(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Forkert brugernavn eller kodeord",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Brugerkontoen er deaktiveret"
         )
     access_token = create_access_token(data={
         "sub": user.username,
@@ -61,7 +97,7 @@ def login_for_access_token(
         "full_name": user.full_name,
         "remarks": user.remarks,
         "school_id": user.school_id,
-        "email": user.email          # <-- TILFØJET HER!
+        "email": user.email,
     }
     return {
         "access_token": access_token,
@@ -69,13 +105,14 @@ def login_for_access_token(
         "user": user_data
     }
 
+
 def get_current_admin_user(
     token: str = Depends(oauth2_scheme),
     session: Session = Depends(get_session)
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail="Kunne ikke validere legitimationsoplysninger",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
@@ -86,19 +123,22 @@ def get_current_admin_user(
             raise credentials_exception
     except JWTError:
         raise credentials_exception
+
     user = session.exec(select(User).where(User.username == username)).first()
-    if not user or getattr(user, "role", "admin") != "admin":
-        raise HTTPException(status_code=403, detail="Admins only")
+    if not user or not user.is_active:
+        raise credentials_exception
+    if getattr(user, "role", None) != "admin":
+        raise HTTPException(status_code=403, detail="Kun administratorer har adgang")
     return user
 
-# NYT: Bruger-auth (tillader ALLE aktive brugere)
+
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     session: Session = Depends(get_session)
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail="Kunne ikke validere legitimationsoplysninger",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
@@ -108,7 +148,8 @@ def get_current_user(
             raise credentials_exception
     except JWTError:
         raise credentials_exception
+
     user = session.exec(select(User).where(User.username == username)).first()
     if not user or not user.is_active:
-        raise HTTPException(status_code=403, detail="Inactive or missing user")
+        raise HTTPException(status_code=403, detail="Inaktiv eller ukendt bruger")
     return user
