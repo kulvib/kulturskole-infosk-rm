@@ -9,19 +9,12 @@ router = APIRouter()
 
 
 @router.get("/schools/", response_model=list[School])
-def get_schools(
-    session=Depends(get_session),
-    user=Depends(get_current_user)          # Alle indloggede kan se skoler
-):
+def get_schools(session=Depends(get_session), user=Depends(get_current_user)):
     return session.exec(select(School)).all()
 
 
 @router.post("/schools/", response_model=School)
-def create_school(
-    school: School,
-    session=Depends(get_session),
-    admin=Depends(get_current_admin_user)   # Kun admin
-):
+def create_school(school: School, session=Depends(get_session), admin=Depends(get_current_admin_user)):
     existing = session.exec(select(School).where(School.name == school.name)).first()
     if existing:
         raise HTTPException(status_code=400, detail="Skolen findes allerede")
@@ -32,20 +25,12 @@ def create_school(
 
 
 @router.get("/schools/{school_id}/clients/", response_model=list[Client])
-def get_clients_for_school(
-    school_id: int,
-    session=Depends(get_session),
-    user=Depends(get_current_user)          # Alle indloggede
-):
+def get_clients_for_school(school_id: int, session=Depends(get_session), user=Depends(get_current_user)):
     return session.exec(select(Client).where(Client.school_id == school_id)).all()
 
 
 @router.delete("/schools/{school_id}/", status_code=204)
-def delete_school(
-    school_id: int,
-    session=Depends(get_session),
-    admin=Depends(get_current_admin_user)   # Kun admin
-):
+def delete_school(school_id: int, session=Depends(get_session), admin=Depends(get_current_admin_user)):
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
@@ -69,7 +54,7 @@ def update_school_times(
     weekend_on: str = Body(None),
     weekend_off: str = Body(None),
     session=Depends(get_session),
-    admin=Depends(get_current_admin_user)   # Kun admin
+    admin=Depends(get_current_admin_user)
 ):
     school = session.get(School, school_id)
     if not school:
@@ -89,11 +74,7 @@ def update_school_times(
 
 
 @router.get("/schools/{school_id}/times")
-def get_school_times(
-    school_id: int,
-    session=Depends(get_session),
-    user=Depends(get_current_user)          # Alle indloggede
-):
+def get_school_times(school_id: int, session=Depends(get_session), user=Depends(get_current_user)):
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
@@ -112,7 +93,7 @@ def update_school_name(
     school_id: int,
     update: SchoolNameUpdate,
     session=Depends(get_session),
-    admin=Depends(get_current_admin_user)   # Kun admin
+    admin=Depends(get_current_admin_user)
 ):
     school = session.get(School, school_id)
     if not school:
