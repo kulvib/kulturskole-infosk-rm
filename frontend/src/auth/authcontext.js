@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
   const warningTimer = useRef();
   const navigate = useNavigate();
 
-  // Opdater localStorage når token eller user ændres
+  // Synkroniser localStorage når token eller user ændres
   useEffect(() => {
     if (token) {
       localStorage.setItem("token", token);
@@ -51,7 +51,7 @@ export function AuthProvider({ children }) {
     navigate("/login", { replace: true });
   }, [navigate]);
 
-  // Inaktivitets-timer
+  // Inaktivitets-timer: advarsel efter 4 min, logout efter yderligere 1 min
   const resetInactivityTimer = useCallback(() => {
     setShowWarning(false);
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
@@ -61,23 +61,22 @@ export function AuthProvider({ children }) {
       setShowWarning(true);
       inactivityTimer.current = setTimeout(() => {
         logoutUser();
-      }, 60000); // 1 min efter advarsel
-    }, 240000); // 4 min
+      }, 60_000); // 1 min efter advarsel
+    }, 240_000); // 4 min inaktivitet
   }, [logoutUser]);
 
   useEffect(() => {
-    if (token) {
-      const events = ["mousemove", "keydown", "mousedown", "touchstart"];
-      events.forEach(evt => window.addEventListener(evt, resetInactivityTimer));
-      resetInactivityTimer();
+    if (!token) return;
 
-      return () => {
-        events.forEach(evt => window.removeEventListener(evt, resetInactivityTimer));
-        if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-        if (warningTimer.current) clearTimeout(warningTimer.current);
-      };
-    }
-    // eslint-disable-next-line
+    const events = ["mousemove", "keydown", "mousedown", "touchstart"];
+    events.forEach(evt => window.addEventListener(evt, resetInactivityTimer));
+    resetInactivityTimer();
+
+    return () => {
+      events.forEach(evt => window.removeEventListener(evt, resetInactivityTimer));
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+      if (warningTimer.current) clearTimeout(warningTimer.current);
+    };
   }, [token, resetInactivityTimer]);
 
   const handleContinueSession = useCallback(() => {
@@ -93,7 +92,7 @@ export function AuthProvider({ children }) {
           <Typography>
             Du har været inaktiv i 4 minutter.<br />
             Du bliver automatisk logget ud om 1 minut.<br />
-            Klik "Fortsæt session" for at starte en ny periode.
+            Klik "Fortsæt session" for at forblive logget ind.
           </Typography>
         </DialogContent>
         <DialogActions>
