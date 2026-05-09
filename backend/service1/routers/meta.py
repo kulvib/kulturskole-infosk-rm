@@ -7,10 +7,10 @@ router = APIRouter()
 @router.get("/meta/endpoints", tags=["Meta"])
 async def get_openapi_spec(
     request: Request,
-    admin=Depends(get_current_admin_user)   # Kun admin kan se API-strukturen
+    admin=Depends(get_current_admin_user)
 ):
     """
-    Returnerer hele OpenAPI-specifikationen for API'et.
+    Returnerer hele OpenAPI-specifikationen.
     Kun tilgængelig for administratorer.
     """
     return request.app.openapi()
