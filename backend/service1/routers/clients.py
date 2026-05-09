@@ -1,17 +1,30 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import select, delete
 from typing import List
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from db import get_session
 from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction, School
-from auth import get_current_user
+from auth import get_current_user, get_current_admin_user
+from models import utcnow
 import os
 import glob
 import json
 
 router = APIRouter()
 
-# Public endpoint: Liste af godkendte klienter
+# Læs HLS-sti fra miljøvariabel med fornuftig fallback
+HLS_BASE_DIR = os.getenv("HLS_BASE_DIR", "/opt/render/project/src/backend/service1/hls")
+CHROME_STATUS_PATH = os.getenv("CHROME_STATUS_PATH", "/home/kulturskolenviborg/api/chrome_status.json")
+
+
+def is_online(client: Client) -> bool:
+    if client.last_seen is None:
+        return False
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    return (now - client.last_seen) < timedelta(minutes=2)
+
+
+# Public endpoint — kun navn og id på godkendte klienter (ingen sensitiv data)
 @router.get("/clients/public")
 def get_clients_public(session=Depends(get_session)):
     clients = session.exec(select(Client).where(Client.status == "approved")).all()
@@ -19,7 +32,7 @@ def get_clients_public(session=Depends(get_session)):
         "clients": [{"id": c.id, "name": c.name} for c in clients]
     }
 
-# Bruger-endpoint - kun godkendte klienter fra egen skole (rolle: bruger eller admin)
+
 @router.get("/clients/me", response_model=List[Client])
 def get_clients_for_my_school(session=Depends(get_session), user=Depends(get_current_user)):
     if not user.school_id:
@@ -27,68 +40,48 @@ def get_clients_for_my_school(session=Depends(get_session), user=Depends(get_cur
     clients = session.exec(
         select(Client).where(Client.status == "approved", Client.school_id == user.school_id)
     ).all()
-    now = datetime.utcnow()
     for client in clients:
-        client.isOnline = (
-            client.last_seen is not None and (now - client.last_seen) < timedelta(minutes=2)
-        )
+        client.isOnline = is_online(client)
     clients.sort(key=lambda c: (c.sort_order is None, c.sort_order if c.sort_order is not None else 9999, c.id))
     return clients
 
-# Liste af alle klienter (nu for både bruger og admin)
+
 @router.get("/clients/", response_model=List[Client])
 def get_clients(session=Depends(get_session), user=Depends(get_current_user)):
     clients = session.exec(select(Client)).all()
-    now = datetime.utcnow()
     for client in clients:
-        client.isOnline = (
-            client.last_seen is not None and (now - client.last_seen) < timedelta(minutes=2)
-        )
+        client.isOnline = is_online(client)
     clients.sort(key=lambda c: (c.sort_order is None, c.sort_order if c.sort_order is not None else 9999, c.id))
     return clients
 
-# Hent én klient (admin: alle, bruger: kun approved + egen skole)
+
 @router.get("/clients/{id}/", response_model=Client)
 def get_client(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    now = datetime.utcnow()
-    client.isOnline = (
-        client.last_seen is not None and (now - client.last_seen) < timedelta(minutes=2)
-    )
-
-    # Admin må altid se
+    client.isOnline = is_online(client)
     if getattr(user, "role", None) == "admin":
         return client
-
-    # Bruger må kun se hvis godkendt og samme skole
     if getattr(user, "role", None) == "bruger":
         if client.status != "approved" or client.school_id != user.school_id:
             raise HTTPException(status_code=403, detail="Du har ikke adgang til denne klient")
         return client
-
-    # Ellers ingen adgang
     raise HTTPException(status_code=403, detail="Du har ikke adgang til denne klient")
 
-# Chrome-status (til frontend visning) - NY: Læs altid direkte fra chrome_status.json hvis muligt
+
 @router.get("/clients/{id}/chrome-status")
-def get_chrome_status(
-    id: int,
-    session=Depends(get_session),
-    user=Depends(get_current_user)
-):
+def get_chrome_status(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    status_path = "/home/kulturskolenviborg/api/chrome_status.json"
     last_step = None
     try:
-        with open(status_path, "r", encoding="utf-8") as f:
+        with open(CHROME_STATUS_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
             if "steps" in data and len(data["steps"]) > 0:
                 last_step = data["steps"][-1]
-    except Exception as e:
+    except Exception:
         last_step = None
     if last_step:
         return {
@@ -98,7 +91,6 @@ def get_chrome_status(
             "chrome_color": last_step.get("color", None),
             "step": last_step
         }
-    # Fallback til database-felt hvis filen ikke kan læses
     return {
         "client_id": client.id,
         "chrome_status": getattr(client, "chrome_status", "unknown"),
@@ -106,7 +98,7 @@ def get_chrome_status(
         "chrome_color": getattr(client, "chrome_color", None)
     }
 
-# Opdater chrome-status
+
 @router.put("/clients/{id}/chrome-status")
 def update_chrome_status(
     id: int,
@@ -117,18 +109,16 @@ def update_chrome_status(
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    status = data.get("chrome_status")
-    color = data.get("chrome_color")
-    client.chrome_status = status
-    client.chrome_last_updated = datetime.utcnow()
-    if color is not None:
-        client.chrome_color = color
+    client.chrome_status = data.get("chrome_status")
+    client.chrome_last_updated = utcnow()
+    if data.get("chrome_color") is not None:
+        client.chrome_color = data.get("chrome_color")
     session.add(client)
     session.commit()
     session.refresh(client)
     return {"ok": True}
 
-# Klienten sender sin aktuelle state
+
 @router.put("/clients/{id}/state")
 def update_client_state(
     id: int,
@@ -148,19 +138,15 @@ def update_client_state(
     session.refresh(client)
     return {"ok": True, "state": client.state}
 
-# Hent klientens aktuelle state
+
 @router.get("/clients/{id}/state")
-def get_client_state(
-    id: int,
-    session=Depends(get_session),
-    user=Depends(get_current_user)
-):
+def get_client_state(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     return {"state": client.state}
 
-# Backend/frontend sender kommando (fx fra knap)
+
 @router.post("/clients/{id}/chrome-command")
 def set_chrome_command(
     id: int,
@@ -168,58 +154,43 @@ def set_chrome_command(
     session=Depends(get_session),
     user=Depends(get_current_user)
 ):
-    """
-    Body schema expected example:
-      {"action":"wakeup", "source":"actionbutton"}
-    source is optional. Allowed values (recommended): "actionbutton", "calendar", "manual".
-    If source is omitted, existing behavior (backend) is preserved.
-    """
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     action = data.get("action")
-    source = data.get("source")  # optional origin/source specifier
+    source = data.get("source")
 
-    # Prevent duplicate livestream requests (existing behavior)
-    # Note: pending_chrome_action on model is an Enum; compare .value for string comparisons if needed
     if action == "livestream_start" and getattr(client.pending_chrome_action, "value", client.pending_chrome_action) == "livestream_start":
         raise HTTPException(status_code=400, detail="Livestream already requested")
 
     try:
         chrome_action = ChromeAction(action)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid action '{action}'")
+        raise HTTPException(status_code=400, detail=f"Ugyldig action '{action}'")
 
-    # Set the pending action
     client.pending_chrome_action = chrome_action
 
-    # Validate and set source if provided
     if source is not None:
         if not isinstance(source, str):
-            raise HTTPException(status_code=400, detail="Invalid source value")
+            raise HTTPException(status_code=400, detail="Ugyldig source-værdi")
         src_lower = source.lower()
         allowed = {"actionbutton", "calendar", "manual", "backend"}
         if src_lower not in allowed:
-            raise HTTPException(status_code=400, detail=f"Invalid source '{source}'. Allowed: {sorted(list(allowed))}")
-        # Persist the source string on the client model (ensure column exists)
-        try:
-            client.pending_chrome_action_source = src_lower
-        except Exception:
-            # If model doesn't have the attribute, raise a clear error so you can add DB column
-            raise HTTPException(status_code=500, detail="Server not configured to store pending_chrome_action_source (add column to Client model)")
+            raise HTTPException(status_code=400, detail=f"Ugyldig source '{source}'. Tilladte: {sorted(allowed)}")
+        client.pending_chrome_action_source = src_lower
 
     session.add(client)
     session.commit()
     session.refresh(client)
-    return {"ok": True, "pending_chrome_action": client.pending_chrome_action.value, "pending_chrome_action_source": getattr(client, "pending_chrome_action_source", None)}
+    return {
+        "ok": True,
+        "pending_chrome_action": client.pending_chrome_action.value,
+        "pending_chrome_action_source": getattr(client, "pending_chrome_action_source", None)
+    }
 
-# Klienten henter aktuel kommando
+
 @router.get("/clients/{id}/chrome-command")
-def get_chrome_command(
-    id: int,
-    session=Depends(get_session),
-    user=Depends(get_current_user)
-):
+def get_chrome_command(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -228,7 +199,7 @@ def get_chrome_command(
         "source": getattr(client, "pending_chrome_action_source", None)
     }
 
-# Opret ny klient
+
 @router.post("/clients/", response_model=Client)
 async def create_client(
     client_in: ClientCreate,
@@ -267,7 +238,7 @@ async def create_client(
     session.refresh(client)
     return client
 
-# Opdater klient
+
 @router.put("/clients/{id}/update", response_model=Client)
 async def update_client(
     id: int,
@@ -278,6 +249,9 @@ async def update_client(
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+
+    fields = client_update.model_fields_set  # Pydantic v2 (erstatter __fields_set__)
+
     if client_update.locality is not None:
         client.locality = client_update.locality
     if client_update.sort_order is not None:
@@ -302,44 +276,32 @@ async def update_client(
         client.pending_shutdown = client_update.pending_shutdown
     if client_update.chrome_status is not None:
         client.chrome_status = client_update.chrome_status
-        client.chrome_last_updated = datetime.utcnow()
-    if getattr(client_update, "chrome_color", None) is not None:
+        client.chrome_last_updated = utcnow()
+    if client_update.chrome_color is not None:
         client.chrome_color = client_update.chrome_color
-    if "pending_chrome_action" in client_update.__fields_set__:
-        val = getattr(client_update, "pending_chrome_action")
-        if val is None:
-            client.pending_chrome_action = ChromeAction.NONE
-        else:
-            try:
-                client.pending_chrome_action = ChromeAction(val)
-            except (ValueError, TypeError):
-                pass
-    # Support updating pending_chrome_action_source via API if present in pydantic model
-    if "pending_chrome_action_source" in client_update.__fields_set__:
-        try:
-            src = getattr(client_update, "pending_chrome_action_source")
-            if src is None:
-                client.pending_chrome_action_source = None
-            else:
-                client.pending_chrome_action_source = str(src).lower()
-        except Exception:
-            pass
-    if getattr(client_update, "school_id", None) is not None:
+    if "pending_chrome_action" in fields:
+        val = client_update.pending_chrome_action
+        client.pending_chrome_action = ChromeAction.NONE if val is None else ChromeAction(val)
+    if "pending_chrome_action_source" in fields:
+        src = client_update.pending_chrome_action_source
+        client.pending_chrome_action_source = str(src).lower() if src else None
+    if client_update.school_id is not None:
         client.school_id = client_update.school_id
-    if getattr(client_update, "state", None) is not None:
+    if client_update.state is not None:
         client.state = client_update.state
-    if getattr(client_update, "livestream_status", None) is not None:
+    if client_update.livestream_status is not None:
         client.livestream_status = client_update.livestream_status
-    if getattr(client_update, "livestream_last_segment", None) is not None:
+    if client_update.livestream_last_segment is not None:
         client.livestream_last_segment = client_update.livestream_last_segment
-    if getattr(client_update, "livestream_last_error", None) is not None:
+    if client_update.livestream_last_error is not None:
         client.livestream_last_error = client_update.livestream_last_error
+
     session.add(client)
     session.commit()
     session.refresh(client)
     return client
 
-# Opdater kiosk_url
+
 @router.put("/clients/{id}/kiosk_url", response_model=Client)
 async def update_kiosk_url(
     id: int,
@@ -359,17 +321,15 @@ async def update_kiosk_url(
     session.refresh(client)
     return client
 
-# Helper: Hent alle datoer for et skoleår
+
 def get_school_year_dates(season_start):
     dates = []
-    # August-december
     for month in range(8, 13):
         for day in range(1, 32):
             try:
                 dates.append(date(season_start, month, day))
             except ValueError:
                 continue
-    # Januar-juli
     for month in range(1, 8):
         for day in range(1, 32):
             try:
@@ -378,7 +338,7 @@ def get_school_year_dates(season_start):
                 continue
     return dates
 
-# Godkend klient + Opret alle kalenderdage som "on" med skolens tider
+
 @router.post("/clients/{id}/approve", response_model=Client)
 async def approve_client(
     id: int,
@@ -402,28 +362,19 @@ async def approve_client(
     session.commit()
     session.refresh(client)
 
-    # --- Opret CalendarMarking med skolens tider ---
-    school = None
-    if client.school_id:
-        school = session.get(School, client.school_id)
+    school = session.get(School, client.school_id) if client.school_id else None
     today = date.today()
-    if today.month >= 8:
-        season_start = today.year
-    else:
-        season_start = today.year - 1
-
+    season_start = today.year if today.month >= 8 else today.year - 1
     school_year_dates = get_school_year_dates(season_start)
     markings = {}
 
-    # Brug skolens tider hvis de findes, ellers fallback
     def_wd_on = getattr(school, "weekday_on", "09:00") if school else "09:00"
     def_wd_off = getattr(school, "weekday_off", "22:30") if school else "22:30"
     def_we_on = getattr(school, "weekend_on", "08:00") if school else "08:00"
     def_we_off = getattr(school, "weekend_off", "18:00") if school else "18:00"
 
     for d in school_year_dates:
-        weekday = d.weekday()
-        if weekday < 5:
+        if d.weekday() < 5:
             markings[d.isoformat()] = {"status": "on", "onTime": def_wd_on, "offTime": def_wd_off}
         else:
             markings[d.isoformat()] = {"status": "on", "onTime": def_we_on, "offTime": def_we_off}
@@ -438,87 +389,71 @@ async def approve_client(
 
     return client
 
-# Heartbeat fra klient
+
 @router.post("/clients/{id}/heartbeat", response_model=Client)
-def client_heartbeat(
-    id: int,
-    session=Depends(get_session),
-    user=Depends(get_current_user)
-):
+def client_heartbeat(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    client.last_seen = datetime.utcnow()
+    client.last_seen = utcnow()
     session.add(client)
     session.commit()
     session.refresh(client)
     return client
 
-# Slet klient + kalendermarkeringer
+
 @router.delete("/clients/{id}/remove")
 async def remove_client(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    session.exec(
-        delete(CalendarMarking).where(CalendarMarking.client_id == client.id)
-    )
+    session.exec(delete(CalendarMarking).where(CalendarMarking.client_id == client.id))
     session.commit()
     session.delete(client)
     session.commit()
     return {"ok": True}
 
-# Streaming, terminal og remote desktop endpoints (til integration)
+
 @router.get("/clients/{id}/stream")
 def client_stream(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     return {"stream_url": f"/mjpeg/{id}"}
+
 
 @router.get("/clients/{id}/terminal")
 def client_terminal(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     return {"terminal_url": f"/terminal/{id}"}
 
+
 @router.get("/clients/{id}/remote-desktop")
 def client_remote_desktop(id: int, session=Depends(get_session), user=Depends(get_current_user)):
     return {"remote_desktop_url": f"/remote-desktop/{id}"}
 
-# --- RESET HLS FOR EN KLIENT ---
+
 @router.post("/clients/{client_id}/reset-hls")
 def reset_hls(client_id: int, user=Depends(get_current_user)):
-    hls_dir = f"/opt/render/project/src/backend/service1/hls/{client_id}/"
+    hls_dir = os.path.join(HLS_BASE_DIR, str(client_id))
     if not os.path.exists(hls_dir):
         raise HTTPException(status_code=404, detail="HLS directory not found for client")
-    files = glob.glob(os.path.join(hls_dir, "*"))
-    deleted = []
-    errors = []
-    for f in files:
+    deleted, errors = [], []
+    for f in glob.glob(os.path.join(hls_dir, "*")):
         try:
             os.remove(f)
             deleted.append(os.path.basename(f))
         except Exception as e:
             errors.append({"file": os.path.basename(f), "error": str(e)})
-    return {
-        "status": "ok",
-        "deleted_files": deleted,
-        "errors": errors
-    }
+    return {"status": "ok", "deleted_files": deleted, "errors": errors}
 
-# --- STOP HLS STREAM & RYD OP (frontend kalder denne ved "forlad side") ---
+
 @router.post("/clients/{client_id}/stop-hls")
 def stop_hls(client_id: int, user=Depends(get_current_user)):
-    hls_dir = f"/opt/render/project/src/backend/service1/hls/{client_id}/"
+    hls_dir = os.path.join(HLS_BASE_DIR, str(client_id))
     if not os.path.exists(hls_dir):
-        return {"status": "ok", "deleted_files": [], "errors": ["HLS directory not found for client"]}
-    files = glob.glob(os.path.join(hls_dir, "*"))
-    deleted = []
-    errors = []
-    for f in files:
+        return {"status": "ok", "deleted_files": [], "errors": ["HLS directory not found"]}
+    deleted, errors = [], []
+    for f in glob.glob(os.path.join(hls_dir, "*")):
         try:
             os.remove(f)
             deleted.append(os.path.basename(f))
         except Exception as e:
             errors.append({"file": os.path.basename(f), "error": str(e)})
-    return {
-        "status": "ok",
-        "deleted_files": deleted,
-        "errors": errors
-    }
+    return {"status": "ok", "deleted_files": deleted, "errors": errors}
