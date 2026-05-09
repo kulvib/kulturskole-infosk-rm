@@ -31,7 +31,7 @@ def extract_program_date_time(filename):
     except Exception:
         return None
 
-def update_manifest(client_dir, keep_n=6, segment_duration=6):
+def update_manifest(client_dir, keep_n=6, segment_duration=4):  # RETTET: 6 → 4
     seg_types = [".ts", ".mp4"]
     for ext in seg_types:
         segs = sorted(
@@ -75,7 +75,7 @@ async def upload_hls_file(
         with open(seg_path, "wb") as f:
             f.write(content)
         print(f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes")
-        update_manifest(client_dir)
+        update_manifest(client_dir)  # Bruger nu default segment_duration=4
         return {"filename": file.filename, "client_id": client_id}
     except Exception as e:
         print("[FEJL VED UPLOAD]", e)
@@ -87,7 +87,7 @@ async def cleanup_hls_files(
     client_id: str = Body(...),
     keep_files: List[str] = Body(...),
     keep_n: int = 6,
-    segment_duration: int = 6,
+    segment_duration: int = 4,  # RETTET: 6 → 4
 ):
     try:
         print(f"[SERVER][CLEANUP] Modtog keep_files: {keep_files}")
@@ -102,7 +102,6 @@ async def cleanup_hls_files(
                 print(f"[CLEANUP] Slettede gammelt segment: {seg}")
             except Exception as e:
                 print(f"[CLEANUP] Kunne ikke slette {seg}: {e}")
-
         update_manifest(client_dir, keep_n=keep_n, segment_duration=segment_duration)
         kept = sorted(
             [f for f in os.listdir(client_dir) if f.startswith("segment_") and (f.endswith(".ts") or f.endswith(".mp4"))],
@@ -119,7 +118,7 @@ def get_last_segment_info(client_id: str, response: Response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
-    
+
     client_dir = os.path.join(HLS_DIR, client_id)
     manifest_path = os.path.join(client_dir, "index.m3u8")
     if not os.path.exists(manifest_path):
