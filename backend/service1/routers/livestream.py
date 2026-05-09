@@ -1,9 +1,13 @@
 import os
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Form, Body, Response, Depends
-from typing import Dict, List
-import traceback
 import re
-from datetime import datetime
+import traceback
+from datetime import datetime, timezone
+from typing import Dict, List
+
+from fastapi import (
+    APIRouter, WebSocket, WebSocketDisconnect,
+    UploadFile, File, HTTPException, Form, Body, Response, Depends
+)
 from auth import get_current_user
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -16,6 +20,11 @@ else:
 os.makedirs(HLS_DIR, exist_ok=True)
 
 router = APIRouter()
+
+
+def utcnow() -> datetime:
+    """Returnerer nuværende UTC-tid (ikke-deprecated)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def safe_client_dir(client_id: str) -> str:
@@ -45,12 +54,13 @@ def extract_program_date_time(filename):
 
 
 def update_manifest(client_dir, keep_n=6, segment_duration=4):
-    seg_types = [".ts", ".mp4"]
-    for ext in seg_types:
+    for ext in [".ts", ".mp4"]:
         segs = sorted(
-            [f for f in os.listdir(client_dir)
-             if f.startswith("segment_") and f.endswith(ext)
-             and os.path.getsize(os.path.join(client_dir, f)) > 1000],
+            [
+                f for f in os.listdir(client_dir)
+                if f.startswith("segment_") and f.endswith(ext)
+                and os.path.getsize(os.path.join(client_dir, f)) > 1000
+            ],
             key=lambda f: extract_num(f, "segment_")
         )
         if segs:
@@ -77,20 +87,17 @@ def update_manifest(client_dir, keep_n=6, segment_duration=4):
 async def upload_hls_file(
     file: UploadFile = File(...),
     client_id: str = Form(...),
-    user=Depends(get_current_user)          # Auth påkrævet
+    user=Depends(get_current_user)
 ):
     allowed_exts = [".ts", ".mp4"]
     if not any(file.filename.endswith(ext) for ext in allowed_exts):
         raise HTTPException(status_code=400, detail="Kun .ts eller .mp4 segmenter understøttes")
-
-    # Valider filnavn (ingen path traversal)
     if not re.match(r'^[a-zA-Z0-9_.-]+$', file.filename):
         raise HTTPException(status_code=400, detail="Ugyldigt filnavn")
 
     client_dir = safe_client_dir(client_id)
     os.makedirs(client_dir, exist_ok=True)
 
-    # Begræns filstørrelse til 50 MB
     MAX_SIZE = 50 * 1024 * 1024
     content = await file.read(MAX_SIZE + 1)
     if len(content) > MAX_SIZE:
@@ -111,7 +118,7 @@ async def cleanup_hls_files(
     keep_files: List[str] = Body(...),
     keep_n: int = 6,
     segment_duration: int = 4,
-    user=Depends(get_current_user)          # Auth påkrævet
+    user=Depends(get_current_user)
 ):
     client_dir = safe_client_dir(client_id)
     if not os.path.exists(client_dir):
@@ -130,8 +137,10 @@ async def cleanup_hls_files(
 
     update_manifest(client_dir, keep_n=keep_n, segment_duration=segment_duration)
     kept = sorted(
-        [f for f in os.listdir(client_dir)
-         if f.startswith("segment_") and (f.endswith(".ts") or f.endswith(".mp4"))],
+        [
+            f for f in os.listdir(client_dir)
+            if f.startswith("segment_") and (f.endswith(".ts") or f.endswith(".mp4"))
+        ],
         key=lambda f: extract_num(f, "segment_")
     )
     return {"deleted": to_delete, "kept": kept}
@@ -168,8 +177,9 @@ def get_last_segment_info(
     if dt:
         timestamp_iso = dt.isoformat() + "Z"
     else:
+        # Ikke-deprecated: brug timezone-aware timestamp
         mtime = os.path.getmtime(seg_path)
-        dt = datetime.utcfromtimestamp(mtime).replace(microsecond=0)
+        dt = datetime.fromtimestamp(mtime, tz=timezone.utc).replace(tzinfo=None, microsecond=0)
         timestamp_iso = dt.isoformat() + "Z"
 
     return {
@@ -203,8 +213,8 @@ def health_check(
             for f in files
         )
         if has_segments:
-            manifest_mtime = os.path.getmtime(manifest_path)
-            last_update = datetime.utcfromtimestamp(manifest_mtime).isoformat() + "Z"
+            mtime = os.path.getmtime(manifest_path)
+            last_update = datetime.fromtimestamp(mtime, tz=timezone.utc).replace(tzinfo=None).isoformat() + "Z"
             return {"online": True, "has_segments": True, "last_update": last_update, "message": "Stream er aktiv"}
         return {"online": True, "has_segments": False, "last_update": None, "message": "Manifest eksisterer, men ingen segmenter endnu"}
     except Exception as e:
@@ -215,13 +225,13 @@ def health_check(
 def reset_hls(
     client_id: str,
     response: Response,
-    user=Depends(get_current_user)          # Auth påkrævet
+    user=Depends(get_current_user)
 ):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     client_dir = safe_client_dir(client_id)
 
     if not os.path.exists(client_dir):
-        return {"message": "already cleaned", "success": True, "timestamp": datetime.utcnow().isoformat() + "Z"}
+        return {"message": "already cleaned", "success": True, "timestamp": utcnow().isoformat() + "Z"}
 
     try:
         for f in os.listdir(client_dir):
@@ -229,9 +239,9 @@ def reset_hls(
                 os.remove(os.path.join(client_dir, f))
             except Exception as e:
                 print(f"[RESET] Kunne ikke slette {f}: {e}")
-        return {"message": "reset done", "success": True, "timestamp": datetime.utcnow().isoformat() + "Z"}
+        return {"message": "reset done", "success": True, "timestamp": utcnow().isoformat() + "Z"}
     except Exception as e:
-        return {"message": f"reset failed: {e}", "success": False, "timestamp": datetime.utcnow().isoformat() + "Z"}
+        return {"message": f"reset failed: {e}", "success": False, "timestamp": utcnow().isoformat() + "Z"}
 
 
 class Room:
@@ -245,7 +255,6 @@ rooms: Dict[str, Room] = {}
 
 @router.websocket("/ws/livestream/{client_id}")
 async def livestream_endpoint(websocket: WebSocket, client_id: str):
-    # Valider client_id format
     if not re.match(r'^[a-zA-Z0-9_-]+$', client_id):
         await websocket.close(code=1008)
         return
@@ -257,9 +266,11 @@ async def livestream_endpoint(websocket: WebSocket, client_id: str):
 
     try:
         data = await websocket.receive_json()
+
         if data.get("type") == "broadcaster":
             room.broadcaster = websocket
             await websocket.send_json({"type": "ack", "role": "broadcaster"})
+
         elif data.get("type") == "newViewer":
             viewer_id = str(data.get("viewer_id"))
             room.viewers[viewer_id] = websocket
@@ -277,7 +288,9 @@ async def livestream_endpoint(websocket: WebSocket, client_id: str):
                 if viewer_id and viewer_id in room.viewers:
                     await room.viewers[viewer_id].send_json(msg)
             else:
-                viewer_id = next((vid for vid, ws in room.viewers.items() if ws == websocket), None)
+                viewer_id = next(
+                    (vid for vid, ws in room.viewers.items() if ws == websocket), None
+                )
                 if room.broadcaster and viewer_id:
                     msg["viewer_id"] = viewer_id
                     await room.broadcaster.send_json(msg)
