@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional
 from pydantic import BaseModel, field_validator
@@ -87,12 +87,9 @@ def create_user(
     session: Session = Depends(get_session),
     admin=Depends(get_current_admin_user)
 ):
-    # Valider kodeordsstyrke
     validate_password_strength(user.password)
-
     if session.exec(select(User).where(User.username == user.username)).first():
         raise HTTPException(status_code=400, detail="Brugernavnet er allerede i brug")
-
     user_obj = User(
         username=user.username,
         hashed_password=get_password_hash(user.password),
@@ -119,7 +116,6 @@ def update_user(
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Bruger ikke fundet")
-
     if user_update.password is not None:
         validate_password_strength(user_update.password)
         user.hashed_password = get_password_hash(user_update.password)
@@ -135,7 +131,6 @@ def update_user(
         user.remarks = user_update.remarks
     if user_update.email is not None:
         user.email = user_update.email
-
     session.add(user)
     session.commit()
     session.refresh(user)
