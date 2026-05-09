@@ -5,8 +5,8 @@ from enum import Enum
 
 
 def utcnow() -> datetime:
-    """Returnerer nuværende UTC-tid (timezone-aware)."""
-    return datetime.now(timezone.utc)
+    """Returnerer nuværende UTC-tid (ikke-deprecated)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class ChromeAction(str, Enum):
