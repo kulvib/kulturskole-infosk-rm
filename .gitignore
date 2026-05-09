@@ -1,0 +1,19 @@
+# Miljøvariabler – MÅ ALDRIG committes
+.env
+*.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# HLS segments
+hls/
+service1/hls/
+
+# Database (hvis lokal SQLite bruges)
+*.db
