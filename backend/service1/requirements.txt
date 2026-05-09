@@ -1,4 +1,4 @@
-fastapi
+fastapi[all]
 sqlmodel
 passlib[bcrypt]
 python-jose[cryptography]
@@ -10,9 +10,6 @@ python-multipart
 psycopg2-binary
 paho-mqtt
 alembic
-fastapi[all]
 requests
 websockets==12.0
-aiortc
-opencv-python
-numpy
+slowapi
