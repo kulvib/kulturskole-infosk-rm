@@ -25,7 +25,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
-import { useAuth } from "../auth/authcontext";
+import { useAuth } from "./auth/authcontext";
 import { getSchools } from "./api";
 
 function getRoleText(role) {
