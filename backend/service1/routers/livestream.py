@@ -261,7 +261,7 @@ async def livestream_endpoint(
         await websocket.close(code=1008)
         return
 
-    # Autentificer bruger via JWT-token i query-parameter
+    # Autentificér bruger via JWT-token i query-parameter
     from db import engine
     with Session(engine) as session:
         user = verify_ws_token(token, session)

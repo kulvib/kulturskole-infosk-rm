@@ -180,13 +180,13 @@ def login_for_access_token(
 
     access_token = create_access_token(data={
         "sub": user.username,
-        "role": getattr(user, "role", "bruger") or "bruger",
+        "role": getattr(user, "role", "bruger"),
     })
     _set_auth_cookie(response, access_token)
 
     user_data = {
         "username": user.username,
-        "role": getattr(user, "role", "bruger") or "bruger",
+        "role": getattr(user, "role", "bruger"),
         "full_name": user.full_name,
         "remarks": user.remarks,
         "school_id": user.school_id,

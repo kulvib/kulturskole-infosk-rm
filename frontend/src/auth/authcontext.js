@@ -28,7 +28,7 @@ export function AuthProvider({ children }) {
   const warningTimer = useRef();
   const navigate = useNavigate();
 
-  // Synkroniser brugerdata (IKKE token) med localStorage
+  // Synkronisér brugerdata (IKKE token) med localStorage
   useEffect(() => {
     if (user) {
       localStorage.setItem("user", JSON.stringify(user));

@@ -93,7 +93,7 @@ export default function UserAdministration() {
   const [downloadCountdown, setDownloadCountdown] = useState(10);
   const [savingNewUser, setSavingNewUser] = useState(false);
 
-  // --- Brugeroplysnngsdialog (viser login-oplysninger efter oprettelse/ændret password)
+  // --- Brugeroplysningsdialog (viser login-oplysninger efter oprettelse/ændret password)
   const [userInfoDialogOpen, setUserInfoDialogOpen] = useState(false);
   const [userInfoDialogData, setUserInfoDialogData] = useState(null);
 

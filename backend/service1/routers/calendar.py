@@ -110,10 +110,11 @@ def get_marked_days(
     for k, v in markings.items():
         try:
             iso_key = datetime.fromisoformat(k).isoformat()
+            iso_date = iso_key[:10]
             # Filtrér efter start_date og end_date hvis angivet
-            if start_date and iso_key[:10] < start_date:
+            if start_date and iso_date < start_date:
                 continue
-            if end_date and iso_key[:10] > end_date:
+            if end_date and iso_date > end_date:
                 continue
             formatted[iso_key] = v
         except Exception:
