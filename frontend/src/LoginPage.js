@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../auth/authcontext";
 import { useNavigate } from "react-router-dom";
-import { login } from "../api";
+import { login } from "./api";
 import {
   Box,
   Button,
