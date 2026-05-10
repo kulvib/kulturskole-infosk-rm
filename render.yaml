@@ -2,7 +2,7 @@ services:
 
   # ─── Backend ────────────────────────────────────────────────────────────────
   - type: web
-    name: timetracking-backend
+    name: infoskaerm-backend
     runtime: python
     rootDir: backend
     buildCommand: "pip install -r requirements.txt"
