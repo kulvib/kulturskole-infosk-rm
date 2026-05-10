@@ -13,10 +13,7 @@ import {
   Alert as MuiAlert,
 } from "@mui/material";
 
-const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
-function getToken() {
-  return localStorage.getItem("token");
-}
+import { apiUrl } from "../../api";
 
 const WEEKDAYS = [
   "søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"
@@ -111,11 +108,10 @@ export default function DateTimeEditDialog({
     if (!open || !date || !clientId) return;
     setLoading(true);
     setOnTime(""); setOffTime("");
-    const token = getToken();
     const normDate = date.split("T")[0];
     fetch(
-      `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${normDate.slice(0, 4)}`,
-      token ? { headers: { Authorization: "Bearer " + token } } : undefined
+      `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${normDate.slice(0, 4)}`,
+      { credentials: "include" }
     )
       .then(res => res.json())
       .then(data => {
@@ -176,11 +172,10 @@ export default function DateTimeEditDialog({
     try {
       const normDate = date.split("T")[0];
       const season = normDate.substring(0, 4);
-      const token = getToken();
 
       const resGet = await fetch(
-        `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
-        token ? { headers: { Authorization: "Bearer " + token } } : undefined
+        `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
+        { credentials: "include" }
       );
       let serverData = {};
       if (resGet.ok) {
@@ -206,14 +201,14 @@ export default function DateTimeEditDialog({
       };
 
       const res = await fetch(
-        `${API_BASE}/api/calendar/marked-days`,
+        `${apiUrl}/api/calendar/marked-days`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             accept: "application/json",
-            ...(token ? { Authorization: "Bearer " + token } : {}),
           },
+          credentials: "include",
           body: JSON.stringify(payload),
         }
       );
@@ -224,8 +219,8 @@ export default function DateTimeEditDialog({
       let returnedDay = updatedDays[updateKey];
       try {
         const resGet2 = await fetch(
-          `${API_BASE}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
-          token ? { headers: { Authorization: "Bearer " + token } } : undefined
+          `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
+          { credentials: "include" }
         );
         if (resGet2.ok) {
           const data2 = await resGet2.json();

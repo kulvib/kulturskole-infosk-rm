@@ -26,9 +26,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import { useAuth } from "../auth/authcontext";
-import axios from "axios";
-
-const API_URL = "https://kulturskole-infosk-rm.onrender.com";
+import { getSchools } from "./api";
 
 function getRoleText(role) {
   if (role === "admin") return "Administrator";
@@ -58,12 +56,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (user && user.role === "bruger" && user.school_id) {
-      axios
-        .get(`${API_URL}/api/schools/`, {
-          headers: { Authorization: "Bearer " + localStorage.getItem("token") },
-        })
-        .then((res) => {
-          const schools = res.data;
+      getSchools()
+        .then((schools) => {
           const school = schools.find((s) => s.id === user.school_id);
           setSchoolName(school ? school.name : "");
         })

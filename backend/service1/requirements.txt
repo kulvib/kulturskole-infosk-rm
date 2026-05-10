@@ -1,7 +1,7 @@
 fastapi[all]>=0.115.0
 sqlmodel
 passlib[bcrypt]
-python-jose[cryptography]>=3.3.0
+PyJWT>=2.8.0
 bcrypt==4.0.1
 pydantic
 uvicorn[standard]

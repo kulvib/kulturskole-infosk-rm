@@ -31,9 +31,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
-import axios from "axios";
+import { getUsers, createUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser, getSchools } from "../../api";
 
-const API_URL = "https://kulturskole-infosk-rm.onrender.com";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ----------- Helper functions ----------- //
@@ -42,35 +41,27 @@ function generateSecurePassword() {
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const digits = "0123456789";
   const specials = "!@#$%&*";
-  let password = lower[Math.floor(Math.random() * lower.length)]
-    + upper[Math.floor(Math.random() * upper.length)]
-    + digits[Math.floor(Math.random() * digits.length)];
-  for (let i = 0; i < Math.floor(Math.random() * 2) + 1; i++) {
-    password += specials[Math.floor(Math.random() * specials.length)];
-  }
   const all = lower + upper + digits + specials;
-  for (let i = password.length; i < 12; i++) {
-    password += all[Math.floor(Math.random() * all.length)];
+  const array = new Uint32Array(16);
+  crypto.getRandomValues(array);
+  // Sørg for mindst ét tegn fra hver kategori
+  let password = [
+    lower[array[0] % lower.length],
+    upper[array[1] % upper.length],
+    digits[array[2] % digits.length],
+    specials[array[3] % specials.length],
+  ];
+  for (let i = 4; i < 12; i++) {
+    password.push(all[array[i] % all.length]);
   }
-  return password.split("").sort(() => Math.random() - 0.5).join("");
-}
-
-function downloadUserInfo(info) {
-  const fileName = info.full_name.trim().replace(/\s+/g, "_") + ".txt";
-  const content = `Fulde navn: ${info.full_name}
-Skole: ${info.schoolName}
-Email: ${info.email || ""}
-----------------
-Brugernavn: ${info.username}
-Password: ${info.password}
-`;
-  const blob = new Blob([content], { type: "text/plain" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  setTimeout(() => document.body.removeChild(link), 100);
+  // Bland ved hjælp af Fisher-Yates med kryptografisk random
+  const shuffleArr = new Uint32Array(password.length);
+  crypto.getRandomValues(shuffleArr);
+  for (let i = password.length - 1; i > 0; i--) {
+    const j = shuffleArr[i] % (i + 1);
+    [password[i], password[j]] = [password[j], password[i]];
+  }
+  return password.join("");
 }
 
 // ----------- Main Component ----------- //
@@ -102,6 +93,10 @@ export default function UserAdministration() {
   const [downloadCountdown, setDownloadCountdown] = useState(10);
   const [savingNewUser, setSavingNewUser] = useState(false);
 
+  // --- Brugeroplysnngsdialog (viser login-oplysninger efter oprettelse/ændret password)
+  const [userInfoDialogOpen, setUserInfoDialogOpen] = useState(false);
+  const [userInfoDialogData, setUserInfoDialogData] = useState(null);
+
   // --- Edit user state (email fields isolated)
   const [editUser, setEditUser] = useState(null);
   const [editUserConfirmEmail, setEditUserConfirmEmail] = useState("");
@@ -129,11 +124,9 @@ export default function UserAdministration() {
   // ----------- Effects ----------- //
   useEffect(() => {
     setLoadingUsers(true);
-    axios.get(`${API_URL}/api/users/`, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
-    })
-      .then(res => setUsers(Array.isArray(res.data)
-        ? res.data.map(u => ({
+    getUsers()
+      .then(data => setUsers(Array.isArray(data)
+        ? data.map(u => ({
             ...u,
             role: u.role === "admin" ? "administrator" : u.role,
           })) : []
@@ -147,10 +140,8 @@ export default function UserAdministration() {
 
   useEffect(() => {
     setLoadingSchools(true);
-    axios.get(`${API_URL}/api/schools/`, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
-    })
-      .then(res => setSchools(Array.isArray(res.data) ? res.data : []))
+    getSchools()
+      .then(data => setSchools(Array.isArray(data) ? data : []))
       .catch(() => setSchools([]))
       .finally(() => setLoadingSchools(false));
   }, []);
@@ -229,25 +220,23 @@ export default function UserAdministration() {
       return;
     }
 
-    axios.post(`${API_URL}/api/users/`, {
+    createUser({
       username,
       password,
       full_name,
-      role: role === "administrator" ? "admin" : "bruger",
+      role: role === "administrator" ? "admin" : role,
       is_active,
       school_id: role === "bruger" ? school_id : undefined,
       remarks,
       email,
-    }, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
-      .then(res => {
+      .then(data => {
         setUsers(Array.isArray(users) ? [...users, {
-          ...res.data,
-          role: res.data.role === "admin" ? "administrator" : res.data.role
+          ...data,
+          role: data.role === "admin" ? "administrator" : data.role
         }] : [{
-          ...res.data,
-          role: res.data.role === "admin" ? "administrator" : res.data.role
+          ...data,
+          role: data.role === "admin" ? "administrator" : data.role
         }]);
         setNewUser({
           username: "",
@@ -264,28 +253,20 @@ export default function UserAdministration() {
         const schoolName = role === "bruger"
           ? (schools.find(s => s.id === school_id)?.name ?? "")
           : "";
-        setNewUserDownloadInfo({
-          full_name,
-          username,
-          password,
-          schoolName,
-          email,
-        });
-        setShowDownloadButton(true);
-        setDownloadCountdown(10);
+        setUserInfoDialogData({ full_name, username, password, schoolName, email });
+        setUserInfoDialogOpen(true);
       })
       .catch(e => {
-        setUserError(e.response?.data?.detail || e.message || "Fejl ved oprettelse");
+        setUserError(e.message || "Fejl ved oprettelse");
         showSnackbar("Fejl ved oprettelse af bruger", "error");
       }).finally(() => setSavingNewUser(false));
   };
 
   // --- Edit User ---
   const openEditUserDialog = (user) => {
-    if (user.full_name === "Henrik Resen") return;
     setEditUser({
       ...user,
-      role: user.role === "admin" ? "bruger" : user.role,
+      role: user.role === "admin" ? "administrator" : user.role,
       password: "",
     });
     setEditUserConfirmEmail(user.email || "");
@@ -321,21 +302,19 @@ export default function UserAdministration() {
       showSnackbar("Fulde navn skal udfyldes", "error");
       return;
     }
-    axios.patch(`${API_URL}/api/users/${id}`, {
-      role: role === "administrator" ? "admin" : "bruger",
+    apiUpdateUser(id, {
+      role: role === "administrator" ? "admin" : role,
       is_active,
-      password,
+      password: password || undefined,
       full_name,
       school_id: role === "bruger" ? school_id : undefined,
       remarks,
       email,
-    }, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
     })
-      .then(res => {
+      .then(data => {
         setUsers(users.map(u =>
-          u.id === res.data.id
-            ? { ...res.data, role: res.data.role === "admin" ? "administrator" : res.data.role }
+          u.id === data.id
+            ? { ...data, role: data.role === "admin" ? "administrator" : data.role }
             : u
         ));
         setUserError("");
@@ -345,22 +324,13 @@ export default function UserAdministration() {
           ? (schools.find(s => s.id === school_id)?.name ?? "")
           : "";
         if (password) {
-          setEditUserDownloadInfo({
-            full_name,
-            username,
-            password,
-            schoolName,
-            email,
-          });
-          setShowEditDownloadButton(true);
-          setEditDownloadCountdown(10);
-          setHoldEditDialogOpen(true);
-        } else {
-          setUserDialogOpen(false);
+          setUserInfoDialogData({ full_name, username, password, schoolName, email });
+          setUserInfoDialogOpen(true);
         }
+        setUserDialogOpen(false);
       })
       .catch(e => {
-        setUserError(e.response?.data?.detail || e.message || "Fejl ved opdatering");
+        setUserError(e.message || "Fejl ved opdatering");
         showSnackbar("Fejl ved opdatering af bruger", "error");
       }).finally(() => setSavingEditUser(false));
   };
@@ -377,9 +347,7 @@ export default function UserAdministration() {
   const handleFinalDeleteUser = () => {
     if (!userToDelete) return;
     if (userToDelete.role === "administrator" && userToDelete.is_active) return;
-    axios.delete(`${API_URL}/api/users/${userToDelete.id}`, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
-    })
+    apiDeleteUser(userToDelete.id)
       .then(() => {
         setUsers(users.filter(u => u.id !== userToDelete.id));
         setDeleteUserDialogOpen(false);
@@ -388,7 +356,7 @@ export default function UserAdministration() {
         showSnackbar("Bruger slettet!", "success");
       })
       .catch(e => {
-        setDeleteUserError("Kunne ikke slette bruger: " + (e.response?.data?.detail || ""));
+        setDeleteUserError("Kunne ikke slette bruger: " + (e.message || ""));
         showSnackbar("Fejl ved sletning af bruger", "error");
       });
   };
@@ -535,12 +503,6 @@ export default function UserAdministration() {
                 <Button variant="contained" onClick={handleAddUser} disabled={savingNewUser}>
                   {savingNewUser ? <CircularProgress size={24} color="inherit" /> : "Opret bruger"}
                 </Button>
-                {showDownloadButton && newUserDownloadInfo && (
-                  <Button variant="outlined" color="primary"
-                    onClick={() => downloadUserInfo(newUserDownloadInfo)}>
-                    Download brugerinfo ({downloadCountdown})
-                  </Button>
-                )}
               </Box>
               <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
                 <TextField label="Søg" size="small" value={userSearch}
@@ -630,7 +592,6 @@ export default function UserAdministration() {
                             <span>
                               <IconButton
                                 onClick={() => openEditUserDialog(user)}
-                                disabled={user.full_name === "Henrik Resen"}
                               >
                                 <EditIcon />
                               </IconButton>
@@ -664,8 +625,8 @@ export default function UserAdministration() {
             </TableContainer>
             {/* Rediger bruger dialog */}
             <Dialog
-              open={userDialogOpen || holdEditDialogOpen}
-              onClose={handleCloseDeleteUserDialog}
+              open={userDialogOpen}
+              onClose={() => setUserDialogOpen(false)}
               maxWidth="sm"
               fullWidth
               sx={{ '& .MuiDialog-paper': { width: '110%' } }}
@@ -761,34 +722,7 @@ export default function UserAdministration() {
                         </Button>
                       </Grid>
                     </Grid>
-                    {holdEditDialogOpen && editUser.password && (
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                          {showEditDownloadButton && editUserDownloadInfo ? (
-                            <Button variant="outlined" color="primary" fullWidth
-                              onClick={() => downloadUserInfo(editUserDownloadInfo)}>
-                              Download brugerinfo ({editDownloadCountdown})
-                            </Button>
-                          ) : (
-                            <Button variant="outlined" color="primary" fullWidth disabled>
-                              Download brugerinfo
-                            </Button>
-                          )}
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <Button variant="contained" color="primary" fullWidth
-                            onClick={() => {
-                              setHoldEditDialogOpen(false);
-                              setShowEditDownloadButton(false);
-                              setEditUserDownloadInfo(null);
-                              setEditDownloadCountdown(10);
-                              setUserDialogOpen(false);
-                            }}>
-                            Videre
-                          </Button>
-                        </Grid>
-                      </Grid>
-                    )}
+                    {/* Adgangskodedialoget vises udenfor Rediger-dialog */}
                   </Stack>
                 )}
                 {(userError || editUserEmailError) &&
@@ -797,20 +731,15 @@ export default function UserAdministration() {
                   </Typography>}
               </DialogContent>
               <DialogActions>
-                {(!holdEditDialogOpen || !editUser?.password) && (
-                  <>
-                    <Button onClick={() => setUserDialogOpen(false)} disabled={savingEditUser}>Annuller</Button>
-                    <Button variant="contained" onClick={handleEditUser} disabled={savingEditUser}>
-                      {savingEditUser ? <CircularProgress size={24} color="inherit" /> : "Gem ændringer"}
-                    </Button>
-                  </>
-                )}
+                <Button onClick={() => setUserDialogOpen(false)} disabled={savingEditUser}>Annuller</Button>
+                <Button variant="contained" onClick={handleEditUser} disabled={savingEditUser}>
+                  {savingEditUser ? <CircularProgress size={24} color="inherit" /> : "Gem ændringer"}
+                </Button>
               </DialogActions>
             </Dialog>
           </Box>
         </Stack>
       </Paper>
-      {/* Slet bruger dialog */}
       <Dialog open={deleteUserDialogOpen} onClose={handleCloseDeleteUserDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
           Slet bruger: {userToDelete?.username}
@@ -872,6 +801,34 @@ export default function UserAdministration() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
+      {/* Login-oplysninger dialog — vises efter oprettelse eller adgangskodeskift */}
+      <Dialog open={userInfoDialogOpen} onClose={() => setUserInfoDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Loginoplysninger for {userInfoDialogData?.full_name}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Brugernavn: <strong>{userInfoDialogData?.username}</strong>
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Adgangskode: <strong>{userInfoDialogData?.password}</strong>
+          </Typography>
+          {userInfoDialogData?.schoolName && (
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              Skole: <strong>{userInfoDialogData.schoolName}</strong>
+            </Typography>
+          )}
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Email: <strong>{userInfoDialogData?.email}</strong>
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Notér venligst disse oplysninger — adgangskoden vises ikke igen.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="contained" onClick={() => setUserInfoDialogOpen(false)}>
+            Luk
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

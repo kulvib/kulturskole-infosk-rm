@@ -11,11 +11,6 @@ from starlette.staticfiles import StaticFiles
 
 load_dotenv()
 
-# Valider kritiske miljøvariabler ved opstart
-_SECRET_KEY = os.getenv("SECRET_KEY", "")
-if not _SECRET_KEY or len(_SECRET_KEY) < 32:
-    raise RuntimeError("SECRET_KEY mangler eller er for kort. Sæt SECRET_KEY (min. 32 tegn) i .env")
-
 _ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 if not _ADMIN_PASSWORD or len(_ADMIN_PASSWORD) < 12:
     raise RuntimeError("ADMIN_PASSWORD mangler eller er for svagt. Sæt ADMIN_PASSWORD (min. 12 tegn) i .env")
@@ -28,6 +23,7 @@ from routers import meta
 from routers import schools
 from routers import users
 from routers import livestream
+from routers import holidays
 from routers.livestream import HLS_DIR
 
 print("### main.py: livestream importeret ###")
@@ -82,13 +78,13 @@ app = FastAPI(
     openapi_url=None if os.getenv("ENVIRONMENT") == "production" else "/openapi.json",
 )
 
-# CORS
+# CORS — begræns til nødvendige metoder og headere
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 
@@ -137,6 +133,13 @@ app.include_router(calendar.router, prefix="/api")
 app.include_router(meta.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(livestream.router, prefix="/api")
+app.include_router(holidays.router, prefix="/api")
+
+
+@app.get("/health")
+def health():
+    """Render healthcheck-endpoint."""
+    return {"status": "ok"}
 
 
 @app.get("/")

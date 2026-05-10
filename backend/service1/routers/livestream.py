@@ -6,9 +6,12 @@ from typing import Dict, List
 
 from fastapi import (
     APIRouter, WebSocket, WebSocketDisconnect,
-    UploadFile, File, HTTPException, Form, Body, Response, Depends
+    UploadFile, File, HTTPException, Form, Body, Response, Depends, Query
 )
-from auth import get_current_user
+from auth import get_current_user, verify_ws_token
+from db import get_session
+from models import utcnow
+from sqlmodel import Session
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SERVICE1_HLS_DIR = os.path.join(BASE_DIR, "..", "service1", "hls")
@@ -20,11 +23,6 @@ else:
 os.makedirs(HLS_DIR, exist_ok=True)
 
 router = APIRouter()
-
-
-def utcnow() -> datetime:
-    """Returnerer nuværende UTC-tid (ikke-deprecated)."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def safe_client_dir(client_id: str) -> str:
@@ -254,10 +252,22 @@ rooms: Dict[str, Room] = {}
 
 
 @router.websocket("/ws/livestream/{client_id}")
-async def livestream_endpoint(websocket: WebSocket, client_id: str):
+async def livestream_endpoint(
+    websocket: WebSocket,
+    client_id: str,
+    token: str = Query(default=None)
+):
     if not re.match(r'^[a-zA-Z0-9_-]+$', client_id):
         await websocket.close(code=1008)
         return
+
+    # Autentificer bruger via JWT-token i query-parameter
+    from db import engine
+    with Session(engine) as session:
+        user = verify_ws_token(token, session)
+        if not user:
+            await websocket.close(code=4001)
+            return
 
     await websocket.accept()
     if client_id not in rooms:

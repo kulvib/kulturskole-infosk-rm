@@ -28,9 +28,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
-import axios from "axios";
-
-const API_URL = "https://kulturskole-infosk-rm.onrender.com";
+import { getSchools, addSchool, getSchoolTimes, updateSchoolTimes, deleteSchool, updateSchoolName, getSchoolClients } from "../../api";
 
 export default function SchoolAdministration() {
   const [schools, setSchools] = useState([]);
@@ -63,10 +61,8 @@ export default function SchoolAdministration() {
 
   useEffect(() => {
     setLoadingSchools(true);
-    axios.get(`${API_URL}/api/schools/`, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
-    })
-      .then(res => setSchools(Array.isArray(res.data) ? res.data : []))
+    getSchools()
+      .then(data => setSchools(Array.isArray(data) ? data : []))
       .catch(() => {
         setSchools([]);
         setError("Kunne ikke hente skoler");
@@ -75,12 +71,10 @@ export default function SchoolAdministration() {
 
   useEffect(() => {
     if (!selectedSchool) return;
-    axios.get(`${API_URL}/api/schools/${selectedSchool}/times/`, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
-    })
-      .then(res => {
-        setWeekdayTimes(res.data.weekday || { onTime: "09:00", offTime: "22:30" });
-        setWeekendTimes(res.data.weekend || { onTime: "08:00", offTime: "18:00" });
+    getSchoolTimes(selectedSchool)
+      .then(data => {
+        setWeekdayTimes(data.weekday || { onTime: "09:00", offTime: "22:30" });
+        setWeekendTimes(data.weekend || { onTime: "08:00", offTime: "18:00" });
       })
       .catch(() => {
         setWeekdayTimes({ onTime: "09:00", offTime: "22:30" });
@@ -96,16 +90,14 @@ export default function SchoolAdministration() {
       setError("Skolen findes allerede!");
       return;
     }
-    axios.post(`${API_URL}/api/schools/`, { name }, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
-    })
-      .then(res => {
-        setSchools(Array.isArray(schools) ? [...schools, res.data] : [res.data]);
+    addSchool(name)
+      .then(data => {
+        setSchools(Array.isArray(schools) ? [...schools, data] : [data]);
         setSchoolName("");
         showSnackbar("Skole oprettet!", "success");
       })
       .catch(e => {
-        setError(e.response?.data?.detail || e.message || "Fejl ved oprettelse");
+        setError(e.message || "Fejl ved oprettelse");
         showSnackbar("Fejl ved oprettelse af skole", "error");
       });
   };
@@ -113,13 +105,11 @@ export default function SchoolAdministration() {
   const handleSaveTimes = async () => {
     if (!selectedSchool) return;
     try {
-      await axios.patch(`${API_URL}/api/schools/${selectedSchool}/times/`, {
+      await updateSchoolTimes(selectedSchool, {
         weekday_on: weekdayTimes.onTime,
         weekday_off: weekdayTimes.offTime,
         weekend_on: weekendTimes.onTime,
         weekend_off: weekendTimes.offTime
-      }, {
-        headers: { Authorization: "Bearer " + localStorage.getItem("token") }
       });
       showSnackbar("Standard tider gemt for skole!", "success");
     } catch (e) {
@@ -134,11 +124,9 @@ export default function SchoolAdministration() {
     setDeleteDialogOpen(true);
     setLoadingClients(true);
     setDeleteStep(1);
-    axios.get(`${API_URL}/api/schools/${school.id}/clients/`, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
-    })
-      .then(res => {
-        setClientsToDelete(Array.isArray(res.data) ? res.data : []);
+    getSchoolClients(school.id)
+      .then(data => {
+        setClientsToDelete(Array.isArray(data) ? data : []);
         setLoadingClients(false);
       })
       .catch(() => {
@@ -151,9 +139,7 @@ export default function SchoolAdministration() {
 
   const handleFinalDeleteSchool = () => {
     if (!schoolToDelete) return;
-    axios.delete(`${API_URL}/api/schools/${schoolToDelete.id}/`, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
-    })
+    deleteSchool(schoolToDelete.id)
       .then(() => {
         setSchools(Array.isArray(schools) ? schools.filter(s => s.id !== schoolToDelete.id) : []);
         if (selectedSchool === schoolToDelete.id) {
@@ -168,7 +154,7 @@ export default function SchoolAdministration() {
         showSnackbar("Skole og tilknyttede klienter er slettet!", "success");
       })
       .catch(e => {
-        setDeleteError("Kunne ikke slette skole: " + (e.response?.data?.detail || ""));
+        setDeleteError("Kunne ikke slette skole: " + (e.message || ""));
         showSnackbar("Fejl ved sletning af skole", "error");
       });
   };
@@ -227,16 +213,14 @@ export default function SchoolAdministration() {
       setEditSchoolError("Skolenavnet findes allerede");
       return;
     }
-    axios.patch(`${API_URL}/api/schools/${school.id}/`, { name: trimmedName }, {
-      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
-    })
-      .then(res => {
-        setSchools(schools.map(s => s.id === school.id ? res.data : s));
+    updateSchoolName(school.id, trimmedName)
+      .then(data => {
+        setSchools(schools.map(s => s.id === school.id ? data : s));
         showSnackbar("Skolenavn opdateret!", "success");
         handleCancelEditSchool();
       })
       .catch(e => {
-        setEditSchoolError(e.response?.data?.detail || "Fejl ved opdatering");
+        setEditSchoolError(e.message || "Fejl ved opdatering");
       });
   };
 

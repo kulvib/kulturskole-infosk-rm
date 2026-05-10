@@ -1,17 +1,16 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import Dashboard from "./components/Dashboard";
-import ClientInfoPage from "./components/ClientInfoPage";
-import ClientDetailsPageWrapper from "./components/ClientDetailsPage/ClientDetailsPageWrapper";
-import LoginPage from "./components/LoginPage";
-import HomePage from "./components/HomePage";
-import NotFound from "./components/NotFound";
+import Dashboard from "./Dashboard";
+import ClientInfoPage from "./pages/ClientInfoPage";
+import ClientDetailsPageWrapper from "./pages/clientdetailspage/ClientDetailsPageWrapper";
+import LoginPage from "./LoginPage";
+import HomePage from "./HomePage";
+import NotFound from "./NotFound";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import AdminRoute from "./auth/AdminRoute";
-import CalendarPage from "./components/CalendarPage/CalendarPage";
-import AdminPage from "./components/AdminPage/AdminPage";
+import CalendarPage from "./pages/calendarpage/CalendarPage";
+import AdminPage from "./pages/adminpages/AdminPage";
 import RemoteDesktop from "./components/RemoteDesktop";
-// import LivestreamTest from "./components/LivestreamTest"; // FJERNET
 
 export default function App() {
   return (

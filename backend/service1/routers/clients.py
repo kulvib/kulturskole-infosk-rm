@@ -415,7 +415,6 @@ async def remove_client(id: int, session=Depends(get_session), user=Depends(get_
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     session.exec(delete(CalendarMarking).where(CalendarMarking.client_id == client.id))
-    session.commit()
     session.delete(client)
     session.commit()
     return {"ok": True}

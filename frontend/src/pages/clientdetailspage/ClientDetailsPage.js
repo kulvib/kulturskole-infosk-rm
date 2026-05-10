@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Box, Grid } from "@mui/material";
 import ClientDetailsHeaderSection from "./ClientDetailsHeaderSection";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
-import ClientDetailsActionsSection from "./ClientDetailsActionsSection";
+import ClientDetailsActionsSection from "./DetailsActionsSection";
 import ClientDetailsLivestreamSection from "./ClientDetailsLivestreamSection";
-import ClientCalendarDialog from "../CalendarPage/ClientCalendarDialog";
+import ClientCalendarDialog from "../calendarpage/ClientCalendarDialog";
 import {
   updateClient,
   pushKioskUrl,
