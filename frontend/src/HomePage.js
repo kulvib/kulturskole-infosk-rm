@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Typography, Paper, Button, Stack } from "@mui/material";
 import { Link } from "react-router-dom";
-import { useAuth } from "../auth/authcontext";
+import { useAuth } from "./auth/authcontext";
 import { getSchools } from "./api";
 
 export default function HomePage() {
