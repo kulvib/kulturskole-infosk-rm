@@ -38,7 +38,7 @@ ADMIN_PASSWORD = _ADMIN_PASSWORD
 ALLOWED_ORIGINS = [
     o.strip() for o in os.getenv(
         "ALLOWED_ORIGINS",
-        "https://infoskaerm-frontend.netlify.app"
+        "https://infoskaerm-frontend.onrender.com"
     ).split(",")
 ]
 
