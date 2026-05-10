@@ -18,7 +18,7 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import { useTheme, alpha } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
 
-const API_BASE = process.env.REACT_APP_API_URL || "https://kulturskole-infosk-rm.onrender.com";
+import { apiUrl } from "../../api";
 
 // Helper: Retry utility
 async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
@@ -118,7 +118,7 @@ export default function ClientDetailsLivestreamSection({
     setError("");
     const video = videoRef.current;
     if (!video) return;
-    const hlsUrl = `${API_BASE}/hls/${clientId}/index.m3u8`;
+    const hlsUrl = `${apiUrl}/hls/${clientId}/index.m3u8`;
 
     let hls;
     let fatalErrorTimeout = null;
@@ -230,7 +230,7 @@ export default function ClientDetailsLivestreamSection({
       while (!stop) {
         try {
           const resp = await fetchWithRetry(
-            `${API_BASE}/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`
+            `${apiUrl}/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`
           );
           if (resp.ok) {
             const data = await resp.json();

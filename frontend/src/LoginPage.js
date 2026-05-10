@@ -19,7 +19,7 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 export default function LoginPage() {
-  const { token, loginUser } = useAuth();
+  const { user, loginUser } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -32,13 +32,13 @@ export default function LoginPage() {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
-    if (token) {
+    if (user) {
       setStatus("Login gennemført. Omdirigerer...");
       setTimeout(() => {
         navigate("/", { replace: true });
       }, 800);
     }
-  }, [token, navigate]);
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,18 +50,14 @@ export default function LoginPage() {
       setStatus("Tjekker brugernavn og kodeord...");
       const data = await login(username, password);
 
-      if (data && data.access_token) {
+      if (data && data.user) {
         setStatus("Login gennemført. Omdirigerer...");
 
-        // Byg brugerobjektet til AuthContext
-        let userObj;
-        if (data.user) {
-          userObj = data.user;
-        } else {
-          userObj = { username, fullName: username };
-        }
-
-        loginUser(data.access_token, userObj);
+        // Byg brugerobjektet til AuthContext (token er i HttpOnly-cookie)
+        loginUser(data.user);
+      } else if (data && data.access_token) {
+        // Baglæns kompatibilitet
+        loginUser(data.user || { username });
       } else {
         setError("Uventet svar fra serveren.");
         setStatus("Login mislykkedes.");

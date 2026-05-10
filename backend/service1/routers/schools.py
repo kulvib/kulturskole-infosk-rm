@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import select
 from db import get_session
-from models import School, Client, CalendarMarking
+from models import School, SchoolCreate, Client, CalendarMarking, User
 from pydantic import BaseModel
 from auth import get_current_user, get_current_admin_user
 
@@ -14,14 +14,21 @@ def get_schools(session=Depends(get_session), user=Depends(get_current_user)):
 
 
 @router.post("/schools/", response_model=School)
-def create_school(school: School, session=Depends(get_session), admin=Depends(get_current_admin_user)):
+def create_school(school: SchoolCreate, session=Depends(get_session), admin=Depends(get_current_admin_user)):
     existing = session.exec(select(School).where(School.name == school.name)).first()
     if existing:
         raise HTTPException(status_code=400, detail="Skolen findes allerede")
-    session.add(school)
+    new_school = School(
+        name=school.name,
+        weekday_on=school.weekday_on,
+        weekday_off=school.weekday_off,
+        weekend_on=school.weekend_on,
+        weekend_off=school.weekend_off,
+    )
+    session.add(new_school)
     session.commit()
-    session.refresh(school)
-    return school
+    session.refresh(new_school)
+    return new_school
 
 
 @router.get("/schools/{school_id}/clients/", response_model=list[Client])
@@ -34,6 +41,7 @@ def delete_school(school_id: int, session=Depends(get_session), admin=Depends(ge
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
+    # Slet tilknyttede klienter og deres kalenderdata
     clients = session.exec(select(Client).where(Client.school_id == school_id)).all()
     for client in clients:
         markings = session.exec(
@@ -42,6 +50,11 @@ def delete_school(school_id: int, session=Depends(get_session), admin=Depends(ge
         for marking in markings:
             session.delete(marking)
         session.delete(client)
+    # Slet tilknyttede brugere (fjern skole-tilknytning)
+    school_users = session.exec(select(User).where(User.school_id == school_id)).all()
+    for school_user in school_users:
+        school_user.school_id = None
+        session.add(school_user)
     session.delete(school)
     session.commit()
 

@@ -1,12 +1,11 @@
+// src/auth/ProtectedRoute.js
+// Beskytter routes mod ikke-indloggede brugere.
+// Validerer sessionen ved at kalde GET /auth/me (bruger HttpOnly-cookie).
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../auth/authcontext";
+import { useAuth } from "./authcontext";
 import { apiUrl } from "../api";
 
-/**
- * ProtectedRoute beskytter routes mod ikke-indloggede brugere.
- * Validerer token mod backend ved første indlæsning.
- */
 export default function ProtectedRoute({ children }) {
   const { user, logoutUser } = useAuth();
   const [valid, setValid] = useState(null); // null = tjekker stadig
@@ -17,7 +16,7 @@ export default function ProtectedRoute({ children }) {
       return;
     }
 
-    // Validér session mod backend via cookie
+    // Validér session mod backend via cookie (credentials: "include")
     fetch(`${apiUrl}/auth/me`, { credentials: "include" })
       .then(res => {
         if (res.status === 401 || res.status === 403) {
@@ -28,17 +27,13 @@ export default function ProtectedRoute({ children }) {
         }
       })
       .catch(() => {
+        // Netværksfejl — lad brugeren fortsætte, backend afviser ugyldige cookies
         setValid(true);
       });
   }, [user, logoutUser]);
 
-  // Ikke logget ind
   if (!user) return <Navigate to="/login" replace />;
-
-  // Venter på svar fra backend
   if (valid === null) return null;
-
-  // Session ugyldig
   if (!valid) return <Navigate to="/login" replace />;
 
   return children;

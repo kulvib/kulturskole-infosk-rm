@@ -3,13 +3,14 @@ import re
 import time
 import threading
 from collections import defaultdict
-from fastapi import APIRouter, HTTPException, Depends, Request, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import APIRouter, HTTPException, Depends, Request, Response, status
+from fastapi.security import OAuth2, OAuth2PasswordRequestForm
+from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
 from passlib.context import CryptContext
 from sqlmodel import Session, select
 from typing import Optional
-from datetime import datetime, timedelta, timezone
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import InvalidTokenError
 from dotenv import load_dotenv
 
 from db import get_session
@@ -25,7 +26,39 @@ if not SECRET_KEY or len(SECRET_KEY) < 32:
     )
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+IS_PRODUCTION = os.getenv("ENVIRONMENT", "production") == "production"
+
+from datetime import datetime, timedelta, timezone
+
+# ---------------------------------------------------------------------------
+# OAuth2-skema: accepterer token fra både Authorization-header og cookie.
+# Bevarer bagudkompatibilitet med eksterne klienter (Raspberry Pi) der bruger
+# Authorization: Bearer <token>, mens browsere bruger HttpOnly-cookie.
+# ---------------------------------------------------------------------------
+class OAuth2PasswordBearerOrCookie(OAuth2):
+    def __init__(self, tokenUrl: str, auto_error: bool = True):
+        flows = OAuthFlowsModel(password={"tokenUrl": tokenUrl, "scopes": {}})
+        super().__init__(flows=flows, auto_error=auto_error)
+        self.auto_error = auto_error
+
+    async def __call__(self, request: Request) -> Optional[str]:
+        # Prøv Authorization-header først (bruges af eksterne klienter)
+        authorization = request.headers.get("Authorization")
+        if authorization and authorization.lower().startswith("bearer "):
+            return authorization[7:]
+        # Prøv derefter HttpOnly-cookie (bruges af browser-frontend)
+        token = request.cookies.get("access_token")
+        if token:
+            return token
+        if self.auto_error:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return None
+
 
 # Kodeordskrav — samme grænse som main.py
 MIN_PASSWORD_LENGTH = 12
@@ -33,7 +66,7 @@ PASSWORD_REGEX = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$')
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+oauth2_scheme = OAuth2PasswordBearerOrCookie(tokenUrl="auth/token")
 
 
 # ---------------------------------------------------------------------------
@@ -106,8 +139,22 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def _set_auth_cookie(response: Response, access_token: str):
+    """Sætter HttpOnly-cookie med adgangstoken. SameSite=None;Secure i produktion."""
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=IS_PRODUCTION,
+        samesite="none" if IS_PRODUCTION else "lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+
+
 @router.post("/token")
 def login_for_access_token(
+    response: Response,
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_session)
@@ -133,11 +180,13 @@ def login_for_access_token(
 
     access_token = create_access_token(data={
         "sub": user.username,
-        "role": getattr(user, "role", "admin")
+        "role": getattr(user, "role", "bruger"),
     })
+    _set_auth_cookie(response, access_token)
+
     user_data = {
         "username": user.username,
-        "role": getattr(user, "role", "admin"),
+        "role": getattr(user, "role", "bruger"),
         "full_name": user.full_name,
         "remarks": user.remarks,
         "school_id": user.school_id,
@@ -147,6 +196,49 @@ def login_for_access_token(
         "access_token": access_token,
         "token_type": "bearer",
         "user": user_data
+    }
+
+
+@router.post("/logout")
+def logout(response: Response):
+    """Sletter adgangstoken-cookie ved logout."""
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=IS_PRODUCTION,
+        samesite="none" if IS_PRODUCTION else "lax",
+        path="/",
+    )
+    return {"ok": True}
+
+
+@router.get("/me")
+def get_me(
+    token: str = Depends(oauth2_scheme),
+    session: Session = Depends(get_session)
+):
+    """Returnerer den aktuelle brugers oplysninger. Bruges af ProtectedRoute til session-validering."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Kunne ikke validere legitimationsoplysninger",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except InvalidTokenError:
+        raise credentials_exception
+    user = session.exec(select(User).where(User.username == username)).first()
+    if not user or not user.is_active:
+        raise credentials_exception
+    return {
+        "username": user.username,
+        "role": user.role,
+        "full_name": user.full_name,
+        "email": user.email,
+        "school_id": user.school_id,
     }
 
 
@@ -165,7 +257,7 @@ def get_current_admin_user(
         role: str = payload.get("role")
         if username is None or role is None:
             raise credentials_exception
-    except JWTError:
+    except InvalidTokenError:
         raise credentials_exception
 
     user = session.exec(select(User).where(User.username == username)).first()
@@ -190,10 +282,27 @@ def get_current_user(
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
-    except JWTError:
+    except InvalidTokenError:
         raise credentials_exception
 
     user = session.exec(select(User).where(User.username == username)).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=403, detail="Inaktiv eller ukendt bruger")
+    return user
+
+
+def verify_ws_token(token: str, session: Session) -> Optional[User]:
+    """Validerer en JWT-token til WebSocket-forbindelser. Returnerer User eller None."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if not username:
+            return None
+    except InvalidTokenError:
+        return None
+    user = session.exec(select(User).where(User.username == username)).first()
+    if not user or not user.is_active:
+        return None
     return user

@@ -2,9 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Box, Typography, Paper, Button, Stack } from "@mui/material";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/authcontext";
-import axios from "axios";
-
-const API_URL = "https://kulturskole-infosk-rm.onrender.com";
+import { getSchools } from "./api";
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -13,12 +11,8 @@ export default function HomePage() {
   // Hent school name hvis bruger
   useEffect(() => {
     if (user && user.role === "bruger" && user.school_id) {
-      axios
-        .get(`${API_URL}/api/schools/`, {
-          headers: { Authorization: "Bearer " + localStorage.getItem("token") },
-        })
-        .then((res) => {
-          const schools = res.data;
+      getSchools()
+        .then((schools) => {
           const school = schools.find((s) => s.id === user.school_id);
           setSchoolName(school ? school.name : "");
         })

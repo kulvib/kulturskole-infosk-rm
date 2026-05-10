@@ -124,3 +124,18 @@ class CalendarMarking(SQLModel, table=True):
     season: int = Field(index=True)
     client_id: int = Field(index=True)
     markings: Dict[str, Any] = Field(sa_column=Column(JSON))
+
+
+class Holiday(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    date: str = Field(index=True)        # ISO-datoformat "YYYY-MM-DD"
+    description: Optional[str] = None
+
+
+class SchoolCreate(SQLModel):
+    """Bruges til oprettelse af skoler — tillader ikke klient at sætte SQL-primærnøgle."""
+    name: str
+    weekday_on: Optional[str] = Field(default="09:00")
+    weekday_off: Optional[str] = Field(default="22:30")
+    weekend_on: Optional[str] = Field(default="08:00")
+    weekend_off: Optional[str] = Field(default="18:00")

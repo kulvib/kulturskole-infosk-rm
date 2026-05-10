@@ -119,9 +119,29 @@ def update_user(
     if user_update.password is not None:
         validate_password_strength(user_update.password)
         user.hashed_password = get_password_hash(user_update.password)
+    # Beskyt mod at fjerne den eneste aktive administrator
+    if user_update.role is not None and user_update.role != "admin" and user.role == "admin":
+        active_admins = session.exec(
+            select(User).where(User.role == "admin", User.is_active == True)
+        ).all()
+        if len(active_admins) <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Kan ikke ændre rollen på den eneste aktive administrator"
+            )
     if user_update.role is not None:
         user.role = user_update.role
     if user_update.is_active is not None:
+        # Beskyt mod at deaktivere den eneste aktive admin
+        if not user_update.is_active and user.role == "admin":
+            active_admins = session.exec(
+                select(User).where(User.role == "admin", User.is_active == True)
+            ).all()
+            if len(active_admins) <= 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Kan ikke deaktivere den eneste aktive administrator"
+                )
         user.is_active = user_update.is_active
     if user_update.school_id is not None:
         user.school_id = user_update.school_id
