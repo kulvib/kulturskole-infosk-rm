@@ -1,12 +1,12 @@
-fastapi[all]
+fastapi[all]>=0.115.0
 sqlmodel
 passlib[bcrypt]
-python-jose[cryptography]
+python-jose[cryptography]>=3.3.0
 bcrypt==4.0.1
 pydantic
 uvicorn[standard]
 python-dotenv
-python-multipart
+python-multipart>=0.0.27
 psycopg2-binary
 alembic
 requests
