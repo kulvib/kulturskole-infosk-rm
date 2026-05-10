@@ -16,6 +16,8 @@ router = APIRouter()
 HLS_BASE_DIR = os.getenv("HLS_BASE_DIR", "/opt/render/project/src/backend/service1/hls")
 CHROME_STATUS_PATH = os.getenv("CHROME_STATUS_PATH", "/home/kulturskolenviborg/api/chrome_status.json")
 
+VALID_CLIENT_STATES = {"normal", "sleep", "wakeup", "shutdown", "error"}
+
 
 def is_online(client: Client) -> bool:
     if client.last_seen is None:
@@ -132,6 +134,11 @@ def update_client_state(
     state = data.get("state")
     if not state:
         raise HTTPException(status_code=400, detail="Missing state")
+    if state not in VALID_CLIENT_STATES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ugyldig state '{state}'. Tilladte værdier: {sorted(VALID_CLIENT_STATES)}"
+        )
     client.state = state
     session.add(client)
     session.commit()
@@ -344,7 +351,7 @@ async def approve_client(
     id: int,
     data: dict = Body(None),
     session=Depends(get_session),
-    user=Depends(get_current_user)
+    user=Depends(get_current_admin_user)
 ):
     client = session.get(Client, id)
     if not client:
@@ -403,7 +410,7 @@ def client_heartbeat(id: int, session=Depends(get_session), user=Depends(get_cur
 
 
 @router.delete("/clients/{id}/remove")
-async def remove_client(id: int, session=Depends(get_session), user=Depends(get_current_user)):
+async def remove_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")

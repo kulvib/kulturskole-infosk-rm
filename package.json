@@ -10,6 +10,6 @@
   "dependencies": {
     "mediasoup": "^3.11.7",
     "express": "^4.19.2",
-    "ws": "^8.17.0"
+    "ws": "^8.17.1"
   }
 }

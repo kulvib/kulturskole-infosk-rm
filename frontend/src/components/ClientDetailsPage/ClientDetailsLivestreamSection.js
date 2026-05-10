@@ -18,7 +18,7 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import { useTheme, alpha } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
 
-const API_BASE = "https://kulturskole-infosk-rm.onrender.com";
+const API_BASE = process.env.REACT_APP_API_URL || "https://kulturskole-infosk-rm.onrender.com";
 
 // Helper: Retry utility
 async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
