@@ -91,13 +91,17 @@ def get_chrome_status(id: int, session=Depends(get_session), user=Depends(get_cu
             "chrome_status": last_step.get("message", "unknown"),
             "chrome_last_updated": last_step.get("timestamp", None),
             "chrome_color": last_step.get("color", None),
-            "step": last_step
+            "step": last_step,
+            "last_seen": client.last_seen,
+            "uptime": client.uptime,
         }
     return {
         "client_id": client.id,
         "chrome_status": getattr(client, "chrome_status", "unknown"),
         "chrome_last_updated": getattr(client, "chrome_last_updated", None),
-        "chrome_color": getattr(client, "chrome_color", None)
+        "chrome_color": getattr(client, "chrome_color", None),
+        "last_seen": client.last_seen,
+        "uptime": client.uptime,
     }
 
 
@@ -460,6 +464,4 @@ def stop_hls(client_id: int, user=Depends(get_current_user)):
         try:
             os.remove(f)
             deleted.append(os.path.basename(f))
-        except Exception as e:
-            errors.append({"file": os.path.basename(f), "error": str(e)})
-    return {"status": "ok", "deleted_files": deleted, "errors": errors}
+        
