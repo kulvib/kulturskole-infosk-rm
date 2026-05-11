@@ -1,6 +1,6 @@
 // src/auth/ProtectedRoute.js
 // Beskytter routes mod ikke-indloggede brugere.
-// Validerer sessionen ved at kalde GET /auth/me (bruger HttpOnly-cookie).
+// Validerer sessionen ved at kalde GET /auth/me med Bearer token (Safari-fix).
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./authcontext";
@@ -16,8 +16,14 @@ export default function ProtectedRoute({ children }) {
       return;
     }
 
-    // Validér session mod backend via cookie (credentials: "include")
-    fetch(`${apiUrl}/auth/me`, { credentials: "include" })
+    // Byg headers med Bearer token hvis tilgængeligt (Safari-fix)
+    const token = localStorage.getItem("token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    fetch(`${apiUrl}/auth/me`, {
+      headers,
+      credentials: "include",
+    })
       .then(res => {
         if (res.status === 401 || res.status === 403) {
           logoutUser();
@@ -27,7 +33,7 @@ export default function ProtectedRoute({ children }) {
         }
       })
       .catch(() => {
-        // Netværksfejl — lad brugeren fortsætte, backend afviser ugyldige cookies
+        // Netværksfejl — lad brugeren fortsætte, backend afviser ugyldige tokens
         setValid(true);
       });
   }, [user, logoutUser]);
