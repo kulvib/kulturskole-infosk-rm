@@ -1,7 +1,7 @@
 // src/auth/authcontext.js
-// AuthContext med HttpOnly-cookie-baseret autentificering.
-// Token gemmes i HttpOnly-cookie (sat af backend) — ikke i localStorage.
-// Kun brugerobjektet gemmes i localStorage til visning i UI.
+// AuthContext med HttpOnly-cookie + Bearer token fallback for Safari.
+// Token gemmes i localStorage og sendes som Authorization-header
+// så Safari ikke blokerer cross-site cookies.
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout as apiLogout } from "../api";
@@ -28,17 +28,21 @@ export function AuthProvider({ children }) {
   const warningTimer = useRef();
   const navigate = useNavigate();
 
-  // Synkronisér brugerdata (IKKE token) med localStorage
+  // Synkronisér brugerdata og token med localStorage
   useEffect(() => {
     if (user) {
       localStorage.setItem("user", JSON.stringify(user));
     } else {
       localStorage.removeItem("user");
+      localStorage.removeItem("token");
     }
   }, [user]);
 
-  const loginUser = useCallback((userData) => {
-    // Token er i HttpOnly-cookie — gem kun brugerdata til UI
+  const loginUser = useCallback((userData, token) => {
+    // Gem token i localStorage så det kan bruges som Bearer header (Safari-fix)
+    if (token) {
+      localStorage.setItem("token", token);
+    }
     setUser(userData);
   }, []);
 
@@ -50,6 +54,7 @@ export function AuthProvider({ children }) {
     }
     setUser(null);
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
     navigate("/login", { replace: true });
   }, [navigate]);
 
