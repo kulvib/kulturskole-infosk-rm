@@ -24,7 +24,7 @@ const SERVER_MESSAGES = [
   { after:  7, msg: "Venter stadig på server..."                                    },
   { after: 15, msg: "Hænger lidt i bremsen — det er normalt ved første besøg"      },
   { after: 25, msg: "Næsten der, serveren er ved at vågne..."                       },
-  { after: 35, msg: "Det tager lidt længere end normalt — du er næsten fremme! 💪"  },
+  { after: 40, msg: "Det tager lidt længere end normalt — du er næsten fremme! 💪"  },
 ];
 
 const TIMEOUT_MS = 60_000; // 60 sekunder total
