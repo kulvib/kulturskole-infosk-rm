@@ -11,10 +11,6 @@ from starlette.staticfiles import StaticFiles
 
 load_dotenv()
 
-_ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
-if not _ADMIN_PASSWORD or len(_ADMIN_PASSWORD) < 12:
-    raise RuntimeError("ADMIN_PASSWORD mangler eller er for svagt. Sæt ADMIN_PASSWORD (min. 12 tegn) i .env")
-
 print("### main.py: Pre-router-import ###")
 
 from routers import clients
@@ -34,7 +30,6 @@ from models import User
 
 print("### main.py: Efter alle imports ###")
 
-ADMIN_PASSWORD = _ADMIN_PASSWORD
 ALLOWED_ORIGINS = [
     o.strip() for o in os.getenv(
         "ALLOWED_ORIGINS",
@@ -47,9 +42,15 @@ def ensure_admin_user():
     with Session(engine) as session:
         user = session.exec(select(User).where(User.username == "admin")).first()
         if not user:
+            admin_password = os.getenv("ADMIN_PASSWORD", "")
+            if not admin_password or len(admin_password) < 12:
+                raise RuntimeError(
+                    "ADMIN_PASSWORD mangler eller er for svagt. "
+                    "Sæt ADMIN_PASSWORD (min. 12 tegn) i Environment på Render."
+                )
             admin = User(
                 username="admin",
-                hashed_password=get_password_hash(ADMIN_PASSWORD),
+                hashed_password=get_password_hash(admin_password),
                 role="admin",
                 is_active=True,
                 email=os.getenv("ADMIN_EMAIL", "admin@example.com"),
@@ -58,10 +59,9 @@ def ensure_admin_user():
             session.commit()
             print("Admin-bruger oprettet ved opstart")
         else:
-            print("Admin-bruger eksisterer allerede")
+            print("Admin-bruger eksisterer allerede — ADMIN_PASSWORD ignoreres")
 
 
-# Moderne lifespan-håndtering (erstatter deprecated @app.on_event)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
