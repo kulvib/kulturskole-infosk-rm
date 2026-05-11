@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "./auth/authcontext";
 import { useNavigate } from "react-router-dom";
-import { login } from "./api";
+import { login, apiUrl } from "./api";
 import {
   Box,
   Button,
@@ -18,90 +18,149 @@ import {
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
-export default function LoginPage() {
-  const { user, loginUser } = useAuth();
-  const navigate = useNavigate();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(false);
+// ─── Opmuntrende beskeder mens server vågner ──────────────────────────────────
+const SERVER_MESSAGES = [
+  { after:  0, msg: "Venter på server..."                                           },
+  { after: 10, msg: "Venter stadig på server..."                                    },
+  { after: 20, msg: "Hænger lidt i bremsen — det er normalt ved første besøg"      },
+  { after: 30, msg: "Næsten der, serveren er ved at vågne..."                       },
+  { after: 45, msg: "Det tager lidt længere end normalt — du er næsten fremme! 💪"  },
+];
 
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+const TIMEOUT_MS = 60_000; // 60 sekunder total
+const RETRY_MS   =  3_000; // pause mellem database-forsøg
 
-  useEffect(() => {
-    if (user) {
-      setStatus("Login gennemført. Omdirigerer...");
-      setTimeout(() => {
-        navigate("/", { replace: true });
-      }, 800);
+
+// ─── Vent på et endpoint med retry indtil timeout ─────────────────────────────
+// Bruges til /health/db som kan svare 503 mens databasen vågner.
+
+async function waitForOk(url, timeoutMs, retryMs) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      const remaining = deadline - Date.now();
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(Math.min(10_000, remaining)),
+      });
+      if (res.ok) return true;
+      // 503/502/504 → prøv igen efter pause
+    } catch {
+      // timeout eller netværksfejl → prøv igen
     }
-  }, [user, navigate]);
+
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise((r) => setTimeout(r, Math.min(retryMs, remaining)));
+  }
+
+  return false;
+}
+
+
+// ─── LoginPage ────────────────────────────────────────────────────────────────
+
+export default function LoginPage() {
+  const { loginUser } = useAuth();
+  const navigate      = useNavigate();
+
+  const [username,     setUsername]     = useState("");
+  const [password,     setPassword]     = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error,        setError]        = useState("");
+  const [statusMsg,    setStatusMsg]    = useState("");
+  const [loading,      setLoading]      = useState(false);
+
+  const theme    = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    setStatus("Forbinder til server...");
+    setStatusMsg("");
     setLoading(true);
 
+    const startedAt = Date.now();
+
+    // ── Beskeder skifter via interval — uafhængigt af fetch ──────────────────
+    const msgInterval = setInterval(() => {
+      const elapsed = (Date.now() - startedAt) / 1000;
+      const current = [...SERVER_MESSAGES]
+        .reverse()
+        .find((m) => m.after <= elapsed);
+      if (current) setStatusMsg(current.msg);
+    }, 1000);
+
     try {
-      setStatus("Tjekker brugernavn og kodeord...");
+      // ── Trin 1: Vent på server — ét kald med 60 sek timeout ─────────────
+      setStatusMsg("Venter på server...");
+
+      const serverRes = await fetch(`${apiUrl}/health`, {
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+
+      if (!serverRes.ok) {
+        throw new Error("Serveren svarer ikke — prøv at genindlæse siden.");
+      }
+
+      // ── Trin 2: Vent på database — retry ved 503 indtil 60 sek ──────────
+      clearInterval(msgInterval);
+      setStatusMsg("Venter på database...");
+
+      const dbOk = await waitForOk(
+        `${apiUrl}/health/db`,
+        TIMEOUT_MS - (Date.now() - startedAt),
+        RETRY_MS,
+      );
+
+      if (!dbOk) {
+        throw new Error("Databasen svarer ikke — prøv at genindlæse siden.");
+      }
+
+      // ── Trin 3: Alt klar — send login ────────────────────────────────────
+      setStatusMsg("Forbinder...");
+
       const data = await login(username, password);
 
       if (data && data.user) {
-        setStatus("Login gennemført. Omdirigerer...");
-
-        // Byg brugerobjektet til AuthContext (token er i HttpOnly-cookie)
+        setStatusMsg("Login gennemført. Omdirigerer...");
         loginUser(data.user);
+        navigate("/", { replace: true });
       } else if (data && data.access_token) {
         // Baglæns kompatibilitet
         loginUser(data.user || { username });
+        navigate("/", { replace: true });
       } else {
-        setError("Uventet svar fra serveren.");
-        setStatus("Login mislykkedes.");
+        throw new Error("Uventet svar fra serveren.");
       }
     } catch (err) {
-      if (err && err.message) {
-        if (
-          err.message.toLowerCase().includes("network") ||
-          err.message.toLowerCase().includes("failed to fetch")
-        ) {
-          setStatus("Forbindelse til serveren mislykkedes.");
-          setError("Kunne ikke oprette forbindelse til serveren. Prøv igen senere.");
-        } else if (
-          err.message.toLowerCase().includes("unauthorized") ||
-          err.message.toLowerCase().includes("401")
-        ) {
-          setStatus("Forkert brugernavn eller kodeord.");
-          setError("Brugernavn eller kodeord er forkert.");
-        } else if (
-          err.message.toLowerCase().includes("locked") ||
-          err.message.toLowerCase().includes("spærret")
-        ) {
-          setStatus("Din konto er spærret.");
-          setError("Din konto er spærret. Kontakt administrator.");
-        } else {
-          setStatus("Login mislykkedes.");
-          setError(err.message);
-        }
+      if (err?.name === "TimeoutError") {
+        setError("Serveren svarer ikke — prøv at genindlæse siden.");
+      } else if (err?.message?.toLowerCase().includes("failed to fetch")) {
+        setError("Kunne ikke oprette forbindelse til serveren. Prøv igen senere.");
+      } else if (
+        err?.message?.toLowerCase().includes("locked") ||
+        err?.message?.toLowerCase().includes("spærret")
+      ) {
+        setError("Din konto er spærret. Kontakt administrator.");
       } else {
-        setStatus("Login mislykkedes.");
-        setError("Ukendt fejl.");
+        setError(err?.message || "Ukendt fejl.");
       }
+    } finally {
+      clearInterval(msgInterval);
+      setLoading(false);
+      setStatusMsg("");
     }
-    setLoading(false);
   };
 
-  const handleClickShowPassword = () => setShowPassword((show) => !show);
+  const canSubmit = username.trim() !== "" && password !== "";
 
   return (
     <Box
       sx={{
-        minHeight: "100vh",
+        minHeight:  "100vh",
         background: "linear-gradient(135deg, #b2fefa 0%, #0ed2f7 100%)",
-        display: "flex",
+        display:    "flex",
         alignItems: "center",
         justifyContent: "center",
         px: { xs: 1, sm: 0 },
@@ -110,35 +169,31 @@ export default function LoginPage() {
       <Paper
         elevation={6}
         sx={{
-          p: { xs: 2, sm: 4 },
-          width: "100%",
-          minWidth: { xs: "unset", sm: 350 },
-          maxWidth: 380,
-          textAlign: "center",
+          p:            { xs: 2, sm: 4 },
+          width:        "100%",
+          minWidth:     { xs: "unset", sm: 350 },
+          maxWidth:     380,
+          textAlign:    "center",
           borderRadius: { xs: 2, sm: 3 },
-          boxShadow: { xs: 2, sm: 6 },
+          boxShadow:    { xs: 2, sm: 6 },
         }}
       >
         <Typography
           variant="h5"
           sx={{
-            mb: 4,
-            fontWeight: 700,
-            fontSize: { xs: "1.23rem", sm: "1.5rem" },
+            mb:           4,
+            fontWeight:   700,
+            fontSize:     { xs: "1.23rem", sm: "1.5rem" },
             letterSpacing: 0.08,
           }}
         >
           Infoskærm administration
         </Typography>
+
         <Box
           component="form"
           onSubmit={handleSubmit}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            width: "100%",
-          }}
+          sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}
         >
           <TextField
             label="Brugernavn"
@@ -166,7 +221,7 @@ export default function LoginPage() {
                 <InputAdornment position="end">
                   <IconButton
                     aria-label="toggle password visibility"
-                    onClick={handleClickShowPassword}
+                    onClick={() => setShowPassword((s) => !s)}
                     edge="end"
                   >
                     {showPassword ? <VisibilityOff /> : <Visibility />}
@@ -175,15 +230,16 @@ export default function LoginPage() {
               ),
             }}
           />
+
           <Button
             type="submit"
             variant="contained"
             color="primary"
-            disabled={loading}
+            disabled={loading || !canSubmit}
             sx={{
-              mt: 1,
+              mt:        1,
               fontWeight: 600,
-              fontSize: { xs: "1.05rem", sm: "1.15rem" },
+              fontSize:  { xs: "1.05rem", sm: "1.15rem" },
               minHeight: { xs: 38, sm: 44 },
             }}
             fullWidth
@@ -191,29 +247,28 @@ export default function LoginPage() {
           >
             {loading ? (
               <>
-                <CircularProgress size={22} sx={{ mr: 1, verticalAlign: "middle" }} />
+                <CircularProgress size={22} sx={{ mr: 1, verticalAlign: "middle" }} color="inherit" />
                 Logger ind...
               </>
             ) : (
               "Log ind"
             )}
           </Button>
-          {(status || error) && (
-            <Typography
-              sx={{
-                mt: 2,
-                color: error ? "error.main" : "text.secondary",
-                fontWeight: 500,
-                minHeight: 24,
-                fontSize: { xs: "0.94rem", sm: "1rem" },
-              }}
-              variant="body2"
+
+          {/* ── Statusbesked mens vi venter ──────────────────────────────── */}
+          {statusMsg && !error && (
+            <Alert
+              severity="info"
+              icon={<CircularProgress size={16} />}
+              sx={{ mt: 1, textAlign: "left" }}
             >
-              {status}
-            </Typography>
+              {statusMsg}
+            </Alert>
           )}
+
+          {/* ── Fejlbesked ───────────────────────────────────────────────── */}
           {error && (
-            <Alert severity="error" sx={{ mt: 1 }}>
+            <Alert severity="error" sx={{ mt: 1, textAlign: "left" }}>
               {error}
             </Alert>
           )}
