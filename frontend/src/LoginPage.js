@@ -22,9 +22,9 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 const SERVER_MESSAGES = [
   { after:  0, msg: "Venter på server..." },
   { after:  7, msg: "Venter stadig på server..." },
-  { after: 15, msg: "Venter stadig på server...den er ved at vågne" },
-  { after: 25, msg: "Hænger lidt i bremsen — hav lidt mere tålmodighed" },
-  { after: 40, msg: "Det tager lidt længere end normalt — du er næsten i mål! 💪" },
+  { after: 15, msg: "Venter stadig på server...den er ved at vågne..." },
+  { after: 25, msg: "Hænger lidt i bremsen...hav lidt mere tålmodighed😃" },
+  { after: 40, msg: "Det tager lidt længere end normalt...du er næsten i mål! 💪" },
 ];
 
 const TIMEOUT_MS = 60_000; // 60 sekunder total
