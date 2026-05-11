@@ -4,8 +4,9 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
-from sqlmodel import Session, select
+from sqlmodel import Session, select, text
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.staticfiles import StaticFiles
 
@@ -136,10 +137,30 @@ app.include_router(livestream.router, prefix="/api")
 app.include_router(holidays.router, prefix="/api")
 
 
+# ─── Health endpoints ─────────────────────────────────────────────────────────
+
 @app.get("/health")
 def health():
     """Render healthcheck-endpoint."""
     return {"status": "ok"}
+
+
+@app.get("/health/db")
+def health_db():
+    """
+    Tjekker at databaseforbindelsen virker ved at køre SELECT 1.
+    Bruges af frontend til at vise konkret status til brugeren.
+    """
+    try:
+        with Session(engine) as session:
+            session.exec(text("SELECT 1"))
+        return {"status": "ok"}
+    except Exception as exc:
+        print(f"Database health check fejlede: {exc}")
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unavailable", "detail": "Databasen svarer ikke"},
+        )
 
 
 @app.get("/")
