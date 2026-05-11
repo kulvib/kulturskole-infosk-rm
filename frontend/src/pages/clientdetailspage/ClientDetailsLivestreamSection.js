@@ -20,6 +20,12 @@ import { useAuth } from "../../auth/authcontext";
 
 import { apiUrl } from "../../api";
 
+// Helper: hent auth-headers (Bearer token — Safari-fix)
+function getAuthHeaders() {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // Helper: Retry utility
 async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
   let lastError;
@@ -27,6 +33,7 @@ async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
     try {
       const resp = await fetch(url, {
         ...options,
+        headers: { ...getAuthHeaders(), ...(options.headers || {}) },
         signal: AbortSignal.timeout(5000)
       });
       if (resp.ok || attempt === maxAttempts) {
@@ -106,7 +113,6 @@ export default function ClientDetailsLivestreamSection({
   const [localRefreshKey, setLocalRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Giver et unikt key til video for _hvert_ refresh
   const effectiveRefreshKey = useMemo(() => {
     return (typeof streamKey !== "undefined" && streamKey !== null) ? streamKey : localRefreshKey;
   }, [streamKey, localRefreshKey]);
@@ -118,7 +124,11 @@ export default function ClientDetailsLivestreamSection({
     setError("");
     const video = videoRef.current;
     if (!video) return;
-    const hlsUrl = `${apiUrl}/hls/${clientId}/index.m3u8`;
+
+    const token = localStorage.getItem("token");
+    const hlsUrl = token
+      ? `${apiUrl}/hls/${clientId}/index.m3u8?token=${encodeURIComponent(token)}`
+      : `${apiUrl}/hls/${clientId}/index.m3u8`;
 
     let hls;
     let fatalErrorTimeout = null;
@@ -132,14 +142,20 @@ export default function ClientDetailsLivestreamSection({
       setManifestReady(true);
     } else if (Hls.isSupported()) {
       hls = new Hls({
-        liveSyncDurationCount: 3,         // 3 × 4s = 12s bagud — stabilt
-        liveMaxLatencyDurationCount: 6,   // max 24s bagud før den springer frem
-        maxBufferLength: 20,              // var 8 — for lavt
-        maxMaxBufferLength: 40,           // var 15 — for lavt
-        liveBackBufferLength: 8,          // behold 8s bag afspilningspunkt
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 6,
+        maxBufferLength: 20,
+        maxMaxBufferLength: 40,
+        liveBackBufferLength: 8,
         enableWorker: true,
         startLevel: -1,
-        lowLatencyMode: false,            // slå fra — segmentbaseret HLS er ikke LL-HLS
+        lowLatencyMode: false,
+        xhrSetup: function (xhr) {
+          // Sæt Authorization header på alle HLS segment-requests
+          if (token) {
+            xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+          }
+        },
       });
       hlsRef.current = hls;
       hls.loadSource(hlsUrl);
@@ -209,7 +225,6 @@ export default function ClientDetailsLivestreamSection({
     else if (video.msRequestFullscreen) video.msRequestFullscreen();
   };
 
-  // UI/UX handlers
   useEffect(() => {
     if (!showControls) return;
     const timeout = setTimeout(() => setShowControls(false), 2200);
@@ -249,14 +264,14 @@ export default function ClientDetailsLivestreamSection({
           setLastSegmentTimestamp(null);
           setLastSegmentLag(null);
         }
-        await new Promise(res => setTimeout(res, 2000));
+        await new Promise(res => setTimeout(res, 1000));
       }
     }
     pollLastSegment();
     return () => { stop = true; };
   }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
-  // Player-reported lag (from HLS instance)
+  // Player-reported lag
   useEffect(() => {
     if (!manifestReady) return;
     if (clientOnline === false) return;
@@ -335,6 +350,11 @@ export default function ClientDetailsLivestreamSection({
               alignItems: "center",
               position: "relative"
             }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => setShowControls(false)}
+            tabIndex={0}
+            onFocus={() => setShowControls(true)}
+            onBlur={() => setShowControls(false)}
           >
             <Box
               sx={{
@@ -344,11 +364,6 @@ export default function ClientDetailsLivestreamSection({
                 alignItems: "center",
                 justifyContent: "center"
               }}
-              onMouseMove={handleMouseMove}
-              onMouseLeave={() => setShowControls(false)}
-              tabIndex={0}
-              onFocus={() => setShowControls(true)}
-              onBlur={() => setShowControls(false)}
             >
               <video
                 ref={videoRef}
@@ -389,9 +404,7 @@ export default function ClientDetailsLivestreamSection({
                     opacity: showControls ? 1 : 0,
                     pointerEvents: showControls ? "auto" : "none",
                     transition: "opacity 0.3s",
-                    "&:hover": {
-                      bgcolor: alpha("#111", 0.85)
-                    }
+                    "&:hover": { bgcolor: alpha("#111", 0.85) }
                   }}
                   size={isMobile ? "small" : "medium"}
                   tabIndex={0}
@@ -403,10 +416,8 @@ export default function ClientDetailsLivestreamSection({
                 <Box
                   sx={{
                     position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "100%",
+                    top: 0, left: 0,
+                    width: "100%", height: "100%",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -450,7 +461,6 @@ export default function ClientDetailsLivestreamSection({
           </Box>
         </Grid>
 
-        {/* Kolonne 3 - kun for admin */}
         {user?.role === "admin" && (
           <Grid item xs={12} md={4} minWidth={0}>
             <Stack spacing={1}>
@@ -468,39 +478,11 @@ export default function ClientDetailsLivestreamSection({
                 </Typography>
               )}
               <Divider sx={{ my: isMobile ? 0.5 : 1 }} />
-              <Box
-                sx={{
-                  background: "#f7f7f7",
-                  borderRadius: 1,
-                  p: 1,
-                  mt: 1,
-                  mb: 1,
-                  display: "inline-block"
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: "#111",
-                    fontFamily: '"Courier New", Courier, monospace',
-                    fontWeight: 700,
-                    letterSpacing: 0.2,
-                    display: "block",
-                    mb: 0.5,
-                    fontSize: isMobile ? 11 : undefined,
-                  }}
-                >
+              <Box sx={{ background: "#f7f7f7", borderRadius: 1, p: 1, mt: 1, mb: 1, display: "inline-block" }}>
+                <Typography variant="caption" sx={{ color: "#111", fontFamily: '"Courier New", Courier, monospace', fontWeight: 700, letterSpacing: 0.2, display: "block", mb: 0.5, fontSize: isMobile ? 11 : undefined }}>
                   Debug info:
                 </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: "#222",
-                    fontFamily: '"Courier New", Courier, monospace',
-                    display: "block",
-                    fontSize: isMobile ? 11 : undefined,
-                  }}
-                >
+                <Typography variant="caption" sx={{ color: "#222", fontFamily: '"Courier New", Courier, monospace', display: "block", fontSize: isMobile ? 11 : undefined }}>
                   <Tooltip title={`Råværdi: ${playerLag ?? "-"}`}>
                     <span>playerLag=<b>{formatLagValue(playerLag)}</b></span>
                   </Tooltip>
@@ -511,31 +493,14 @@ export default function ClientDetailsLivestreamSection({
                   , lagType=<b>{lagType}</b>
                 </Typography>
                 {!isSafari() && clientOnline !== false && (
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: "#444",
-                      fontFamily: '"Courier New", Courier, monospace',
-                      textAlign: "left",
-                      mt: 1,
-                      fontSize: isMobile ? 11 : undefined,
-                    }}
-                  >
+                  <Typography variant="caption" sx={{ color: "#444", fontFamily: '"Courier New", Courier, monospace', textAlign: "left", mt: 1, fontSize: isMobile ? 11 : undefined }}>
                     Segment: <b>{currentSegment}</b>
                   </Typography>
                 )}
                 {isSafari() && clientOnline !== false && (
                   <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
                     <span role="img" aria-label="advarsel" style={{ fontSize: "1.2em", marginRight: 4 }}>⚠️</span>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: "#b25c00",
-                        fontFamily: '"Courier New", Courier, monospace',
-                        fontWeight: 700,
-                        fontSize: isMobile ? 11 : undefined,
-                      }}
-                    >
+                    <Typography variant="caption" sx={{ color: "#b25c00", fontFamily: '"Courier New", Courier, monospace', fontWeight: 700, fontSize: isMobile ? 11 : undefined }}>
                       Safari: Segmentnummer vises ikke. Forsinkelse er kun estimeret ud fra serverens sidste segment.
                     </Typography>
                   </Box>
