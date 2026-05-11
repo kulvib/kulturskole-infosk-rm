@@ -230,7 +230,8 @@ export default function ClientDetailsLivestreamSection({
       while (!stop) {
         try {
           const resp = await fetchWithRetry(
-            `${apiUrl}/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`
+            `${apiUrl}/api/hls/${clientId}/last-segment-info?nocache=${Date.now()}`,
+            { credentials: "include" }
           );
           if (resp.ok) {
             const data = await resp.json();
