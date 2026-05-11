@@ -124,11 +124,12 @@ export default function LoginPage() {
 
       if (data && data.user) {
         setStatusMsg("Login gennemført. Omdirigerer...");
-        loginUser(data.user);
+        // Send BÅDE user og access_token — token gemmes i localStorage (Safari-fix)
+        loginUser(data.user, data.access_token);
         navigate("/", { replace: true });
       } else if (data && data.access_token) {
         // Baglæns kompatibilitet
-        loginUser(data.user || { username });
+        loginUser(data.user || { username }, data.access_token);
         navigate("/", { replace: true });
       } else {
         throw new Error("Uventet svar fra serveren.");
