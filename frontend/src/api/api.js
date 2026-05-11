@@ -1,10 +1,18 @@
 // api.js
 export const apiUrl = process.env.REACT_APP_API_URL || "https://kulturskole-infosk-rm.onrender.com";
 
+// INTERN HJÆLPER: hent auth-headers (Bearer token fra localStorage — Safari-fix)
+function authHeaders(extra = {}) {
+  const token = localStorage.getItem("token");
+  return token
+    ? { Authorization: `Bearer ${token}`, ...extra }
+    : { ...extra };
+}
+
 // INTERN HJÆLPER: fælles fejlhåndtering for 401
 function handle401() {
-  // Fjern brugersession fra localStorage og omdirigér til login
   localStorage.removeItem("user");
+  localStorage.removeItem("token");
   window.location.href = "/login";
 }
 
@@ -37,6 +45,7 @@ export async function login(username, password) {
 export async function logout() {
   await fetch(`${apiUrl}/auth/logout`, {
     method: "POST",
+    headers: authHeaders(),
     credentials: "include",
   });
 }
@@ -44,6 +53,7 @@ export async function logout() {
 // HENT KLIENTER (admin)
 export async function getClients() {
   const res = await fetch(`${apiUrl}/api/clients/`, {
+    headers: authHeaders(),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
@@ -54,6 +64,7 @@ export async function getClients() {
 // HENT KLIENTER (bruger - kun egne godkendte)
 export async function getMyClients() {
   const res = await fetch(`${apiUrl}/api/clients/me`, {
+    headers: authHeaders(),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
@@ -71,6 +82,7 @@ export async function getClientsPublic() {
 // HENT ÉN KLIENT
 export async function getClient(id) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/`, {
+    headers: authHeaders(),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
@@ -81,7 +93,7 @@ export async function getClient(id) {
 // HENT KIOSK/CHROME STATUS
 export async function getChromeStatus(id, { fallbackToClient = false } = {}) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/chrome-status`, {
-    headers: { Accept: "application/json" },
+    headers: authHeaders({ Accept: "application/json" }),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
@@ -118,7 +130,7 @@ export async function getChromeStatus(id, { fallbackToClient = false } = {}) {
 export async function updateClient(id, updates) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/update`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify(updates),
   });
@@ -131,7 +143,7 @@ export async function updateClient(id, updates) {
 export async function approveClient(id, school_id) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/approve`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: school_id ? JSON.stringify({ school_id }) : undefined,
   });
@@ -144,6 +156,7 @@ export async function approveClient(id, school_id) {
 export async function removeClient(id) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/remove`, {
     method: "DELETE",
+    headers: authHeaders(),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
@@ -154,7 +167,7 @@ export async function removeClient(id) {
 export async function pushKioskUrl(id, url) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/kiosk_url`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify({ kiosk_url: url }),
   });
@@ -205,7 +218,7 @@ export async function clientAction(id, action) {
 
   const res = await fetch(url, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify(payload),
   });
@@ -218,7 +231,7 @@ export async function clientAction(id, action) {
 export async function setClientState(id, state) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/state`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify({ state }),
   });
@@ -242,7 +255,10 @@ export function getClientStream(id) {
 
 // HELLIGDAGE
 export async function getHolidays() {
-  const res = await fetch(`${apiUrl}/api/holidays/`, { credentials: "include" });
+  const res = await fetch(`${apiUrl}/api/holidays/`, {
+    headers: authHeaders(),
+    credentials: "include",
+  });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok) { throw new Error(await extractError(res, "Kunne ikke hente helligdage")); }
   return await res.json();
@@ -251,7 +267,7 @@ export async function getHolidays() {
 export async function addHoliday(date, description) {
   const res = await fetch(`${apiUrl}/api/holidays/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify({ date, description }),
   });
@@ -263,6 +279,7 @@ export async function addHoliday(date, description) {
 export async function deleteHoliday(id) {
   const res = await fetch(`${apiUrl}/api/holidays/${id}`, {
     method: "DELETE",
+    headers: authHeaders(),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
@@ -273,7 +290,7 @@ export async function deleteHoliday(id) {
 export async function saveMarkedDays(payload) {
   const res = await fetch(`${apiUrl}/api/calendar/marked-days`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify(payload),
   });
@@ -287,6 +304,7 @@ export async function getMarkedDays(season, client_id, startDate, endDate) {
   if (startDate) params.append("start_date", startDate.toISOString().slice(0, 10));
   if (endDate) params.append("end_date", endDate.toISOString().slice(0, 10));
   const res = await fetch(`${apiUrl}/api/calendar/marked-days?${params.toString()}`, {
+    headers: authHeaders(),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
@@ -295,7 +313,10 @@ export async function getMarkedDays(season, client_id, startDate, endDate) {
 }
 
 export async function getCurrentSeason() {
-  const res = await fetch(`${apiUrl}/api/calendar/season`, { credentials: "include" });
+  const res = await fetch(`${apiUrl}/api/calendar/season`, {
+    headers: authHeaders(),
+    credentials: "include",
+  });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok) { throw new Error("Kunne ikke hente aktuel sæson"); }
   return await res.json();
@@ -303,7 +324,10 @@ export async function getCurrentSeason() {
 
 // SKOLER
 export async function getSchools() {
-  const res = await fetch(`${apiUrl}/api/schools/`, { credentials: "include" });
+  const res = await fetch(`${apiUrl}/api/schools/`, {
+    headers: authHeaders(),
+    credentials: "include",
+  });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok) { throw new Error(await extractError(res, "Kunne ikke hente skoler")); }
   return await res.json();
@@ -312,7 +336,7 @@ export async function getSchools() {
 export async function addSchool(name) {
   const res = await fetch(`${apiUrl}/api/schools/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify({ name }),
   });
@@ -322,7 +346,10 @@ export async function addSchool(name) {
 }
 
 export async function getSchoolTimes(schoolId) {
-  const res = await fetch(`${apiUrl}/api/schools/${schoolId}/times`, { credentials: "include" });
+  const res = await fetch(`${apiUrl}/api/schools/${schoolId}/times`, {
+    headers: authHeaders(),
+    credentials: "include",
+  });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok) { throw new Error(await extractError(res, "Kunne ikke hente skoletider")); }
   return await res.json();
@@ -331,7 +358,7 @@ export async function getSchoolTimes(schoolId) {
 export async function updateSchoolTimes(schoolId, updates) {
   const res = await fetch(`${apiUrl}/api/schools/${schoolId}/times`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify(updates),
   });
@@ -342,7 +369,10 @@ export async function updateSchoolTimes(schoolId, updates) {
 
 // BRUGERE (admin)
 export async function getUsers() {
-  const res = await fetch(`${apiUrl}/api/users/`, { credentials: "include" });
+  const res = await fetch(`${apiUrl}/api/users/`, {
+    headers: authHeaders(),
+    credentials: "include",
+  });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok) { throw new Error(await extractError(res, "Kunne ikke hente brugere")); }
   return await res.json();
@@ -351,7 +381,7 @@ export async function getUsers() {
 export async function createUser(userData) {
   const res = await fetch(`${apiUrl}/api/users/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify(userData),
   });
@@ -363,7 +393,7 @@ export async function createUser(userData) {
 export async function updateUser(id, updates) {
   const res = await fetch(`${apiUrl}/api/users/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify(updates),
   });
@@ -375,6 +405,7 @@ export async function updateUser(id, updates) {
 export async function deleteUser(id) {
   const res = await fetch(`${apiUrl}/api/users/${id}`, {
     method: "DELETE",
+    headers: authHeaders(),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
@@ -382,7 +413,10 @@ export async function deleteUser(id) {
 }
 
 export async function getSchoolClients(schoolId) {
-  const res = await fetch(`${apiUrl}/api/schools/${schoolId}/clients/`, { credentials: "include" });
+  const res = await fetch(`${apiUrl}/api/schools/${schoolId}/clients/`, {
+    headers: authHeaders(),
+    credentials: "include",
+  });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok) { throw new Error(await extractError(res, "Kunne ikke hente klienter for skole")); }
   return await res.json();
@@ -391,6 +425,7 @@ export async function getSchoolClients(schoolId) {
 export async function deleteSchool(id) {
   const res = await fetch(`${apiUrl}/api/schools/${id}/`, {
     method: "DELETE",
+    headers: authHeaders(),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
@@ -400,7 +435,7 @@ export async function deleteSchool(id) {
 export async function updateSchoolName(id, name) {
   const res = await fetch(`${apiUrl}/api/schools/${id}/`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify({ name }),
   });
@@ -412,6 +447,7 @@ export async function updateSchoolName(id, name) {
 // LIVESTREAM
 export async function getLivestreamStatus(clientId) {
   const res = await fetch(`${apiUrl}/api/livestream/status/${clientId}`, {
+    headers: authHeaders(),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
@@ -422,6 +458,7 @@ export async function getLivestreamStatus(clientId) {
 export async function startLivestream(clientId) {
   const res = await fetch(`${apiUrl}/api/livestream/start/${clientId}`, {
     method: "POST",
+    headers: authHeaders(),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
@@ -432,10 +469,10 @@ export async function startLivestream(clientId) {
 export async function stopLivestream(clientId) {
   const res = await fetch(`${apiUrl}/api/livestream/stop/${clientId}`, {
     method: "POST",
+    headers: authHeaders(),
     credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok) { throw new Error(await extractError(res, "Kunne ikke stoppe livestream")); }
   return await res.json();
 }
-
