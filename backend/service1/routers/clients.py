@@ -464,4 +464,6 @@ def stop_hls(client_id: int, user=Depends(get_current_user)):
         try:
             os.remove(f)
             deleted.append(os.path.basename(f))
-        
+        except Exception as e:
+            errors.append({"file": os.path.basename(f), "error": str(e)})
+    return {"status": "ok", "deleted_files": deleted, "errors": errors}
