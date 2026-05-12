@@ -11,6 +11,7 @@ import AdminRoute from "./auth/AdminRoute";
 import CalendarPage from "./pages/calendarpage/CalendarPage";
 import AdminPage from "./pages/adminpages/AdminPage";
 import RemoteDesktop from "./components/RemoteDesktop";
+import ChangePassword from "./pages/ChangePassword";
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="clients" element={<ClientInfoPage />} />
         <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
         <Route path="calendar" element={<CalendarPage />} />
+        <Route path="skift-adgangskode" element={<ChangePassword />} />
         <Route
           path="administration"
           element={

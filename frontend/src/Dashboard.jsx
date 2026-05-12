@@ -25,6 +25,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
+import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import { useAuth } from "./auth/authcontext";
 import { getSchools } from "./api";
 
@@ -49,6 +50,7 @@ export default function Dashboard() {
     { text: "Forside", path: "/", match: "/", icon: <HomeIcon /> },
     { text: "Klienter", path: "/clients", match: "/clients", icon: <PeopleIcon /> },
     { text: "Kalender", path: "/calendar", match: "/calendar", icon: <CalendarMonthIcon /> },
+    { text: "Skift adgangskode", path: "/skift-adgangskode", match: "/skift-adgangskode", icon: <VpnKeyIcon /> },
     ...(user?.role === "admin"
       ? [{ text: "Administration", path: "/administration", match: "/administration", icon: <AdminPanelSettingsIcon /> }]
       : []),
@@ -186,6 +188,24 @@ export default function Dashboard() {
           </>
         ) : null}
       </Typography>
+      <Button
+        component={Link}
+        to="/skift-adgangskode"
+        variant="outlined"
+        color="inherit"
+        startIcon={<VpnKeyIcon />}
+        sx={{
+          borderColor: "white",
+          color: "white",
+          fontWeight: "normal",
+          fontSize: 16,
+          px: 2,
+          py: 0.5,
+          '&:hover': { borderColor: "#90caf9", background: "#1565c0" },
+        }}
+      >
+        SKIFT ADGANGSKODE
+      </Button>
       <Button
         variant="outlined"
         color="inherit"

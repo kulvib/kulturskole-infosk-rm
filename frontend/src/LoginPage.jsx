@@ -134,7 +134,7 @@ export default function LoginPage() {
         setStatusMsg("Login gennemført. Omdirigerer...");
         // Send BÅDE user og access_token — token gemmes i localStorage (Safari-fix)
         loginUser(data.user, data.access_token);
-        navigate("/", { replace: true });
+        navigate(data.user.must_change_password ? "/skift-adgangskode" : "/", { replace: true });
       } else if (data && data.access_token) {
         // Baglæns kompatibilitet
         loginUser(data.user || { username }, data.access_token);
