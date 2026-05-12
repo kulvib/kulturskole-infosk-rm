@@ -1,4 +1,4 @@
-// src/auth/authcontext.js
+// src/auth/authcontext.jsx
 // AuthContext med HttpOnly-cookie + Bearer token fallback for Safari.
 // Token gemmes i localStorage og sendes som Authorization-header
 // så Safari ikke blokerer cross-site cookies.

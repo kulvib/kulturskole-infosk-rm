@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import SchoolAdministration from "./SchoolAdministration";
-import UserAdministration from "./UserAdministration";
+import BrugerAdministration from "./BrugerAdministration";
 import { Box, Tabs, Tab, Paper } from "@mui/material";
 
 export default function AdminPage() {
@@ -30,7 +30,7 @@ export default function AdminPage() {
         )}
         {tabIndex === 1 && (
           <Box sx={{ mb: 4 }}>
-            <UserAdministration />
+            <BrugerAdministration />
           </Box>
         )}
       </Box>

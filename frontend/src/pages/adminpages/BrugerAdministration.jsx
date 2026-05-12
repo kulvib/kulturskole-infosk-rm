@@ -31,7 +31,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
-import { getUsers, createUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser, getSchools } from "../../api";
+import { getSchools, getUsers, createUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from "../../api";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -65,7 +65,7 @@ function generateSecurePassword() {
 }
 
 // ----------- Main Component ----------- //
-export default function UserAdministration() {
+export default function BrugerAdministration() {
   // ----------- State ----------- //
   const [users, setUsers] = useState([]);
   const [schools, setSchools] = useState([]);

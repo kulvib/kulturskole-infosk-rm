@@ -1,4 +1,4 @@
-// src/auth/AdminRoute.js
+// src/auth/AdminRoute.jsx
 // Beskytter routes mod ikke-administratorer.
 import React from "react";
 import { Navigate } from "react-router-dom";

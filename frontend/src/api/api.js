@@ -1,5 +1,5 @@
 // api.js
-export const apiUrl = process.env.REACT_APP_API_URL || "https://kulturskole-infosk-rm.onrender.com";
+export const apiUrl = import.meta.env.VITE_API_URL || "https://kulturskole-infosk-rm.onrender.com";
 
 // INTERN HJÆLPER: hent auth-headers (Bearer token fra localStorage — Safari-fix)
 function authHeaders(extra = {}) {
