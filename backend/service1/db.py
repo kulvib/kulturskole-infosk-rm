@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, create_engine, Session
+from sqlalchemy import inspect, text
 import os
 import sys
 import warnings
@@ -32,6 +33,21 @@ engine = create_engine(DATABASE_URL, echo=_echo)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+    with engine.begin() as conn:
+        inspector = inspect(conn)
+        try:
+            user_columns = {column["name"] for column in inspector.get_columns("user")}
+        except Exception:
+            user_columns = set()
+        if "must_change_password" not in user_columns:
+            if engine.dialect.name == "postgresql":
+                conn.execute(
+                    text('ALTER TABLE "user" ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE')
+                )
+            else:
+                conn.execute(
+                    text("ALTER TABLE user ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0")
+                )
 
 
 def get_session():

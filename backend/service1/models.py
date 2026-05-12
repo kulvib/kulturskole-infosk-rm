@@ -36,6 +36,7 @@ class User(SQLModel, table=True):
     hashed_password: str
     role: str = "admin"
     is_active: bool = True
+    must_change_password: bool = True
     school_id: Optional[int] = Field(default=None, foreign_key="school.id")
     full_name: Optional[str] = None
     remarks: Optional[str] = None

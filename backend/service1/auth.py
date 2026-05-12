@@ -60,9 +60,9 @@ class OAuth2PasswordBearerOrCookie(OAuth2):
         return None
 
 
-# Kodeordskrav — samme grænse som main.py
-MIN_PASSWORD_LENGTH = 12
-PASSWORD_REGEX = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$')
+# Kodeordskrav — skal holdes synkroniseret med frontend PASSWORD_REGEX
+MIN_PASSWORD_LENGTH = 8
+PASSWORD_REGEX = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$")
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -103,15 +103,13 @@ def _clear_rate_limit(ip: str):
 
 def validate_password_strength(password: str):
     """Kaster HTTPException hvis kodeordet ikke opfylder kravene."""
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Kodeord skal være mindst {MIN_PASSWORD_LENGTH} tegn langt."
-        )
     if not PASSWORD_REGEX.match(password):
         raise HTTPException(
             status_code=400,
-            detail="Kodeord skal indeholde mindst ét stort bogstav, ét lille bogstav og ét tal."
+            detail=(
+                f"Kodeord skal være mindst {MIN_PASSWORD_LENGTH} tegn langt og indeholde "
+                "mindst ét stort bogstav, ét lille bogstav og ét tal."
+            )
         )
 
 
@@ -185,12 +183,14 @@ def login_for_access_token(
     _set_auth_cookie(response, access_token)
 
     user_data = {
+        "id": user.id,
         "username": user.username,
         "role": getattr(user, "role", "bruger"),
         "full_name": user.full_name,
         "remarks": user.remarks,
         "school_id": user.school_id,
         "email": user.email,
+        "must_change_password": user.must_change_password,
     }
     return {
         "access_token": access_token,
@@ -234,11 +234,13 @@ def get_me(
     if not user or not user.is_active:
         raise credentials_exception
     return {
+        "id": user.id,
         "username": user.username,
         "role": user.role,
         "full_name": user.full_name,
         "email": user.email,
         "school_id": user.school_id,
+        "must_change_password": user.must_change_password,
     }
 
 
