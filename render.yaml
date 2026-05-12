@@ -38,7 +38,7 @@ services:
     name: infoskaerm-frontend
     rootDir: frontend
     buildCommand: "npm ci && npm run build"
-    staticPublishPath: ./build
+    staticPublishPath: ./dist
 
     headers:
       # Tillad ikke at siden indlejres i en iframe (clickjacking-beskyttelse)
@@ -75,5 +75,5 @@ services:
         destination: /index.html
 
     envVars:
-      - key: REACT_APP_API_URL
+      - key: VITE_API_URL
         sync: false
