@@ -21,13 +21,21 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 // ─── Opmuntrende beskeder mens server vågner ──────────────────────────────────
 const SERVER_MESSAGES = [
   { after:  0, msg: "Venter på server..." },
-  { after:  7, msg: "Venter stadig på server..." },
-  { after: 15, msg: "Venter stadig på server...den er ved at vågne..." },
-  { after: 25, msg: "Hænger lidt i bremsen...hav lidt mere tålmodighed 😃" },
-  { after: 40, msg: "Det tager lidt længere end normalt...du er næsten i mål! 💪" },
+  { after:  7, msg: "Venter stadig...serveren starter op 🔄" },
+  { after: 14, msg: "Det tager lidt tid...serveren vågner langsomt ☕" },
+  { after: 21, msg: "Næsten der...serveren er ved at komme sig 💤" },
+  { after: 28, msg: "Serveren strækker sig og gaber... 🥱" },
+  { after: 35, msg: "Den er ved at vågne ⏳" },
+  { after: 42, msg: "Hænger lidt i bremsen...hav tålmodighed 😃" },
+  { after: 49, msg: "Stadig i gang...du er tålmodig, vi er taknemmelige 🙏" },
+  { after: 56, msg: "Det tager lidt længere end normalt... 💪" },
+  { after: 63, msg: "Vi er stadig på sagen...giv ikke op! 🚀" },
+  { after: 70, msg: "Snart...vi lover! ⚡" },
+  { after: 77, msg: "Sidste stræk! Serveren er næsten klar 🏁" },
+  { after: 84, msg: "Øjeblik endnu...du er næsten i mål! 🎯" },
 ];
 
-const TIMEOUT_MS = 60_000; // 60 sekunder total
+const TIMEOUT_MS = 90_000; // 90 sekunder total
 const RETRY_MS   =  3_000; // pause mellem database-forsøg
 
 
