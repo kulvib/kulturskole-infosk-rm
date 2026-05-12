@@ -1,4 +1,4 @@
-// src/components/RemoteDesktop.js
+// src/components/RemoteDesktop.jsx
 // Viser fjernskrivebord for en klient via Guacamole.
 import React from "react";
 import { useParams } from "react-router-dom";

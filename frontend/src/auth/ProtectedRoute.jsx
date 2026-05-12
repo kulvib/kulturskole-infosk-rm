@@ -1,4 +1,4 @@
-// src/auth/ProtectedRoute.js
+// src/auth/ProtectedRoute.jsx
 // Beskytter routes mod ikke-indloggede brugere.
 // Validerer sessionen ved at kalde GET /auth/me med Bearer token (Safari-fix).
 import React, { useEffect, useState } from "react";
