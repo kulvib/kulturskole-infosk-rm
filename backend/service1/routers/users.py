@@ -131,7 +131,10 @@ def update_user(
             or user_update.email is not None
         )
         if non_self_fields:
-            raise HTTPException(status_code=403, detail="Du må kun ændre dit eget kodeord")
+            raise HTTPException(
+                status_code=403,
+                detail="Du må kun ændre dit eget kodeord og sætte must_change_password til false",
+            )
     if user_update.password is not None:
         validate_password_strength(user_update.password)
         user.hashed_password = get_password_hash(user_update.password)
