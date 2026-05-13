@@ -181,29 +181,29 @@ export async function clientAction(id, action) {
   let url, method, payload;
 
   if (action === "chrome-start") {
-    url = `${apiUrl}/api/clients/${id}/chrome-command`;
-    method = "POST";
-    payload = { action: "start" };
-  } else if (action === "chrome-shutdown") {
-    url = `${apiUrl}/api/clients/${id}/chrome-command`;
-    method = "POST";
-    payload = { action: "stop" };
+    url = `${apiUrl}/api/clients/${id}/update`;
+    method = "PUT";
+    payload = { pending_chrome_action: "start", pending_chrome_action_source: "actionbutton" };
+  } else if (action === "chrome-stop" || action === "chrome-shutdown") {
+    url = `${apiUrl}/api/clients/${id}/update`;
+    method = "PUT";
+    payload = { pending_chrome_action: "stop", pending_chrome_action_source: "actionbutton" };
   } else if (action === "livestream_start") {
-    url = `${apiUrl}/api/clients/${id}/chrome-command`;
-    method = "POST";
-    payload = { action: "livestream_start" };
+    url = `${apiUrl}/api/clients/${id}/update`;
+    method = "PUT";
+    payload = { pending_chrome_action: "livestream_start", pending_chrome_action_source: "actionbutton" };
   } else if (action === "livestream_stop") {
-    url = `${apiUrl}/api/clients/${id}/chrome-command`;
-    method = "POST";
-    payload = { action: "livestream_stop" };
+    url = `${apiUrl}/api/clients/${id}/update`;
+    method = "PUT";
+    payload = { pending_chrome_action: "livestream_stop", pending_chrome_action_source: "actionbutton" };
   } else if (action === "sleep") {
-    url = `${apiUrl}/api/clients/${id}/chrome-command`;
-    method = "POST";
-    payload = { action: "sleep" };
+    url = `${apiUrl}/api/clients/${id}/update`;
+    method = "PUT";
+    payload = { pending_chrome_action: "sleep", pending_chrome_action_source: "actionbutton" };
   } else if (action === "wakeup") {
-    url = `${apiUrl}/api/clients/${id}/chrome-command`;
-    method = "POST";
-    payload = { action: "wakeup" };
+    url = `${apiUrl}/api/clients/${id}/update`;
+    method = "PUT";
+    payload = { pending_chrome_action: "wakeup", pending_chrome_action_source: "actionbutton" };
   } else if (action === "restart") {
     url = `${apiUrl}/api/clients/${id}/update`;
     method = "PUT";
