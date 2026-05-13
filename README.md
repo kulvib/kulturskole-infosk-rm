@@ -43,6 +43,25 @@ Vigtige regler:
 - Kun superadmin kan tildele/redigere/slette superadmin-brugere
 - Self-service passwordskift kræver `old_password`
 
+## Mapping-tabel (timetracking → kulturskole-infoskaerm)
+
+| Timetracking-komponent/fil | Kulturskole-infoskaerm-komponent/fil |
+|---|---|
+| Global MUI ThemeProvider + CssBaseline bootstrap | `frontend/src/main.jsx` + `frontend/src/theme.js` |
+| Brugeradministration-side (tabel, sortering, søgning, roller) | `frontend/src/pages/adminpages/BrugerAdministration.jsx` |
+| Opret ny bruger-dialog (feltrækkefølge + validering + password-generator) | `frontend/src/pages/adminpages/BrugerAdministration.jsx` |
+| Rediger bruger-dialog (email-bekræftelse, status, rolle, reset password) | `frontend/src/pages/adminpages/BrugerAdministration.jsx` |
+| Slet bruger 2-trins bekræftelse + loginoplysninger-dialog | `frontend/src/pages/adminpages/BrugerAdministration.jsx` |
+
+## Kort test-vejledning
+
+1. Start backend og frontend (se kommandoer nedenfor).
+2. Log ind som admin/superadmin.
+3. Gå til **Administration → Brugeradministration**.
+4. Klik **Opret ny bruger** og verificér feltrækkefølge, validering, status-valg og password-generator.
+5. Redigér en bruger og verificér rolle/status-opdatering samt adgangskode-reset.
+6. Slet en bruger og verificér 2-trins bekræftelse.
+
 ## Lokal kørsel
 
 1. Kopiér `.env.example` til `.env` og udfyld værdier

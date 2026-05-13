@@ -30,6 +30,7 @@ import {
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import AddIcon from "@mui/icons-material/Add";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import { getSchools, getUsers, createUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from "../../api";
@@ -46,7 +47,7 @@ const ROLE_DISPLAY = {
 
 // Roller som en normal admin (ikke superadmin) må tildele
 const ADMIN_ALLOWED_ROLES = ["admin", "bruger", "viewer"];
-const USER_TABLE_COLUMN_COUNT = 10;
+const USER_TABLE_COLUMN_COUNT = 9;
 
 // ----------- Helper functions ----------- //
 function generateSecurePassword() {
@@ -57,7 +58,6 @@ function generateSecurePassword() {
   const all = lower + upper + digits + specials;
   const array = new Uint32Array(16);
   crypto.getRandomValues(array);
-  // Sørg for mindst ét tegn fra hver kategori
   let password = [
     lower[array[0] % lower.length],
     upper[array[1] % upper.length],
@@ -67,7 +67,6 @@ function generateSecurePassword() {
   for (let i = 4; i < 12; i++) {
     password.push(all[array[i] % all.length]);
   }
-  // Bland ved hjælp af Fisher-Yates med kryptografisk random
   const shuffleArr = new Uint32Array(password.length);
   crypto.getRandomValues(shuffleArr);
   for (let i = password.length - 1; i > 0; i--) {
@@ -77,10 +76,6 @@ function generateSecurePassword() {
   return password.join("");
 }
 
-/**
- * @param {string|Date|null|undefined} value
- * @returns {string}
- */
 function formatCreatedAt(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -88,65 +83,56 @@ function formatCreatedAt(value) {
   return date.toLocaleString("da-DK");
 }
 
+const EMPTY_NEW_USER = {
+  username: "",
+  password: "",
+  full_name: "",
+  role: "",
+  is_active: true,
+  school_id: "",
+  remarks: "",
+  email: "",
+  confirmEmail: "",
+};
+
 // ----------- Main Component ----------- //
 export default function BrugerAdministration() {
   const { isSuperadmin } = useAuth();
-
-  // Rolle-muligheder baseret på den nuværende brugers rolle
   const availableRoles = isSuperadmin ? Object.keys(ROLE_DISPLAY) : ADMIN_ALLOWED_ROLES;
-
-  // Hjælper: må current user administrere en given target-bruger?
   const canManageUser = (targetUser) => isSuperadmin || targetUser.role !== "superadmin";
 
   // ----------- State ----------- //
   const [users, setUsers] = useState([]);
   const [schools, setSchools] = useState([]);
-  const [userError, setUserError] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [loadingSchools, setLoadingSchools] = useState(false);
-
   const [userSort, setUserSort] = useState({ key: "username", direction: "asc" });
   const [userSearch, setUserSearch] = useState("");
 
-  // --- New user state
-  const [newUser, setNewUser] = useState({
-    username: "",
-    password: "",
-    full_name: "",
-    role: "",
-    is_active: true,
-    school_id: "",
-    remarks: "",
-    email: "",
-    confirmEmail: "",
-  });
-  const [newUserDownloadInfo, setNewUserDownloadInfo] = useState(null);
-  const [showDownloadButton, setShowDownloadButton] = useState(false);
-  const [downloadCountdown, setDownloadCountdown] = useState(10);
+  // Opret bruger dialog
+  const [opretDialogOpen, setOpretDialogOpen] = useState(false);
+  const [newUser, setNewUser] = useState(EMPTY_NEW_USER);
+  const [newUserError, setNewUserError] = useState("");
   const [savingNewUser, setSavingNewUser] = useState(false);
 
-  // --- Brugeroplysningsdialog (viser login-oplysninger efter oprettelse/ændret password)
+  // Login-oplysninger dialog
   const [userInfoDialogOpen, setUserInfoDialogOpen] = useState(false);
   const [userInfoDialogData, setUserInfoDialogData] = useState(null);
 
-  // --- Edit user state (email fields isolated)
+  // Rediger bruger dialog
   const [editUser, setEditUser] = useState(null);
   const [editUserConfirmEmail, setEditUserConfirmEmail] = useState("");
   const [editUserEmailError, setEditUserEmailError] = useState("");
+  const [editUserError, setEditUserError] = useState("");
   const [userDialogOpen, setUserDialogOpen] = useState(false);
-  const [holdEditDialogOpen, setHoldEditDialogOpen] = useState(false);
-  const [editUserDownloadInfo, setEditUserDownloadInfo] = useState(null);
-  const [showEditDownloadButton, setShowEditDownloadButton] = useState(false);
-  const [editDownloadCountdown, setEditDownloadCountdown] = useState(10);
   const [savingEditUser, setSavingEditUser] = useState(false);
 
-  // --- Delete user state
+  // Slet bruger dialog
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [deleteUserError, setDeleteUserError] = useState("");
   const [deleteUserStep, setDeleteUserStep] = useState(1);
 
-  // --- Snackbar
+  // Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const showSnackbar = (message, severity = "success") =>
     setSnackbar({ open: true, message, severity });
@@ -160,93 +146,76 @@ export default function BrugerAdministration() {
       .then(data => setUsers(Array.isArray(data) ? data : []))
       .catch(() => {
         setUsers([]);
-        setUserError("Kunne ikke hente brugere (kun admin kan se listen)");
+        showSnackbar("Kunne ikke hente brugere (kun admin kan se listen)", "error");
       })
       .finally(() => setLoadingUsers(false));
   }, []);
 
   useEffect(() => {
-    setLoadingSchools(true);
     getSchools()
       .then(data => setSchools(Array.isArray(data) ? data : []))
-      .catch(() => setSchools([]))
-      .finally(() => setLoadingSchools(false));
+      .catch(() => setSchools([]));
   }, []);
 
-  useEffect(() => {
-    let timer;
-    if (showDownloadButton && downloadCountdown > 0) {
-      timer = setTimeout(() => setDownloadCountdown(val => val - 1), 1000);
-    } else if (showDownloadButton && downloadCountdown === 0) {
-      setShowDownloadButton(false);
-      setNewUserDownloadInfo(null);
-      setDownloadCountdown(10);
-    }
-    return () => clearTimeout(timer);
-  }, [showDownloadButton, downloadCountdown]);
-
-  useEffect(() => {
-    let timer;
-    if (showEditDownloadButton && editDownloadCountdown > 0) {
-      setHoldEditDialogOpen(true);
-      timer = setTimeout(() => setEditDownloadCountdown(val => val - 1), 1000);
-    } else if (showEditDownloadButton && editDownloadCountdown === 0) {
-      setShowEditDownloadButton(false);
-      setEditUserDownloadInfo(null);
-      setEditDownloadCountdown(10);
-      setHoldEditDialogOpen(false);
-      setUserDialogOpen(false);
-    }
-    return () => clearTimeout(timer);
-  }, [showEditDownloadButton, editDownloadCountdown]);
-
   // ----------- Handlers ----------- //
-  // --- Password generator ---
+
   const handleGeneratePassword = (forEdit = false) => {
     const password = generateSecurePassword();
     if (forEdit) {
-      setEditUser(editUser => ({ ...editUser, password }));
-      showSnackbar("Password genereret!", "info");
+      setEditUser(prev => ({ ...prev, password }));
     } else {
       setNewUser(prev => ({ ...prev, password }));
-      showSnackbar("Password genereret!", "info");
     }
+    showSnackbar("Adgangskode genereret!", "info");
   };
 
-  // --- New User ---
+  // --- Opret bruger ---
+  const handleOpenOpretDialog = () => {
+    setNewUser(EMPTY_NEW_USER);
+    setNewUserError("");
+    setOpretDialogOpen(true);
+  };
+
+  const handleCloseOpretDialog = () => {
+    if (savingNewUser) return;
+    setOpretDialogOpen(false);
+    setNewUser(EMPTY_NEW_USER);
+    setNewUserError("");
+  };
+
   const handleAddUser = () => {
-    setUserError("");
-    setSavingNewUser(true);
+    setNewUserError("");
     const { username, password, full_name, role, is_active, school_id, remarks, email, confirmEmail } = newUser;
 
-    let missing = [];
+    const missing = [];
     if (!username) missing.push("Brugernavn");
-    if (!password) missing.push("Password");
     if (!full_name) missing.push("Fulde navn");
-    if (!role) missing.push("Rolle");
     if (!email) missing.push("Email");
     if (!confirmEmail) missing.push("Bekræft email");
+    if (!role) missing.push("Rolle");
     if (role === "bruger" && !school_id) missing.push("Skole");
+    if (!password) missing.push("Adgangskode (tryk 'Generer adgangskode')");
 
-    if (email && confirmEmail && email !== confirmEmail) {
-      setUserError("Email adresserne matcher ikke!");
-      setSavingNewUser(false);
-      showSnackbar("Email adresserne matcher ikke!", "error");
+    if (email && !emailRegex.test(email)) {
+      const msg = "Ugyldig emailadresse!";
+      setNewUserError(msg);
+      showSnackbar(msg, "error");
       return;
     }
-    if (email && !emailRegex.test(email)) {
-      setUserError("Ugyldig emailadresse!");
-      setSavingNewUser(false);
-      showSnackbar("Ugyldig emailadresse!", "error");
+    if (email && confirmEmail && email !== confirmEmail) {
+      const msg = "Email adresserne matcher ikke!";
+      setNewUserError(msg);
+      showSnackbar(msg, "error");
       return;
     }
     if (missing.length > 0) {
-      setUserError(missing.join(", ") + " skal udfyldes");
-      setSavingNewUser(false);
-      showSnackbar(missing.join(", ") + " skal udfyldes", "error");
+      const msg = missing.join(", ") + " skal udfyldes";
+      setNewUserError(msg);
+      showSnackbar(msg, "error");
       return;
     }
 
+    setSavingNewUser(true);
     createUser({
       username,
       password,
@@ -254,49 +223,35 @@ export default function BrugerAdministration() {
       role,
       is_active,
       school_id: role === "bruger" ? school_id : undefined,
-      remarks,
+      remarks: remarks || undefined,
       email,
     })
       .then(data => {
-        setUsers(Array.isArray(users) ? [...users, data] : [data]);
-        setNewUser({
-          username: "",
-          password: "",
-          full_name: "",
-          role: "",
-          is_active: true,
-          school_id: "",
-          remarks: "",
-          email: "",
-          confirmEmail: ""
-        });
+        setUsers(prev => Array.isArray(prev) ? [...prev, data] : [data]);
         showSnackbar("Bruger oprettet!", "success");
         const schoolName = role === "bruger"
           ? (schools.find(s => s.id === school_id)?.name ?? "")
           : "";
         setUserInfoDialogData({ full_name, username, password, schoolName, email });
         setUserInfoDialogOpen(true);
+        setOpretDialogOpen(false);
+        setNewUser(EMPTY_NEW_USER);
       })
       .catch(e => {
-        setUserError(e.message || "Fejl ved oprettelse");
-        showSnackbar("Fejl ved oprettelse af bruger", "error");
-      }).finally(() => setSavingNewUser(false));
+        const msg = e.message || "Fejl ved oprettelse";
+        setNewUserError(msg);
+        showSnackbar("Fejl ved oprettelse af bruger: " + msg, "error");
+      })
+      .finally(() => setSavingNewUser(false));
   };
 
-  // --- Edit User ---
+  // --- Rediger bruger ---
   const openEditUserDialog = (user) => {
-    setEditUser({
-      ...user,
-      password: "",
-    });
+    setEditUser({ ...user, password: "" });
     setEditUserConfirmEmail(user.email || "");
     setEditUserEmailError("");
+    setEditUserError("");
     setUserDialogOpen(true);
-    setHoldEditDialogOpen(false);
-    setUserError("");
-    setShowEditDownloadButton(false);
-    setEditUserDownloadInfo(null);
-    setEditDownloadCountdown(10);
   };
 
   const handleEditUser = () => {
@@ -317,53 +272,58 @@ export default function BrugerAdministration() {
       return;
     }
     if (!full_name) {
-      setUserError("Fulde navn skal udfyldes");
+      setEditUserError("Fulde navn skal udfyldes");
       setSavingEditUser(false);
       showSnackbar("Fulde navn skal udfyldes", "error");
       return;
     }
+
     apiUpdateUser(id, {
       role,
       is_active,
       password: password || undefined,
       full_name,
       school_id: role === "bruger" ? school_id : undefined,
-      remarks,
+      remarks: remarks || undefined,
       email,
     })
       .then(data => {
-        setUsers(users.map(u => u.id === data.id ? data : u));
-        setUserError("");
+        setUsers(prev => prev.map(u => u.id === data.id ? data : u));
         setEditUserEmailError("");
+        setEditUserError("");
         showSnackbar("Bruger opdateret!", "success");
-        const schoolName = role === "bruger" && school_id
-          ? (schools.find(s => s.id === school_id)?.name ?? "")
-          : "";
         if (password) {
+          const schoolName = role === "bruger" && school_id
+            ? (schools.find(s => s.id === school_id)?.name ?? "")
+            : "";
           setUserInfoDialogData({ full_name, username, password, schoolName, email });
           setUserInfoDialogOpen(true);
         }
         setUserDialogOpen(false);
       })
       .catch(e => {
-        setUserError(e.message || "Fejl ved opdatering");
-        showSnackbar("Fejl ved opdatering af bruger", "error");
-      }).finally(() => setSavingEditUser(false));
+        const msg = e.message || "Fejl ved opdatering";
+        setEditUserError(msg);
+        showSnackbar("Fejl ved opdatering af bruger: " + msg, "error");
+      })
+      .finally(() => setSavingEditUser(false));
   };
 
-  // --- Delete User ---
+  // --- Slet bruger ---
   const handleOpenDeleteUserDialog = (user) => {
     setUserToDelete(user);
     setDeleteUserDialogOpen(true);
     setDeleteUserError("");
     setDeleteUserStep(1);
   };
+
   const handleFirstDeleteUserConfirm = () => setDeleteUserStep(2);
+
   const handleFinalDeleteUser = () => {
     if (!userToDelete) return;
     apiDeleteUser(userToDelete.id)
       .then(() => {
-        setUsers(users.filter(u => u.id !== userToDelete.id));
+        setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
         setDeleteUserDialogOpen(false);
         setUserToDelete(null);
         setDeleteUserStep(1);
@@ -374,6 +334,7 @@ export default function BrugerAdministration() {
         showSnackbar("Fejl ved sletning af bruger", "error");
       });
   };
+
   const handleCloseDeleteUserDialog = () => {
     setDeleteUserDialogOpen(false);
     setUserToDelete(null);
@@ -381,9 +342,9 @@ export default function BrugerAdministration() {
     setDeleteUserStep(1);
   };
 
-  // --- Sorting, filtering ---
+  // --- Sortering og filtrering ---
   const getAlphaSchools = () =>
-    schools.slice().sort((a, b) => a.name.localeCompare(b.name, 'da', { sensitivity: 'base' }));
+    schools.slice().sort((a, b) => a.name.localeCompare(b.name, "da", { sensitivity: "base" }));
 
   const getSortedUsers = () => {
     let arr = users.filter(u => {
@@ -407,14 +368,16 @@ export default function BrugerAdministration() {
       switch (userSort.key) {
         case "username": aVal = a.username || ""; bVal = b.username || ""; break;
         case "fullname": aVal = a.full_name || ""; bVal = b.full_name || ""; break;
-        case "role": aVal = ROLE_DISPLAY[a.role] || a.role || "";
+        case "role":
+          aVal = ROLE_DISPLAY[a.role] || a.role || "";
           bVal = ROLE_DISPLAY[b.role] || b.role || ""; break;
-        case "school": aVal = a.school_id ? (schools.find(s => s.id === a.school_id)?.name ?? "") : "";
+        case "school":
+          aVal = a.school_id ? (schools.find(s => s.id === a.school_id)?.name ?? "") : "";
           bVal = b.school_id ? (schools.find(s => s.id === b.school_id)?.name ?? "") : ""; break;
         case "email": aVal = a.email || ""; bVal = b.email || ""; break;
         default: aVal = a.username || ""; bVal = b.username || "";
       }
-      const cmp = (aVal || "").localeCompare(bVal || "", 'da', { sensitivity: 'base' });
+      const cmp = (aVal || "").localeCompare(bVal || "", "da", { sensitivity: "base" });
       return userSort.direction === "asc" ? cmp : -cmp;
     });
     return arr;
@@ -423,393 +386,550 @@ export default function BrugerAdministration() {
   const handleUserTableSort = (key) => {
     setUserSort(prev => ({
       key,
-      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc"
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
     }));
   };
+
+  const sortIcon = (key) => {
+    if (userSort.key !== key) return null;
+    return userSort.direction === "asc"
+      ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
+      : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />;
+  };
+
+  // ----------- Delte formular-felter (identisk rækkefølge i opret og rediger) ----------- //
+  // Felter til "Opret ny bruger"-dialog
+  const opretFormFields = (
+    <Stack gap={2} sx={{ mt: 1 }}>
+      {/* 1. Brugernavn */}
+      <TextField
+        required
+        label="Brugernavn"
+        value={newUser.username}
+        onChange={e => setNewUser(prev => ({ ...prev, username: e.target.value }))}
+        fullWidth
+        size="small"
+        disabled={savingNewUser}
+        autoFocus
+      />
+      {/* 2. Fulde navn */}
+      <TextField
+        required
+        label="Fulde navn"
+        value={newUser.full_name}
+        onChange={e => setNewUser(prev => ({ ...prev, full_name: e.target.value }))}
+        fullWidth
+        size="small"
+        disabled={savingNewUser}
+      />
+      {/* 3. Email + Bekræft email */}
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={6}>
+          <TextField
+            required
+            label="Email"
+            type="email"
+            value={newUser.email}
+            onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+            fullWidth
+            size="small"
+            disabled={savingNewUser}
+            error={!!(newUser.email && !emailRegex.test(newUser.email))}
+            helperText={newUser.email && !emailRegex.test(newUser.email) ? "Ugyldig emailadresse" : ""}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            required
+            label="Bekræft email"
+            type="email"
+            value={newUser.confirmEmail}
+            onChange={e => setNewUser(prev => ({ ...prev, confirmEmail: e.target.value }))}
+            fullWidth
+            size="small"
+            disabled={savingNewUser}
+            error={!!(newUser.confirmEmail && newUser.email !== newUser.confirmEmail)}
+            helperText={newUser.confirmEmail && newUser.email !== newUser.confirmEmail ? "Email adresserne matcher ikke" : ""}
+          />
+        </Grid>
+      </Grid>
+      {/* 4. Rolle */}
+      <FormControl fullWidth size="small" required>
+        <InputLabel id="opret-rolle-label">Rolle</InputLabel>
+        <Select
+          labelId="opret-rolle-label"
+          value={newUser.role}
+          label="Rolle"
+          onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value, school_id: "" }))}
+          disabled={savingNewUser}
+        >
+          {availableRoles.map(role => (
+            <MenuItem key={role} value={role}>{ROLE_DISPLAY[role]}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      {/* 5. Skole (kun hvis rolle=bruger) */}
+      {newUser.role === "bruger" && (
+        <FormControl fullWidth size="small" required>
+          <InputLabel id="opret-skole-label">Skole</InputLabel>
+          <Select
+            labelId="opret-skole-label"
+            value={newUser.school_id}
+            label="Skole"
+            onChange={e => setNewUser(prev => ({ ...prev, school_id: e.target.value }))}
+            disabled={savingNewUser}
+          >
+            {getAlphaSchools().map(school => (
+              <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
+      {/* 6. Status */}
+      <FormControl fullWidth size="small">
+        <InputLabel id="opret-status-label">Status</InputLabel>
+        <Select
+          labelId="opret-status-label"
+          value={newUser.is_active ? "true" : "false"}
+          label="Status"
+          onChange={e => setNewUser(prev => ({ ...prev, is_active: e.target.value === "true" }))}
+          disabled={savingNewUser}
+        >
+          <MenuItem value="true">Aktiv</MenuItem>
+          <MenuItem value="false">Spærret</MenuItem>
+        </Select>
+      </FormControl>
+      {/* 7. Bemærkninger */}
+      <TextField
+        label="Bemærkninger"
+        value={newUser.remarks || ""}
+        onChange={e => setNewUser(prev => ({ ...prev, remarks: e.target.value }))}
+        fullWidth
+        size="small"
+        multiline
+        minRows={1}
+        maxRows={3}
+        disabled={savingNewUser}
+      />
+      {/* 8. Adgangskode + generator */}
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={6}>
+          <TextField
+            label="Adgangskode"
+            type="text"
+            value={newUser.password}
+            disabled
+            fullWidth
+            size="small"
+            helperText={!newUser.password ? "Klik 'Generer adgangskode' for at oprette en sikker adgangskode" : ""}
+          />
+        </Grid>
+        <Grid item xs={12} md={6} sx={{ display: "flex", alignItems: "center" }}>
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => handleGeneratePassword(false)}
+            disabled={savingNewUser}
+            fullWidth
+          >
+            Generer adgangskode
+          </Button>
+        </Grid>
+      </Grid>
+      {newUserError && (
+        <Typography color="error" variant="body2">{newUserError}</Typography>
+      )}
+    </Stack>
+  );
 
   // ----------- Render ----------- //
   return (
     <Box>
       <Paper sx={{ mb: 4, p: 3 }}>
-        <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-end">
-          <Box sx={{ flex: 2, minWidth: 340 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-              Brugeradministration
-            </Typography>
-            {/* Opret bruger-formular */}
-            <Grid container spacing={2} sx={{ mb: 1 }}>
-              {/* Linje 1 */}
-              <Grid item xs={12} md={3}>
-                <TextField required label="Brugernavn" value={newUser.username}
-                  onChange={e => setNewUser({ ...newUser, username: e.target.value })} size="small" fullWidth />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <TextField required label="Fulde navn" value={newUser.full_name}
-                  onChange={e => setNewUser({ ...newUser, full_name: e.target.value })} size="small" fullWidth />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <FormControl size="small" fullWidth required>
-                  <InputLabel id="rolle-label">Rolle</InputLabel>
-                  <Select
-                    labelId="rolle-label"
-                    value={newUser.role}
-                    label="Rolle"
+        {/* Overskrift + søgefelt + opret-knap */}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          gap={2}
+          sx={{ mb: 2 }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            Brugeradministration
+          </Typography>
+          <Stack direction="row" gap={2} alignItems="center" flexWrap="wrap">
+            <TextField
+              label="Søg"
+              size="small"
+              value={userSearch}
+              onChange={e => setUserSearch(e.target.value)}
+              sx={{ minWidth: 200 }}
+              placeholder="Søg bruger, navn, rolle, email..."
+            />
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleOpenOpretDialog}
+            >
+              Opret ny bruger
+            </Button>
+          </Stack>
+        </Stack>
+
+        {/* Brugertabel */}
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell
+                  sx={{ fontWeight: 700, cursor: "pointer" }}
+                  onClick={() => handleUserTableSort("username")}
+                >
+                  Brugernavn {sortIcon("username")}
+                </TableCell>
+                <TableCell
+                  sx={{ fontWeight: 700, cursor: "pointer" }}
+                  onClick={() => handleUserTableSort("fullname")}
+                >
+                  Fulde navn {sortIcon("fullname")}
+                </TableCell>
+                <TableCell
+                  sx={{ fontWeight: 700, cursor: "pointer" }}
+                  onClick={() => handleUserTableSort("email")}
+                >
+                  Email {sortIcon("email")}
+                </TableCell>
+                <TableCell
+                  sx={{ fontWeight: 700, cursor: "pointer" }}
+                  onClick={() => handleUserTableSort("role")}
+                >
+                  Rolle {sortIcon("role")}
+                </TableCell>
+                <TableCell
+                  sx={{ fontWeight: 700, cursor: "pointer" }}
+                  onClick={() => handleUserTableSort("school")}
+                >
+                  Skole {sortIcon("school")}
+                </TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Oprettet</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Bemærkninger</TableCell>
+                <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loadingUsers ? (
+                <TableRow>
+                  <TableCell colSpan={USER_TABLE_COLUMN_COUNT} align="center">
+                    <CircularProgress size={24} />
+                  </TableCell>
+                </TableRow>
+              ) : getSortedUsers().length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={USER_TABLE_COLUMN_COUNT} align="center" sx={{ color: "#888" }}>
+                    Ingen brugere oprettet endnu
+                  </TableCell>
+                </TableRow>
+              ) : (
+                getSortedUsers().map(user => (
+                  <TableRow key={user.id} hover>
+                    <TableCell>{user.username}</TableCell>
+                    <TableCell>{user.full_name || ""}</TableCell>
+                    <TableCell>{user.email || ""}</TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={ROLE_DISPLAY[user.role] || user.role}
+                        color={
+                          user.role === "superadmin" ? "error"
+                          : user.role === "admin" ? "warning"
+                          : "default"
+                        }
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {user.school_id
+                        ? (schools.find(s => s.id === user.school_id)?.name ?? user.school_id)
+                        : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={user.is_active ? "Aktiv" : "Spærret"}
+                        color={user.is_active ? "success" : "default"}
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>{formatCreatedAt(user.created_at)}</TableCell>
+                    <TableCell>{user.remarks || ""}</TableCell>
+                    <TableCell align="right">
+                      {canManageUser(user) ? (
+                        <>
+                          <Tooltip title="Rediger bruger">
+                            <span>
+                              <IconButton onClick={() => openEditUserDialog(user)}>
+                                <EditIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title="Slet bruger">
+                            <span>
+                              <IconButton
+                                color="error"
+                                onClick={() => handleOpenDeleteUserDialog(user)}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </>
+                      ) : (
+                        <Tooltip title="Kun superadministratorer kan administrere denne bruger">
+                          <span>
+                            <IconButton disabled>
+                              <EditIcon />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* ===== Opret ny bruger dialog ===== */}
+      <Dialog
+        open={opretDialogOpen}
+        onClose={handleCloseOpretDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Opret ny bruger</DialogTitle>
+        <DialogContent>{opretFormFields}</DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseOpretDialog} disabled={savingNewUser}>
+            Annuller
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleAddUser}
+            disabled={savingNewUser || !newUser.password}
+          >
+            {savingNewUser ? <CircularProgress size={24} color="inherit" /> : "Opret bruger"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ===== Rediger bruger dialog ===== */}
+      <Dialog
+        open={userDialogOpen}
+        onClose={() => !savingEditUser && setUserDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Rediger bruger</DialogTitle>
+        <DialogContent>
+          {editUser && (
+            <Stack gap={2} sx={{ mt: 1 }}>
+              {/* 1. Brugernavn (ikke redigerbart) */}
+              <TextField
+                label="Brugernavn"
+                value={editUser.username}
+                disabled
+                fullWidth
+                size="small"
+              />
+              {/* 2. Fulde navn */}
+              <TextField
+                required
+                label="Fulde navn"
+                value={editUser.full_name || ""}
+                onChange={e => setEditUser(prev => ({ ...prev, full_name: e.target.value }))}
+                fullWidth
+                size="small"
+                disabled={savingEditUser}
+              />
+              {/* 3. Email + Bekræft email */}
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField
                     required
-                    onChange={e => setNewUser({ ...newUser, role: e.target.value, school_id: "" })}
+                    label="Email"
+                    type="email"
+                    value={editUser.email || ""}
+                    onChange={e => setEditUser(prev => ({ ...prev, email: e.target.value }))}
+                    fullWidth
+                    size="small"
+                    disabled={savingEditUser}
+                    error={!!(editUser.email && !emailRegex.test(editUser.email))}
+                    helperText={editUser.email && !emailRegex.test(editUser.email) ? "Ugyldig emailadresse" : ""}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    required
+                    label="Bekræft email"
+                    type="email"
+                    value={editUserConfirmEmail || ""}
+                    onChange={e => setEditUserConfirmEmail(e.target.value)}
+                    fullWidth
+                    size="small"
+                    disabled={savingEditUser}
+                    error={!!(editUser.email && editUser.email !== editUserConfirmEmail)}
+                    helperText={editUser.email && editUser.email !== editUserConfirmEmail ? "Email adresserne matcher ikke" : ""}
+                  />
+                </Grid>
+              </Grid>
+              {/* 4. Rolle */}
+              <FormControl fullWidth size="small">
+                <InputLabel id="edit-rolle-label">Rolle</InputLabel>
+                <Select
+                  labelId="edit-rolle-label"
+                  value={editUser.role || ""}
+                  label="Rolle"
+                  onChange={e => {
+                    const value = e.target.value;
+                    setEditUser(prev => ({
+                      ...prev,
+                      role: value,
+                      school_id: value === "bruger" ? prev.school_id : "",
+                    }));
+                  }}
+                  disabled={savingEditUser}
+                >
+                  {availableRoles.map(role => (
+                    <MenuItem key={role} value={role}>{ROLE_DISPLAY[role]}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {/* 5. Skole (kun hvis rolle=bruger) */}
+              {editUser.role === "bruger" && (
+                <FormControl fullWidth size="small">
+                  <InputLabel id="edit-skole-label">Skole</InputLabel>
+                  <Select
+                    labelId="edit-skole-label"
+                    value={editUser.school_id || ""}
+                    label="Skole"
+                    onChange={e => setEditUser(prev => ({ ...prev, school_id: e.target.value }))}
+                    disabled={savingEditUser}
                   >
-                    {availableRoles.map(role => (
-                      <MenuItem key={role} value={role}>{ROLE_DISPLAY[role]}</MenuItem>
+                    {getAlphaSchools().map(school => (
+                      <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
+              )}
+              {/* 6. Status */}
+              <FormControl fullWidth size="small">
+                <InputLabel id="edit-status-label">Status</InputLabel>
+                <Select
+                  labelId="edit-status-label"
+                  value={editUser.is_active ? "true" : "false"}
+                  label="Status"
+                  onChange={e => setEditUser(prev => ({ ...prev, is_active: e.target.value === "true" }))}
+                  disabled={savingEditUser}
+                >
+                  <MenuItem value="true">Aktiv</MenuItem>
+                  <MenuItem value="false">Spærret</MenuItem>
+                </Select>
+              </FormControl>
+              {/* 7. Bemærkninger */}
+              <TextField
+                label="Bemærkninger"
+                value={editUser.remarks || ""}
+                onChange={e => setEditUser(prev => ({ ...prev, remarks: e.target.value }))}
+                fullWidth
+                size="small"
+                multiline
+                minRows={1}
+                maxRows={3}
+                disabled={savingEditUser}
+              />
+              {/* 8. Adgangskode + generator */}
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Adgangskode"
+                    type="text"
+                    value={editUser.password || ""}
+                    disabled
+                    fullWidth
+                    size="small"
+                    helperText="Generer kun ny adgangskode hvis den skal nulstilles"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6} sx={{ display: "flex", alignItems: "center" }}>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => handleGeneratePassword(true)}
+                    disabled={savingEditUser}
+                    fullWidth
+                  >
+                    Generer adgangskode
+                  </Button>
+                </Grid>
               </Grid>
-              <Grid item xs={12} md={3}>
-                {newUser.role === "bruger" ? (
-                  <FormControl size="small" fullWidth>
-                    <InputLabel id="skole-label">Skole</InputLabel>
-                    <Select
-                      labelId="skole-label"
-                      value={newUser.school_id}
-                      label="Skole"
-                      onChange={e => setNewUser({ ...newUser, school_id: e.target.value })}
-                    >
-                      {getAlphaSchools().map(school => (
-                        <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                ) : (
-                  <Box />
-                )}
-              </Grid>
-              {/* Linje 2 */}
-              <Grid item xs={12} md={3}>
-                <TextField required label="Email" type="email" value={newUser.email}
-                  onChange={e => setNewUser({ ...newUser, email: e.target.value })} size="small" fullWidth
-                  error={!!(newUser.email && !emailRegex.test(newUser.email))}
-                  helperText={newUser.email && !emailRegex.test(newUser.email) ? "Ugyldig emailadresse" : ""} />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <TextField required label="Bekræft email" type="email" value={newUser.confirmEmail}
-                  onChange={e => setNewUser({ ...newUser, confirmEmail: e.target.value })} size="small" fullWidth
-                  error={!!(newUser.confirmEmail && newUser.email !== newUser.confirmEmail)}
-                  helperText={newUser.confirmEmail && newUser.email !== newUser.confirmEmail ? "Email adresserne matcher ikke" : ""} />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <TextField label="Password" value={newUser.password} required type="text"
-                  size="small" fullWidth disabled placeholder="Password" />
-              </Grid>
-              <Grid item xs={12} md={3} sx={{ display: "flex", alignItems: "center" }}>
-                <Button variant="outlined" color="primary"
-                  onClick={() => handleGeneratePassword(false)}
-                  sx={{ mr: 2 }} disabled={savingNewUser} fullWidth>
-                  Generer password
-                </Button>
-              </Grid>
-              {/* Linje 3 */}
-              <Grid item xs={12}>
-                <TextField label="Bemærkninger" value={newUser.remarks || ""}
-                  onChange={e => setNewUser({ ...newUser, remarks: e.target.value })} size="small"
-                  fullWidth multiline minRows={1} maxRows={3} />
-              </Grid>
-            </Grid>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2, mt: 2 }}>
-              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                <Button variant="contained" onClick={handleAddUser} disabled={savingNewUser}>
-                  {savingNewUser ? <CircularProgress size={24} color="inherit" /> : "Opret bruger"}
-                </Button>
-              </Box>
-              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                <TextField label="Søg" size="small" value={userSearch}
-                  onChange={e => setUserSearch(e.target.value)} sx={{ minWidth: 120 }}
-                  placeholder="Søg bruger, navn, rolle, email, skole, bemærkninger..." />
-              </Box>
+              {(editUserError || editUserEmailError) && (
+                <Typography color="error" variant="body2">
+                  {editUserError || editUserEmailError}
+                </Typography>
+              )}
             </Stack>
-            {userError && <Typography color="error" sx={{ mb: 2 }}>
-              {typeof userError === "object" ? JSON.stringify(userError) : userError}
-            </Typography>}
-            {/* Brugertabel */}
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("username")}>
-                      Brugernavn
-                      {userSort.key === "username" &&
-                        (userSort.direction === "asc"
-                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("fullname")}>
-                      Fulde navn
-                      {userSort.key === "fullname" &&
-                        (userSort.direction === "asc"
-                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("email")}>
-                      Email
-                      {userSort.key === "email" &&
-                        (userSort.direction === "asc"
-                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("role")}>
-                      Rolle
-                      {userSort.key === "role" &&
-                        (userSort.direction === "asc"
-                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, cursor: "pointer" }} onClick={() => handleUserTableSort("school")}>
-                      Skole
-                      {userSort.key === "school" &&
-                        (userSort.direction === "asc"
-                          ? <ArrowDownwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />
-                          : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Oprettet</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Bemærkninger</TableCell>
-                    <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {loadingUsers ? (
-                    <TableRow>
-                        <TableCell colSpan={USER_TABLE_COLUMN_COUNT} align="center">
-                        <CircularProgress size={24} />
-                      </TableCell>
-                    </TableRow>
-                  ) : getSortedUsers().length === 0 ? (
-                    <TableRow>
-                        <TableCell colSpan={USER_TABLE_COLUMN_COUNT} align="center" sx={{ color: "#888" }}>
-                        Ingen brugere oprettet endnu
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    getSortedUsers().map(user => (
-                      <TableRow key={user.id} hover>
-                        <TableCell>{user.username}</TableCell>
-                        <TableCell>{user.full_name || ""}</TableCell>
-                        <TableCell>{user.email || ""}</TableCell>
-                        <TableCell>
-                          <Chip
-                            size="small"
-                            label={ROLE_DISPLAY[user.role] || user.role}
-                            color={user.role === "superadmin" ? "error" : user.role === "admin" ? "warning" : "default"}
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {user.school_id
-                            ? (schools.find(s => s.id === user.school_id)?.name ?? user.school_id)
-                            : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {user.is_active ? "Aktiv" : "Spærret"}
-                        </TableCell>
-                        <TableCell>{formatCreatedAt(user.created_at)}</TableCell>
-                        <TableCell>{user.remarks || ""}</TableCell>
-                        <TableCell align="right">
-                          {canManageUser(user) ? (
-                            <>
-                              <Tooltip title="Rediger bruger">
-                                <span>
-                                  <IconButton onClick={() => openEditUserDialog(user)}>
-                                    <EditIcon />
-                                  </IconButton>
-                                </span>
-                              </Tooltip>
-                              <Tooltip title="Slet bruger">
-                                <span>
-                                  <IconButton
-                                    color="error"
-                                    onClick={() => handleOpenDeleteUserDialog(user)}
-                                  >
-                                    <DeleteIcon />
-                                  </IconButton>
-                                </span>
-                              </Tooltip>
-                            </>
-                          ) : (
-                            <Tooltip title="Kun superadministratorer kan administrere denne bruger">
-                              <span>
-                                <IconButton disabled>
-                                  <EditIcon />
-                                </IconButton>
-                              </span>
-                            </Tooltip>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            {/* Rediger bruger dialog */}
-            <Dialog
-              open={userDialogOpen}
-              onClose={() => setUserDialogOpen(false)}
-              maxWidth="sm"
-              fullWidth
-              sx={{ '& .MuiDialog-paper': { width: '110%' } }}
-            >
-              <DialogTitle>Rediger bruger</DialogTitle>
-              <DialogContent>
-                {editUser && (
-                  <Stack gap={2} sx={{ mt: 1 }}>
-                    <TextField label="Brugernavn" value={editUser.username} disabled fullWidth size="small" />
-                    <TextField required label="Fulde navn" value={editUser.full_name || ""}
-                      onChange={e => setEditUser({ ...editUser, full_name: e.target.value })} fullWidth size="small" />
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={6}>
-                        <TextField required label="Email" type="email"
-                          value={editUser.email || ""}
-                          onChange={e => setEditUser({ ...editUser, email: e.target.value })}
-                          fullWidth size="small"
-                          error={!!(editUser.email && !emailRegex.test(editUser.email))}
-                          helperText={editUser.email && !emailRegex.test(editUser.email) ? "Ugyldig emailadresse" : ""}
-                        />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField required label="Bekræft email" type="email"
-                          value={editUserConfirmEmail || ""}
-                          onChange={e => setEditUserConfirmEmail(e.target.value)}
-                          fullWidth size="small"
-                          error={!!(editUser.email && editUser.email !== editUserConfirmEmail)}
-                          helperText={editUser.email && editUser.email !== editUserConfirmEmail ? "Email adresserne matcher ikke" : ""}
-                        />
-                      </Grid>
-                    </Grid>
-                    <FormControl fullWidth size="small">
-                      <InputLabel id="edit-rolle-label">Rolle</InputLabel>
-                      <Select
-                        labelId="edit-rolle-label"
-                        value={editUser.role || ""}
-                        label="Rolle"
-                        onChange={e => {
-                          const value = e.target.value;
-                          setEditUser(prev => ({
-                            ...prev,
-                            role: value,
-                            school_id: value === "bruger" ? prev.school_id : ""
-                          }));
-                        }}
-                        disabled={savingEditUser}
-                      >
-                        {availableRoles.map(role => (
-                          <MenuItem key={role} value={role}>{ROLE_DISPLAY[role]}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    {editUser.role === "bruger" && (
-                      <FormControl fullWidth size="small">
-                        <InputLabel id="edit-skole-label">Skole</InputLabel>
-                        <Select
-                          labelId="edit-skole-label"
-                          value={editUser.school_id || ""}
-                          label="Skole"
-                          onChange={e => setEditUser({ ...editUser, school_id: e.target.value })}
-                          disabled={savingEditUser}
-                        >
-                          {getAlphaSchools().map(school => (
-                            <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    )}
-                    <FormControl fullWidth size="small">
-                      <InputLabel id="edit-status-label">Status</InputLabel>
-                      <Select
-                        labelId="edit-status-label"
-                        value={editUser.is_active ? "true" : "false"}
-                        label="Status"
-                        onChange={e => setEditUser({ ...editUser, is_active: e.target.value === "true" })}
-                        disabled={savingEditUser}
-                      >
-                        <MenuItem value="true">Aktiv</MenuItem>
-                        <MenuItem value="false">Spærret</MenuItem>
-                      </Select>
-                    </FormControl>
-                    <TextField label="Bemærkninger" value={editUser.remarks || ""}
-                      onChange={e => setEditUser({ ...editUser, remarks: e.target.value })}
-                      fullWidth size="small" multiline minRows={1} maxRows={3} disabled={savingEditUser} />
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={6}>
-                        <TextField label="Password" type="text" value={editUser.password || ""}
-                          disabled fullWidth size="small" />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Button variant="outlined" color="primary"
-                          onClick={() => handleGeneratePassword(true)} disabled={savingEditUser} fullWidth>
-                          Generer password
-                        </Button>
-                      </Grid>
-                    </Grid>
-                    {/* Adgangskodedialoget vises udenfor Rediger-dialog */}
-                  </Stack>
-                )}
-                {(userError || editUserEmailError) &&
-                  <Typography color="error" sx={{ mt: 2 }}>
-                    {userError || editUserEmailError}
-                  </Typography>}
-              </DialogContent>
-              <DialogActions>
-                <Button onClick={() => setUserDialogOpen(false)} disabled={savingEditUser}>Annuller</Button>
-                <Button variant="contained" onClick={handleEditUser} disabled={savingEditUser}>
-                  {savingEditUser ? <CircularProgress size={24} color="inherit" /> : "Gem ændringer"}
-                </Button>
-              </DialogActions>
-            </Dialog>
-          </Box>
-        </Stack>
-      </Paper>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUserDialogOpen(false)} disabled={savingEditUser}>
+            Annuller
+          </Button>
+          <Button variant="contained" onClick={handleEditUser} disabled={savingEditUser}>
+            {savingEditUser ? <CircularProgress size={24} color="inherit" /> : "Gem ændringer"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ===== Slet bruger dialog ===== */}
       <Dialog open={deleteUserDialogOpen} onClose={handleCloseDeleteUserDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Slet bruger: {userToDelete?.username}
-        </DialogTitle>
+        <DialogTitle>Slet bruger: {userToDelete?.username}</DialogTitle>
         <DialogContent>
           <Typography color="error" gutterBottom sx={{ mb: 2 }}>
             Advarsel: Du er ved at slette brugeren <b>{userToDelete?.username}</b>.<br />
             Denne handling kan <b>ikke fortrydes!</b>
           </Typography>
-          {userToDelete && (
-            <>
-              {deleteUserStep === 1 && (
-                <Typography sx={{ mb: 2 }}>
-                  Er du sikker på at du vil slette denne bruger?
-                </Typography>
-              )}
-              {deleteUserStep === 2 && (
-                <Typography color="error" sx={{ mb: 2 }}>
-                  Tryk <b>Slet endeligt</b> for at bekræfte.
-                </Typography>
-              )}
-            </>
+          {deleteUserStep === 1 && (
+            <Typography sx={{ mb: 2 }}>
+              Er du sikker på at du vil slette denne bruger?
+            </Typography>
+          )}
+          {deleteUserStep === 2 && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              Tryk <b>Slet endeligt</b> for at bekræfte.
+            </Typography>
           )}
           {deleteUserError && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              {deleteUserError}
-            </Typography>
+            <Typography color="error" variant="body2">{deleteUserError}</Typography>
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDeleteUserDialog}>Annuller</Button>
-          {userToDelete && (
-            deleteUserStep === 1 ? (
-              <Button color="warning" variant="contained" onClick={handleFirstDeleteUserConfirm}>
-                Bekræft sletning
-              </Button>
-            ) : (
-              <Button color="error" variant="contained" onClick={handleFinalDeleteUser}>
-                Slet endeligt
-              </Button>
-            )
+          {deleteUserStep === 1 ? (
+            <Button color="warning" variant="contained" onClick={handleFirstDeleteUserConfirm}>
+              Bekræft sletning
+            </Button>
+          ) : (
+            <Button color="error" variant="contained" onClick={handleFinalDeleteUser}>
+              Slet endeligt
+            </Button>
           )}
         </DialogActions>
       </Dialog>
+
+      {/* ===== Snackbar ===== */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3400}
@@ -820,7 +940,8 @@ export default function BrugerAdministration() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
-      {/* Login-oplysninger dialog — vises efter oprettelse eller adgangskodeskift */}
+
+      {/* ===== Login-oplysninger dialog ===== */}
       <Dialog open={userInfoDialogOpen} onClose={() => setUserInfoDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Loginoplysninger for {userInfoDialogData?.full_name}</DialogTitle>
         <DialogContent>
