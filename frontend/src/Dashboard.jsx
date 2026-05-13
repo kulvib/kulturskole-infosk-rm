@@ -30,8 +30,10 @@ import { useAuth } from "./auth/authcontext";
 import { getSchools } from "./api";
 
 function getRoleText(role) {
+  if (role === "superadmin") return "Superadministrator";
   if (role === "admin") return "Administrator";
   if (role === "bruger") return "Bruger";
+  if (role === "viewer") return "Viewer (Se adgang)";
   return role || "";
 }
 
@@ -41,7 +43,7 @@ export default function Dashboard() {
   const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logoutUser } = useAuth();
+  const { user, logoutUser, isAdmin } = useAuth();
   const [schoolName, setSchoolName] = useState("");
 
   const drawerWidth = isMobile ? 160 : isTablet ? 190 : 230;
@@ -51,7 +53,7 @@ export default function Dashboard() {
     { text: "Klienter", path: "/clients", match: "/clients", icon: <PeopleIcon /> },
     { text: "Kalender", path: "/calendar", match: "/calendar", icon: <CalendarMonthIcon /> },
     { text: "Skift adgangskode", path: "/skift-adgangskode", match: "/skift-adgangskode", icon: <VpnKeyIcon /> },
-    ...(user?.role === "admin"
+    ...(isAdmin
       ? [{ text: "Administration", path: "/administration", match: "/administration", icon: <AdminPanelSettingsIcon /> }]
       : []),
   ];
@@ -180,7 +182,7 @@ export default function Dashboard() {
         }}
       >
         {(user.full_name || user.username) +
-          (user.role === "admin" ? ` - ${getRoleText(user.role)}` : "")}
+          (isAdmin ? ` - ${getRoleText(user.role)}` : "")}
         {user.email ? (
           <>
             <br />

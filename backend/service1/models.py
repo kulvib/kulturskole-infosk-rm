@@ -34,13 +34,21 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str
     hashed_password: str
-    role: str = "admin"
+    role: str = "bruger"
     is_active: bool = True
     must_change_password: bool = True
     school_id: Optional[int] = Field(default=None, foreign_key="school.id")
     full_name: Optional[str] = None
     remarks: Optional[str] = None
     email: str
+
+    @property
+    def is_admin(self):
+        return self.role in ("admin", "superadmin")
+
+    @property
+    def is_superadmin(self):
+        return self.role == "superadmin"
 
 
 class ClientBase(SQLModel):

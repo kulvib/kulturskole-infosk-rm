@@ -461,7 +461,7 @@ export default function ClientDetailsLivestreamSection({
           </Box>
         </Grid>
 
-        {user?.role === "admin" && (
+        {(user?.role === "admin" || user?.role === "superadmin") && (
           <Grid item xs={12} md={4} minWidth={0}>
             <Stack spacing={1}>
               <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>

@@ -63,7 +63,7 @@ def get_client(id: int, session=Depends(get_session), user=Depends(get_current_u
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     client.isOnline = is_online(client)
-    if getattr(user, "role", None) == "admin":
+    if getattr(user, "is_admin", False):
         return client
     if getattr(user, "role", None) == "bruger":
         if client.status != "approved" or client.school_id != user.school_id:

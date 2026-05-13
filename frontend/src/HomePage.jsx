@@ -5,7 +5,7 @@ import { useAuth } from "./auth/authcontext";
 import { getSchools } from "./api";
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [schoolName, setSchoolName] = useState("");
 
   // Hent school name hvis bruger
@@ -57,7 +57,7 @@ export default function HomePage() {
           Infoskærm administration
         </Typography>
         {/* Besked til brugere/admins */}
-        {user?.role !== "admin" && schoolName && (
+        {!isAdmin && schoolName && (
           <Typography
             variant="subtitle1"
             sx={{
@@ -116,7 +116,7 @@ export default function HomePage() {
           >
             Gå til kalender side
           </Button>
-          {user?.role === "admin" && (
+          {isAdmin && (
             <Button
               variant="contained"
               color="primary"

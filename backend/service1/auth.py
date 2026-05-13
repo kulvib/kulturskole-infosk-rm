@@ -265,8 +265,34 @@ def get_current_admin_user(
     user = session.exec(select(User).where(User.username == username)).first()
     if not user or not user.is_active:
         raise credentials_exception
-    if getattr(user, "role", None) != "admin":
+    if not user.is_admin:
         raise HTTPException(status_code=403, detail="Kun administratorer har adgang")
+    return user
+
+
+def get_current_superadmin_user(
+    token: str = Depends(oauth2_scheme),
+    session: Session = Depends(get_session)
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Kunne ikke validere legitimationsoplysninger",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        role: str = payload.get("role")
+        if username is None or role is None:
+            raise credentials_exception
+    except InvalidTokenError:
+        raise credentials_exception
+
+    user = session.exec(select(User).where(User.username == username)).first()
+    if not user or not user.is_active:
+        raise credentials_exception
+    if not user.is_superadmin:
+        raise HTTPException(status_code=403, detail="Kun superadministratorer har adgang")
     return user
 
 
@@ -290,6 +316,20 @@ def get_current_user(
     user = session.exec(select(User).where(User.username == username)).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=403, detail="Inaktiv eller ukendt bruger")
+    return user
+
+
+def require_admin(user: User):
+    """Kaster 403 hvis brugeren ikke er admin eller superadmin."""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Kun administratorer har adgang")
+    return user
+
+
+def require_superadmin(user: User):
+    """Kaster 403 hvis brugeren ikke er superadmin."""
+    if not user.is_superadmin:
+        raise HTTPException(status_code=403, detail="Kun superadministratorer har adgang")
     return user
 
 

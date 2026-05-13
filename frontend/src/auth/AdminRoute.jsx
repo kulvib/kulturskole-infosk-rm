@@ -4,11 +4,12 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./authcontext";
 
-export default function AdminRoute({ children }) {
-  const { user } = useAuth();
+export default function AdminRoute({ children, requireSuperadmin = false }) {
+  const { user, isAdmin, isSuperadmin } = useAuth();
 
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== "admin") return <Navigate to="/" replace />;
+  if (!isAdmin) return <Navigate to="/" replace />;
+  if (requireSuperadmin && !isSuperadmin) return <Navigate to="/" replace />;
 
   return children;
 }
