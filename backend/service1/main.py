@@ -64,7 +64,7 @@ def migrate_legacy_user_roles():
 def ensure_admin_user():
     with Session(engine) as session:
         admin_user_exists = session.exec(
-            select(User).where(User.role.in_(["admin", "superadmin"]), User.is_active == True)
+            select(User).where(User.role.in_(["admin", "superadmin"]), User.is_active)
         ).first()
         if not admin_user_exists:
             admin_password = os.getenv("ADMIN_PASSWORD", "")
