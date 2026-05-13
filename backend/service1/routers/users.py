@@ -204,7 +204,7 @@ def update_user(
             )
 
     if user_update.password is not None:
-        if is_self and not current_user.is_admin:
+        if is_self:
             if not user_update.old_password:
                 raise HTTPException(status_code=400, detail="Gammelt kodeord er påkrævet")
             if not verify_password(user_update.old_password, user.hashed_password):

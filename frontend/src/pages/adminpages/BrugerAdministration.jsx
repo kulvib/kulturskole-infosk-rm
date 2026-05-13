@@ -46,6 +46,7 @@ const ROLE_DISPLAY = {
 
 // Roller som en normal admin (ikke superadmin) må tildele
 const ADMIN_ALLOWED_ROLES = ["admin", "bruger", "viewer"];
+const USER_TABLE_COLUMN_COUNT = 10;
 
 // ----------- Helper functions ----------- //
 function generateSecurePassword() {
@@ -572,13 +573,13 @@ export default function BrugerAdministration() {
                 <TableBody>
                   {loadingUsers ? (
                     <TableRow>
-                        <TableCell colSpan={10} align="center">
+                        <TableCell colSpan={USER_TABLE_COLUMN_COUNT} align="center">
                         <CircularProgress size={24} />
                       </TableCell>
                     </TableRow>
                   ) : getSortedUsers().length === 0 ? (
                     <TableRow>
-                        <TableCell colSpan={10} align="center" sx={{ color: "#888" }}>
+                        <TableCell colSpan={USER_TABLE_COLUMN_COUNT} align="center" sx={{ color: "#888" }}>
                         Ingen brugere oprettet endnu
                       </TableCell>
                     </TableRow>
