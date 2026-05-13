@@ -18,11 +18,11 @@ import {
 } from "@mui/material";
 import ChromeReaderModeIcon from "@mui/icons-material/ChromeReaderMode";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
-import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
-import TerminalIcon from "@mui/icons-material/Terminal";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import NightlightIcon from "@mui/icons-material/Nightlight";
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import StopIcon from "@mui/icons-material/Stop";
 import { useTheme } from "@mui/material/styles";
 import { clientAction } from "../../api";
 import { useAuth } from "../../auth/authcontext";
@@ -35,6 +35,8 @@ import { useAuth } from "../../auth/authcontext";
 
 function ClientDetailsActionsSection({
   clientId,
+  clientState,
+  pendingChromeAction,
   handleOpenTerminal,
   handleOpenRemoteDesktop,
   refreshing, // optional: hvis wrapper sender refreshing-flag kan vi rydde loading når refresh er færdig
@@ -49,6 +51,10 @@ function ClientDetailsActionsSection({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
+  const normalizedClientState = String(clientState || "").trim().toLowerCase();
+  const isSleeping = normalizedClientState.startsWith("sleep");
+  const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
+  const hasPendingAction = !!normalizedPendingAction && normalizedPendingAction !== "none";
 
   // Nulstil lokale loading-states når clientId skifter (fx ved navigation) for at undgå fastlåst UI
   useEffect(() => {
@@ -141,6 +147,14 @@ function ClientDetailsActionsSection({
     boxShadow: 1,
   };
 
+  const isDisabledByState = useCallback((actionKey) => {
+    if (clientOnline === false || hasPendingAction) return true;
+    if (isSleeping) {
+      return actionKey !== "wakeup";
+    }
+    return actionKey === "wakeup";
+  }, [clientOnline, hasPendingAction, isSleeping]);
+
   // --- Admin: 2 rækker af 4 knapper i ønsket rækkefølge ---
   const adminFirstRow = [
     {
@@ -151,17 +165,19 @@ function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: () => doClientAction("chrome-start"),
       loading: actionLoading["chrome-start"],
+      disabled: isDisabledByState("chrome-start"),
       tooltip: "Start kiosk browser",
     },
     {
-      key: "chrome-shutdown",
-      label: "Luk kiosk browser",
+      key: "chrome-stop",
+      label: "Stop kiosk browser",
       icon: <PowerSettingsNewIcon />,
       color: "secondary",
       variant: "outlined",
-      onClick: () => doClientAction("chrome-shutdown"),
-      loading: actionLoading["chrome-shutdown"],
-      tooltip: "Luk kiosk browser",
+      onClick: () => doClientAction("chrome-stop"),
+      loading: actionLoading["chrome-stop"],
+      disabled: isDisabledByState("chrome-stop"),
+      tooltip: "Stop kiosk browser",
     },
     {
       key: "sleep",
@@ -171,6 +187,7 @@ function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: () => doClientAction("sleep"),
       loading: actionLoading["sleep"],
+      disabled: isDisabledByState("sleep"),
       tooltip: "Sæt klient i dvale",
     },
     {
@@ -181,29 +198,12 @@ function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: () => doClientAction("wakeup"),
       loading: actionLoading["wakeup"],
+      disabled: isDisabledByState("wakeup"),
       tooltip: "Væk klient fra dvale",
     },
   ];
 
   const adminSecondRow = [
-    {
-      key: "desktop",
-      label: "Fjernskrivebord",
-      icon: <DesktopWindowsIcon />,
-      color: "primary",
-      variant: "outlined",
-      onClick: handleOpenRemoteDesktop,
-      tooltip: "Fjernskrivebord på klient",
-    },
-    {
-      key: "terminal",
-      label: "Terminal på klient",
-      icon: <TerminalIcon />,
-      color: "inherit",
-      variant: "outlined",
-      onClick: handleOpenTerminal,
-      tooltip: "Terminal på klient",
-    },
     {
       key: "restart",
       label: "Genstart klient",
@@ -212,6 +212,7 @@ function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => doClientAction("restart"),
       loading: actionLoading["restart"],
+      disabled: isDisabledByState("restart"),
       tooltip: "Genstart klient",
     },
     {
@@ -222,29 +223,41 @@ function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => setShutdownDialogOpen(true),
       loading: actionLoading["shutdown"],
+      disabled: isDisabledByState("shutdown"),
       tooltip: "Sluk klient",
+    },
+    {
+      key: "livestream_start",
+      label: "Start livestream",
+      icon: <PlayArrowIcon />,
+      color: "success",
+      variant: "outlined",
+      onClick: () => doClientAction("livestream_start"),
+      loading: actionLoading["livestream_start"],
+      disabled: isDisabledByState("livestream_start"),
+      tooltip: "Start livestream",
+    },
+    {
+      key: "livestream_stop",
+      label: "Stop livestream",
+      icon: <StopIcon />,
+      color: "error",
+      variant: "outlined",
+      onClick: () => doClientAction("livestream_stop"),
+      loading: actionLoading["livestream_stop"],
+      disabled: isDisabledByState("livestream_stop"),
+      tooltip: "Stop livestream",
     },
   ];
 
-  // --- Bruger: 1 række á 4 knapper, 2. række kun "Genstart klient" ---
+  // --- Bruger: samme handlinger ---
   const userFirstRow = [
     adminFirstRow[0],
     adminFirstRow[1],
     adminFirstRow[2],
     adminFirstRow[3],
   ];
-  const userSecondRow = [
-    {
-      key: "restart",
-      label: "Genstart klient",
-      icon: <RestartAltIcon />,
-      color: "warning",
-      variant: "contained",
-      onClick: () => doClientAction("restart"),
-      loading: actionLoading["restart"],
-      tooltip: "Genstart klient",
-    }
-  ];
+  const userSecondRow = adminSecondRow;
 
   const renderButton = btn => (
     <Grid item xs={12} sm={6} md={3} key={btn.key}>
@@ -254,7 +267,7 @@ function ClientDetailsActionsSection({
             variant={btn.variant}
             color={btn.color}
             startIcon={btn.icon}
-            disabled={!!btn.loading || clientOnline === false} /* NEW: disable when explicit offline */
+            disabled={!!btn.loading || !!btn.disabled}
             onClick={btn.onClick}
             sx={actionBtnStyle}
             fullWidth
@@ -277,6 +290,11 @@ function ClientDetailsActionsSection({
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
         {(user?.role === "admin" || user?.role === "superadmin") ? (
           <>
+            {hasPendingAction && (
+              <Alert severity="info" sx={{ mb: 1.5 }}>
+                Afventer klient: {normalizedPendingAction}
+              </Alert>
+            )}
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {adminFirstRow.map(renderButton)}
             </Grid>
@@ -287,6 +305,11 @@ function ClientDetailsActionsSection({
           </>
         ) : (
           <>
+            {hasPendingAction && (
+              <Alert severity="info" sx={{ mb: 1.5 }}>
+                Afventer klient: {normalizedPendingAction}
+              </Alert>
+            )}
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {userFirstRow.map(renderButton)}
             </Grid>
@@ -316,7 +339,7 @@ function ClientDetailsActionsSection({
               }}
               color="error"
               variant="contained"
-              disabled={clientOnline === false} /* NEW: disallow confirm if offline */
+              disabled={isDisabledByState("shutdown")}
             >
               Ja, sluk klienten
             </Button>

@@ -81,7 +81,7 @@ class Client(ClientBase, table=True):
     school_id: Optional[int] = Field(default=None, foreign_key="school.id")
     state: Optional[str] = Field(
         default="normal",
-        description="Driftstilstand: normal, sleep, wakeup, shutdown, error"
+        description="Driftstilstand: normal, sleeping, wakeup, shutdown, error"
     )
     livestream_status: Optional[str] = "idle"
     livestream_last_segment: Optional[datetime] = None
@@ -120,6 +120,8 @@ class ClientUpdate(SQLModel):
     chrome_status: Optional[str] = None
     chrome_last_updated: Optional[datetime] = None
     chrome_color: Optional[str] = None
+    last_seen: Optional[datetime] = None
+    created_at: Optional[datetime] = None
     pending_chrome_action: Optional[ChromeAction] = None
     pending_chrome_action_source: Optional[str] = None
     school_id: Optional[int] = None

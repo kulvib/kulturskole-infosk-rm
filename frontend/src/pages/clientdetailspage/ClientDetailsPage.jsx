@@ -155,13 +155,16 @@ export default function ClientDetailsPage({
     try {
       if (!memoizedClientId) throw new Error("No client id");
       await apiClientAction(memoizedClientId, action);
+      if (typeof handleRefresh === "function") {
+        await handleRefresh();
+      }
       if (typeof showSnackbar === "function") showSnackbar({ message: "Handlingen blev udført!", severity: "success" });
     } catch (err) {
       if (typeof showSnackbar === "function") showSnackbar({ message: "Fejl: " + (err?.message || err), severity: "error" });
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
-  }, [memoizedClientId, showSnackbar]);
+  }, [memoizedClientId, showSnackbar, handleRefresh]);
 
   const handleOpenTerminal = useCallback(() => { if (!memoizedClientId) return; openTerminal(memoizedClientId); }, [memoizedClientId]);
   const handleOpenRemoteDesktop = useCallback(() => { if (!memoizedClientId) return; openRemoteDesktop(memoizedClientId); }, [memoizedClientId]);
@@ -218,12 +221,6 @@ export default function ClientDetailsPage({
     }
   };
 
-  useEffect(() => {
-    if (memoizedClientId) {
-      apiClientAction(memoizedClientId, "livestream_start").catch(() => {});
-    }
-  }, [memoizedClientId]);
-
   const memoActionLoading = useMemo(() => actionLoading, [actionLoading]);
 
   if (!clientState) return null;
@@ -279,6 +276,8 @@ export default function ClientDetailsPage({
         <Grid item xs={12}>
           <ClientDetailsActionsSection
             clientId={memoizedClientId}
+            clientState={clientState?.state}
+            pendingChromeAction={clientState?.pending_chrome_action}
             handleClientAction={handleClientAction}
             handleOpenTerminal={handleOpenTerminal}
             handleOpenRemoteDesktop={handleOpenRemoteDesktop}

@@ -61,6 +61,21 @@ def create_db_and_tables():
                     text("ALTER TABLE user ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP")
                 )
 
+        try:
+            client_columns = {column["name"] for column in inspector.get_columns("client")}
+        except Exception:
+            client_columns = set()
+        if "state" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN state TEXT DEFAULT 'normal'"))
+        if "pending_chrome_action_source" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN pending_chrome_action_source TEXT"))
+        if "livestream_status" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN livestream_status TEXT DEFAULT 'idle'"))
+        if "livestream_last_segment" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN livestream_last_segment TIMESTAMP"))
+        if "livestream_last_error" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN livestream_last_error TEXT"))
+
 
 def get_session():
     with Session(engine) as session:

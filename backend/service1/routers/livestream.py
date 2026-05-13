@@ -8,6 +8,7 @@ from fastapi import (
     APIRouter, WebSocket, WebSocketDisconnect,
     UploadFile, File, HTTPException, Form, Body, Response, Depends, Query
 )
+from pydantic import BaseModel
 from auth import get_current_user, verify_ws_token
 from db import get_session
 from models import utcnow
@@ -23,6 +24,11 @@ else:
 os.makedirs(HLS_DIR, exist_ok=True)
 
 router = APIRouter()
+
+
+class HlsCleanupRequest(BaseModel):
+    client_id: str
+    keep_files: List[str]
 
 
 def safe_client_dir(client_id: str) -> str:
@@ -112,12 +118,13 @@ async def upload_hls_file(
 
 @router.post("/hls/cleanup")
 async def cleanup_hls_files(
-    client_id: str = Body(...),
-    keep_files: List[str] = Body(...),
+    payload: HlsCleanupRequest,
     keep_n: int = 6,
     segment_duration: int = 4,
     user=Depends(get_current_user)
 ):
+    client_id = payload.client_id
+    keep_files = payload.keep_files
     client_dir = safe_client_dir(client_id)
     if not os.path.exists(client_dir):
         return {"deleted": [], "kept": []}

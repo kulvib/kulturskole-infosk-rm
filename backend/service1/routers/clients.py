@@ -16,7 +16,15 @@ router = APIRouter()
 HLS_BASE_DIR = os.getenv("HLS_BASE_DIR", "/opt/render/project/src/backend/service1/hls")
 CHROME_STATUS_PATH = os.getenv("CHROME_STATUS_PATH", "/home/kulturskolenviborg/api/chrome_status.json")
 
-VALID_CLIENT_STATES = {"normal", "sleep", "wakeup", "shutdown", "error"}
+VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error"}
+VALID_PENDING_CHROME_ACTION_SOURCES = {"actionbutton", "calendar"}
+
+
+def normalize_client_state(value: str) -> str:
+    normalized = str(value).lower()
+    if normalized == "sleep":
+        return "sleeping"
+    return normalized
 
 
 def is_online(client: Client) -> bool:
@@ -138,6 +146,7 @@ def update_client_state(
     state = data.get("state")
     if not state:
         raise HTTPException(status_code=400, detail="Missing state")
+    state = normalize_client_state(state)
     if state not in VALID_CLIENT_STATES:
         raise HTTPException(
             status_code=400,
@@ -185,9 +194,11 @@ def set_chrome_command(
         if not isinstance(source, str):
             raise HTTPException(status_code=400, detail="Ugyldig source-værdi")
         src_lower = source.lower()
-        allowed = {"actionbutton", "calendar", "manual", "backend"}
-        if src_lower not in allowed:
-            raise HTTPException(status_code=400, detail=f"Ugyldig source '{source}'. Tilladte: {sorted(allowed)}")
+        if src_lower not in VALID_PENDING_CHROME_ACTION_SOURCES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ugyldig source '{source}'. Tilladte: {sorted(VALID_PENDING_CHROME_ACTION_SOURCES)}"
+            )
         client.pending_chrome_action_source = src_lower
 
     session.add(client)
@@ -263,48 +274,74 @@ async def update_client(
 
     fields = client_update.model_fields_set  # Pydantic v2 (erstatter __fields_set__)
 
-    if client_update.locality is not None:
+    if "locality" in fields:
         client.locality = client_update.locality
-    if client_update.sort_order is not None:
+    if "sort_order" in fields:
         client.sort_order = client_update.sort_order
-    if client_update.kiosk_url is not None:
+    if "kiosk_url" in fields:
         client.kiosk_url = client_update.kiosk_url
-    if client_update.ubuntu_version is not None:
+    if "ubuntu_version" in fields:
         client.ubuntu_version = client_update.ubuntu_version
-    if client_update.uptime is not None:
+    if "uptime" in fields:
         client.uptime = client_update.uptime
-    if client_update.wifi_ip_address is not None:
+    if "wifi_ip_address" in fields:
         client.wifi_ip_address = client_update.wifi_ip_address
-    if client_update.wifi_mac_address is not None:
+    if "wifi_mac_address" in fields:
         client.wifi_mac_address = client_update.wifi_mac_address
-    if client_update.lan_ip_address is not None:
+    if "lan_ip_address" in fields:
         client.lan_ip_address = client_update.lan_ip_address
-    if client_update.lan_mac_address is not None:
+    if "lan_mac_address" in fields:
         client.lan_mac_address = client_update.lan_mac_address
-    if client_update.pending_reboot is not None:
-        client.pending_reboot = client_update.pending_reboot
-    if client_update.pending_shutdown is not None:
-        client.pending_shutdown = client_update.pending_shutdown
-    if client_update.chrome_status is not None:
+    if "chrome_status" in fields:
         client.chrome_status = client_update.chrome_status
-        client.chrome_last_updated = utcnow()
-    if client_update.chrome_color is not None:
+    if "chrome_color" in fields:
         client.chrome_color = client_update.chrome_color
+    if "chrome_last_updated" in fields:
+        client.chrome_last_updated = client_update.chrome_last_updated
+    elif "chrome_status" in fields:
+        client.chrome_last_updated = utcnow()
+    if "last_seen" in fields:
+        client.last_seen = client_update.last_seen
+    if "created_at" in fields:
+        client.created_at = client_update.created_at
+    if "pending_reboot" in fields:
+        client.pending_reboot = client_update.pending_reboot
+    if "pending_shutdown" in fields:
+        client.pending_shutdown = client_update.pending_shutdown
     if "pending_chrome_action" in fields:
         val = client_update.pending_chrome_action
         client.pending_chrome_action = ChromeAction.NONE if val is None else ChromeAction(val)
     if "pending_chrome_action_source" in fields:
         src = client_update.pending_chrome_action_source
-        client.pending_chrome_action_source = str(src).lower() if src else None
-    if client_update.school_id is not None:
+        if src is None:
+            client.pending_chrome_action_source = None
+        else:
+            src_lower = str(src).lower()
+            if src_lower not in VALID_PENDING_CHROME_ACTION_SOURCES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Ugyldig source '{src}'. Tilladte: {sorted(VALID_PENDING_CHROME_ACTION_SOURCES)}"
+                )
+            client.pending_chrome_action_source = src_lower
+    if "school_id" in fields:
         client.school_id = client_update.school_id
-    if client_update.state is not None:
-        client.state = client_update.state
-    if client_update.livestream_status is not None:
+    if "state" in fields:
+        state = client_update.state
+        if state is None:
+            client.state = None
+        else:
+            state_lower = normalize_client_state(state)
+            if state_lower not in VALID_CLIENT_STATES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Ugyldig state '{state}'. Tilladte værdier: {sorted(VALID_CLIENT_STATES)}"
+                )
+            client.state = state_lower
+    if "livestream_status" in fields:
         client.livestream_status = client_update.livestream_status
-    if client_update.livestream_last_segment is not None:
+    if "livestream_last_segment" in fields:
         client.livestream_last_segment = client_update.livestream_last_segment
-    if client_update.livestream_last_error is not None:
+    if "livestream_last_error" in fields:
         client.livestream_last_error = client_update.livestream_last_error
 
     session.add(client)
