@@ -4,7 +4,7 @@ from typing import List, Optional
 from pydantic import BaseModel, field_validator
 from models import User
 from db import get_session
-from auth import get_current_admin_user, get_password_hash, validate_password_strength
+from auth import get_current_admin_user, get_current_user, get_password_hash, validate_password_strength
 
 router = APIRouter()
 
@@ -88,6 +88,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None
+    must_change_password: Optional[bool] = None
     school_id: Optional[int] = None
     full_name: Optional[str] = None
     remarks: Optional[str] = None
@@ -153,17 +154,56 @@ def update_user(
     user_id: int,
     user_update: UserUpdate,
     session: Session = Depends(get_session),
-    admin: User = Depends(get_current_admin_user),
+    current_user: User = Depends(get_current_user),
 ):
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Bruger ikke fundet")
 
-    # En admin må ikke redigere superadmins
-    _require_can_manage_target(admin, user)
+    is_self = current_user.id == user_id
+
+    # Ikke-admin må kun opdatere sig selv (kodeord + must_change_password)
+    if not is_self and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Du har ikke adgang til at opdatere denne bruger")
+    if is_self and not current_user.is_admin:
+        non_self_fields = (
+            user_update.role is not None
+            or user_update.is_active is not None
+            or user_update.school_id is not None
+            or user_update.full_name is not None
+            or user_update.remarks is not None
+            or user_update.email is not None
+        )
+        if non_self_fields:
+            raise HTTPException(
+                status_code=403,
+                detail="Du må kun ændre dit eget kodeord og sætte must_change_password til false",
+            )
+
+    if user_update.password is not None:
+        validate_password_strength(user_update.password)
+        user.hashed_password = get_password_hash(user_update.password)
+        if is_self:
+            user.must_change_password = False
+
+    if user_update.must_change_password is not None:
+        if is_self and not current_user.is_admin and user_update.must_change_password:
+            raise HTTPException(status_code=403, detail="Du må ikke sætte must_change_password til true")
+        user.must_change_password = user_update.must_change_password
+
+    # Tidlig retur for selvbetjening (ikke-admin)
+    if is_self and not current_user.is_admin:
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+
+    # Admin-operationer herunder:
+    # En admin (ikke superadmin) må ikke redigere superadmins
+    _require_can_manage_target(current_user, user)
 
     if user_update.role is not None:
-        _require_role_assignment_allowed(admin, user_update.role)
+        _require_role_assignment_allowed(current_user, user_update.role)
         # Last-superadmin guard: forhindre nedgradering af den sidst aktive superadmin
         if (
             user.role == "superadmin"
@@ -190,10 +230,6 @@ def update_user(
                 detail="Kan ikke deaktivere den sidste aktive superadministrator",
             )
         user.is_active = user_update.is_active
-
-    if user_update.password is not None:
-        validate_password_strength(user_update.password)
-        user.hashed_password = get_password_hash(user_update.password)
     if user_update.school_id is not None:
         user.school_id = user_update.school_id
     if user_update.full_name is not None:

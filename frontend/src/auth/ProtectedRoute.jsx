@@ -2,12 +2,13 @@
 // Beskytter routes mod ikke-indloggede brugere.
 // Validerer sessionen ved at kalde GET /auth/me med Bearer token (Safari-fix).
 import React, { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./authcontext";
 import { apiUrl } from "../api";
 
 export default function ProtectedRoute({ children, requireSuperadmin = false }) {
   const { user, logoutUser, isSuperadmin } = useAuth();
+  const location = useLocation();
   const [valid, setValid] = useState(null); // null = tjekker stadig
 
   useEffect(() => {
@@ -42,6 +43,9 @@ export default function ProtectedRoute({ children, requireSuperadmin = false }) 
   if (valid === null) return null;
   if (!valid) return <Navigate to="/login" replace />;
   if (requireSuperadmin && !isSuperadmin) return <Navigate to="/" replace />;
+  if (user.must_change_password && location.pathname !== "/skift-adgangskode") {
+    return <Navigate to="/skift-adgangskode" replace />;
+  }
 
   return children;
 }
