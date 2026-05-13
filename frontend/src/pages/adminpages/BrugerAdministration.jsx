@@ -76,6 +76,13 @@ function generateSecurePassword() {
   return password.join("");
 }
 
+function formatCreatedAt(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("da-DK");
+}
+
 // ----------- Main Component ----------- //
 export default function BrugerAdministration() {
   const { isSuperadmin } = useAuth();
@@ -557,6 +564,7 @@ export default function BrugerAdministration() {
                           : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Oprettet</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Bemærkninger</TableCell>
                     <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
                   </TableRow>
@@ -564,13 +572,13 @@ export default function BrugerAdministration() {
                 <TableBody>
                   {loadingUsers ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center">
+                        <TableCell colSpan={10} align="center">
                         <CircularProgress size={24} />
                       </TableCell>
                     </TableRow>
                   ) : getSortedUsers().length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ color: "#888" }}>
+                        <TableCell colSpan={10} align="center" sx={{ color: "#888" }}>
                         Ingen brugere oprettet endnu
                       </TableCell>
                     </TableRow>
@@ -596,6 +604,7 @@ export default function BrugerAdministration() {
                         <TableCell>
                           {user.is_active ? "Aktiv" : "Spærret"}
                         </TableCell>
+                        <TableCell>{formatCreatedAt(user.created_at)}</TableCell>
                         <TableCell>{user.remarks || ""}</TableCell>
                         <TableCell align="right">
                           {canManageUser(user) ? (

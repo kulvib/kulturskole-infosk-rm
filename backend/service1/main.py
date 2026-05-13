@@ -63,26 +63,30 @@ def migrate_legacy_user_roles():
 
 def ensure_admin_user():
     with Session(engine) as session:
-        user = session.exec(select(User).where(User.username == "admin")).first()
-        if not user:
+        admin_user_exists = session.exec(
+            select(User).where(User.role.in_(["admin", "superadmin"]), User.is_active == True)
+        ).first()
+        if not admin_user_exists:
             admin_password = os.getenv("ADMIN_PASSWORD", "")
             if not admin_password or len(admin_password) < 12:
                 raise RuntimeError(
                     "ADMIN_PASSWORD mangler eller er for svagt. "
                     "Sæt ADMIN_PASSWORD (min. 12 tegn) i Environment på Render."
                 )
+            admin_username = os.getenv("ADMIN_USERNAME", "admin").strip() or "admin"
             admin = User(
-                username="admin",
+                username=admin_username,
                 hashed_password=get_password_hash(admin_password),
                 role="superadmin",
                 is_active=True,
                 email=os.getenv("ADMIN_EMAIL", "admin@example.com"),
+                must_change_password=True,
             )
             session.add(admin)
             session.commit()
             print("Superadmin-bruger oprettet ved opstart")
         else:
-            print("Admin-bruger eksisterer allerede — ADMIN_PASSWORD ignoreres")
+            print("Aktiv admin/superadmin findes allerede — ADMIN_* env ignoreres")
 
 
 @asynccontextmanager

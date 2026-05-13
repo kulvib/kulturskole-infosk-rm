@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
+from datetime import datetime
 from models import User
 from db import get_session
-from auth import get_current_admin_user, get_current_user, get_password_hash, validate_password_strength
+from auth import (
+    get_current_admin_user,
+    get_current_user,
+    get_password_hash,
+    validate_password_strength,
+    verify_password,
+)
 
 router = APIRouter()
 
@@ -85,6 +92,7 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    old_password: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None
@@ -114,7 +122,22 @@ class UserUpdate(BaseModel):
         return v.strip().lower()
 
 
-@router.get("/users/", response_model=List[User])
+class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    created_at: datetime
+    role: str
+    is_active: bool
+    must_change_password: bool
+    school_id: Optional[int] = None
+    full_name: Optional[str] = None
+    remarks: Optional[str] = None
+    email: str
+
+
+@router.get("/users/", response_model=List[UserRead])
 def list_users(
     session: Session = Depends(get_session),
     admin: User = Depends(get_current_admin_user),
@@ -122,7 +145,7 @@ def list_users(
     return session.exec(select(User)).all()
 
 
-@router.post("/users/", response_model=User, status_code=201)
+@router.post("/users/", response_model=UserRead, status_code=201)
 def create_user(
     user: UserCreate,
     session: Session = Depends(get_session),
@@ -149,7 +172,7 @@ def create_user(
     return user_obj
 
 
-@router.patch("/users/{user_id}", response_model=User)
+@router.patch("/users/{user_id}", response_model=UserRead)
 def update_user(
     user_id: int,
     user_update: UserUpdate,
@@ -181,6 +204,11 @@ def update_user(
             )
 
     if user_update.password is not None:
+        if is_self and not current_user.is_admin:
+            if not user_update.old_password:
+                raise HTTPException(status_code=400, detail="Gammelt kodeord er påkrævet")
+            if not verify_password(user_update.old_password, user.hashed_password):
+                raise HTTPException(status_code=400, detail="Gammelt kodeord er forkert")
         validate_password_strength(user_update.password)
         user.hashed_password = get_password_hash(user_update.password)
         if is_self:
@@ -271,4 +299,3 @@ def delete_user(
 
     session.delete(user)
     session.commit()
-

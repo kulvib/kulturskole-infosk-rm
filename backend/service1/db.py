@@ -48,6 +48,15 @@ def create_db_and_tables():
                 conn.execute(
                     text("ALTER TABLE user ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0")
                 )
+        if "created_at" not in user_columns:
+            if engine.dialect.name == "postgresql":
+                conn.execute(
+                    text('ALTER TABLE "user" ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT NOW()')
+                )
+            else:
+                conn.execute(
+                    text("ALTER TABLE user ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP")
+                )
 
 
 def get_session():
