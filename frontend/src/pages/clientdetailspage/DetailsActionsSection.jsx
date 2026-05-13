@@ -275,7 +275,7 @@ function ClientDetailsActionsSection({
   return (
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2, ...cardStyle }}>
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
-        {user?.role === "admin" ? (
+        {(user?.role === "admin" || user?.role === "superadmin") ? (
           <>
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {adminFirstRow.map(renderButton)}

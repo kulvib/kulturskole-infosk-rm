@@ -90,8 +90,11 @@ export function AuthProvider({ children }) {
     resetInactivityTimer();
   }, [resetInactivityTimer]);
 
+  const isSuperadmin = user?.role === "superadmin";
+  const isAdmin = user?.role === "admin" || isSuperadmin;
+
   return (
-    <AuthContext.Provider value={{ user, loginUser, logoutUser }}>
+    <AuthContext.Provider value={{ user, loginUser, logoutUser, isAdmin, isSuperadmin }}>
       {children}
       <Dialog open={showWarning}>
         <DialogTitle>Inaktivitet registreret</DialogTitle>

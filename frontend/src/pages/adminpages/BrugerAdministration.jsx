@@ -26,14 +26,26 @@ import {
   InputLabel,
   TextField,
   Grid,
+  Chip,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import { getSchools, getUsers, createUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from "../../api";
+import { useAuth } from "../../auth/authcontext";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const ROLE_DISPLAY = {
+  superadmin: "Superadministrator",
+  admin: "Administrator",
+  bruger: "Bruger",
+  viewer: "Viewer (Se adgang)",
+};
+
+// Roller som en normal admin (ikke superadmin) må tildele
+const ADMIN_ALLOWED_ROLES = ["admin", "bruger", "viewer"];
 
 // ----------- Helper functions ----------- //
 function generateSecurePassword() {
@@ -66,6 +78,14 @@ function generateSecurePassword() {
 
 // ----------- Main Component ----------- //
 export default function BrugerAdministration() {
+  const { isSuperadmin } = useAuth();
+
+  // Rolle-muligheder baseret på den nuværende brugers rolle
+  const availableRoles = isSuperadmin ? Object.keys(ROLE_DISPLAY) : ADMIN_ALLOWED_ROLES;
+
+  // Hjælper: må current user administrere en given target-bruger?
+  const canManageUser = (targetUser) => isSuperadmin || targetUser.role !== "superadmin";
+
   // ----------- State ----------- //
   const [users, setUsers] = useState([]);
   const [schools, setSchools] = useState([]);
@@ -125,12 +145,7 @@ export default function BrugerAdministration() {
   useEffect(() => {
     setLoadingUsers(true);
     getUsers()
-      .then(data => setUsers(Array.isArray(data)
-        ? data.map(u => ({
-            ...u,
-            role: u.role === "admin" ? "administrator" : u.role,
-          })) : []
-      ))
+      .then(data => setUsers(Array.isArray(data) ? data : []))
       .catch(() => {
         setUsers([]);
         setUserError("Kunne ikke hente brugere (kun admin kan se listen)");
@@ -224,20 +239,14 @@ export default function BrugerAdministration() {
       username,
       password,
       full_name,
-      role: role === "administrator" ? "admin" : role,
+      role,
       is_active,
       school_id: role === "bruger" ? school_id : undefined,
       remarks,
       email,
     })
       .then(data => {
-        setUsers(Array.isArray(users) ? [...users, {
-          ...data,
-          role: data.role === "admin" ? "administrator" : data.role
-        }] : [{
-          ...data,
-          role: data.role === "admin" ? "administrator" : data.role
-        }]);
+        setUsers(Array.isArray(users) ? [...users, data] : [data]);
         setNewUser({
           username: "",
           password: "",
@@ -266,7 +275,6 @@ export default function BrugerAdministration() {
   const openEditUserDialog = (user) => {
     setEditUser({
       ...user,
-      role: user.role === "admin" ? "administrator" : user.role,
       password: "",
     });
     setEditUserConfirmEmail(user.email || "");
@@ -303,7 +311,7 @@ export default function BrugerAdministration() {
       return;
     }
     apiUpdateUser(id, {
-      role: role === "administrator" ? "admin" : role,
+      role,
       is_active,
       password: password || undefined,
       full_name,
@@ -312,11 +320,7 @@ export default function BrugerAdministration() {
       email,
     })
       .then(data => {
-        setUsers(users.map(u =>
-          u.id === data.id
-            ? { ...data, role: data.role === "admin" ? "administrator" : data.role }
-            : u
-        ));
+        setUsers(users.map(u => u.id === data.id ? data : u));
         setUserError("");
         setEditUserEmailError("");
         showSnackbar("Bruger opdateret!", "success");
@@ -343,10 +347,8 @@ export default function BrugerAdministration() {
     setDeleteUserStep(1);
   };
   const handleFirstDeleteUserConfirm = () => setDeleteUserStep(2);
-  const canDeleteAdmin = userToDelete?.role === "administrator" && userToDelete?.is_active === false;
   const handleFinalDeleteUser = () => {
     if (!userToDelete) return;
-    if (userToDelete.role === "administrator" && userToDelete.is_active) return;
     apiDeleteUser(userToDelete.id)
       .then(() => {
         setUsers(users.filter(u => u.id !== userToDelete.id));
@@ -382,7 +384,7 @@ export default function BrugerAdministration() {
         (u.username && u.username.toLowerCase().includes(search)) ||
         (u.full_name && u.full_name.toLowerCase().includes(search)) ||
         (u.email && u.email.toLowerCase().includes(search)) ||
-        (u.role === "administrator" ? "administrator" : "bruger").includes(search) ||
+        (ROLE_DISPLAY[u.role] || u.role || "").toLowerCase().includes(search) ||
         schoolName.toLowerCase().includes(search) ||
         (u.remarks && u.remarks.toLowerCase().includes(search))
       );
@@ -393,8 +395,8 @@ export default function BrugerAdministration() {
       switch (userSort.key) {
         case "username": aVal = a.username || ""; bVal = b.username || ""; break;
         case "fullname": aVal = a.full_name || ""; bVal = b.full_name || ""; break;
-        case "role": aVal = a.role === "administrator" ? "administrator" : "bruger";
-          bVal = b.role === "administrator" ? "administrator" : "bruger"; break;
+        case "role": aVal = ROLE_DISPLAY[a.role] || a.role || "";
+          bVal = ROLE_DISPLAY[b.role] || b.role || ""; break;
         case "school": aVal = a.school_id ? (schools.find(s => s.id === a.school_id)?.name ?? "") : "";
           bVal = b.school_id ? (schools.find(s => s.id === b.school_id)?.name ?? "") : ""; break;
         case "email": aVal = a.email || ""; bVal = b.email || ""; break;
@@ -443,8 +445,9 @@ export default function BrugerAdministration() {
                     required
                     onChange={e => setNewUser({ ...newUser, role: e.target.value, school_id: "" })}
                   >
-                    <MenuItem value="bruger">Bruger</MenuItem>
-                    <MenuItem value="administrator">Administrator</MenuItem>
+                    {availableRoles.map(role => (
+                      <MenuItem key={role} value={role}>{ROLE_DISPLAY[role]}</MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>
@@ -577,7 +580,14 @@ export default function BrugerAdministration() {
                         <TableCell>{user.username}</TableCell>
                         <TableCell>{user.full_name || ""}</TableCell>
                         <TableCell>{user.email || ""}</TableCell>
-                        <TableCell>{user.role === "administrator" ? "administrator" : "bruger"}</TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            label={ROLE_DISPLAY[user.role] || user.role}
+                            color={user.role === "superadmin" ? "error" : user.role === "admin" ? "warning" : "default"}
+                            variant="outlined"
+                          />
+                        </TableCell>
                         <TableCell>
                           {user.school_id
                             ? (schools.find(s => s.id === user.school_id)?.name ?? user.school_id)
@@ -588,34 +598,35 @@ export default function BrugerAdministration() {
                         </TableCell>
                         <TableCell>{user.remarks || ""}</TableCell>
                         <TableCell align="right">
-                          <Tooltip title="Rediger bruger">
-                            <span>
-                              <IconButton
-                                onClick={() => openEditUserDialog(user)}
-                              >
-                                <EditIcon />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                          <Tooltip
-                            title={
-                              user.role === "administrator"
-                                ? user.is_active
-                                  ? "Administrator kan kun slettes hvis status er Spærret"
-                                  : "Slet administrator"
-                                : "Slet bruger"
-                            }
-                          >
-                            <span>
-                              <IconButton
-                                color="error"
-                                onClick={() => handleOpenDeleteUserDialog(user)}
-                                disabled={user.role === "administrator" && user.is_active}
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
+                          {canManageUser(user) ? (
+                            <>
+                              <Tooltip title="Rediger bruger">
+                                <span>
+                                  <IconButton onClick={() => openEditUserDialog(user)}>
+                                    <EditIcon />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                              <Tooltip title="Slet bruger">
+                                <span>
+                                  <IconButton
+                                    color="error"
+                                    onClick={() => handleOpenDeleteUserDialog(user)}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            </>
+                          ) : (
+                            <Tooltip title="Kun superadministratorer kan administrere denne bruger">
+                              <span>
+                                <IconButton disabled>
+                                  <EditIcon />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))
@@ -674,8 +685,9 @@ export default function BrugerAdministration() {
                         }}
                         disabled={savingEditUser}
                       >
-                        <MenuItem value="bruger">Bruger</MenuItem>
-                        <MenuItem value="administrator">Administrator</MenuItem>
+                        {availableRoles.map(role => (
+                          <MenuItem key={role} value={role}>{ROLE_DISPLAY[role]}</MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                     {editUser.role === "bruger" && (
@@ -749,26 +761,19 @@ export default function BrugerAdministration() {
             Advarsel: Du er ved at slette brugeren <b>{userToDelete?.username}</b>.<br />
             Denne handling kan <b>ikke fortrydes!</b>
           </Typography>
-          {userToDelete?.role === "administrator" && userToDelete?.is_active && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              Administrator-brugere kan kun slettes hvis status er Spærret.
-            </Typography>
-          )}
           {userToDelete && (
-            userToDelete.role !== "administrator" || canDeleteAdmin ? (
-              <>
-                {deleteUserStep === 1 && (
-                  <Typography sx={{ mb: 2 }}>
-                    Er du sikker på at du vil slette denne bruger?
-                  </Typography>
-                )}
-                {deleteUserStep === 2 && (
-                  <Typography color="error" sx={{ mb: 2 }}>
-                    Tryk <b>Slet endeligt</b> for at bekræfte.
-                  </Typography>
-                )}
-              </>
-            ) : null
+            <>
+              {deleteUserStep === 1 && (
+                <Typography sx={{ mb: 2 }}>
+                  Er du sikker på at du vil slette denne bruger?
+                </Typography>
+              )}
+              {deleteUserStep === 2 && (
+                <Typography color="error" sx={{ mb: 2 }}>
+                  Tryk <b>Slet endeligt</b> for at bekræfte.
+                </Typography>
+              )}
+            </>
           )}
           {deleteUserError && (
             <Typography color="error" sx={{ mb: 2 }}>
@@ -778,7 +783,7 @@ export default function BrugerAdministration() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDeleteUserDialog}>Annuller</Button>
-          {(userToDelete && (userToDelete.role !== "administrator" || canDeleteAdmin)) && (
+          {userToDelete && (
             deleteUserStep === 1 ? (
               <Button color="warning" variant="contained" onClick={handleFirstDeleteUserConfirm}>
                 Bekræft sletning

@@ -8,11 +8,51 @@ from auth import get_current_admin_user, get_password_hash, validate_password_st
 
 router = APIRouter()
 
+ROLLE_VISNING = {
+    "superadmin": "Superadministrator",
+    "admin": "Administrator",
+    "bruger": "Bruger",
+    "viewer": "Viewer (Se adgang)",
+}
+
+# Roller som en normal admin (ikke superadmin) må tildele
+ADMIN_ALLOWED_ROLES = ["admin", "bruger", "viewer"]
+
+
+def _count_active_superadmins(session: Session) -> int:
+    return len(
+        session.exec(
+            select(User).where(User.role == "superadmin", User.is_active == True)
+        ).all()
+    )
+
+
+def _require_role_assignment_allowed(current_user: User, requested_role: str):
+    """Kontrollér at current_user må tildele requested_role."""
+    if current_user.is_superadmin:
+        return  # superadmin må alt
+    if requested_role not in ADMIN_ALLOWED_ROLES:
+        raise HTTPException(
+            status_code=403,
+            detail="Kun superadministratorer må tildele rollen 'superadmin'",
+        )
+
+
+def _require_can_manage_target(current_user: User, target_user: User):
+    """Kontrollér at current_user må redigere/slette target_user."""
+    if current_user.is_superadmin:
+        return  # superadmin må alt
+    if target_user.role == "superadmin":
+        raise HTTPException(
+            status_code=403,
+            detail="Kun superadministratorer må redigere eller slette superadministratorer",
+        )
+
 
 class UserCreate(BaseModel):
     username: str
     password: str
-    role: str = "elev"
+    role: str = "bruger"
     is_active: bool = True
     school_id: Optional[int] = None
     full_name: Optional[str] = None
@@ -38,7 +78,7 @@ class UserCreate(BaseModel):
     @field_validator("role")
     @classmethod
     def role_must_be_valid(cls, v):
-        allowed = {"admin", "elev", "bruger"}
+        allowed = set(ROLLE_VISNING.keys())
         if v not in allowed:
             raise ValueError(f"Rolle skal være én af: {', '.join(sorted(allowed))}")
         return v
@@ -58,7 +98,7 @@ class UserUpdate(BaseModel):
     def role_must_be_valid(cls, v):
         if v is None:
             return v
-        allowed = {"admin", "elev", "bruger"}
+        allowed = set(ROLLE_VISNING.keys())
         if v not in allowed:
             raise ValueError(f"Rolle skal være én af: {', '.join(sorted(allowed))}")
         return v
@@ -76,7 +116,7 @@ class UserUpdate(BaseModel):
 @router.get("/users/", response_model=List[User])
 def list_users(
     session: Session = Depends(get_session),
-    admin=Depends(get_current_admin_user)
+    admin: User = Depends(get_current_admin_user),
 ):
     return session.exec(select(User)).all()
 
@@ -85,11 +125,13 @@ def list_users(
 def create_user(
     user: UserCreate,
     session: Session = Depends(get_session),
-    admin=Depends(get_current_admin_user)
+    admin: User = Depends(get_current_admin_user),
 ):
+    _require_role_assignment_allowed(admin, user.role)
     validate_password_strength(user.password)
     if session.exec(select(User).where(User.username == user.username)).first():
         raise HTTPException(status_code=400, detail="Brugernavnet er allerede i brug")
+
     user_obj = User(
         username=user.username,
         hashed_password=get_password_hash(user.password),
@@ -111,38 +153,47 @@ def update_user(
     user_id: int,
     user_update: UserUpdate,
     session: Session = Depends(get_session),
-    admin=Depends(get_current_admin_user)
+    admin: User = Depends(get_current_admin_user),
 ):
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Bruger ikke fundet")
+
+    # En admin må ikke redigere superadmins
+    _require_can_manage_target(admin, user)
+
+    if user_update.role is not None:
+        _require_role_assignment_allowed(admin, user_update.role)
+        # Last-superadmin guard: forhindre nedgradering af den sidst aktive superadmin
+        if (
+            user.role == "superadmin"
+            and user.is_active
+            and user_update.role != "superadmin"
+            and _count_active_superadmins(session) <= 1
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Kan ikke ændre rollen på den sidste aktive superadministrator",
+            )
+        user.role = user_update.role
+
+    if user_update.is_active is not None:
+        # Last-superadmin guard: forhindre deaktivering af den sidst aktive superadmin
+        if (
+            not user_update.is_active
+            and user.role == "superadmin"
+            and user.is_active
+            and _count_active_superadmins(session) <= 1
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Kan ikke deaktivere den sidste aktive superadministrator",
+            )
+        user.is_active = user_update.is_active
+
     if user_update.password is not None:
         validate_password_strength(user_update.password)
         user.hashed_password = get_password_hash(user_update.password)
-    # Beskyt mod at fjerne den eneste aktive administrator
-    if user_update.role is not None and user_update.role != "admin" and user.role == "admin":
-        active_admins = session.exec(
-            select(User).where(User.role == "admin", User.is_active == True)
-        ).all()
-        if len(active_admins) <= 1:
-            raise HTTPException(
-                status_code=400,
-                detail="Kan ikke ændre rollen på den eneste aktive administrator"
-            )
-    if user_update.role is not None:
-        user.role = user_update.role
-    if user_update.is_active is not None:
-        # Beskyt mod at deaktivere den eneste aktive admin
-        if not user_update.is_active and user.role == "admin":
-            active_admins = session.exec(
-                select(User).where(User.role == "admin", User.is_active == True)
-            ).all()
-            if len(active_admins) <= 1:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Kan ikke deaktivere den eneste aktive administrator"
-                )
-        user.is_active = user_update.is_active
     if user_update.school_id is not None:
         user.school_id = user_update.school_id
     if user_update.full_name is not None:
@@ -151,6 +202,7 @@ def update_user(
         user.remarks = user_update.remarks
     if user_update.email is not None:
         user.email = user_update.email
+
     session.add(user)
     session.commit()
     session.refresh(user)
@@ -161,10 +213,26 @@ def update_user(
 def delete_user(
     user_id: int,
     session: Session = Depends(get_session),
-    admin=Depends(get_current_admin_user)
+    admin: User = Depends(get_current_admin_user),
 ):
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Bruger ikke fundet")
+
+    # En admin må ikke slette superadmins
+    _require_can_manage_target(admin, user)
+
+    # Last-superadmin guard
+    if (
+        user.role == "superadmin"
+        and user.is_active
+        and _count_active_superadmins(session) <= 1
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Kan ikke slette den sidste aktive superadministrator",
+        )
+
     session.delete(user)
     session.commit()
+

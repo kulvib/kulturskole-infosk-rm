@@ -39,6 +39,28 @@ ALLOWED_ORIGINS = [
 ]
 
 
+def migrate_legacy_user_roles():
+    """Idempotent migrering: admin→superadmin og elev→bruger."""
+    with Session(engine) as session:
+        users = session.exec(
+            select(User).where(User.role.in_(["admin", "elev"]))
+        ).all()
+        changed = 0
+        for user in users:
+            if user.role == "admin":
+                user.role = "superadmin"
+                changed += 1
+            elif user.role == "elev":
+                user.role = "bruger"
+                changed += 1
+            session.add(user)
+        if changed:
+            session.commit()
+            print(f"Rollemigration: {changed} brugere migreret (admin→superadmin, elev→bruger)")
+        else:
+            print("Rollemigration: ingen forældede roller fundet")
+
+
 def ensure_admin_user():
     with Session(engine) as session:
         user = session.exec(select(User).where(User.username == "admin")).first()
@@ -52,13 +74,13 @@ def ensure_admin_user():
             admin = User(
                 username="admin",
                 hashed_password=get_password_hash(admin_password),
-                role="admin",
+                role="superadmin",
                 is_active=True,
                 email=os.getenv("ADMIN_EMAIL", "admin@example.com"),
             )
             session.add(admin)
             session.commit()
-            print("Admin-bruger oprettet ved opstart")
+            print("Superadmin-bruger oprettet ved opstart")
         else:
             print("Admin-bruger eksisterer allerede — ADMIN_PASSWORD ignoreres")
 
@@ -66,6 +88,7 @@ def ensure_admin_user():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
+    migrate_legacy_user_roles()
     ensure_admin_user()
     yield
 

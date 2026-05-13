@@ -511,7 +511,7 @@ function ClientDetailsHeaderSection({
                       <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none" }}>{client?.name ?? <span style={{ color: "#888" }}>Ukendt navn</span>}</TableCell>
                     </TableRow>
 
-                    {user?.role === "admin" && (
+                    {(user?.role === "admin" || user?.role === "superadmin") && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap", pr: isMobile ? 0.5 : 1, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Klient ID:</TableCell>
                         <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none" }}>{client?.id ?? "?"}</TableCell>
@@ -519,7 +519,7 @@ function ClientDetailsHeaderSection({
                     )}
 
                     {/* Skole kun synlig for admin */}
-                    {user?.role === "admin" && (
+                    {(user?.role === "admin" || user?.role === "superadmin") && (
                       <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                         <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap", pr: isMobile ? 0.5 : 1, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none", width: labelCellWidth, minWidth: labelCellWidth }}>Skole:</TableCell>
                         <TableCell sx={{ fontWeight: 400, pl: isMobile ? 0.5 : 1.5, py: 0, verticalAlign: "middle", fontSize: isMobile ? 12 : 14, borderBottom: "none" }}>

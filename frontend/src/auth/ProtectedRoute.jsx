@@ -6,8 +6,8 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "./authcontext";
 import { apiUrl } from "../api";
 
-export default function ProtectedRoute({ children }) {
-  const { user, logoutUser } = useAuth();
+export default function ProtectedRoute({ children, requireSuperadmin = false }) {
+  const { user, logoutUser, isSuperadmin } = useAuth();
   const [valid, setValid] = useState(null); // null = tjekker stadig
 
   useEffect(() => {
@@ -41,6 +41,7 @@ export default function ProtectedRoute({ children }) {
   if (!user) return <Navigate to="/login" replace />;
   if (valid === null) return null;
   if (!valid) return <Navigate to="/login" replace />;
+  if (requireSuperadmin && !isSuperadmin) return <Navigate to="/" replace />;
 
   return children;
 }

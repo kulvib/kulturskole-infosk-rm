@@ -648,7 +648,7 @@ export default function CalendarPage() {
           </span>
         </Tooltip>
       </Box>
-      {user?.role === "admin" && (
+      {(user?.role === "admin" || user?.role === "superadmin") && (
         <Paper elevation={2} sx={{
           p: { xs: 1, sm: 2 },
           mb: 3,

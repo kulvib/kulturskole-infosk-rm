@@ -287,7 +287,7 @@ export default function ClientInfoPage() {
     return school ? school.name : <span style={{ color: "#888" }}>Ingen skole</span>;
   };
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
   // Responsive mobil/tablet render
   const renderMobileRow = (client, idx, provided, snapshot) => (
