@@ -25,8 +25,10 @@ export default function ChangePassword() {
   const { user: me, logoutUser } = useAuth();
   const navigate = useNavigate();
 
+  const [oldPassword, setOldPassword] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showRepeatPassword, setShowRepeatPassword] = useState(false);
   const [error, setError] = useState("");
@@ -57,6 +59,11 @@ export default function ChangePassword() {
       return;
     }
 
+    if (!oldPassword) {
+      setError("Gammelt kodeord er påkrævet.");
+      return;
+    }
+
     if (!PASSWORD_REGEX.test(password)) {
       setError("Kodeord skal være mindst 8 tegn og indeholde store/små bogstaver samt tal.");
       return;
@@ -69,7 +76,7 @@ export default function ChangePassword() {
 
     setLoading(true);
     try {
-      await updateUser(me.id, { password, must_change_password: false });
+      await updateUser(me.id, { old_password: oldPassword, password, must_change_password: false });
       setSuccess(true);
       const start = Date.now();
       progressTimerRef.current = setInterval(() => {
@@ -104,6 +111,23 @@ export default function ChangePassword() {
           </Stack>
         ) : (
           <Stack component="form" onSubmit={handleSubmit} spacing={2}>
+            <TextField
+              label="Gammel adgangskode"
+              type={showOldPassword ? "text" : "password"}
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton edge="end" onClick={() => setShowOldPassword((prev) => !prev)}>
+                      {showOldPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
             <TextField
               label="Ny adgangskode"
               type={showPassword ? "text" : "password"}

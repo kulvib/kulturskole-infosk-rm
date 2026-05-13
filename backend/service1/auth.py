@@ -157,22 +157,21 @@ def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_session)
 ):
+    invalid_credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Forkert brugernavn eller kodeord",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
     # Rate limiting baseret på klientens IP
     client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip)
 
     user = authenticate_user(form_data.username, form_data.password, session)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Forkert brugernavn eller kodeord",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise invalid_credentials_exception
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Brugerkontoen er deaktiveret"
-        )
+        raise invalid_credentials_exception
 
     _clear_rate_limit(client_ip)
 

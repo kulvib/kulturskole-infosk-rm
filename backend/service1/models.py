@@ -34,6 +34,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str
     hashed_password: str
+    created_at: datetime = Field(default_factory=utcnow, nullable=False)
     role: str = "bruger"
     is_active: bool = True
     must_change_password: bool = True

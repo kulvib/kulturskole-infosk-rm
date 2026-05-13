@@ -46,6 +46,7 @@ const ROLE_DISPLAY = {
 
 // Roller som en normal admin (ikke superadmin) må tildele
 const ADMIN_ALLOWED_ROLES = ["admin", "bruger", "viewer"];
+const USER_TABLE_COLUMN_COUNT = 10;
 
 // ----------- Helper functions ----------- //
 function generateSecurePassword() {
@@ -74,6 +75,17 @@ function generateSecurePassword() {
     [password[i], password[j]] = [password[j], password[i]];
   }
   return password.join("");
+}
+
+/**
+ * @param {string|Date|null|undefined} value
+ * @returns {string}
+ */
+function formatCreatedAt(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("da-DK");
 }
 
 // ----------- Main Component ----------- //
@@ -557,6 +569,7 @@ export default function BrugerAdministration() {
                           : <ArrowUpwardIcon fontSize="small" sx={{ verticalAlign: "middle" }} />)}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Oprettet</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Bemærkninger</TableCell>
                     <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Handlinger</TableCell>
                   </TableRow>
@@ -564,13 +577,13 @@ export default function BrugerAdministration() {
                 <TableBody>
                   {loadingUsers ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center">
+                        <TableCell colSpan={USER_TABLE_COLUMN_COUNT} align="center">
                         <CircularProgress size={24} />
                       </TableCell>
                     </TableRow>
                   ) : getSortedUsers().length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ color: "#888" }}>
+                        <TableCell colSpan={USER_TABLE_COLUMN_COUNT} align="center" sx={{ color: "#888" }}>
                         Ingen brugere oprettet endnu
                       </TableCell>
                     </TableRow>
@@ -596,6 +609,7 @@ export default function BrugerAdministration() {
                         <TableCell>
                           {user.is_active ? "Aktiv" : "Spærret"}
                         </TableCell>
+                        <TableCell>{formatCreatedAt(user.created_at)}</TableCell>
                         <TableCell>{user.remarks || ""}</TableCell>
                         <TableCell align="right">
                           {canManageUser(user) ? (
