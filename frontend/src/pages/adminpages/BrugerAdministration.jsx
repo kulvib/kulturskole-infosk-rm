@@ -77,6 +77,10 @@ function generateSecurePassword() {
   return password.join("");
 }
 
+/**
+ * @param {string|Date|null|undefined} value
+ * @returns {string}
+ */
 function formatCreatedAt(value) {
   if (!value) return "-";
   const date = new Date(value);

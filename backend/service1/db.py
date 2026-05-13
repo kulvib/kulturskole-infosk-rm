@@ -49,6 +49,8 @@ def create_db_and_tables():
                     text("ALTER TABLE user ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0")
                 )
         if "created_at" not in user_columns:
+            # NB: Eksisterende rækker får migrationstidspunktet som created_at.
+            # Historisk oprettelsestid findes ikke i legacy-skemaet.
             if engine.dialect.name == "postgresql":
                 conn.execute(
                     text('ALTER TABLE "user" ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT NOW()')

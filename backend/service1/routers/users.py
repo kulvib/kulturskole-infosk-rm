@@ -133,8 +133,8 @@ class UserRead(BaseModel):
     must_change_password: bool
     school_id: Optional[int] = None
     full_name: Optional[str] = None
-    remarks: Optional[str] = None
     email: str
+    remarks: Optional[str] = None
 
 
 @router.get("/users/", response_model=List[UserRead])
