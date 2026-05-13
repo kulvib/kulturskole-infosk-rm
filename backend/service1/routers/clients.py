@@ -16,8 +16,15 @@ router = APIRouter()
 HLS_BASE_DIR = os.getenv("HLS_BASE_DIR", "/opt/render/project/src/backend/service1/hls")
 CHROME_STATUS_PATH = os.getenv("CHROME_STATUS_PATH", "/home/kulturskolenviborg/api/chrome_status.json")
 
-VALID_CLIENT_STATES = {"normal", "sleeping", "sleep", "wakeup", "shutdown", "error"}
+VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error"}
 VALID_PENDING_CHROME_ACTION_SOURCES = {"actionbutton", "calendar"}
+
+
+def normalize_client_state(value: str) -> str:
+    normalized = str(value).lower()
+    if normalized == "sleep":
+        return "sleeping"
+    return normalized
 
 
 def is_online(client: Client) -> bool:
@@ -139,9 +146,7 @@ def update_client_state(
     state = data.get("state")
     if not state:
         raise HTTPException(status_code=400, detail="Missing state")
-    state = str(state).lower()
-    if state == "sleep":
-        state = "sleeping"
+    state = normalize_client_state(state)
     if state not in VALID_CLIENT_STATES:
         raise HTTPException(
             status_code=400,
@@ -325,9 +330,7 @@ async def update_client(
         if state is None:
             client.state = None
         else:
-            state_lower = state.lower()
-            if state_lower == "sleep":
-                state_lower = "sleeping"
+            state_lower = normalize_client_state(state)
             if state_lower not in VALID_CLIENT_STATES:
                 raise HTTPException(
                     status_code=400,

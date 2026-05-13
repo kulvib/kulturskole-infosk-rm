@@ -184,7 +184,7 @@ export async function clientAction(id, action) {
     url = `${apiUrl}/api/clients/${id}/update`;
     method = "PUT";
     payload = { pending_chrome_action: "start", pending_chrome_action_source: "actionbutton" };
-  } else if (action === "chrome-stop" || action === "chrome-shutdown") {
+  } else if (action === "chrome-stop") {
     url = `${apiUrl}/api/clients/${id}/update`;
     method = "PUT";
     payload = { pending_chrome_action: "stop", pending_chrome_action_source: "actionbutton" };

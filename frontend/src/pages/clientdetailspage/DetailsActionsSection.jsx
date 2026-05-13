@@ -149,9 +149,10 @@ function ClientDetailsActionsSection({
 
   const isDisabledByState = useCallback((actionKey) => {
     if (clientOnline === false || hasPendingAction) return true;
-    if (isSleeping) return actionKey !== "wakeup";
-    if (actionKey === "wakeup") return true;
-    return false;
+    if (isSleeping) {
+      return actionKey !== "wakeup";
+    }
+    return actionKey === "wakeup";
   }, [clientOnline, hasPendingAction, isSleeping]);
 
   // --- Admin: 2 rækker af 4 knapper i ønsket rækkefølge ---
@@ -180,7 +181,7 @@ function ClientDetailsActionsSection({
     },
     {
       key: "sleep",
-      label: "Sleep",
+      label: "Sæt i dvale",
       icon: <NightlightIcon />,
       color: "info",
       variant: "outlined",
@@ -191,7 +192,7 @@ function ClientDetailsActionsSection({
     },
     {
       key: "wakeup",
-      label: "Wake",
+      label: "Væk fra dvale",
       icon: <WbSunnyIcon />,
       color: "success",
       variant: "outlined",
@@ -205,7 +206,7 @@ function ClientDetailsActionsSection({
   const adminSecondRow = [
     {
       key: "restart",
-      label: "Reboot",
+      label: "Genstart klient",
       icon: <RestartAltIcon />,
       color: "warning",
       variant: "contained",
@@ -216,7 +217,7 @@ function ClientDetailsActionsSection({
     },
     {
       key: "shutdown",
-      label: "Shutdown",
+      label: "Sluk klient",
       icon: <PowerSettingsNewIcon />,
       color: "error",
       variant: "contained",
