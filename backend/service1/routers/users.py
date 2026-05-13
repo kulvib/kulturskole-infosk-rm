@@ -208,7 +208,7 @@ def update_user(
             if not user_update.old_password:
                 raise HTTPException(status_code=400, detail="Gammelt kodeord er påkrævet")
             if not verify_password(user_update.old_password, user.hashed_password):
-                raise HTTPException(status_code=400, detail="Gammelt kodeord er forkert")
+                raise HTTPException(status_code=400, detail="Ugyldig anmodning")
         validate_password_strength(user_update.password)
         user.hashed_password = get_password_hash(user_update.password)
         if is_self:
