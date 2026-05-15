@@ -55,13 +55,12 @@ function formatDateTimeWithDay(date) {
   return `${dayName} ${day}.${month} ${year}, kl. ${hour}:${min}:${sec}`;
 }
 
-// FIX: Grænser justeret til realistiske værdier for denne stream (~30-45s forsinkelse er normalt)
 function getLagStatus(lag) {
   if (lag == null) return { text: "", color: "#888" };
-  if (lag < 15)  return { text: "Live",                                              color: "#43a047" };
-  if (lag < 35)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`,  color: "#43a047" };
-  if (lag < 70)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`,  color: "#f90"    };
-  return           { text: `Stream er ${Math.round(lag)} sekunder forsinket`,        color: "#e53935" };
+  if (lag < 15)  return { text: "Live",                                             color: "#43a047" };
+  if (lag < 35)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#43a047" };
+  if (lag < 70)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#f90"    };
+  return           { text: `Stream er ${Math.round(lag)} sekunder forsinket`,       color: "#e53935" };
 }
 
 function formatLagValue(val) {
@@ -87,7 +86,7 @@ export default function ClientDetailsLivestreamSection({
   const [lastFetched, setLastFetched]           = useState(null);
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
   const [lastSegmentLag, setLastSegmentLag]     = useState(null);
-  const [videoLag, setVideoLag]                 = useState(null); // FIX: video.duration - video.currentTime — virker i ALLE browsere
+  const [videoLag, setVideoLag]                 = useState(null);
   const [showControls, setShowControls]         = useState(false);
   const [localRefreshKey, setLocalRefreshKey]   = useState(0);
   const [refreshing, setRefreshing]             = useState(false);
@@ -147,18 +146,27 @@ export default function ClientDetailsLivestreamSection({
       : `${apiUrl}/hls/${clientId}/index.m3u8`;
 
     let fatalErrorTimeout = null;
+    let playTimeout       = null;  // FIX: bruges til at rydde setTimeout ved cleanup
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Safari: native HLS
       video.src = hlsUrl; video.muted = true; video.autoplay = true; video.playsInline = true;
-      const onLoaded = () => { setManifestReady(true); video.play().catch(() => {}); };
+      const onLoaded = () => {
+        setManifestReady(true);
+        // FIX: setTimeout så React når at re-rendre og vise video-elementet inden play()
+        playTimeout = setTimeout(() => video.play().catch(() => {}), 100);
+      };
       video.addEventListener("loadedmetadata", onLoaded, { once: true });
       return () => {
         video.removeEventListener("loadedmetadata", onLoaded);
+        if (playTimeout) clearTimeout(playTimeout);
         try { video.pause(); video.removeAttribute("src"); video.load(); } catch {}
         setManifestReady(false);
       };
 
     } else if (Hls.isSupported()) {
+      // Chrome + Firefox: HLS.js
+      // xhrSetup er FJERNET — eliminerer CORS preflight OPTIONS på segment-requests
       const hls = new Hls({
         liveSyncDurationCount:       7,
         liveMaxLatencyDurationCount: 10,
@@ -169,7 +177,6 @@ export default function ClientDetailsLivestreamSection({
         enableWorker:                true,
         startLevel:                  -1,
         lowLatencyMode:              false,
-        // xhrSetup FJERNET — eliminerer CORS preflight på segment-requests
       });
 
       hlsRef.current = hls;
@@ -179,7 +186,13 @@ export default function ClientDetailsLivestreamSection({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setManifestReady(true);
         setError("");
-        video.play().catch(() => {});
+        // FIX: Årsag til sort skærm i Chrome:
+        // setManifestReady(true) er en async React state-opdatering.
+        // Hvis video.play() kaldes INDEN React re-renderer, er video-elementet
+        // stadig inde i en display:none container → Chrome decoder ingen frames
+        // → sort skærm. setTimeout(100ms) giver React tid til at re-rendre og
+        // vise video-elementet inden afspilning starter.
+        playTimeout = setTimeout(() => video.play().catch(() => {}), 100);
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
@@ -208,6 +221,7 @@ export default function ClientDetailsLivestreamSection({
 
       return () => {
         if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
+        if (playTimeout) clearTimeout(playTimeout);
         if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
         try { video.pause(); video.removeAttribute("src"); video.load(); } catch {}
         setManifestReady(false);
@@ -216,17 +230,7 @@ export default function ClientDetailsLivestreamSection({
     // eslint-disable-next-line
   }, [clientId, effectiveRefreshKey, clientOnline, serverReady]);
 
-  // -------------------------------------------------------------------------
-  // FIX: Universel lag-måling via video.duration - video.currentTime
-  //
-  // Dette virker i ALLE browsere (Safari, Chrome, Firefox) fordi:
-  //   video.duration = live-kantens position i sekunder (opdateres løbende)
-  //   video.currentTime = spillerens nuværende position
-  //   differens = faktisk forsinkelse bag live-kanten
-  //
-  // hls.latency er FJERNET — den returnerer næsten altid ~2-5s uanset
-  // faktisk forsinkelse og er derfor ubrugelig som statusindikator.
-  // -------------------------------------------------------------------------
+  // Universel lag-måling: video.duration - video.currentTime (alle browsere)
   useEffect(() => {
     if (!manifestReady || clientOnline === false) return;
     const interval = setInterval(() => {
@@ -297,7 +301,6 @@ export default function ClientDetailsLivestreamSection({
   function handleVideoPlaying() { setBuffering(false); }
   function handleVideoCanPlay() { setBuffering(false); }
 
-  // videoLag er primær — lastSegmentLag kun fallback til debug
   const lagToShow    = videoLag ?? lastSegmentLag;
   const sanitizedLag = lagToShow != null && lagToShow < 0 ? 0 : lagToShow;
   const lagStatus    = getLagStatus(sanitizedLag);
