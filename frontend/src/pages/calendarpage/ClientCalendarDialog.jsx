@@ -1,40 +1,23 @@
 import React, { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Box,
-  CircularProgress,
-  Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Stack,
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, Box,
+  CircularProgress, Typography, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Stack,
 } from "@mui/material";
-import { LocalizationProvider } from "@mui/x-date-pickers";
-import { DatePicker } from "@mui/x-date-pickers";
+import { LocalizationProvider, DatePicker } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import daLocale from "date-fns/locale/da";
 import { getMarkedDays, getCurrentSeason } from "../../api";
 
 function formatDateLong(dt) {
-  const weekdays = [
-    "Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"
-  ];
-  const weekday = weekdays[dt.getDay()];
+  const weekdays = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
   const day = dt.getDate().toString().padStart(2, "0");
   const month = (dt.getMonth() + 1).toString().padStart(2, "0");
-  const year = dt.getFullYear();
-  return `${weekday} ${day}.${month} ${year}`;
+  return `${weekdays[dt.getDay()]} ${day}.${month} ${dt.getFullYear()}`;
 }
 
-// FIX: Slår op med både fuld nøgle (YYYY-MM-DDT00:00:00) og kort nøgle (YYYY-MM-DD)
-// så tabellen viser korrekte data uanset hvilket format backend returnerer.
+// FIX: Slår dato op med både YYYY-MM-DDT00:00:00 og YYYY-MM-DD format.
+// Backend returnerer YYYY-MM-DDT00:00:00 nøgler; fallback til kortformat sikrer robusthed.
 function getStatusAndTimesFromRaw(markedDays, dt) {
   const yyyy = dt.getFullYear();
   const mm = (dt.getMonth() + 1).toString().padStart(2, "0");
@@ -42,28 +25,23 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
   const dateKeyFull = `${yyyy}-${mm}-${dd}T00:00:00`;
   const dateKeyShort = `${yyyy}-${mm}-${dd}`;
 
-  const data = markedDays[dateKeyFull] || markedDays[dateKeyShort];
+  const data = markedDays[dateKeyFull]
+    || markedDays[dateKeyShort]
+    || Object.entries(markedDays).find(([k]) => k.startsWith(dateKeyShort))?.[1];
 
   if (!data || !data.status || data.status === "off") {
     return { status: "off", powerOn: "", powerOff: "" };
   }
-  return {
-    status: "on",
-    powerOn: data.onTime || "",
-    powerOff: data.offTime || "",
-  };
+  return { status: "on", powerOn: data.onTime || "", powerOff: data.offTime || "" };
 }
 
 function StatusText({ status }) {
   return (
-    <Typography
-      variant="body2"
-      sx={{
-        fontWeight: 600,
-        color: status === "on" ? "#43a047" : "#e53935",
-        textTransform: "lowercase",
-      }}
-    >
+    <Typography variant="body2" sx={{
+      fontWeight: 600,
+      color: status === "on" ? "#43a047" : "#e53935",
+      textTransform: "lowercase",
+    }}>
       {status}
     </Typography>
   );
@@ -72,11 +50,29 @@ function StatusText({ status }) {
 function getDaysInRange(start, end) {
   const days = [];
   let d = new Date(start);
-  while (d <= end) {
+  d.setHours(0, 0, 0, 0);
+  const endD = new Date(end);
+  endD.setHours(0, 0, 0, 0);
+  while (d <= endD) {
     days.push(new Date(d));
     d.setDate(d.getDate() + 1);
   }
   return days;
+}
+
+function addMonths(date, num) {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + num);
+  return d;
+}
+
+// FIX: Formatér Date-objekt til YYYY-MM-DD string til API-kald
+function formatDateToString(d) {
+  if (!d) return undefined;
+  const yyyy = d.getFullYear();
+  const mm = (d.getMonth() + 1).toString().padStart(2, "0");
+  const dd = d.getDate().toString().padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function ClientPowerPeriodTable({ markedDays, days }) {
@@ -109,21 +105,6 @@ function ClientPowerPeriodTable({ markedDays, days }) {
   );
 }
 
-function addMonths(date, num) {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + num);
-  return d;
-}
-
-// FIX: Formatér Date-objekt til YYYY-MM-DD string til API-kald
-function formatDateToString(d) {
-  if (!d) return undefined;
-  const yyyy = d.getFullYear();
-  const mm = (d.getMonth() + 1).toString().padStart(2, "0");
-  const dd = d.getDate().toString().padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 export default function ClientCalendarDialog({ open, onClose, clientId }) {
   const [season, setSeason] = useState(null);
   const [startDate, setStartDate] = useState(() => new Date());
@@ -133,39 +114,38 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
   const [showTable, setShowTable] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      (async () => {
-        try {
-          const s = await getCurrentSeason();
-          setSeason(s);
+    if (!open) return;
+    (async () => {
+      try {
+        const s = await getCurrentSeason();
+        setSeason(s);
 
-          const today = new Date();
-          let start = today;
-          let end = addMonths(today, 1);
+        const today = new Date();
+        let start = new Date(today);
+        let end = addMonths(today, 1);
 
-          // FIX: Klip datoer til sæson-grænser kun hvis backend returnerer dem
-          if (s && s.start_date && s.end_date) {
-            const seasonStart = new Date(s.start_date);
-            const seasonEnd = new Date(s.end_date);
-            if (start < seasonStart) start = new Date(seasonStart);
-            if (start > seasonEnd) start = new Date(seasonEnd);
-            if (end < seasonStart) end = new Date(seasonStart);
-            if (end > seasonEnd) end = new Date(seasonEnd);
-          }
-
-          setStartDate(start);
-          setEndDate(end);
-          setMarkedDays({});
-          setShowTable(false);
-        } catch {
-          // Fallback: brug dags dato uden sæson-begrænsning
-          setStartDate(new Date());
-          setEndDate(addMonths(new Date(), 1));
-          setMarkedDays({});
-          setShowTable(false);
+        // FIX: Klip start/slut til sæson-grænser hvis tilgængelige
+        if (s?.start_date && s?.end_date) {
+          const seasonStart = new Date(s.start_date);
+          const seasonEnd = new Date(s.end_date);
+          if (start < seasonStart) start = new Date(seasonStart);
+          if (start > seasonEnd) start = new Date(seasonEnd);
+          if (end < seasonStart) end = new Date(seasonStart);
+          if (end > seasonEnd) end = new Date(seasonEnd);
         }
-      })();
-    }
+
+        setStartDate(start);
+        setEndDate(end);
+        setMarkedDays({});
+        setShowTable(false);
+      } catch {
+        // Fallback uden sæson-begrænsning
+        setStartDate(new Date());
+        setEndDate(addMonths(new Date(), 1));
+        setMarkedDays({});
+        setShowTable(false);
+      }
+    })();
   }, [open]);
 
   const handleFetch = async () => {
@@ -185,7 +165,6 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
     setLoading(false);
   };
 
-  // FIX: Beregn sæson-grænser til DatePicker fra backend-data
   const seasonStartDate = season?.start_date ? new Date(season.start_date) : undefined;
   const seasonEndDate = season?.end_date ? new Date(season.end_date) : undefined;
 
@@ -212,9 +191,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               format="dd/MM/yyyy"
               slotProps={{
                 textField: {
-                  variant: "outlined",
-                  fullWidth: true,
-                  size: "medium",
+                  variant: "outlined", fullWidth: true, size: "medium",
                   sx: { minWidth: 170 },
                   error: !startDate,
                   helperText: !startDate ? "Vælg startdato" : "",
@@ -225,15 +202,12 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               label={<span style={{ fontWeight: 500 }}>Slutdato</span>}
               value={endDate}
               onChange={setEndDate}
-              // FIX: slutdato kan ikke være før startdato
               minDate={startDate || seasonStartDate}
               maxDate={seasonEndDate}
               format="dd/MM/yyyy"
               slotProps={{
                 textField: {
-                  variant: "outlined",
-                  fullWidth: true,
-                  size: "medium",
+                  variant: "outlined", fullWidth: true, size: "medium",
                   sx: { minWidth: 170 },
                   error: !endDate,
                   helperText: !endDate ? "Vælg slutdato" : "",
@@ -246,7 +220,6 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               size="large"
               sx={{ minWidth: 165, whiteSpace: "nowrap" }}
               onClick={handleFetch}
-              // FIX: Deaktiveret også hvis season ikke er hentet endnu
               disabled={loading || !startDate || !endDate || !season}
             >
               Vis kalender
@@ -267,9 +240,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
         )}
       </DialogContent>
       <DialogActions sx={{ justifyContent: "center", pb: 2, pt: 1 }}>
-        <Button onClick={onClose} color="primary">
-          Luk
-        </Button>
+        <Button onClick={onClose} color="primary">Luk</Button>
       </DialogActions>
     </Dialog>
   );
