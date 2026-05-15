@@ -68,17 +68,16 @@ function formatDateTimeWithDay(date) {
 }
 
 function getLagStatus(lag) {
-  // BUG 1 FIX: modtager ét enkelt lag-tal (backendLag som primær)
   if (lag == null) return { text: "", color: "#888" };
-  if (lag < 5)  return { text: "Live", color: "#43a047" };
-  if (lag < 20) return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#43a047" };
-  if (lag < 45) return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#f90" };
-  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#e53935" };
+  if (lag < 8)   return { text: "Live",                                                        color: "#43a047" };
+  if (lag < 20)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`,             color: "#43a047" };
+  if (lag < 60)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`,             color: "#f90" };
+  return           { text: `Stream er ${Math.round(lag)} sekunder forsinket`,                  color: "#e53935" };
 }
 
 function formatLagValue(val) {
   if (val == null) return "-";
-  return Number(val).toFixed(3).replace(/(\.\d*?[1-9])0+$|\.0*$/, "$1");
+  return Number(val).toFixed(1) + "s";
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +101,8 @@ export default function ClientDetailsLivestreamSection({
   const [lastFetched, setLastFetched]               = useState(null);
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
   const [lastSegmentLag, setLastSegmentLag]         = useState(null);
-  const [playerLag, setPlayerLag]                   = useState(null);
+  const [playerLag, setPlayerLag]                   = useState(null);   // HLS.js latency (Chrome/Firefox)
+  const [safariLag, setSafariLag]                   = useState(null);   // video.duration - video.currentTime (Safari)
   const [showControls, setShowControls]             = useState(false);
   const [localRefreshKey, setLocalRefreshKey]       = useState(0);
   const [refreshing, setRefreshing]                 = useState(false);
@@ -130,18 +130,12 @@ export default function ClientDetailsLivestreamSection({
         try {
           const resp = await fetch(
             `${apiUrl}/api/hls/${clientId}/health`,
-            {
-              headers: getAuthHeaders(),
-              signal: AbortSignal.timeout(5000)
-            }
+            { headers: getAuthHeaders(), signal: AbortSignal.timeout(5000) }
           );
           if (resp.ok) {
             const data = await resp.json();
             if (data.has_segments && !data.is_stale) {
-              if (!stop) {
-                setServerReady(true);
-                setStreamStale(false);
-              }
+              if (!stop) { setServerReady(true); setStreamStale(false); }
               return;
             }
             if (!stop) setStreamStale(data.has_segments && data.is_stale);
@@ -162,11 +156,18 @@ export default function ClientDetailsLivestreamSection({
     if (!clientId || !clientOnline || !serverReady) return;
     setManifestReady(false);
     setError("");
+    setPlayerLag(null);
+    setSafariLag(null);
 
     const video = videoRef.current;
     if (!video) return;
 
     const token  = localStorage.getItem("token");
+
+    // Token sendes som query-parameter i manifest-URL'en.
+    // Segmenter hentes af StaticFiles som ikke kræver auth.
+    // Vi bruger IKKE xhrSetup/Authorization-header da det trigger
+    // CORS preflight i Firefox og Chrome — StaticFiles blokerer OPTIONS.
     const hlsUrl = token
       ? `${apiUrl}/hls/${clientId}/index.m3u8?token=${encodeURIComponent(token)}`
       : `${apiUrl}/hls/${clientId}/index.m3u8`;
@@ -174,7 +175,9 @@ export default function ClientDetailsLivestreamSection({
     let fatalErrorTimeout = null;
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // --- Safari: native HLS ---
+      // -----------------------------------------------------------------------
+      // Safari: native HLS — ingen HLS.js, ingen CORS-problemer
+      // -----------------------------------------------------------------------
       video.src         = hlsUrl;
       video.muted       = true;
       video.autoplay    = true;
@@ -188,34 +191,31 @@ export default function ClientDetailsLivestreamSection({
 
       return () => {
         video.removeEventListener("loadedmetadata", onLoaded);
-        try {
-          video.pause();
-          video.removeAttribute("src");
-          video.load();
-        } catch {}
+        try { video.pause(); video.removeAttribute("src"); video.load(); } catch {}
         setManifestReady(false);
       };
 
     } else if (Hls.isSupported()) {
-      // --- HLS.js (Chrome + Firefox) ---
-      // Tunet til 6s segmenter med 15-segment vindue (90s):
-      // liveSyncDurationCount:7   → 7 × 6s = 42s bag live-kant
-      // liveMaxLatencyDuration:10 → 10 × 6s = 60s maks bagud
-      // maxBufferLength:20        → BUG 3 FIX: var 12 → 20s (Firefox kræver mere)
-      // maxMaxBufferLength:30     → var 18 → 30s
+      // -----------------------------------------------------------------------
+      // HLS.js: Chrome + Firefox
+      //
+      // VIGTIGT: xhrSetup er FJERNET.
+      // Authorization-header triggererede CORS preflight OPTIONS på segment-
+      // requests. StaticFiles håndterer ikke OPTIONS → 405 → segmenter blokeret
+      // i Firefox og Chrome. Token er i manifest-URL'en som query-param — det
+      // er nok. Segmenter kræver ikke auth (de serves af StaticFiles direkte).
+      // -----------------------------------------------------------------------
       const hls = new Hls({
-        liveSyncDurationCount:       7,
-        liveMaxLatencyDurationCount: 10,
-        initialLiveManifestSize:     4,
-        maxBufferLength:             20,  // BUG 3 FIX: Firefox kræver min 20s
+        liveSyncDurationCount:       7,   // 7 × 6s = 42s bag live-kant
+        liveMaxLatencyDurationCount: 10,  // 10 × 6s = 60s maks bagud
+        initialLiveManifestSize:     4,   // vent på 4 segmenter inden start
+        maxBufferLength:             20,
         maxMaxBufferLength:          30,
         liveBackBufferLength:        6,
         enableWorker:                true,
         startLevel:                  -1,
         lowLatencyMode:              false,
-        xhrSetup(xhr) {
-          if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-        },
+        // xhrSetup FJERNET — eliminerer CORS preflight på segment-requests
       });
 
       hlsRef.current = hls;
@@ -225,8 +225,6 @@ export default function ClientDetailsLivestreamSection({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setManifestReady(true);
         setError("");
-        // BUG 2 FIX: Chrome kræver eksplicit play() — autoplay-attribut alene
-        // er ikke nok når HLS.js styrer MediaSource
         video.play().catch(() => {});
       });
 
@@ -235,20 +233,14 @@ export default function ClientDetailsLivestreamSection({
           setError("Fatal streamfejl. Prøver automatisk at genstarte om lidt …");
           hls.destroy();
           hlsRef.current = null;
-          try {
-            video.pause();
-            video.removeAttribute("src");
-            video.load();
-          } catch {}
+          try { video.pause(); video.removeAttribute("src"); video.load(); } catch {}
           setManifestReady(false);
           setServerReady(false);
           if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
           fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 3000);
         } else {
-          // bufferStalledError er ikke-fatal — HLS.js genstarter selv.
-          // Ingen seek, ingen UI-fejl, ingen log — bare ignorer.
           if (data.details === "bufferStalledError") return;
-          console.warn("[HLS Error]", data);
+          console.warn("[HLS Error]", data.details);
           setError(data.details || "Ukendt HLS-fejl");
           setTimeout(() => setError(""), 5000);
         }
@@ -267,15 +259,8 @@ export default function ClientDetailsLivestreamSection({
 
       return () => {
         if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
-        if (hlsRef.current) {
-          hlsRef.current.destroy();
-          hlsRef.current = null;
-        }
-        try {
-          video.pause();
-          video.removeAttribute("src");
-          video.load();
-        } catch {}
+        if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
+        try { video.pause(); video.removeAttribute("src"); video.load(); } catch {}
         setManifestReady(false);
       };
     }
@@ -323,7 +308,48 @@ export default function ClientDetailsLivestreamSection({
   function handleVideoCanPlay() { setBuffering(false); }
 
   // -------------------------------------------------------------------------
+  // HLS.js player lag — Chrome + Firefox
+  // hls.latency = spillerens faktiske forsinkelse bag live-kanten.
+  // Dette er den korrekte forsinkelsesmåling for HLS.js-browsere.
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    if (!manifestReady || isSafari() || clientOnline === false) return;
+    const interval = setInterval(() => {
+      const hls = hlsRef.current;
+      if (hls && typeof hls.latency === "number" && isFinite(hls.latency)) {
+        setPlayerLag(Math.max(0, hls.latency));
+      } else if (hls && typeof hls.playbackLatency === "number" && isFinite(hls.playbackLatency)) {
+        setPlayerLag(Math.max(0, hls.playbackLatency));
+      } else {
+        setPlayerLag(null);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [manifestReady, effectiveRefreshKey, clientOnline]);
+
+  // -------------------------------------------------------------------------
+  // Safari lag — video.duration - video.currentTime
+  // Safari bruger native HLS — ingen HLS.js latency tilgængelig.
+  // video.duration = live-kanten i sekunder fra start.
+  // video.currentTime = spillerens position.
+  // Differensen = faktisk forsinkelse bag live-kanten.
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    if (!manifestReady || !isSafari() || clientOnline === false) return;
+    const interval = setInterval(() => {
+      const video = videoRef.current;
+      if (video && isFinite(video.duration) && video.duration > 0 && video.currentTime > 0) {
+        const lag = video.duration - video.currentTime;
+        setSafariLag(lag > 0 ? lag : null);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [manifestReady, effectiveRefreshKey, clientOnline]);
+
+  // -------------------------------------------------------------------------
   // Backend lag polling — hvert 2s
+  // Bruges KUN til debug-info — ikke til forsinkelsesvisning.
+  // lastSegmentLag = tid siden server modtog seneste segment (~2-6s).
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !manifestReady || clientOnline === false) return;
@@ -361,31 +387,23 @@ export default function ClientDetailsLivestreamSection({
   }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
   // -------------------------------------------------------------------------
-  // Player-reported lag (HLS.js latency) — kun til debug
-  // -------------------------------------------------------------------------
-  useEffect(() => {
-    if (!manifestReady || clientOnline === false) return;
-    const interval = setInterval(() => {
-      const hls = hlsRef.current;
-      if (hls && typeof hls.latency === "number") {
-        setPlayerLag(hls.latency);
-      } else if (hls && typeof hls.playbackLatency === "number") {
-        setPlayerLag(hls.playbackLatency);
-      } else {
-        setPlayerLag(null);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [manifestReady, effectiveRefreshKey, clientOnline]);
-
-  // -------------------------------------------------------------------------
   // Afledte værdier
-  // BUG 1 FIX: backendLag er primær forsinkelseskilde — den måler præcist
-  // hvornår det seneste segment blev optaget på klienten.
-  // playerLag (hls.latency) er HLS.js's eget upræcise estimat — kun til debug.
+  //
+  // Forsinkelsesvisning:
+  //   Chrome/Firefox → playerLag (hls.latency) = faktisk spillerforsinkelse
+  //   Safari         → safariLag (video.duration - video.currentTime)
+  //   Fallback       → lastSegmentLag (kun upload-alder, unøjagtig)
+  //
+  // lastSegmentLag vises KUN i debug-panelet — ikke i status-teksten.
   // -------------------------------------------------------------------------
-  const lagToShow    = lastSegmentLag ?? playerLag;
-  const lagType      = lastSegmentLag != null ? "backend" : "player";
+  const lagToShow = isSafari()
+    ? (safariLag ?? lastSegmentLag)
+    : (playerLag ?? lastSegmentLag);
+
+  const lagType = isSafari()
+    ? (safariLag != null ? "safari-video" : "backend")
+    : (playerLag != null ? "player" : "backend");
+
   const sanitizedLag = lagToShow != null && lagToShow < 0 ? 0 : lagToShow;
   const lagStatus    = getLagStatus(sanitizedLag);
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
@@ -423,9 +441,7 @@ export default function ClientDetailsLivestreamSection({
                         : "#9e9e9e",
                 border: "1px solid #ddd",
                 mr: 1,
-                animation: (manifestReady && clientOnline !== false)
-                  ? "pulsate 2s infinite"
-                  : "none"
+                animation: (manifestReady && clientOnline !== false) ? "pulsate 2s infinite" : "none"
               }} />
               <Tooltip title={clientOnline === false ? "Klienten er offline" : "Genindlæs stream"}>
                 <span>
@@ -463,7 +479,7 @@ export default function ClientDetailsLivestreamSection({
         <Grid item xs={12} md={5} minWidth={0}>
           <Box
             sx={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}
-            onMouseMove={handleMouseMove}
+            onMouseMove={() => setShowControls(true)}
             onMouseLeave={() => setShowControls(false)}
             tabIndex={0}
             onFocus={() => setShowControls(true)}
@@ -526,15 +542,10 @@ export default function ClientDetailsLivestreamSection({
 
               {buffering && (
                 <Box sx={{
-                  position: "absolute",
-                  top: 0, left: 0,
+                  position: "absolute", top: 0, left: 0,
                   width: "100%", height: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  zIndex: 10,
-                  background: "rgba(0,0,0,0.18)",
-                  borderRadius: 8,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  zIndex: 10, background: "rgba(0,0,0,0.18)", borderRadius: 8,
                 }}>
                   <CircularProgress size={isMobile ? 20 : 40} color="inherit" />
                   <Typography variant="body2" sx={{ color: "#fff", ml: isMobile ? 1 : 2, fontSize: isMobile ? 12 : undefined }}>
@@ -546,9 +557,7 @@ export default function ClientDetailsLivestreamSection({
 
             {(!manifestReady || clientOnline === false) && (
               <Box sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                display: "flex", alignItems: "center", justifyContent: "center",
                 minHeight: isMobile ? 100 : 160,
                 width: "100%",
                 bgcolor: clientOnline === false ? "#fafafa" : "transparent",
@@ -560,13 +569,9 @@ export default function ClientDetailsLivestreamSection({
                   </Typography>
                 ) : (
                   <>
-                    <CircularProgress
-                      size={isMobile ? 24 : 32}
-                      color={streamStale ? "error" : "inherit"}
-                    />
+                    <CircularProgress size={isMobile ? 24 : 32} color={streamStale ? "error" : "inherit"} />
                     <Typography variant="body2" sx={{
-                      ml: 2,
-                      fontSize: isMobile ? 13 : undefined,
+                      ml: 2, fontSize: isMobile ? 13 : undefined,
                       color: streamStale ? "#e53935" : undefined
                     }}>
                       {loadingText}
@@ -592,62 +597,54 @@ export default function ClientDetailsLivestreamSection({
               )}
               {lastFetched && clientOnline !== false && (
                 <Typography variant="body2" sx={{ color: "#000", textAlign: "left", fontSize: isMobile ? 13 : undefined }}>
-                  Sidste kontakt til serveren: {formatDateTimeWithDay(lastFetched)}
+                  Sidst kontakt: {formatDateTimeWithDay(lastFetched)}
                 </Typography>
               )}
               <Divider sx={{ my: isMobile ? 0.5 : 1 }} />
-              <Box sx={{ background: "#f7f7f7", borderRadius: 1, p: 1, mt: 1, mb: 1, display: "inline-block" }}>
+              <Box sx={{ background: "#f7f7f7", borderRadius: 1, p: 1, mt: 1, mb: 1 }}>
                 <Typography variant="caption" sx={{
-                  color: "#111",
-                  fontFamily: '"Courier New", Courier, monospace',
-                  fontWeight: 700,
-                  letterSpacing: 0.2,
-                  display: "block",
-                  mb: 0.5,
+                  color: "#111", fontFamily: '"Courier New", Courier, monospace',
+                  fontWeight: 700, letterSpacing: 0.2, display: "block", mb: 0.5,
                   fontSize: isMobile ? 11 : undefined
                 }}>
                   Debug info:
                 </Typography>
                 <Typography variant="caption" sx={{
-                  color: "#222",
-                  fontFamily: '"Courier New", Courier, monospace',
-                  display: "block",
-                  fontSize: isMobile ? 11 : undefined
+                  color: "#222", fontFamily: '"Courier New", Courier, monospace',
+                  display: "block", fontSize: isMobile ? 11 : undefined
                 }}>
                   serverReady=<b>{serverReady ? "ja" : "nej"}</b>,{" "}
-                  isStale=<b>{streamStale ? "ja" : "nej"}</b>,{" "}
-                  <Tooltip title={`Råværdi: ${playerLag ?? "-"} (kun til debug — bruges ikke til visning)`}>
+                  isStale=<b>{streamStale ? "ja" : "nej"}</b>
+                </Typography>
+                <Typography variant="caption" sx={{
+                  color: "#222", fontFamily: '"Courier New", Courier, monospace',
+                  display: "block", fontSize: isMobile ? 11 : undefined
+                }}>
+                  <Tooltip title="HLS.js hls.latency (Chrome/Firefox)">
                     <span>playerLag=<b>{formatLagValue(playerLag)}</b></span>
                   </Tooltip>
-                  ,{" "}
-                  <Tooltip title={`Råværdi: ${lastSegmentLag ?? "-"} (primær forsinkelseskilde)`}>
+                  {" "}
+                  <Tooltip title="video.duration - video.currentTime (Safari)">
+                    <span>safariLag=<b>{formatLagValue(safariLag)}</b></span>
+                  </Tooltip>
+                  {" "}
+                  <Tooltip title="Tid siden server modtog seneste segment (upload-alder)">
                     <span>backendLag=<b>{formatLagValue(lastSegmentLag)}</b></span>
                   </Tooltip>
-                  , lagType=<b>{lagType}</b>
                 </Typography>
-                {!isSafari() && clientOnline !== false && (
+                <Typography variant="caption" sx={{
+                  color: "#222", fontFamily: '"Courier New", Courier, monospace',
+                  display: "block", fontSize: isMobile ? 11 : undefined
+                }}>
+                  lagType=<b>{lagType}</b>, vist=<b>{formatLagValue(sanitizedLag)}</b>
+                </Typography>
+                {clientOnline !== false && (
                   <Typography variant="caption" sx={{
-                    color: "#444",
-                    fontFamily: '"Courier New", Courier, monospace',
-                    textAlign: "left",
-                    mt: 1,
-                    fontSize: isMobile ? 11 : undefined
+                    color: "#444", fontFamily: '"Courier New", Courier, monospace',
+                    display: "block", mt: 0.5, fontSize: isMobile ? 11 : undefined
                   }}>
                     Segment: <b>{currentSegment}</b>
                   </Typography>
-                )}
-                {isSafari() && clientOnline !== false && (
-                  <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
-                    <span role="img" aria-label="advarsel" style={{ fontSize: "1.2em", marginRight: 4 }}>⚠️</span>
-                    <Typography variant="caption" sx={{
-                      color: "#b25c00",
-                      fontFamily: '"Courier New", Courier, monospace',
-                      fontWeight: 700,
-                      fontSize: isMobile ? 11 : undefined
-                    }}>
-                      Safari: Segmentnummer vises ikke. Forsinkelse er kun estimeret ud fra serverens sidste segment.
-                    </Typography>
-                  </Box>
                 )}
               </Box>
             </Stack>
