@@ -18,7 +18,7 @@ if DATABASE_URL.startswith("sqlite"):
     if num_workers > 1:
         warnings.warn(
             "ADVARSEL: SQLite er ikke sikkert med flere workers. "
-            "Brug DATABASE_URL til PostgreSQL i produktion.",
+            "Brug PostgreSQL i produktion.",
             RuntimeWarning, stacklevel=2,
         )
 
@@ -26,75 +26,51 @@ _echo = os.getenv("ENVIRONMENT", "production") != "production"
 engine = create_engine(DATABASE_URL, echo=_echo)
 
 
-def migrate_seasons_to_string():
+def _migrate_seasons_to_string(conn):
     """
-    Migrerer season-værdier fra integer (2025) til string ("2025/2026").
-    Kører sikkert flere gange — springer over hvis allerede migreret.
+    Migrerer season-kolonner fra integer (2025) til string-format ('2025/2026').
+    Kører sikkert hvis migrationen allerede er udført.
     """
-    try:
-        with engine.begin() as conn:
-            if engine.dialect.name == "postgresql":
-                # CalendarMarking
+    dialect = engine.dialect.name
+
+    for table in ["calendarmarking", "schoolseasontimes"]:
+        try:
+            if dialect == "postgresql":
+                # Tjek om kolonnen stadig er integer-type
                 result = conn.execute(text("""
                     SELECT data_type FROM information_schema.columns
-                    WHERE table_name = 'calendarmarking'
-                      AND column_name = 'season'
-                      AND table_schema = 'public'
-                """)).first()
-                if result and result[0] in ('integer', 'bigint', 'smallint'):
-                    conn.execute(text("""
-                        ALTER TABLE calendarmarking
-                        ALTER COLUMN season TYPE TEXT
-                        USING season::text || '/' || (season + 1)::text
-                    """))
-                    print("Migration: calendarmarking.season INTEGER → TEXT")
-                else:
-                    # Allerede TEXT — konvertér eventuelle rene tal-værdier
-                    conn.execute(text(r"""
-                        UPDATE calendarmarking
-                        SET season = season || '/' || (season::integer + 1)::text
-                        WHERE season ~ '^\d+$'
-                    """))
+                    WHERE table_name = :tbl AND column_name = 'season'
+                """), {"tbl": table}).fetchone()
 
-                # SchoolSeasonTimes
-                result2 = conn.execute(text("""
-                    SELECT data_type FROM information_schema.columns
-                    WHERE table_name = 'schoolseasontimes'
-                      AND column_name = 'season'
-                      AND table_schema = 'public'
-                """)).first()
-                if result2 and result2[0] in ('integer', 'bigint', 'smallint'):
-                    conn.execute(text("""
-                        ALTER TABLE schoolseasontimes
-                        ALTER COLUMN season TYPE TEXT
-                        USING season::text || '/' || (season + 1)::text
+                if result and result[0] in ("integer", "bigint", "smallint"):
+                    # Konvertér kolonnetype og værdier i ét step
+                    conn.execute(text(f"""
+                        ALTER TABLE {table}
+                        ALTER COLUMN season TYPE VARCHAR
+                        USING (season::text || '/' || (season + 1)::text)
                     """))
-                    print("Migration: schoolseasontimes.season INTEGER → TEXT")
-                else:
-                    conn.execute(text(r"""
-                        UPDATE schoolseasontimes
-                        SET season = season || '/' || (season::integer + 1)::text
-                        WHERE season ~ '^\d+$'
-                    """))
+                    print(f"[DB] Migreret {table}.season int→string (PostgreSQL)")
+
             else:
-                # SQLite: dynamisk typning — UPDATE til string-format
-                conn.execute(text("""
-                    UPDATE calendarmarking
-                    SET season = CAST(CAST(season AS INTEGER) AS TEXT)
-                        || '/' ||
-                        CAST(CAST(season AS INTEGER) + 1 AS TEXT)
-                    WHERE season NOT LIKE '%/%'
-                """))
-                conn.execute(text("""
-                    UPDATE schoolseasontimes
-                    SET season = CAST(CAST(season AS INTEGER) AS TEXT)
-                        || '/' ||
-                        CAST(CAST(season AS INTEGER) + 1 AS TEXT)
-                    WHERE season NOT LIKE '%/%'
-                """))
-                print("Migration: season-værdier konverteret til '2025/2026' format")
-    except Exception as e:
-        print(f"Season migration (ikke kritisk): {e}")
+                # SQLite — tjek om der er værdier uden '/'
+                result = conn.execute(text(
+                    f"SELECT COUNT(*) FROM {table} "
+                    f"WHERE CAST(season AS TEXT) NOT LIKE '%/%'"
+                )).fetchone()
+
+                if result and result[0] > 0:
+                    conn.execute(text(f"""
+                        UPDATE {table}
+                        SET season =
+                            CAST(CAST(season AS INTEGER) AS TEXT) || '/' ||
+                            CAST(CAST(season AS INTEGER) + 1 AS TEXT)
+                        WHERE CAST(season AS TEXT) NOT LIKE '%/%'
+                    """))
+                    print(f"[DB] Migreret {table}.season int→string (SQLite)")
+
+        except Exception as e:
+            # Tabellen eksisterer måske ikke endnu — det er OK
+            print(f"[DB] Season-migration info for {table}: {e}")
 
 
 def create_db_and_tables():
@@ -103,9 +79,9 @@ def create_db_and_tables():
     with engine.begin() as conn:
         inspector = inspect(conn)
 
-        # --- User migrationer ---
+        # --- User-kolonner ---
         try:
-            user_columns = {c["name"] for c in inspector.get_columns("user")}
+            user_columns = {col["name"] for col in inspector.get_columns("user")}
         except Exception:
             user_columns = set()
 
@@ -129,9 +105,9 @@ def create_db_and_tables():
                     "ALTER TABLE user ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
                 ))
 
-        # --- Client migrationer ---
+        # --- Client-kolonner ---
         try:
-            client_columns = {c["name"] for c in inspector.get_columns("client")}
+            client_columns = {col["name"] for col in inspector.get_columns("client")}
         except Exception:
             client_columns = set()
 
@@ -146,8 +122,8 @@ def create_db_and_tables():
         if "livestream_last_error" not in client_columns:
             conn.execute(text("ALTER TABLE client ADD COLUMN livestream_last_error TEXT"))
 
-    # Kør season-migration efter tabeller er oprettet/verificeret
-    migrate_seasons_to_string()
+        # --- Migrér season int → string ---
+        _migrate_seasons_to_string(conn)
 
 
 def get_session():
