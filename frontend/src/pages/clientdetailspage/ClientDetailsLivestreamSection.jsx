@@ -549,4 +549,11 @@ export default function ClientDetailsLivestreamSection({
 
       <style>{`
         @keyframes pulsate {
-          0%   { transform: scale(1);    *
+          0%   { transform: scale(1);    opacity: 1;   background: #43a047; }
+          50%  { transform: scale(1.25); opacity: 0.5; background: #43a047; }
+          100% { transform: scale(1);    opacity: 1;   background: #43a047; }
+        }
+      `}</style>
+    </Card>
+  );
+}
