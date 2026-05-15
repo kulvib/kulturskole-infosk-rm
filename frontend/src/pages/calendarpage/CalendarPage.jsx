@@ -3,7 +3,7 @@ import React, {
 } from "react";
 import {
   Box, Card, CardContent, Typography, Button, CircularProgress, Paper,
-  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack
+  Checkbox, TextField, Snackbar, Alert as MuiAlert, Tooltip, Select, MenuItem, Stack, Chip
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
@@ -12,7 +12,6 @@ import DateTimeEditDialog from "./DateTimeEditDialog";
 import ClientCalendarDialog from "./ClientCalendarDialog";
 import { useAuth } from "../../auth/authcontext";
 
-// Henter sæsonbaserede tider for alle skoler — opdateres når schools eller season ændres
 function useAllSchoolTimes(schools, season) {
   const [schoolTimesMap, setSchoolTimesMap] = useState({});
   useEffect(() => {
@@ -41,19 +40,35 @@ const monthNames = [
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
+// FIX: season er nu string "2025/2026" — nuværende + 2 fremtidige
 function getSeasons() {
   const now = new Date();
-  let seasonStartYear = now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1)
-    ? now.getFullYear()
-    : now.getFullYear() - 1;
-  return Array.from({ length: 3 }, (_, i) => {
-    const start = seasonStartYear + i;
-    const end = (start + 1).toString().slice(-2);
-    return { label: `${start}/${end}`, value: start };
+  const currentStart = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  return [0, 1, 2].map(i => {
+    const start = currentStart + i;
+    return {
+      value: `${start}/${start + 1}`,
+      label: `${start}/${start + 1}`,
+      isCurrent: i === 0,
+    };
   });
 }
 
-function getSchoolYearMonths(seasonStart) {
+// FIX: Udtræk startår fra string "2025/2026" → 2025
+function seasonToStartYear(season) {
+  if (!season) return new Date().getFullYear();
+  if (typeof season === "number") return season;
+  return parseInt(season.split("/")[0], 10);
+}
+
+function getCurrentSeasonString() {
+  const now = new Date();
+  const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${start}/${start + 1}`;
+}
+
+function getSchoolYearMonths(season) {
+  const seasonStart = seasonToStartYear(season);
   return [
     ...Array.from({ length: 5 }, (_, i) => ({ name: monthNames[i], month: i + 7, year: seasonStart })),
     ...Array.from({ length: 7 }, (_, i) => ({ name: monthNames[i + 5], month: i, year: seasonStart + 1 })),
@@ -197,10 +212,15 @@ function markedDaysReducer(state, action) {
   }
 }
 
+const SEASONS = getSeasons();
+const DEFAULT_SEASON = SEASONS[0].value;
+
 export default function CalendarPage() {
   const { user } = useAuth();
   const token = null;
-  const [selectedSeason, setSelectedSeason] = useState(getSeasons()[0].value);
+
+  // FIX: selectedSeason er nu string "2025/2026"
+  const [selectedSeason, setSelectedSeason] = useState(DEFAULT_SEASON);
   const [schools, setSchools] = useState([]);
   const [selectedSchool, setSelectedSchool] = useState("");
   const [clients, setClients] = useState([]);
@@ -221,29 +241,24 @@ export default function CalendarPage() {
   const lastDialogSavedMarkedDays = useRef({});
   const lastDialogSavedTimestamp = useRef(0);
 
-  const seasons = getSeasons();
-  const currentSeasonStartYear = useMemo(() => {
-    const now = new Date();
-    return (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1))
-      ? now.getFullYear() : now.getFullYear() - 1;
-  }, []);
+  // FIX: currentSeason er nu string til sammenligning
+  const currentSeason = getCurrentSeasonString();
 
   const [fadeIn, setFadeIn] = useState(true);
   useEffect(() => {
     let timer;
-    if (selectedSeason !== currentSeasonStartYear) {
+    if (selectedSeason !== currentSeason) {
       timer = setInterval(() => setFadeIn(f => !f), 1200);
     } else {
       setFadeIn(true);
     }
     return () => timer && clearInterval(timer);
-  }, [selectedSeason, currentSeasonStartYear]);
+  }, [selectedSeason, currentSeason]);
 
   useEffect(() => {
     getSchools(token).then(setSchools).catch(() => setSchools([]));
   }, [token]);
 
-  // Henter sæsonbaserede tider for alle skoler
   const allSchoolTimes = useAllSchoolTimes(schools, selectedSeason);
 
   const fetchClients = useCallback(async (showSuccess = false) => {
@@ -616,7 +631,8 @@ export default function CalendarPage() {
         </Box>
         <Box sx={{ flex: 1, display: "flex", justifyContent: { xs: "center", sm: "flex-end" }, alignItems: "center", gap: 1 }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
-            {selectedSeason !== currentSeasonStartYear && (
+            {/* FIX: sammenlign string med string */}
+            {selectedSeason !== currentSeason && (
               <Tooltip title="Ikke indeværende sæson" arrow>
                 <WarningAmberIcon
                   color="warning"
@@ -628,13 +644,34 @@ export default function CalendarPage() {
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2, fontSize: { xs: "1rem", sm: "1.15rem" } }}>
             Vælg sæson:
           </Typography>
+          {/* FIX: onChange sætter string direkte — ikke Number() */}
           <Select
-            size="small" value={selectedSeason}
-            onChange={e => setSelectedSeason(Number(e.target.value))}
-            sx={{ minWidth: 100 }} disabled={isDisabled}
+            size="small"
+            value={selectedSeason}
+            onChange={e => setSelectedSeason(e.target.value)}
+            sx={{ minWidth: 160 }}
+            disabled={isDisabled}
+            renderValue={val => {
+              const s = SEASONS.find(x => x.value === val);
+              return (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <span>{val}</span>
+                  {s?.isCurrent && (
+                    <Chip label="Nuværende" size="small" color="primary" sx={{ height: 18, fontSize: "0.7rem" }} />
+                  )}
+                </Box>
+              );
+            }}
           >
-            {seasons.map(season => (
-              <MenuItem key={season.value} value={season.value}>{season.label}</MenuItem>
+            {SEASONS.map(season => (
+              <MenuItem key={season.value} value={season.value}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <span>{season.label}</span>
+                  {season.isCurrent && (
+                    <Chip label="Nuværende sæson" size="small" color="primary" sx={{ height: 20, fontSize: "0.72rem" }} />
+                  )}
+                </Box>
+              </MenuItem>
             ))}
           </Select>
         </Box>
@@ -673,6 +710,7 @@ export default function CalendarPage() {
         onSaved={handleSaveDateTime} localMarkedDays={markedDays[editDialogClient]}
         schoolId={editDialogClientObj?.schoolId || editDialogClientObj?.school_id}
         schoolTimes={editDialogSchoolTimes}
+        season={selectedSeason}
       />
       <ClientCalendarDialog
         open={calendarDialogOpen} onClose={() => setCalendarDialogOpen(false)}
