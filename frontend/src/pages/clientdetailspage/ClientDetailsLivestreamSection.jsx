@@ -58,12 +58,12 @@ function formatDateTimeWithDay(date) {
   const ukedage = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
   const d = new Date(date);
   const dayName = ukedage[d.getDay()];
-  const day = d.getDate().toString().padStart(2, "0");
-  const month = (d.getMonth() + 1).toString().padStart(2, "0");
-  const year = d.getFullYear();
-  const hour = d.getHours().toString().padStart(2, "0");
-  const min = d.getMinutes().toString().padStart(2, "0");
-  const sec = d.getSeconds().toString().padStart(2, "0");
+  const day     = d.getDate().toString().padStart(2, "0");
+  const month   = (d.getMonth() + 1).toString().padStart(2, "0");
+  const year    = d.getFullYear();
+  const hour    = d.getHours().toString().padStart(2, "0");
+  const min     = d.getMinutes().toString().padStart(2, "0");
+  const sec     = d.getSeconds().toString().padStart(2, "0");
   return `${dayName} ${day}.${month} ${year}, kl. ${hour}:${min}:${sec}`;
 }
 
@@ -97,8 +97,9 @@ export default function ClientDetailsLivestreamSection({
   clientOnline = true
 }) {
   const videoRef = useRef(null);
-  const hlsRef  = useRef(null);
+  const hlsRef   = useRef(null);
 
+  const [serverReady, setServerReady]               = useState(false); // FIX: venter på at server har segmenter
   const [manifestReady, setManifestReady]           = useState(false);
   const [error, setError]                           = useState("");
   const [buffering, setBuffering]                   = useState(false);
@@ -120,10 +121,46 @@ export default function ClientDetailsLivestreamSection({
   }, [streamKey, localRefreshKey]);
 
   // -------------------------------------------------------------------------
-  // HLS.js lifecycle
+  // FIX: Poll /health indtil serveren har segmenter klar
+  // Forhindrer 404 på manifest fordi HLS.js prøver at loade
+  // inden første segment er uploadet efter /reset ved startup
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !clientOnline) return;
+    setServerReady(false);
+    let stop = false;
+
+    async function pollUntilReady() {
+      while (!stop) {
+        try {
+          const resp = await fetch(
+            `${apiUrl}/api/hls/${clientId}/health`,
+            {
+              headers: getAuthHeaders(),
+              signal: AbortSignal.timeout(5000)
+            }
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.has_segments) {
+              if (!stop) setServerReady(true);
+              return;
+            }
+          }
+        } catch {}
+        if (!stop) await new Promise(res => setTimeout(res, 2000));
+      }
+    }
+
+    pollUntilReady();
+    return () => { stop = true; };
+  }, [clientId, effectiveRefreshKey, clientOnline]);
+
+  // -------------------------------------------------------------------------
+  // HLS.js lifecycle — starter kun når serverReady er true
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    if (!clientId || !clientOnline || !serverReady) return;
     setManifestReady(false);
     setError("");
 
@@ -139,10 +176,9 @@ export default function ClientDetailsLivestreamSection({
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       // --- Safari: native HLS ---
-      // FIX: Vent på loadedmetadata inden manifestReady sættes til true
-      video.src        = hlsUrl;
-      video.muted      = true;
-      video.autoplay   = true;
+      video.src         = hlsUrl;
+      video.muted       = true;
+      video.autoplay    = true;
       video.playsInline = true;
 
       const onLoaded = () => setManifestReady(true);
@@ -159,17 +195,16 @@ export default function ClientDetailsLivestreamSection({
       };
 
     } else if (Hls.isSupported()) {
-      // --- HLS.js ---
-      // FIX: Tunet til 6-sekunders segmenter — reducerer unødvendig forsinkelse
+      // --- HLS.js: tunet til 6s segmenter ---
       const hls = new Hls({
-        liveSyncDurationCount:        2,   // 2 × 6s = 12s sync-mål
-        liveMaxLatencyDurationCount:  4,   // 4 × 6s = 24s max latency
-        maxBufferLength:              20,
-        maxMaxBufferLength:           40,
-        liveBackBufferLength:         8,
-        enableWorker:                 true,
-        startLevel:                   -1,
-        lowLatencyMode:               false,
+        liveSyncDurationCount:       2,   // 2 × 6s = 12s sync-mål
+        liveMaxLatencyDurationCount: 4,   // 4 × 6s = 24s max latency
+        maxBufferLength:             20,
+        maxMaxBufferLength:          40,
+        liveBackBufferLength:        8,
+        enableWorker:                true,
+        startLevel:                  -1,
+        lowLatencyMode:              false,
         xhrSetup(xhr) {
           if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
         },
@@ -181,7 +216,7 @@ export default function ClientDetailsLivestreamSection({
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setManifestReady(true);
-        setError(""); // Ryd evt. gammel fejl
+        setError("");
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
@@ -196,10 +231,11 @@ export default function ClientDetailsLivestreamSection({
             video.load();
           } catch {}
           setManifestReady(false);
-          // FIX: Øget delay til 3s så backend kan nå at producere nyt segment
+          // Sæt serverReady til false så health-polling starter forfra
+          setServerReady(false);
+          if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
           fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 3000);
         } else {
-          // FIX: Non-fatal fejl ryddes automatisk efter 5 sekunder
           setError(data.details || "Ukendt HLS-fejl");
           setTimeout(() => setError(""), 5000);
         }
@@ -208,7 +244,7 @@ export default function ClientDetailsLivestreamSection({
       hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
         if (data?.frag && typeof data.frag.sn === "number") {
           setCurrentSegment(data.frag.sn);
-          setError(""); // Stream virker — ryd evt. fejl
+          setError("");
         }
       });
 
@@ -231,7 +267,7 @@ export default function ClientDetailsLivestreamSection({
       };
     }
     // eslint-disable-next-line
-  }, [clientId, effectiveRefreshKey, clientOnline]);
+  }, [clientId, effectiveRefreshKey, clientOnline, serverReady]);
 
   // -------------------------------------------------------------------------
   // Manuel refresh
@@ -239,6 +275,7 @@ export default function ClientDetailsLivestreamSection({
   const handleRefreshClick = () => {
     if (!clientOnline) return;
     setRefreshing(true);
+    setServerReady(false);
     setLocalRefreshKey(k => k + 1);
     setTimeout(() => setRefreshing(false), 800);
   };
@@ -266,13 +303,13 @@ export default function ClientDetailsLivestreamSection({
   // -------------------------------------------------------------------------
   // Video events
   // -------------------------------------------------------------------------
-  const handleMouseMove    = () => setShowControls(true);
-  function handleVideoWaiting()  { setBuffering(true);  }
-  function handleVideoPlaying()  { setBuffering(false); }
-  function handleVideoCanPlay()  { setBuffering(false); }
+  const handleMouseMove   = () => setShowControls(true);
+  function handleVideoWaiting() { setBuffering(true);  }
+  function handleVideoPlaying() { setBuffering(false); }
+  function handleVideoCanPlay() { setBuffering(false); }
 
   // -------------------------------------------------------------------------
-  // Backend lag polling (hvert 2s — var 1s, unødvendigt aggressivt)
+  // Backend lag polling — hvert 2s
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !manifestReady || clientOnline === false) return;
@@ -301,7 +338,6 @@ export default function ClientDetailsLivestreamSection({
           setLastSegmentTimestamp(null);
           setLastSegmentLag(null);
         }
-        // FIX: Reduceret fra 1s til 2s — lag-måling behøver ikke 1Hz opdatering
         await new Promise(res => setTimeout(res, 2000));
       }
     }
@@ -331,11 +367,16 @@ export default function ClientDetailsLivestreamSection({
   // -------------------------------------------------------------------------
   // Afledte værdier
   // -------------------------------------------------------------------------
-  const lagToShow     = playerLag ?? lastSegmentLag;
-  const lagType       = playerLag != null ? "player" : "backend";
-  const sanitizedLag  = lagToShow != null && lagToShow < 0 ? 0 : lagToShow;
-  const lagStatus     = getLagStatus(sanitizedLag, lastSegmentLag);
+  const lagToShow    = playerLag ?? lastSegmentLag;
+  const lagType      = playerLag != null ? "player" : "backend";
+  const sanitizedLag = lagToShow != null && lagToShow < 0 ? 0 : lagToShow;
+  const lagStatus    = getLagStatus(sanitizedLag, lastSegmentLag);
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
+
+  // Loading-tekst afhænger af hvor i processen vi er
+  const loadingText = !serverReady
+    ? "Venter på at stream starter …"
+    : "Forbinder til stream …";
 
   // -------------------------------------------------------------------------
   // Render
@@ -355,7 +396,7 @@ export default function ClientDetailsLivestreamSection({
                 borderRadius: "50%",
                 bgcolor: clientOnline === false
                   ? "#9e9e9e"
-                  : (manifestReady ? "#43a047" : "#e53935"),
+                  : (manifestReady ? "#43a047" : (serverReady ? "#ff9800" : "#e53935")),
                 border: "1px solid #ddd",
                 mr: 1,
                 animation: (manifestReady && clientOnline !== false)
@@ -497,7 +538,7 @@ export default function ClientDetailsLivestreamSection({
                   <>
                     <CircularProgress size={isMobile ? 24 : 32} />
                     <Typography variant="body2" sx={{ ml: 2, fontSize: isMobile ? 13 : undefined }}>
-                      Forbinder til stream …
+                      {loadingText}
                     </Typography>
                   </>
                 )}
@@ -542,6 +583,7 @@ export default function ClientDetailsLivestreamSection({
                   display: "block",
                   fontSize: isMobile ? 11 : undefined
                 }}>
+                  serverReady=<b>{serverReady ? "ja" : "nej"}</b>,{" "}
                   <Tooltip title={`Råværdi: ${playerLag ?? "-"}`}>
                     <span>playerLag=<b>{formatLagValue(playerLag)}</b></span>
                   </Tooltip>
