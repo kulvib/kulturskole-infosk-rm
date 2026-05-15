@@ -37,10 +37,6 @@ async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
   throw lastError || new Error("All retry attempts failed");
 }
 
-function isSafari() {
-  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-}
-
 function formatDateTimeWithDay(date) {
   if (!date) return "";
   const ukedage = ["Søndag","Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag"];
@@ -142,11 +138,9 @@ export default function ClientDetailsLivestreamSection({
   // -------------------------------------------------------------------------
   // HLS.js lifecycle
   //
-  // FIX: HLS.js har forrang over native HLS.
-  // Chrome understøtter canPlayType("application/vnd.apple.mpegurl") i nyere
-  // versioner, men bruger native HLS uden FRAG_CHANGED events → lag beregnes
-  // aldrig. Vi tjekker Hls.isSupported() FØRST så HLS.js altid bruges i Chrome
-  // og Firefox. Native HLS er kun fallback for ældre Safari.
+  // HLS.js har forrang over native HLS i alle browsere inkl. Safari.
+  // Dette sikrer at FRAG_CHANGED events virker og lag-beregning er ensartet.
+  // Native HLS er kun fallback for meget gamle browsere uden HLS.js-support.
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !clientOnline || !serverReady) return;
@@ -168,9 +162,7 @@ export default function ClientDetailsLivestreamSection({
 
     if (Hls.isSupported()) {
       // -----------------------------------------------------------------------
-      // HLS.js — Chrome, Firefox og moderne Safari
-      // Prioriteres over native HLS så FRAG_CHANGED events virker korrekt
-      // og lag-beregning fungerer i alle browsere.
+      // HLS.js — Chrome, Firefox og Safari (alle moderne browsere)
       // -----------------------------------------------------------------------
       const hls = new Hls({
         liveSyncDurationCount:        3,
@@ -182,15 +174,12 @@ export default function ClientDetailsLivestreamSection({
         enableWorker:                 true,
         startLevel:                   -1,
         lowLatencyMode:               false,
-        // FIX Chrome DTS-fejl: segmenter med reset_timestamps=1 starter ved
-        // DTS=0. #EXT-X-DISCONTINUITY i manifestet signalerer dette til HLS.js.
-        // forceKeyFrameOnDiscontinuity:false forhindrer ekstra keyframe-krav.
         forceKeyFrameOnDiscontinuity: false,
       });
 
       hlsRef.current = hls;
 
-      // Sæt egenskaber FØR attachMedia så Chrome's MSE pipeline læser dem korrekt
+      // Sæt egenskaber FØR attachMedia
       video.muted       = true;
       video.autoplay    = true;
       video.playsInline = true;
@@ -241,7 +230,7 @@ export default function ClientDetailsLivestreamSection({
 
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       // -----------------------------------------------------------------------
-      // Native HLS — kun ældre Safari der ikke understøtter HLS.js
+      // Native HLS — fallback for meget gamle browsere uden HLS.js-support
       // -----------------------------------------------------------------------
       video.src = hlsUrl; video.muted = true; video.autoplay = true; video.playsInline = true;
       const onLoaded = () => {
@@ -299,40 +288,17 @@ export default function ClientDetailsLivestreamSection({
   }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
   // -------------------------------------------------------------------------
-  // Safari: poll video.seekable for forsinkelse
-  // -------------------------------------------------------------------------
-  useEffect(() => {
-    if (!manifestReady || !isSafari() || clientOnline === false) return;
-    const interval = setInterval(() => {
-      const video = videoRef.current;
-      if (video && video.seekable && video.seekable.length > 0) {
-        const liveEdge = video.seekable.end(video.seekable.length - 1);
-        const lag = liveEdge - video.currentTime;
-        if (isFinite(lag) && lag >= 0 && lag < 600) {
-          setLastSegmentLag(lag);
-        }
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [manifestReady, effectiveRefreshKey, clientOnline]);
-
-  // -------------------------------------------------------------------------
-  // Forsinkelsesberegning:
+  // Forsinkelsesberegning — samme metode i alle browsere via HLS.js:
   //   totalLag = (sidsteSeg - spillerSeg) × segSek + uploadAlder
   //
   // Fallback: vis uploadAlder alene hvis FRAG_CHANGED endnu ikke har fyret
-  // (kan ske de første sekunder efter stream starter)
   // -------------------------------------------------------------------------
   const computedLag = useMemo(() => {
-    if (isSafari()) {
-      return lastSegmentLag != null ? Math.round(lastSegmentLag) : null;
-    }
     if (lastSegNum != null && currentSegNum != null && lastSegmentLag != null) {
       const segsBehind = lastSegNum - currentSegNum;
       const lag = segsBehind * fragDuration + lastSegmentLag;
       return lag >= 0 ? Math.round(lag) : null;
     }
-    // Fallback: FRAG_CHANGED ikke fyret endnu — vis uploadAlder alene
     if (lastSegmentLag != null) {
       return Math.round(lastSegmentLag);
     }
@@ -583,11 +549,4 @@ export default function ClientDetailsLivestreamSection({
 
       <style>{`
         @keyframes pulsate {
-          0%   { transform: scale(1);    opacity: 1;   background: #43a047; }
-          50%  { transform: scale(1.25); opacity: 0.5; background: #43a047; }
-          100% { transform: scale(1);    opacity: 1;   background: #43a047; }
-        }
-      `}</style>
-    </Card>
-  );
-}
+          0%   { transform: scale(1);    *
