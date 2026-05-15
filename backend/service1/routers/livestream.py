@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import traceback
 from datetime import datetime, timezone
 from typing import Dict, List
@@ -19,6 +20,10 @@ os.makedirs(HLS_DIR, exist_ok=True)
 
 router = APIRouter()
 
+# Antal sekunder før et manifest betragtes som forældet
+# Ved 8s segmenter: 3 segmenter = 24s — giver lidt luft til upload-forsinkelse
+MANIFEST_STALE_SECONDS = 30
+
 
 # ---------------------------------------------------------------------------
 # Models
@@ -26,7 +31,7 @@ router = APIRouter()
 class HlsCleanupRequest(BaseModel):
     client_id: str
     keep_files: List[str]
-    segment_duration: int = 6
+    segment_duration: int = 8   # FIX: var 6 → 8, matcher ny klient-default (SEGMENT_LENGTH=8)
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +62,8 @@ def extract_program_date_time(filename: str):
         return None
 
 
-def _normalize_segment_duration(value, default: int = 6, min_v: int = 1, max_v: int = 60) -> int:
+def _normalize_segment_duration(value, default: int = 8, min_v: int = 1, max_v: int = 60) -> int:
+    # FIX: default ændret fra 6 til 8 så det matcher klient-default
     try:
         n = int(value)
         return max(min_v, min(max_v, n))
@@ -68,7 +74,7 @@ def _normalize_segment_duration(value, default: int = 6, min_v: int = 1, max_v: 
 def _write_manifest(manifest_path: str, segments: List[str], media_seq: int, segment_duration: int) -> None:
     """
     Skriv manifest med præcis de segmenter der er angivet.
-    FIX: Bygger kun manifest fra kendte/friske segmenter — scanner ikke hele mappen.
+    Bygger kun manifest fra kendte/friske segmenter — scanner ikke hele mappen.
     """
     with open(manifest_path, "w", encoding="utf-8", newline="\n") as m3u:
         m3u.write("#EXTM3U\n")
@@ -83,12 +89,12 @@ def _write_manifest(manifest_path: str, segments: List[str], media_seq: int, seg
             m3u.write(f"{seg}\n")
 
 
-def update_manifest(client_dir: str, keep_n: int = 10, segment_duration: int = 6) -> None:
+def update_manifest(client_dir: str, keep_n: int = 10, segment_duration: int = 8) -> None:
     """
     Generer index.m3u8 fra de nyeste segmenter i client_dir.
     Bruges kun ved upload — scanner mappen men tager kun de nyeste keep_n segmenter.
     """
-    segment_duration = _normalize_segment_duration(segment_duration, default=6)
+    segment_duration = _normalize_segment_duration(segment_duration, default=8)
 
     for ext in [".ts", ".mp4"]:
         segs = sorted(
@@ -120,7 +126,7 @@ def update_manifest(client_dir: str, keep_n: int = 10, segment_duration: int = 6
 async def upload_hls_file(
     file: UploadFile = File(...),
     client_id: str = Form(...),
-    segment_duration: int = Form(6),
+    segment_duration: int = Form(8),   # FIX: var 6 → 8
     user=Depends(get_current_user)
 ):
     allowed_exts = [".ts", ".mp4"]
@@ -129,7 +135,7 @@ async def upload_hls_file(
     if not re.match(r"^[a-zA-Z0-9_.-]+$", file.filename):
         raise HTTPException(status_code=400, detail="Ugyldigt filnavn")
 
-    segment_duration = _normalize_segment_duration(segment_duration, default=6)
+    segment_duration = _normalize_segment_duration(segment_duration, default=8)
     client_dir       = safe_client_dir(client_id)
     os.makedirs(client_dir, exist_ok=True)
 
@@ -153,8 +159,7 @@ async def upload_hls_file(
 
 # ---------------------------------------------------------------------------
 # Cleanup
-# FIX: Bygger manifest KUN fra keep_files (kendte friske segmenter)
-#      — ikke fra en scanning af hele mappen som kan indeholde gamle segmenter
+# Bygger manifest KUN fra keep_files (kendte friske segmenter)
 # ---------------------------------------------------------------------------
 @router.post("/hls/cleanup")
 async def cleanup_hls_files(
@@ -164,7 +169,7 @@ async def cleanup_hls_files(
 ):
     client_id        = payload.client_id
     keep_files       = payload.keep_files
-    segment_duration = _normalize_segment_duration(payload.segment_duration, default=6)
+    segment_duration = _normalize_segment_duration(payload.segment_duration, default=8)
     client_dir       = safe_client_dir(client_id)
 
     if not os.path.exists(client_dir):
@@ -181,8 +186,7 @@ async def cleanup_hls_files(
         except Exception as e:
             print(f"[CLEANUP] Kunne ikke slette {seg}: {e}")
 
-    # FIX: Byg manifest KUN fra keep_files der rent faktisk eksisterer på disk
-    # Ikke update_manifest() som scanner hele mappen og kan finde gamle segmenter
+    # Byg manifest KUN fra keep_files der rent faktisk eksisterer på disk
     kept_sorted = sorted(
         [f for f in keep_files if os.path.exists(os.path.join(client_dir, f))],
         key=lambda f: extract_num(f, "segment_")
@@ -254,6 +258,10 @@ def get_last_segment_info(
 
 # ---------------------------------------------------------------------------
 # Health check
+# FIX: Tilføjet friskhedstjek — returnerer is_stale=True hvis manifest ikke
+#      er opdateret inden for MANIFEST_STALE_SECONDS (30s).
+#      Forhindrer at frontend sidder fast i serverReady=true når klienten er
+#      gået ned men segmenterne stadig ligger på disk.
 # ---------------------------------------------------------------------------
 @router.get("/hls/{client_id}/health")
 def health_check(
@@ -268,7 +276,13 @@ def health_check(
     client_dir    = safe_client_dir(client_id)
     manifest_path = os.path.join(client_dir, "index.m3u8")
     if not os.path.exists(manifest_path):
-        return {"online": False, "has_segments": False, "last_update": None, "message": "Manifest ikke fundet"}
+        return {
+            "online":       False,
+            "has_segments": False,
+            "is_stale":     False,
+            "last_update":  None,
+            "message":      "Manifest ikke fundet"
+        }
 
     try:
         files        = os.listdir(client_dir)
@@ -279,15 +293,42 @@ def health_check(
         if has_segments:
             mtime       = os.path.getmtime(manifest_path)
             last_update = datetime.fromtimestamp(mtime, tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-            return {"online": True, "has_segments": True, "last_update": last_update, "message": "Stream er aktiv"}
-        return {"online": True, "has_segments": False, "last_update": None, "message": "Manifest eksisterer, men ingen segmenter endnu"}
+
+            # FIX: Tjek om manifestet er forældet
+            # Hvis klienten er gået ned ligger de gamle segmenter stadig på disk
+            # og has_segments ville returnere True — det ville sende frontend i en
+            # evig HLS.js fatal-fejl-loop. is_stale=True signalerer at frontend
+            # skal blive ved med at polle i stedet for at starte HLS.js
+            age_seconds = time.time() - mtime
+            is_stale    = age_seconds > MANIFEST_STALE_SECONDS
+
+            return {
+                "online":       True,
+                "has_segments": True,
+                "is_stale":     is_stale,
+                "last_update":  last_update,
+                "message":      "Stream er forældet — klienten svarer ikke" if is_stale else "Stream er aktiv"
+            }
+
+        return {
+            "online":       True,
+            "has_segments": False,
+            "is_stale":     False,
+            "last_update":  None,
+            "message":      "Manifest eksisterer, men ingen segmenter endnu"
+        }
     except Exception as e:
-        return {"online": False, "has_segments": False, "last_update": None, "message": f"Fejl: {str(e)}"}
+        return {
+            "online":       False,
+            "has_segments": False,
+            "is_stale":     False,
+            "last_update":  None,
+            "message":      f"Fejl: {str(e)}"
+        }
 
 
 # ---------------------------------------------------------------------------
 # Reset — sletter ALT for denne klient inkl. manifest
-# Bruges ved klient-startup så gamle segmenter ikke forurener lag-beregning
 # ---------------------------------------------------------------------------
 @router.post("/hls/{client_id}/reset")
 def reset_hls(
