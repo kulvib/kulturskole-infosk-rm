@@ -5,7 +5,6 @@ from enum import Enum
 
 
 def utcnow() -> datetime:
-    """Returnerer nuværende UTC-tid (ikke-deprecated)."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
@@ -28,6 +27,18 @@ class School(SQLModel, table=True):
     weekday_off: Optional[str] = Field(default="22:30")
     weekend_on: Optional[str] = Field(default="08:00")
     weekend_off: Optional[str] = Field(default="18:00")
+
+
+# NY: Sæsonbaserede tider per skole.
+# Hvis ingen sæsonspecifik post findes, bruges School-modellens standardtider som fallback.
+class SchoolSeasonTimes(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    school_id: int = Field(foreign_key="school.id", index=True)
+    season: int = Field(index=True)
+    weekday_on: str = Field(default="09:00")
+    weekday_off: str = Field(default="22:30")
+    weekend_on: str = Field(default="08:00")
+    weekend_off: str = Field(default="18:00")
 
 
 class User(SQLModel, table=True):
@@ -79,10 +90,7 @@ class Client(ClientBase, table=True):
     pending_chrome_action: Optional[ChromeAction] = Field(default=ChromeAction.NONE)
     pending_chrome_action_source: Optional[str] = None
     school_id: Optional[int] = Field(default=None, foreign_key="school.id")
-    state: Optional[str] = Field(
-        default="normal",
-        description="Driftstilstand: normal, sleeping, wakeup, shutdown, error"
-    )
+    state: Optional[str] = Field(default="normal")
     livestream_status: Optional[str] = "idle"
     livestream_last_segment: Optional[datetime] = None
     livestream_last_error: Optional[str] = None
@@ -140,12 +148,11 @@ class CalendarMarking(SQLModel, table=True):
 
 class Holiday(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    date: str = Field(index=True)        # ISO-datoformat "YYYY-MM-DD"
+    date: str = Field(index=True)
     description: Optional[str] = None
 
 
 class SchoolCreate(SQLModel):
-    """Bruges til oprettelse af skoler — tillader ikke klient at sætte SQL-primærnøgle."""
     name: str
     weekday_on: Optional[str] = Field(default="09:00")
     weekday_off: Optional[str] = Field(default="22:30")
