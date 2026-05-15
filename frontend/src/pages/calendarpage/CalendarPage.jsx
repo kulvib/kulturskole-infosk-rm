@@ -467,8 +467,6 @@ export default function CalendarPage() {
     }
   };
 
-  // Modificeret: DateTimeEditDialog sender nu den opdaterede dag (day) tilbage.
-  // Vi opdaterer lokal state direkte med den dag for at undgå race / autosave-overskrivning.
   const handleSaveDateTime = ({ date, clientId, day }) => {
     if (!clientId || !date) return;
     const normDate = date;
@@ -491,7 +489,7 @@ export default function CalendarPage() {
       return;
     }
 
-    // Fallback: hvis dialogen af en eller anden grund ikke returnerede day, hent hele markedDays fra server.
+    // Fallback: hent hele markedDays fra server
     (async () => {
       try {
         const data = await getMarkedDays(selectedSeason, clientId);
@@ -524,6 +522,7 @@ export default function CalendarPage() {
           .join("; ")
       : ""
   ), [selectedClients, filteredClients, activeClient, schools]);
+
   const activeClientName = useMemo(() => (
     activeClient
       ? (() => {
@@ -534,10 +533,11 @@ export default function CalendarPage() {
       : "Automatisk"
   ), [activeClient, filteredClients, schools]);
 
+  // FIX: Sænket krav fra 2 til 1 klient så enkelt-klient-brugere også kan gemme
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
-      if (selectedClients.length < 2) {
-        setSnackbar({ open: true, message: "Vælg mindst to klienter", severity: "error" });
+      if (selectedClients.length < 1) {
+        setSnackbar({ open: true, message: "Vælg mindst én klient", severity: "error" });
         return;
       }
       if (!activeClient) {
@@ -585,7 +585,7 @@ export default function CalendarPage() {
               clientId: activeClient,
               days: mapRawDays(data.markedDays || {})
             });
-          } catch (e) {
+          } catch {
             dispatchMarkedDays({
               type: "set",
               clientId: activeClient,
@@ -594,7 +594,7 @@ export default function CalendarPage() {
           }
         }
         setSavingCalendar(false);
-      } catch (e) {
+      } catch {
         setSavingCalendar(false);
       }
     }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]
@@ -612,7 +612,6 @@ export default function CalendarPage() {
   const isDisabled = !activeClient;
   const sortedSchools = useMemo(() => [...schools].sort((a, b) => a.name.localeCompare(b.name)), [schools]);
 
-  // ----------- RENDER -----------
   const editDialogClientObj = clients.find(c => c.id === editDialogClient);
 
   return (
@@ -715,7 +714,8 @@ export default function CalendarPage() {
           disabled={false}
           selectedSchool={selectedSchool}
         />
-        {selectedClients.length > 1 && (
+        {/* FIX: Vis gem-knap og info også ved kun 1 valgt klient */}
+        {selectedClients.length >= 1 && (
           <Box sx={{
             mt: 2,
             display: "flex",
@@ -728,24 +728,22 @@ export default function CalendarPage() {
               <Typography variant="body2" sx={{ fontSize: { xs: "1rem", sm: "1.1rem" }, fontWeight: 700 }}>
                 Viser kalender for: {activeClientName}
               </Typography>
-              <Typography variant="body2" sx={{
-                fontSize: { xs: "0.9rem", sm: "0.8rem" },
-                color: "#555", fontWeight: 400
-              }}>
-                ændringerne slår også igennem på klienterne: {otherClientNames}
-              </Typography>
+              {selectedClients.length > 1 && (
+                <Typography variant="body2" sx={{
+                  fontSize: { xs: "0.9rem", sm: "0.8rem" },
+                  color: "#555", fontWeight: 400
+                }}>
+                  ændringerne slår også igennem på klienterne: {otherClientNames}
+                </Typography>
+              )}
             </Box>
             <Button
               variant="contained"
               color="primary"
               onClick={() => handleSave(true)}
-              disabled={savingCalendar || selectedClients.length < 2}
+              disabled={savingCalendar || selectedClients.length < 1}
               startIcon={savingCalendar ? <CircularProgress color="inherit" size={20} /> : null}
               sx={{
-                boxShadow: selectedClients.length < 2 ? "none" : undefined,
-                bgcolor: selectedClients.length < 2 ? "#eee" : undefined,
-                color: selectedClients.length < 2 ? "#888" : undefined,
-                pointerEvents: selectedClients.length < 2 ? "none" : undefined,
                 minWidth: { xs: "100%", sm: 180 },
                 width: { xs: "100%", sm: 220 },
                 mt: { xs: 1, sm: 0 }
@@ -913,7 +911,7 @@ export default function CalendarPage() {
   );
 }
 
-// MonthCalendar med native browser tooltip på dagene!
+// MonthCalendar med native browser tooltip på dagene
 const MonthCalendar = React.memo(function MonthCalendar({
   name,
   month,
@@ -1008,7 +1006,6 @@ const MonthCalendar = React.memo(function MonthCalendar({
         }}>
           {name} {year}
         </Typography>
-        {/* Ugedage-header: første række i grid, 8 kolonner, venstre tom */}
         <Box sx={{
           display: "grid",
           gridTemplateColumns: "repeat(8, 1fr)",
@@ -1050,7 +1047,6 @@ const MonthCalendar = React.memo(function MonthCalendar({
                 color: "#222",
                 background: "transparent",
                 minWidth: 0,
-                mr: { xs: 0, sm: 0 }
               }}>
                 {row.weekNum}
               </Box>
@@ -1093,8 +1089,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
                           size={circleSize}
                           sx={{
                             position: "absolute",
-                            top: 0,
-                            left: 0,
+                            top: 0, left: 0,
                             zIndex: 1,
                             color: "#1976d2",
                             background: "transparent"
@@ -1104,8 +1099,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
                       <Box
                         sx={{
                           position: "absolute",
-                          top: 2,
-                          left: 2,
+                          top: 2, left: 2,
                           width: innerCircleSize,
                           height: innerCircleSize,
                           borderRadius: "50%",
