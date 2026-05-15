@@ -56,7 +56,7 @@ function formatDateTimeWithDay(date) {
 }
 
 function getLagStatus(lag) {
-  if (lag == null) return { text: "", color: "#888" };
+  if (lag == null) return { text: "Beregner forsinkelse …", color: "#888" };
   if (lag < 15)  return { text: "Live",                                             color: "#43a047" };
   if (lag < 35)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#43a047" };
   if (lag < 70)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#f90"    };
@@ -146,14 +146,13 @@ export default function ClientDetailsLivestreamSection({
       : `${apiUrl}/hls/${clientId}/index.m3u8`;
 
     let fatalErrorTimeout = null;
-    let playTimeout       = null;  // FIX: bruges til at rydde setTimeout ved cleanup
+    let playTimeout       = null;
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       // Safari: native HLS
       video.src = hlsUrl; video.muted = true; video.autoplay = true; video.playsInline = true;
       const onLoaded = () => {
         setManifestReady(true);
-        // FIX: setTimeout så React når at re-rendre og vise video-elementet inden play()
         playTimeout = setTimeout(() => video.play().catch(() => {}), 100);
       };
       video.addEventListener("loadedmetadata", onLoaded, { once: true });
@@ -166,7 +165,7 @@ export default function ClientDetailsLivestreamSection({
 
     } else if (Hls.isSupported()) {
       // Chrome + Firefox: HLS.js
-      // xhrSetup er FJERNET — eliminerer CORS preflight OPTIONS på segment-requests
+      // xhrSetup FJERNET — eliminerer CORS preflight OPTIONS på segment-requests
       const hls = new Hls({
         liveSyncDurationCount:       7,
         liveMaxLatencyDurationCount: 10,
@@ -186,13 +185,12 @@ export default function ClientDetailsLivestreamSection({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setManifestReady(true);
         setError("");
-        // FIX: Årsag til sort skærm i Chrome:
-        // setManifestReady(true) er en async React state-opdatering.
-        // Hvis video.play() kaldes INDEN React re-renderer, er video-elementet
-        // stadig inde i en display:none container → Chrome decoder ingen frames
-        // → sort skærm. setTimeout(100ms) giver React tid til at re-rendre og
-        // vise video-elementet inden afspilning starter.
-        playTimeout = setTimeout(() => video.play().catch(() => {}), 100);
+        // FIX Chrome sort skærm:
+        // video-elementet er inde i en container der skifter fra display:none til flex
+        // når manifestReady=true. React's state-opdatering er asynkron — hvis play()
+        // kaldes inden React re-renderer og viser containeren, afspiller Chrome i et
+        // usynligt element → sort skærm. 150ms delay sikrer React har re-renderet.
+        playTimeout = setTimeout(() => video.play().catch(() => {}), 150);
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
@@ -213,7 +211,8 @@ export default function ClientDetailsLivestreamSection({
 
       hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
         if (data?.frag && typeof data.frag.sn === "number") {
-          setCurrentSegment(data.frag.sn); setError("");
+          setCurrentSegment(data.frag.sn);
+          setError("");
         }
       });
 
@@ -230,16 +229,47 @@ export default function ClientDetailsLivestreamSection({
     // eslint-disable-next-line
   }, [clientId, effectiveRefreshKey, clientOnline, serverReady]);
 
-  // Universel lag-måling: video.duration - video.currentTime (alle browsere)
+  // -------------------------------------------------------------------------
+  // FIX forsinkelsesmåling:
+  //
+  // hls.playingDate = Date-objekt for den frame der afspilles nu,
+  // baseret på EXT-X-PROGRAM-DATE-TIME i manifestet (nu skrevet af backend).
+  // Date.now() - hls.playingDate = faktisk wall-clock forsinkelse.
+  //
+  // Safari fallback: video.currentTime mod segment_duration + mtime-estimat
+  // er upålidelig — brug lastSegmentLag + fast offset i stedet.
+  // -------------------------------------------------------------------------
   useEffect(() => {
     if (!manifestReady || clientOnline === false) return;
+
     const interval = setInterval(() => {
-      const video = videoRef.current;
-      if (video && isFinite(video.duration) && video.duration > 0 && video.currentTime > 0) {
-        const lag = video.duration - video.currentTime;
-        setVideoLag(lag > 0 ? Math.round(lag) : 0);
+      // HLS.js (Chrome + Firefox): brug hls.playingDate
+      const hls = hlsRef.current;
+      if (hls && hls.playingDate instanceof Date) {
+        const lag = (Date.now() - hls.playingDate.getTime()) / 1000;
+        if (isFinite(lag) && lag >= 0 && lag < 600) {
+          setVideoLag(Math.round(lag));
+          return;
+        }
       }
+
+      // Safari: native HLS — video.seekable.end(0) er live-kanten
+      const video = videoRef.current;
+      if (video && video.seekable && video.seekable.length > 0) {
+        const liveEdge   = video.seekable.end(video.seekable.length - 1);
+        const currentPos = video.currentTime;
+        if (isFinite(liveEdge) && isFinite(currentPos) && liveEdge > 0) {
+          const lag = liveEdge - currentPos;
+          if (lag >= 0 && lag < 600) {
+            setVideoLag(Math.round(lag));
+            return;
+          }
+        }
+      }
+
+      setVideoLag(null);
     }, 1000);
+
     return () => clearInterval(interval);
   }, [manifestReady, effectiveRefreshKey, clientOnline]);
 
@@ -301,9 +331,9 @@ export default function ClientDetailsLivestreamSection({
   function handleVideoPlaying() { setBuffering(false); }
   function handleVideoCanPlay() { setBuffering(false); }
 
-  const lagToShow    = videoLag ?? lastSegmentLag;
-  const sanitizedLag = lagToShow != null && lagToShow < 0 ? 0 : lagToShow;
-  const lagStatus    = getLagStatus(sanitizedLag);
+  // Brug KUN videoLag til statusvisning — ingen fallback til lastSegmentLag
+  const sanitizedLag    = (videoLag != null && videoLag >= 0) ? videoLag : null;
+  const lagStatus       = getLagStatus(manifestReady ? sanitizedLag : null);
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
 
   const loadingText = streamStale
@@ -349,7 +379,7 @@ export default function ClientDetailsLivestreamSection({
             <Typography variant="body2" sx={{ color: lagStatus.color, fontSize: isMobile ? 13 : undefined }}>
               {clientOnline === false
                 ? "Klienten er offline — stream ikke tilgængelig"
-                : (lagStatus.text || "Ingen status")}
+                : lagStatus.text}
             </Typography>
 
             {error && clientOnline !== false && (
@@ -358,7 +388,10 @@ export default function ClientDetailsLivestreamSection({
           </Stack>
         </Grid>
 
-        {/* Video */}
+        {/* Video — FIX Chrome sort skærm:
+            Video-elementet er ALTID synligt og renderet.
+            Loading-state vises som et sort overlay OVEN PÅ video.
+            Dermed er video-elementet aldrig i display:none når play() kaldes. */}
         <Grid item xs={12} md={5} minWidth={0}>
           <Box
             sx={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}
@@ -366,73 +399,85 @@ export default function ClientDetailsLivestreamSection({
             onMouseLeave={() => setShowControls(false)}
             tabIndex={0} onFocus={() => setShowControls(true)} onBlur={() => setShowControls(false)}
           >
-            <Box sx={{
-              position: "relative", width: "100%",
-              display: (manifestReady && clientOnline !== false) ? "flex" : "none",
-              alignItems: "center", justifyContent: "center"
-            }}>
-              <video
-                ref={videoRef} id="livestream-video"
-                autoPlay playsInline muted
-                onWaiting={handleVideoWaiting} onPlaying={handleVideoPlaying} onCanPlay={handleVideoCanPlay}
-                style={{
-                  width: isMobile ? "100%" : 420, maxWidth: "100%",
-                  maxHeight: isMobile ? 200 : 320, borderRadius: 8,
-                  border: "2px solid #444", boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
-                  background: "#000", margin: 0, display: "block",
-                }}
-                tabIndex={-1} key={effectiveRefreshKey}
-              />
-
-              {manifestReady && clientOnline !== false && (
-                <IconButton
-                  onClick={handleFullscreen} aria-label="Fuld skærm"
-                  sx={{
-                    position: "absolute", bottom: 12, right: 12,
-                    bgcolor: alpha("#222", 0.6), color: "#fff", borderRadius: "50%",
-                    zIndex: 20, boxShadow: "0 2px 8px rgba(0,0,0,0.19)",
-                    opacity: showControls ? 1 : 0,
-                    pointerEvents: showControls ? "auto" : "none",
-                    transition: "opacity 0.3s",
-                    "&:hover": { bgcolor: alpha("#111", 0.85) }
-                  }}
-                  size={isMobile ? "small" : "medium"} tabIndex={0}
-                >
-                  <FullscreenIcon sx={{ fontSize: isMobile ? 26 : 32 }} />
-                </IconButton>
-              )}
-
-              {buffering && (
-                <Box sx={{
-                  position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  zIndex: 10, background: "rgba(0,0,0,0.18)", borderRadius: 8,
-                }}>
-                  <CircularProgress size={isMobile ? 20 : 40} color="inherit" />
-                  <Typography variant="body2" sx={{ color: "#fff", ml: isMobile ? 1 : 2, fontSize: isMobile ? 12 : undefined }}>
-                    Buffering …
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-
-            {(!manifestReady || clientOnline === false) && (
+            {clientOnline === false ? (
               <Box sx={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 minHeight: isMobile ? 100 : 160, width: "100%",
-                bgcolor: clientOnline === false ? "#fafafa" : "transparent", borderRadius: 1
+                bgcolor: "#fafafa", borderRadius: 1
               }}>
-                {clientOnline === false ? (
-                  <Typography variant="body2" sx={{ fontSize: isMobile ? 13 : undefined }}>
-                    Klienten er offline — livestream deaktiveret
-                  </Typography>
-                ) : (
-                  <>
-                    <CircularProgress size={isMobile ? 24 : 32} color={streamStale ? "error" : "inherit"} />
-                    <Typography variant="body2" sx={{ ml: 2, fontSize: isMobile ? 13 : undefined, color: streamStale ? "#e53935" : undefined }}>
+                <Typography variant="body2" sx={{ fontSize: isMobile ? 13 : undefined }}>
+                  Klienten er offline — livestream deaktiveret
+                </Typography>
+              </Box>
+            ) : (
+              <Box sx={{ position: "relative", width: "100%" }}>
+                {/* Video altid renderet — aldrig display:none */}
+                <video
+                  ref={videoRef}
+                  id="livestream-video"
+                  autoPlay playsInline muted
+                  onWaiting={handleVideoWaiting}
+                  onPlaying={handleVideoPlaying}
+                  onCanPlay={handleVideoCanPlay}
+                  style={{
+                    width: isMobile ? "100%" : 420,
+                    maxWidth: "100%",
+                    maxHeight: isMobile ? 200 : 320,
+                    borderRadius: 8,
+                    border: "2px solid #444",
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
+                    background: "#000",
+                    display: "block",
+                  }}
+                  tabIndex={-1}
+                  key={effectiveRefreshKey}
+                />
+
+                {/* Loading overlay — vises oven på video mens stream ikke er klar */}
+                {!manifestReady && (
+                  <Box sx={{
+                    position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "#000", borderRadius: 8, zIndex: 5,
+                  }}>
+                    <CircularProgress size={isMobile ? 24 : 32} color={streamStale ? "error" : "inherit"} sx={{ color: "#fff" }} />
+                    <Typography variant="body2" sx={{ color: "#fff", ml: 2, fontSize: isMobile ? 13 : undefined }}>
                       {loadingText}
                     </Typography>
-                  </>
+                  </Box>
+                )}
+
+                {/* Buffering overlay */}
+                {manifestReady && buffering && (
+                  <Box sx={{
+                    position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    zIndex: 10, background: "rgba(0,0,0,0.45)", borderRadius: 8,
+                  }}>
+                    <CircularProgress size={isMobile ? 20 : 40} color="inherit" sx={{ color: "#fff" }} />
+                    <Typography variant="body2" sx={{ color: "#fff", ml: isMobile ? 1 : 2, fontSize: isMobile ? 12 : undefined }}>
+                      Buffering …
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Fullscreen knap */}
+                {manifestReady && (
+                  <IconButton
+                    onClick={handleFullscreen} aria-label="Fuld skærm"
+                    sx={{
+                      position: "absolute", bottom: 12, right: 12,
+                      bgcolor: alpha("#222", 0.6), color: "#fff", borderRadius: "50%",
+                      zIndex: 20, boxShadow: "0 2px 8px rgba(0,0,0,0.19)",
+                      opacity: showControls ? 1 : 0,
+                      pointerEvents: showControls ? "auto" : "none",
+                      transition: "opacity 0.3s",
+                      "&:hover": { bgcolor: alpha("#111", 0.85) }
+                    }}
+                    size={isMobile ? "small" : "medium"} tabIndex={0}
+                  >
+                    <FullscreenIcon sx={{ fontSize: isMobile ? 26 : 32 }} />
+                  </IconButton>
                 )}
               </Box>
             )}
@@ -469,17 +514,18 @@ export default function ClientDetailsLivestreamSection({
                   display: "block", fontSize: isMobile ? 11 : undefined
                 }}>
                   serverReady=<b>{serverReady ? "ja" : "nej"}</b>,{" "}
-                  isStale=<b>{streamStale ? "ja" : "nej"}</b>
+                  isStale=<b>{streamStale ? "ja" : "nej"}</b>,{" "}
+                  manifestReady=<b>{manifestReady ? "ja" : "nej"}</b>
                 </Typography>
                 <Typography variant="caption" sx={{
                   color: "#222", fontFamily: '"Courier New", Courier, monospace',
                   display: "block", fontSize: isMobile ? 11 : undefined
                 }}>
-                  <Tooltip title="video.duration - video.currentTime (alle browsere)">
+                  <Tooltip title="hls.playingDate / video.seekable — faktisk wall-clock forsinkelse">
                     <span>videoLag=<b>{formatLagValue(videoLag)}</b></span>
                   </Tooltip>
                   {" · "}
-                  <Tooltip title="Tid siden server modtog seneste segment">
+                  <Tooltip title="Tid siden server modtog seneste segment (kun til debug)">
                     <span>backendLag=<b>{formatLagValue(lastSegmentLag)}</b></span>
                   </Tooltip>
                 </Typography>
