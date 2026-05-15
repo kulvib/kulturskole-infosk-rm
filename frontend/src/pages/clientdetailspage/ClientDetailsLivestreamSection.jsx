@@ -123,7 +123,6 @@ export default function ClientDetailsLivestreamSection({
 
   // -------------------------------------------------------------------------
   // Poll /health indtil serveren har friske segmenter klar
-  // Respekterer is_stale — forhindrer connect til en stream der er gået ned
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !clientOnline) return;
@@ -201,17 +200,17 @@ export default function ClientDetailsLivestreamSection({
 
     } else if (Hls.isSupported()) {
       // --- HLS.js ---
-      // Tunet til 8s segmenter:
-      // liveSyncDurationCount:4       → 4 × 8s = 32s bag live-kant
-      // liveMaxLatencyDurationCount:6 → 6 × 8s = 48s max latency
-      // initialLiveManifestSize:3     → vent på 3 segmenter inden afspilning starter
+      // Tunet til 6s segmenter:
+      // liveSyncDurationCount:5       → 5 × 6s = 30s bag live-kant
+      // liveMaxLatencyDurationCount:8 → 8 × 6s = 48s max latency
+      // initialLiveManifestSize:4     → vent på 4 segmenter (24s) inden start
       const hls = new Hls({
-        liveSyncDurationCount:       4,
-        liveMaxLatencyDurationCount: 6,
-        initialLiveManifestSize:     3,
+        liveSyncDurationCount:       5,
+        liveMaxLatencyDurationCount: 8,
+        initialLiveManifestSize:     4,
         maxBufferLength:             40,
         maxMaxBufferLength:          80,
-        liveBackBufferLength:        16,
+        liveBackBufferLength:        12,
         enableWorker:                true,
         startLevel:                  -1,
         lowLatencyMode:              false,
@@ -244,8 +243,8 @@ export default function ClientDetailsLivestreamSection({
           if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
           fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 3000);
         } else {
-          // FIX: bufferStalledError er ikke-fatal — HLS.js genstarter selv.
-          // Ingen seek, ingen UI-fejl, ingen console.warn — bare ignorer.
+          // bufferStalledError er ikke-fatal — HLS.js genstarter selv.
+          // Ingen seek, ingen UI-fejl, ingen log — bare ignorer.
           if (data.details === "bufferStalledError") return;
           console.warn("[HLS Error]", data);
           setError(data.details || "Ukendt HLS-fejl");
