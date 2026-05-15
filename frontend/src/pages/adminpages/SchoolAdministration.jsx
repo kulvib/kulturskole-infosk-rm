@@ -16,7 +16,6 @@ import {
 } from "../../api";
 import { useAuth } from "../../auth/authcontext";
 
-// Nuværende sæson + 2 fremtidige — season er string "2025/2026"
 function getSeasons() {
   const now = new Date();
   const currentStart = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
@@ -74,14 +73,12 @@ export default function SchoolAdministration() {
       .finally(() => setLoadingSchools(false));
   }, []);
 
-  // Admin ser kun sin egen skole
   useEffect(() => {
     if (!isSuperadmin && user?.school_id && schools.length > 0) {
       setSelectedSchool(user.school_id);
     }
   }, [isSuperadmin, user, schools]);
 
-  // Hent sæsonbaserede tider når skole eller sæson ændres
   useEffect(() => {
     if (!selectedSchool || !selectedSeason) return;
     setLoadingTimes(true);
@@ -162,7 +159,10 @@ export default function SchoolAdministration() {
         setClientsToDelete([]); setDeleteStep(1);
         showSnackbar("Skole og tilknyttede klienter er slettet!", "success");
       })
-      .catch(e => { setDeleteError("Kunne ikke slette skole: " + (e.message || "")); showSnackbar("Fejl ved sletning af skole", "error"); });
+      .catch(e => {
+        setDeleteError("Kunne ikke slette skole: " + (e.message || ""));
+        showSnackbar("Fejl ved sletning af skole", "error");
+      });
   };
 
   const handleCloseDeleteDialog = () => {
@@ -300,6 +300,169 @@ export default function SchoolAdministration() {
                       disabled={!selectedSchool} />
                   </Stack>
                 </Box>
-                <Button variant="contained" size="large"
+                <Button
+                  variant="contained" size="large"
                   sx={{ minWidth: 140, height: 40, alignSelf: "flex-end" }}
-                  onClick={handleSaveTimes} disabled={!selectedSchool
+                  onClick={handleSaveTimes}
+                  disabled={!selectedSchool}
+                >
+                  Gem tider
+                </Button>
+              </Stack>
+            )}
+          </Box>
+        </Stack>
+      </Paper>
+
+      {/* Tilføj skole — kun superadmin */}
+      {isSuperadmin && (
+        <Paper sx={{ mb: 4, p: 3 }}>
+          <Stack direction={{ xs: "column", md: "row" }} gap={4} alignItems="flex-end">
+            <Box sx={{ flex: 2, minWidth: 340 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Tilføj skole</Typography>
+              <Stack direction="row" gap={2} alignItems="flex-end" sx={{ mb: 2 }}>
+                <TextField
+                  label="Skole-navn" value={schoolName}
+                  onChange={e => setSchoolName(e.target.value)}
+                  error={!!error} helperText={error}
+                  size="small" sx={inputSx} fullWidth
+                />
+                <Button variant="contained" sx={{ height: 40, minWidth: 140 }} onClick={handleAddSchool}>
+                  Tilføj skole
+                </Button>
+                <TextField
+                  label="Søg" size="small" value={schoolSearch}
+                  onChange={e => setSchoolSearch(e.target.value)}
+                  sx={{ minWidth: 120 }} placeholder="Søg skole..."
+                />
+                <Tooltip title={`Sortér alfabetisk ${schoolSort.direction === "asc" ? "(A-Å)" : "(Å-A)"}`}>
+                  <IconButton
+                    onClick={() => setSchoolSort(prev => ({ ...prev, direction: prev.direction === "asc" ? "desc" : "asc" }))}
+                    sx={{ ml: 1 }} aria-label="Sortér"
+                  >
+                    {schoolSort.direction === "asc" ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+              {deleteError && <Typography color="error" sx={{ mb: 2 }}>{deleteError}</Typography>}
+              {getSortedSchools().length === 0 ? (
+                <Typography align="center" sx={{ color: "#888", mt: 2 }}>Ingen skoler oprettet endnu</Typography>
+              ) : (
+                <Grid container spacing={2} sx={{ mt: 2 }}>
+                  {getSortedSchools().map(school => (
+                    <Grid item xs={12} sm={6} md={2.4} key={school.id ?? school.name}>
+                      <Card variant="outlined" sx={{ height: "100%" }}>
+                        <CardContent sx={{ pb: 1 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            {editSchoolId === school.id ? (
+                              <TextField
+                                value={editSchoolName}
+                                onChange={e => { setEditSchoolName(e.target.value); setEditSchoolError(""); }}
+                                size="small" error={!!editSchoolError} helperText={editSchoolError}
+                                sx={{ minWidth: 120, flex: 1 }} autoFocus
+                                onKeyDown={e => { if (e.key === "Enter") handleSaveEditSchool(school); }}
+                              />
+                            ) : (
+                              <Typography variant="subtitle1" sx={{ fontWeight: "normal", flex: 1 }}>
+                                {school.name}
+                              </Typography>
+                            )}
+                            <Box sx={{ display: "flex", alignItems: "center", ml: 1 }}>
+                              {editSchoolId === school.id ? (
+                                <Tooltip title="Gem">
+                                  <IconButton color="primary" onClick={() => handleSaveEditSchool(school)} size="small" sx={{ m: 0, p: "2px" }}>
+                                    <CheckIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              ) : (
+                                <>
+                                  <Tooltip title="Rediger navn">
+                                    <IconButton color="primary" onClick={() => handleEditSchool(school)} size="small" sx={{ m: 0, p: "2px" }}>
+                                      <EditIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Slet skole">
+                                    <span>
+                                      <IconButton edge="end" aria-label="slet" color="error" onClick={() => handleOpenDeleteDialog(school)} size="small" sx={{ m: 0, p: "2px", ml: 0.3 }}>
+                                        <DeleteIcon fontSize="small" />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                </>
+                              )}
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+            </Box>
+          </Stack>
+        </Paper>
+      )}
+
+      {/* Slet-dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog} maxWidth="md" fullWidth>
+        <DialogTitle>Slet skole: {schoolToDelete?.name}</DialogTitle>
+        <DialogContent>
+          <Typography color="error" gutterBottom sx={{ mb: 2 }}>
+            Advarsel: Du er ved at slette skolen <b>{schoolToDelete?.name}</b>.<br />
+            Alle tilknyttede klienter vil også blive slettet!
+          </Typography>
+          {loadingClients ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+              <CircularProgress size={24} />
+              <Typography>Henter tilknyttede klienter...</Typography>
+            </Box>
+          ) : (
+            <>
+              {Array.isArray(clientsToDelete) && clientsToDelete.length > 0 ? (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Tilknyttede klienter:</Typography>
+                  {clientsToDelete.map(client => (
+                    <Box key={client.id} sx={{ mb: 0.5, ml: 2 }}>
+                      <Typography variant="body2">
+                        Klient ID: {client.id} – Lokation: {client.locality || client.name || "-"}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              ) : (
+                <Typography sx={{ mb: 2 }}>Ingen klienter er tilknyttet denne skole.</Typography>
+              )}
+            </>
+          )}
+          {deleteStep === 1 && (
+            <Typography sx={{ mb: 2 }}>Er du sikker på at du vil slette denne skole og alle dens klienter?</Typography>
+          )}
+          {deleteStep === 2 && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              Denne handling kan <b>ikke fortrydes!</b><br />Tryk <b>Slet endeligt</b> for at bekræfte.
+            </Typography>
+          )}
+          {deleteError && <Typography color="error" sx={{ mb: 2 }}>{deleteError}</Typography>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog}>Annuller</Button>
+          {deleteStep === 1 ? (
+            <Button color="warning" variant="contained" onClick={() => setDeleteStep(2)} disabled={loadingClients}>
+              Bekræft sletning
+            </Button>
+          ) : (
+            <Button color="error" variant="contained" onClick={handleFinalDeleteSchool} disabled={loadingClients}>
+              Slet endeligt
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={snackbar.open} autoHideDuration={3400} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
+    </Box>
+  );
+}
