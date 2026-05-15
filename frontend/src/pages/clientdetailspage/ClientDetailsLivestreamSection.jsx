@@ -111,7 +111,7 @@ export default function ClientDetailsLivestreamSection({
   const [showControls, setShowControls]             = useState(false);
   const [localRefreshKey, setLocalRefreshKey]       = useState(0);
   const [refreshing, setRefreshing]                 = useState(false);
-  const [streamStale, setStreamStale]               = useState(false); // FIX: tracker forældet stream
+  const [streamStale, setStreamStale]               = useState(false);
 
   const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -123,8 +123,7 @@ export default function ClientDetailsLivestreamSection({
 
   // -------------------------------------------------------------------------
   // Poll /health indtil serveren har friske segmenter klar
-  // FIX: Respekterer is_stale fra backend — forhindrer at frontend prøver at
-  //      connecte til en stream der er gået ned men har gamle segmenter på disk
+  // Respekterer is_stale — forhindrer connect til en stream der er gået ned
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !clientOnline) return;
@@ -144,9 +143,6 @@ export default function ClientDetailsLivestreamSection({
           );
           if (resp.ok) {
             const data = await resp.json();
-
-            // FIX: Kun sæt serverReady=true hvis segmenter er friske (ikke forældede)
-            // is_stale=true betyder klienten er gået ned men segmenterne ligger stadig
             if (data.has_segments && !data.is_stale) {
               if (!stop) {
                 setServerReady(true);
@@ -154,8 +150,6 @@ export default function ClientDetailsLivestreamSection({
               }
               return;
             }
-
-            // Vis "forældet" besked hvis segmenter eksisterer men er gamle
             if (!stop) setStreamStale(data.has_segments && data.is_stale);
           }
         } catch {}
@@ -208,11 +202,11 @@ export default function ClientDetailsLivestreamSection({
     } else if (Hls.isSupported()) {
       // --- HLS.js ---
       // Tunet til 8s segmenter:
-      // liveSyncDurationCount:3       → 3 × 8s = 24s sync-mål (undgår buffer stalls)
+      // liveSyncDurationCount:3       → 3 × 8s = 24s sync-mål
       // liveMaxLatencyDurationCount:5 → 5 × 8s = 40s max latency
       const hls = new Hls({
-        liveSyncDurationCount:       3,   // 3 × 8s = 24s buffer
-        liveMaxLatencyDurationCount: 5,   // 5 × 8s = 40s max latency
+        liveSyncDurationCount:       3,
+        liveMaxLatencyDurationCount: 5,
         maxBufferLength:             30,
         maxMaxBufferLength:          60,
         liveBackBufferLength:        12,
@@ -245,13 +239,21 @@ export default function ClientDetailsLivestreamSection({
             video.load();
           } catch {}
           setManifestReady(false);
-          // FIX: Sæt serverReady=false så health-polling starter forfra
-          // i stedet for at gå direkte til HLS.js igen med et potentielt forældet manifest
           setServerReady(false);
           if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
           fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 3000);
         } else {
-          // Non-fatal (inkl. bufferStalledError) — ryd efter 5s
+          // FIX: bufferStalledError er ikke-fatal — HLS.js genstarter selv.
+          // Søg til live-kanten for at hjælpe recovery. Vis IKKE fejl i UI.
+          if (data.details === "bufferStalledError") {
+            try {
+              if (video.duration && isFinite(video.duration)) {
+                video.currentTime = video.duration - 0.5;
+              }
+            } catch {}
+            return;
+          }
+          // Andre ikke-fatale fejl — vis kort i UI
           setError(data.details || "Ukendt HLS-fejl");
           setTimeout(() => setError(""), 5000);
         }
@@ -390,7 +392,6 @@ export default function ClientDetailsLivestreamSection({
   const lagStatus    = getLagStatus(sanitizedLag, lastSegmentLag);
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
 
-  // FIX: Tre tydelige loading-states
   const loadingText = streamStale
     ? "Stream er gået ned — venter på genstart …"
     : !serverReady
@@ -418,10 +419,10 @@ export default function ClientDetailsLivestreamSection({
                   : manifestReady
                     ? "#43a047"
                     : streamStale
-                      ? "#e53935"       // rød: stream er nede
+                      ? "#e53935"
                       : serverReady
-                        ? "#ff9800"     // orange: HLS.js forbinder
-                        : "#9e9e9e",    // grå: venter på segmenter
+                        ? "#ff9800"
+                        : "#9e9e9e",
                 border: "1px solid #ddd",
                 mr: 1,
                 animation: (manifestReady && clientOnline !== false)
