@@ -20,16 +20,26 @@ class SchoolNameUpdate(BaseModel):
     name: str
 
 
-def _require_school_access(user: User, school_id: int):
-    """Superadmin har adgang til alle skoler. Admin kun til sin egen skole."""
+def _require_school_access(user, school_id: int):
+    """Superadmin har adgang til alle skoler. Admin kun til sin egen."""
     if user.is_superadmin:
         return
     if user.is_admin and user.school_id == school_id:
         return
-    raise HTTPException(
-        status_code=403,
-        detail="Du har kun adgang til din egen skoles tider"
-    )
+    raise HTTPException(status_code=403, detail="Du har kun adgang til din egen skoles tider")
+
+
+def _validate_season(season: str) -> str:
+    parts = season.split("/")
+    if len(parts) != 2:
+        raise HTTPException(status_code=400, detail="Ugyldig sæson — brug format '2025/2026'")
+    try:
+        start, end = int(parts[0]), int(parts[1])
+        if end != start + 1:
+            raise HTTPException(status_code=400, detail="Slut-år skal være start-år + 1")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Ugyldig sæson — brug format '2025/2026'")
+    return season
 
 
 @router.get("/schools/", response_model=list[School])
@@ -67,27 +77,18 @@ def delete_school(school_id: int, session=Depends(get_session), admin=Depends(ge
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
     clients = session.exec(select(Client).where(Client.school_id == school_id)).all()
     for client in clients:
-        markings = session.exec(
-            select(CalendarMarking).where(CalendarMarking.client_id == client.id)
-        ).all()
-        for marking in markings:
+        for marking in session.exec(select(CalendarMarking).where(CalendarMarking.client_id == client.id)).all():
             session.delete(marking)
         session.delete(client)
-    school_users = session.exec(select(User).where(User.school_id == school_id)).all()
-    for school_user in school_users:
+    for school_user in session.exec(select(User).where(User.school_id == school_id)).all():
         school_user.school_id = None
         session.add(school_user)
-    # Slet sæsonbaserede tider for skolen
-    season_times_list = session.exec(
-        select(SchoolSeasonTimes).where(SchoolSeasonTimes.school_id == school_id)
-    ).all()
-    for st in season_times_list:
+    for st in session.exec(select(SchoolSeasonTimes).where(SchoolSeasonTimes.school_id == school_id)).all():
         session.delete(st)
     session.delete(school)
     session.commit()
 
 
-# Eksisterende endpoint — bevaret for bagudkompatibilitet
 @router.patch("/schools/{school_id}/times", response_model=School)
 def update_school_times(
     school_id: int,
@@ -95,6 +96,7 @@ def update_school_times(
     session=Depends(get_session),
     admin=Depends(get_current_admin_user)
 ):
+    """Bagudkompatibelt endpoint — opdaterer skolens standardtider (ikke sæsonbaseret)."""
     _require_school_access(admin, school_id)
     school = session.get(School, school_id)
     if not school:
@@ -113,7 +115,6 @@ def update_school_times(
     return school
 
 
-# Eksisterende endpoint — bevaret for bagudkompatibilitet
 @router.get("/schools/{school_id}/times")
 def get_school_times(school_id: int, session=Depends(get_session), user=Depends(get_current_user)):
     school = session.get(School, school_id)
@@ -125,15 +126,15 @@ def get_school_times(school_id: int, session=Depends(get_session), user=Depends(
     }
 
 
-# NY: Hent sæsonbaserede tider for en skole.
-# Falder tilbage til skolens standardtider hvis ingen sæsonspecifik post findes.
-@router.get("/schools/{school_id}/season-times/{season}")
+@router.get("/schools/{school_id}/season-times/{season:path}")
 def get_school_season_times(
     school_id: int,
-    season: int,
+    season: str,
     session=Depends(get_session),
     user=Depends(get_current_user)
 ):
+    """Henter sæsonbaserede tider. Falder tilbage til skolens standardtider."""
+    _validate_season(season)
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
@@ -148,23 +149,22 @@ def get_school_season_times(
             "weekday": {"onTime": season_times.weekday_on, "offTime": season_times.weekday_off},
             "weekend": {"onTime": season_times.weekend_on, "offTime": season_times.weekend_off},
         }
-    # Fallback til skolens standardtider
     return {
         "weekday": {"onTime": school.weekday_on or "09:00", "offTime": school.weekday_off or "22:30"},
         "weekend": {"onTime": school.weekend_on or "08:00", "offTime": school.weekend_off or "18:00"},
     }
 
 
-# NY: Gem sæsonbaserede tider for en skole.
-# Superadmin: alle skoler. Admin: kun egen skole.
-@router.patch("/schools/{school_id}/season-times/{season}")
+@router.patch("/schools/{school_id}/season-times/{season:path}")
 def update_school_season_times(
     school_id: int,
-    season: int,
+    season: str,
     times: SchoolTimesUpdate,
     session=Depends(get_session),
     admin=Depends(get_current_admin_user)
 ):
+    """Gemmer sæsonbaserede tider. Superadmin: alle skoler. Admin: kun egen skole."""
+    _validate_season(season)
     _require_school_access(admin, school_id)
     school = session.get(School, school_id)
     if not school:
@@ -176,10 +176,8 @@ def update_school_season_times(
         )
     ).first()
     if not season_times:
-        # Opret ny post med skolens standardtider som udgangspunkt
         season_times = SchoolSeasonTimes(
-            school_id=school_id,
-            season=season,
+            school_id=school_id, season=season,
             weekday_on=school.weekday_on or "09:00",
             weekday_off=school.weekday_off or "22:30",
             weekend_on=school.weekend_on or "08:00",
