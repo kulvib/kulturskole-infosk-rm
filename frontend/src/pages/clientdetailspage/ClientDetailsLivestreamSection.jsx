@@ -59,9 +59,10 @@ function getLagStatus(lag) {
   return           { text: `Stream er ${Math.round(lag)} sekunder forsinket`,       color: "#e53935" };
 }
 
+// Maks 2 decimaler i debug-panelet
 function formatLagValue(val) {
   if (val == null) return "-";
-  return Number(val).toFixed(1) + "s";
+  return Number(val).toFixed(2) + "s";
 }
 
 function extractSegNum(filename) {
@@ -535,7 +536,7 @@ export default function ClientDetailsLivestreamSection({
                 }}>
                   spillerSeg=<b>{currentSegNum ?? "-"}</b>,{" "}
                   sidsteSeg=<b>{lastSegNum ?? "-"}</b>,{" "}
-                  segSek=<b>{fragDuration}s</b>
+                  segSek=<b>{Number(fragDuration).toFixed(2)}s</b>
                 </Typography>
                 <Typography variant="caption" sx={{
                   color: "#222", fontFamily: '"Courier New", Courier, monospace',
