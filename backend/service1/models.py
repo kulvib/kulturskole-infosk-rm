@@ -32,7 +32,7 @@ class School(SQLModel, table=True):
 class SchoolSeasonTimes(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     school_id: int = Field(foreign_key="school.id", index=True)
-    season: str = Field(index=True)  # "2025/2026" format
+    season: str = Field(index=True)          # fx "2025/2026"
     weekday_on: str = Field(default="09:00")
     weekday_off: str = Field(default="22:30")
     weekend_on: str = Field(default="08:00")
@@ -99,6 +99,10 @@ class ClientCreate(ClientBase):
     kiosk_url: Optional[str] = None
     ubuntu_version: Optional[str] = None
     uptime: Optional[str] = None
+    wifi_ip_address: Optional[str] = None
+    wifi_mac_address: Optional[str] = None
+    lan_ip_address: Optional[str] = None
+    lan_mac_address: Optional[str] = None
     chrome_status: Optional[str] = None
     chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = ChromeAction.NONE
@@ -135,7 +139,7 @@ class ClientUpdate(SQLModel):
 
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    season: str = Field(index=True)  # "2025/2026" format
+    season: str = Field(index=True)          # fx "2025/2026"
     client_id: int = Field(index=True)
     markings: Dict[str, Any] = Field(sa_column=Column(JSON))
 
