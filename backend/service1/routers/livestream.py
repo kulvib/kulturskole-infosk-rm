@@ -21,8 +21,12 @@ os.makedirs(HLS_DIR, exist_ok=True)
 router = APIRouter()
 
 # Antal sekunder før et manifest betragtes som forældet
-# Ved 8s segmenter: 3 segmenter = 24s — giver lidt luft til upload-forsinkelse
+# Ved 6s segmenter: 3 segmenter = 18s — giver lidt luft til upload-forsinkelse
 MANIFEST_STALE_SECONDS = 30
+
+# FIX: 15 segmenter × 6s = 90s vindue
+# Spiller er ~37s bag live → fremad buffer = 90-37 = 53s = ~8 segmenter ✅
+KEEP_N = 15
 
 
 # ---------------------------------------------------------------------------
@@ -31,7 +35,7 @@ MANIFEST_STALE_SECONDS = 30
 class HlsCleanupRequest(BaseModel):
     client_id: str
     keep_files: List[str]
-    segment_duration: int = 8   # FIX: var 6 → 8, matcher ny klient-default (SEGMENT_LENGTH=8)
+    segment_duration: int = 6
 
 
 # ---------------------------------------------------------------------------
@@ -62,8 +66,7 @@ def extract_program_date_time(filename: str):
         return None
 
 
-def _normalize_segment_duration(value, default: int = 8, min_v: int = 1, max_v: int = 60) -> int:
-    # FIX: default ændret fra 6 til 8 så det matcher klient-default
+def _normalize_segment_duration(value, default: int = 6, min_v: int = 1, max_v: int = 60) -> int:
     try:
         n = int(value)
         return max(min_v, min(max_v, n))
@@ -89,12 +92,12 @@ def _write_manifest(manifest_path: str, segments: List[str], media_seq: int, seg
             m3u.write(f"{seg}\n")
 
 
-def update_manifest(client_dir: str, keep_n: int = 10, segment_duration: int = 8) -> None:
+def update_manifest(client_dir: str, keep_n: int = KEEP_N, segment_duration: int = 6) -> None:
     """
     Generer index.m3u8 fra de nyeste segmenter i client_dir.
     Bruges kun ved upload — scanner mappen men tager kun de nyeste keep_n segmenter.
     """
-    segment_duration = _normalize_segment_duration(segment_duration, default=8)
+    segment_duration = _normalize_segment_duration(segment_duration, default=6)
 
     for ext in [".ts", ".mp4"]:
         segs = sorted(
@@ -126,7 +129,7 @@ def update_manifest(client_dir: str, keep_n: int = 10, segment_duration: int = 8
 async def upload_hls_file(
     file: UploadFile = File(...),
     client_id: str = Form(...),
-    segment_duration: int = Form(8),   # FIX: var 6 → 8
+    segment_duration: int = Form(6),
     user=Depends(get_current_user)
 ):
     allowed_exts = [".ts", ".mp4"]
@@ -135,7 +138,7 @@ async def upload_hls_file(
     if not re.match(r"^[a-zA-Z0-9_.-]+$", file.filename):
         raise HTTPException(status_code=400, detail="Ugyldigt filnavn")
 
-    segment_duration = _normalize_segment_duration(segment_duration, default=8)
+    segment_duration = _normalize_segment_duration(segment_duration, default=6)
     client_dir       = safe_client_dir(client_id)
     os.makedirs(client_dir, exist_ok=True)
 
@@ -149,7 +152,7 @@ async def upload_hls_file(
         f.write(content)
 
     print(f"[UPLOAD] Gemt: {file.filename} ({len(content)} bytes), client={client_id}, duration={segment_duration}s")
-    update_manifest(client_dir, keep_n=10, segment_duration=segment_duration)
+    update_manifest(client_dir, keep_n=KEEP_N, segment_duration=segment_duration)
     return {
         "filename":         file.filename,
         "client_id":        client_id,
@@ -164,12 +167,12 @@ async def upload_hls_file(
 @router.post("/hls/cleanup")
 async def cleanup_hls_files(
     payload: HlsCleanupRequest,
-    keep_n: int = 10,
+    keep_n: int = KEEP_N,
     user=Depends(get_current_user)
 ):
     client_id        = payload.client_id
     keep_files       = payload.keep_files
-    segment_duration = _normalize_segment_duration(payload.segment_duration, default=8)
+    segment_duration = _normalize_segment_duration(payload.segment_duration, default=6)
     client_dir       = safe_client_dir(client_id)
 
     if not os.path.exists(client_dir):
@@ -236,7 +239,6 @@ def get_last_segment_info(
     if not os.path.exists(seg_path):
         return {"error": "segment missing", "is_healthy": False}
 
-    # Timestamp fra filnavn — fallback til mtime
     dt = extract_program_date_time(last_segment)
     if dt:
         timestamp_iso = dt.isoformat() + "Z"
@@ -258,10 +260,6 @@ def get_last_segment_info(
 
 # ---------------------------------------------------------------------------
 # Health check
-# FIX: Tilføjet friskhedstjek — returnerer is_stale=True hvis manifest ikke
-#      er opdateret inden for MANIFEST_STALE_SECONDS (30s).
-#      Forhindrer at frontend sidder fast i serverReady=true når klienten er
-#      gået ned men segmenterne stadig ligger på disk.
 # ---------------------------------------------------------------------------
 @router.get("/hls/{client_id}/health")
 def health_check(
@@ -293,12 +291,6 @@ def health_check(
         if has_segments:
             mtime       = os.path.getmtime(manifest_path)
             last_update = datetime.fromtimestamp(mtime, tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-            # FIX: Tjek om manifestet er forældet
-            # Hvis klienten er gået ned ligger de gamle segmenter stadig på disk
-            # og has_segments ville returnere True — det ville sende frontend i en
-            # evig HLS.js fatal-fejl-loop. is_stale=True signalerer at frontend
-            # skal blive ved med at polle i stedet for at starte HLS.js
             age_seconds = time.time() - mtime
             is_stale    = age_seconds > MANIFEST_STALE_SECONDS
 
