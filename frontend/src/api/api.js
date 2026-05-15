@@ -1,7 +1,6 @@
 // api.js
 export const apiUrl = import.meta.env.VITE_API_URL || "https://kulturskole-infosk-rm.onrender.com";
 
-// INTERN HJÆLPER: hent auth-headers (Bearer token fra localStorage — Safari-fix)
 function authHeaders(extra = {}) {
   const token = localStorage.getItem("token");
   return token
@@ -9,14 +8,12 @@ function authHeaders(extra = {}) {
     : { ...extra };
 }
 
-// INTERN HJÆLPER: fælles fejlhåndtering for 401
 function handle401() {
   localStorage.removeItem("user");
   localStorage.removeItem("token");
   window.location.href = "/login";
 }
 
-// INTERN HJÆLPER: læs fejlbesked fra response
 async function extractError(res, fallback) {
   try {
     const data = await res.json();
@@ -26,7 +23,6 @@ async function extractError(res, fallback) {
   }
 }
 
-// LOGIN
 export async function login(username, password) {
   const res = await fetch(`${apiUrl}/auth/token`, {
     method: "POST",
@@ -41,7 +37,6 @@ export async function login(username, password) {
   return await res.json();
 }
 
-// LOGOUT
 export async function logout() {
   await fetch(`${apiUrl}/auth/logout`, {
     method: "POST",
@@ -50,7 +45,6 @@ export async function logout() {
   });
 }
 
-// HENT KLIENTER (admin)
 export async function getClients() {
   const res = await fetch(`${apiUrl}/api/clients/`, {
     headers: authHeaders(),
@@ -61,7 +55,6 @@ export async function getClients() {
   return await res.json();
 }
 
-// HENT KLIENTER (bruger - kun egne godkendte)
 export async function getMyClients() {
   const res = await fetch(`${apiUrl}/api/clients/me`, {
     headers: authHeaders(),
@@ -72,14 +65,12 @@ export async function getMyClients() {
   return await res.json();
 }
 
-// HENT KLIENT-LISTE PUBLIC
 export async function getClientsPublic() {
   const res = await fetch(`${apiUrl}/api/clients/public`);
   if (!res.ok) { throw new Error(await extractError(res, "Kunne ikke hente klienter")); }
   return await res.json();
 }
 
-// HENT ÉN KLIENT
 export async function getClient(id) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/`, {
     headers: authHeaders(),
@@ -90,7 +81,6 @@ export async function getClient(id) {
   return await res.json();
 }
 
-// HENT KIOSK/CHROME STATUS
 export async function getChromeStatus(id, { fallbackToClient = false } = {}) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/chrome-status`, {
     headers: authHeaders({ Accept: "application/json" }),
@@ -126,7 +116,6 @@ export async function getChromeStatus(id, { fallbackToClient = false } = {}) {
   return json;
 }
 
-// OPDATÉR KLIENT
 export async function updateClient(id, updates) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/update`, {
     method: "PUT",
@@ -139,7 +128,6 @@ export async function updateClient(id, updates) {
   return await res.json();
 }
 
-// GODKEND KLIENT
 export async function approveClient(id, school_id) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/approve`, {
     method: "POST",
@@ -152,7 +140,6 @@ export async function approveClient(id, school_id) {
   return await res.json();
 }
 
-// FJERN KLIENT
 export async function removeClient(id) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/remove`, {
     method: "DELETE",
@@ -163,7 +150,6 @@ export async function removeClient(id) {
   if (!res.ok) { throw new Error(await extractError(res, "Kunne ikke fjerne klient")); }
 }
 
-// KIOSK URL
 export async function pushKioskUrl(id, url) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/kiosk_url`, {
     method: "PUT",
@@ -176,7 +162,6 @@ export async function pushKioskUrl(id, url) {
   return await res.json();
 }
 
-// KLIENT ACTIONS
 export async function clientAction(id, action) {
   let url, method, payload;
 
@@ -227,7 +212,6 @@ export async function clientAction(id, action) {
   return await res.json();
 }
 
-// SÆT KLIENTENS STATE
 export async function setClientState(id, state) {
   const res = await fetch(`${apiUrl}/api/clients/${id}/state`, {
     method: "PUT",
@@ -240,7 +224,6 @@ export async function setClientState(id, state) {
   return await res.json();
 }
 
-// ÅBN TERMINAL / REMOTE DESKTOP
 export function openTerminal(id) {
   window.open(`${apiUrl}/api/clients/${id}/terminal`, "_blank", "noopener");
 }
@@ -253,7 +236,6 @@ export function getClientStream(id) {
   return `${apiUrl}/api/clients/${id}/stream`;
 }
 
-// HELLIGDAGE
 export async function getHolidays() {
   const res = await fetch(`${apiUrl}/api/holidays/`, {
     headers: authHeaders(),
@@ -286,7 +268,6 @@ export async function deleteHoliday(id) {
   if (!res.ok) { throw new Error(await extractError(res, "Kunne ikke slette helligdag")); }
 }
 
-// KALENDER
 export async function saveMarkedDays(payload) {
   const res = await fetch(`${apiUrl}/api/calendar/marked-days`, {
     method: "POST",
@@ -299,10 +280,12 @@ export async function saveMarkedDays(payload) {
   return await res.json();
 }
 
+// FIX: startDate og endDate er allerede YYYY-MM-DD strings fra ClientCalendarDialog.
+// Kald IKKE .toISOString() på dem — det kaster TypeError på strings.
 export async function getMarkedDays(season, client_id, startDate, endDate) {
   const params = new URLSearchParams({ season, client_id });
-  if (startDate) params.append("start_date", startDate.toISOString().slice(0, 10));
-  if (endDate) params.append("end_date", endDate.toISOString().slice(0, 10));
+  if (startDate) params.append("start_date", startDate);
+  if (endDate) params.append("end_date", endDate);
   const res = await fetch(`${apiUrl}/api/calendar/marked-days?${params.toString()}`, {
     headers: authHeaders(),
     credentials: "include",
@@ -322,7 +305,6 @@ export async function getCurrentSeason() {
   return await res.json();
 }
 
-// SKOLER
 export async function getSchools() {
   const res = await fetch(`${apiUrl}/api/schools/`, {
     headers: authHeaders(),
@@ -367,7 +349,6 @@ export async function updateSchoolTimes(schoolId, updates) {
   return await res.json();
 }
 
-// BRUGERE (admin)
 export async function getUsers() {
   const res = await fetch(`${apiUrl}/api/users/`, {
     headers: authHeaders(),
@@ -444,7 +425,6 @@ export async function updateSchoolName(id, name) {
   return await res.json();
 }
 
-// LIVESTREAM
 export async function getLivestreamStatus(clientId) {
   const res = await fetch(`${apiUrl}/api/livestream/status/${clientId}`, {
     headers: authHeaders(),
