@@ -57,7 +57,7 @@ function formatDateTimeWithDay(date) {
 
 function getLagStatus(lag) {
   if (lag == null) return { text: "Beregner forsinkelse …", color: "#888" };
-  if (lag < 15)  return { text: "Live",                                             color: "#43a047" };
+  if (lag < 8)   return { text: "Live",                                             color: "#43a047" };
   if (lag < 35)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#43a047" };
   if (lag < 70)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#f90"    };
   return           { text: `Stream er ${Math.round(lag)} sekunder forsinket`,       color: "#e53935" };
@@ -66,6 +66,12 @@ function getLagStatus(lag) {
 function formatLagValue(val) {
   if (val == null) return "-";
   return Number(val).toFixed(1) + "s";
+}
+
+function extractSegNum(filename) {
+  if (!filename) return null;
+  const m = String(filename).match(/segment_(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
 }
 
 export default function ClientDetailsLivestreamSection({
@@ -82,11 +88,12 @@ export default function ClientDetailsLivestreamSection({
   const [manifestReady, setManifestReady]       = useState(false);
   const [error, setError]                       = useState("");
   const [buffering, setBuffering]               = useState(false);
-  const [currentSegment, setCurrentSegment]     = useState("-");
-  const [lastFetched, setLastFetched]           = useState(null);
+  const [currentSegNum, setCurrentSegNum]       = useState(null);  // nummer på segment der afspilles nu
+  const [fragDuration, setFragDuration]         = useState(8);     // segmentlængde i sekunder
+  const [lastSegNum, setLastSegNum]             = useState(null);  // nyeste segment på server
+  const [lastSegmentLag, setLastSegmentLag]     = useState(null);  // uploadalder på nyeste segment
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
-  const [lastSegmentLag, setLastSegmentLag]     = useState(null);
-  const [videoLag, setVideoLag]                 = useState(null);
+  const [lastFetched, setLastFetched]           = useState(null);
   const [showControls, setShowControls]         = useState(false);
   const [localRefreshKey, setLocalRefreshKey]   = useState(0);
   const [refreshing, setRefreshing]             = useState(false);
@@ -100,7 +107,9 @@ export default function ClientDetailsLivestreamSection({
     return (streamKey !== null && streamKey !== undefined) ? streamKey : localRefreshKey;
   }, [streamKey, localRefreshKey]);
 
+  // -------------------------------------------------------------------------
   // Poll /health
+  // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !clientOnline) return;
     setServerReady(false);
@@ -130,12 +139,15 @@ export default function ClientDetailsLivestreamSection({
     return () => { stop = true; };
   }, [clientId, effectiveRefreshKey, clientOnline]);
 
+  // -------------------------------------------------------------------------
   // HLS.js lifecycle
+  // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !clientOnline || !serverReady) return;
     setManifestReady(false);
     setError("");
-    setVideoLag(null);
+    setCurrentSegNum(null);
+    setLastSegNum(null);
 
     const video = videoRef.current;
     if (!video) return;
@@ -149,7 +161,9 @@ export default function ClientDetailsLivestreamSection({
     let playTimeout       = null;
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // -----------------------------------------------------------------------
       // Safari: native HLS
+      // -----------------------------------------------------------------------
       video.src = hlsUrl; video.muted = true; video.autoplay = true; video.playsInline = true;
       const onLoaded = () => {
         setManifestReady(true);
@@ -164,33 +178,46 @@ export default function ClientDetailsLivestreamSection({
       };
 
     } else if (Hls.isSupported()) {
+      // -----------------------------------------------------------------------
       // Chrome + Firefox: HLS.js
-      // xhrSetup FJERNET — eliminerer CORS preflight OPTIONS på segment-requests
+      //
+      // CHROME FIX: korrekt initialiseringsrækkefølge:
+      //   1. attachMedia(video) — binder MSE pipeline til video-elementet
+      //   2. vent på MEDIA_ATTACHED event
+      //   3. loadSource(url) — starter manifest-fetch
+      //
+      // Forkert rækkefølge (loadSource → attachMedia) giver sort skærm i Chrome
+      // fordi MSE-buffere initialiseres inden video-elementet er klar.
+      // -----------------------------------------------------------------------
       const hls = new Hls({
-        liveSyncDurationCount:       7,
-        liveMaxLatencyDurationCount: 10,
-        initialLiveManifestSize:     4,
+        liveSyncDurationCount:       4,   // 4 × 8s = 32s bag live-kant (lavere forsinkelse)
+        liveMaxLatencyDurationCount: 6,   // 6 × 8s = 48s maks bagud
+        initialLiveManifestSize:     3,
         maxBufferLength:             20,
         maxMaxBufferLength:          30,
-        liveBackBufferLength:        6,
+        liveBackBufferLength:        8,
         enableWorker:                true,
         startLevel:                  -1,
         lowLatencyMode:              false,
+        // xhrSetup FJERNET — ingen Authorization-header på segment-requests
+        // → ingen CORS preflight OPTIONS → Firefox og Chrome virker
       });
 
       hlsRef.current = hls;
-      hls.loadSource(hlsUrl);
+
+      // CHROME FIX: attachMedia FØRST
       hls.attachMedia(video);
+
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+        // loadSource KUN efter media er attached
+        hls.loadSource(hlsUrl);
+      });
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setManifestReady(true);
         setError("");
-        // FIX Chrome sort skærm:
-        // video-elementet er inde i en container der skifter fra display:none til flex
-        // når manifestReady=true. React's state-opdatering er asynkron — hvis play()
-        // kaldes inden React re-renderer og viser containeren, afspiller Chrome i et
-        // usynligt element → sort skærm. 150ms delay sikrer React har re-renderet.
-        playTimeout = setTimeout(() => video.play().catch(() => {}), 150);
+        // play() med lille delay så React når at re-rendre
+        playTimeout = setTimeout(() => video.play().catch(() => {}), 100);
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
@@ -211,7 +238,8 @@ export default function ClientDetailsLivestreamSection({
 
       hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
         if (data?.frag && typeof data.frag.sn === "number") {
-          setCurrentSegment(data.frag.sn);
+          setCurrentSegNum(data.frag.sn);
+          if (data.frag.duration > 0) setFragDuration(data.frag.duration);
           setError("");
         }
       });
@@ -230,50 +258,9 @@ export default function ClientDetailsLivestreamSection({
   }, [clientId, effectiveRefreshKey, clientOnline, serverReady]);
 
   // -------------------------------------------------------------------------
-  // FIX forsinkelsesmåling:
-  //
-  // hls.playingDate = Date-objekt for den frame der afspilles nu,
-  // baseret på EXT-X-PROGRAM-DATE-TIME i manifestet (nu skrevet af backend).
-  // Date.now() - hls.playingDate = faktisk wall-clock forsinkelse.
-  //
-  // Safari fallback: video.currentTime mod segment_duration + mtime-estimat
-  // er upålidelig — brug lastSegmentLag + fast offset i stedet.
+  // Backend polling — hvert 2s
+  // Henter nyeste segmentnummer + uploadalder fra serveren.
   // -------------------------------------------------------------------------
-  useEffect(() => {
-    if (!manifestReady || clientOnline === false) return;
-
-    const interval = setInterval(() => {
-      // HLS.js (Chrome + Firefox): brug hls.playingDate
-      const hls = hlsRef.current;
-      if (hls && hls.playingDate instanceof Date) {
-        const lag = (Date.now() - hls.playingDate.getTime()) / 1000;
-        if (isFinite(lag) && lag >= 0 && lag < 600) {
-          setVideoLag(Math.round(lag));
-          return;
-        }
-      }
-
-      // Safari: native HLS — video.seekable.end(0) er live-kanten
-      const video = videoRef.current;
-      if (video && video.seekable && video.seekable.length > 0) {
-        const liveEdge   = video.seekable.end(video.seekable.length - 1);
-        const currentPos = video.currentTime;
-        if (isFinite(liveEdge) && isFinite(currentPos) && liveEdge > 0) {
-          const lag = liveEdge - currentPos;
-          if (lag >= 0 && lag < 600) {
-            setVideoLag(Math.round(lag));
-            return;
-          }
-        }
-      }
-
-      setVideoLag(null);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [manifestReady, effectiveRefreshKey, clientOnline]);
-
-  // Backend lag polling — kun til debug
   useEffect(() => {
     if (!clientId || !manifestReady || clientOnline === false) return;
     let stop = false;
@@ -288,15 +275,23 @@ export default function ClientDetailsLivestreamSection({
           if (resp.ok) {
             const data = await resp.json();
             setLastFetched(new Date());
+
+            // Nyeste segmentnummer på server
+            const num = extractSegNum(data.segment);
+            if (num !== null) setLastSegNum(num);
+
             if (data.timestamp) {
               setLastSegmentTimestamp(data.timestamp);
+              // uploadalder = tid siden server modtog nyeste segment
               setLastSegmentLag((Date.now() - new Date(data.timestamp).getTime()) / 1000);
             } else {
-              setLastSegmentTimestamp(null); setLastSegmentLag(null);
+              setLastSegmentTimestamp(null);
+              setLastSegmentLag(null);
             }
           }
         } catch {
-          setLastSegmentTimestamp(null); setLastSegmentLag(null);
+          setLastSegmentTimestamp(null);
+          setLastSegmentLag(null);
         }
         await new Promise(res => setTimeout(res, 2000));
       }
@@ -306,6 +301,56 @@ export default function ClientDetailsLivestreamSection({
     return () => { stop = true; };
   }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
+  // -------------------------------------------------------------------------
+  // Safari: poll video.seekable for forsinkelse
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    if (!manifestReady || !isSafari() || clientOnline === false) return;
+    const interval = setInterval(() => {
+      const video = videoRef.current;
+      if (video && video.seekable && video.seekable.length > 0) {
+        const liveEdge = video.seekable.end(video.seekable.length - 1);
+        const lag = liveEdge - video.currentTime;
+        if (isFinite(lag) && lag >= 0 && lag < 600) {
+          setLastSegmentLag(lag); // brug som lag-kilde for Safari
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [manifestReady, effectiveRefreshKey, clientOnline]);
+
+  // -------------------------------------------------------------------------
+  // Beregning af faktisk forsinkelse
+  //
+  // FORKLARING:
+  //   lastSegNum    = nyeste segments nummer på server (fx 47)
+  //   currentSegNum = segment der afspilles nu i spilleren (fx 42)
+  //   fragDuration  = varighed pr. segment i sekunder (fra HLS.js, fx 8s)
+  //   lastSegmentLag = uploadalder på nyeste segment (tid siden server modtog det, fx 3s)
+  //
+  //   totalLag = (47 - 42) × 8 + 3 = 43s ✓
+  //
+  // Dette er den eneste metode der giver præcis forsinkelse uanset browser,
+  // clocksync eller EXT-X-PROGRAM-DATE-TIME i manifestet.
+  //
+  // Safari: bruger video.seekable.end - video.currentTime direkte.
+  // -------------------------------------------------------------------------
+  const computedLag = useMemo(() => {
+    if (isSafari()) {
+      // Safari bruger seekable-beregning sat i ovenstående interval
+      return lastSegmentLag != null ? Math.round(lastSegmentLag) : null;
+    }
+    if (lastSegNum != null && currentSegNum != null && lastSegmentLag != null) {
+      const segsBehind = lastSegNum - currentSegNum;
+      const lag = segsBehind * fragDuration + lastSegmentLag;
+      return lag >= 0 ? Math.round(lag) : null;
+    }
+    return null;
+  }, [lastSegNum, currentSegNum, fragDuration, lastSegmentLag]);
+
+  // -------------------------------------------------------------------------
+  // Handlers
+  // -------------------------------------------------------------------------
   const handleRefreshClick = () => {
     if (!clientOnline) return;
     setRefreshing(true); setServerReady(false); setStreamStale(false);
@@ -331,9 +376,7 @@ export default function ClientDetailsLivestreamSection({
   function handleVideoPlaying() { setBuffering(false); }
   function handleVideoCanPlay() { setBuffering(false); }
 
-  // Brug KUN videoLag til statusvisning — ingen fallback til lastSegmentLag
-  const sanitizedLag    = (videoLag != null && videoLag >= 0) ? videoLag : null;
-  const lagStatus       = getLagStatus(manifestReady ? sanitizedLag : null);
+  const lagStatus       = getLagStatus(manifestReady ? computedLag : null);
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
 
   const loadingText = streamStale
@@ -341,6 +384,9 @@ export default function ClientDetailsLivestreamSection({
     : !serverReady ? "Venter på at stream starter …"
     : "Forbinder til stream …";
 
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
   return (
     <Card elevation={2} sx={{ borderRadius: 2, p: isMobile ? 1 : 2, ...disabledOverlay }}>
       <Grid container spacing={isMobile ? 1 : 2} alignItems="flex-start">
@@ -388,10 +434,7 @@ export default function ClientDetailsLivestreamSection({
           </Stack>
         </Grid>
 
-        {/* Video — FIX Chrome sort skærm:
-            Video-elementet er ALTID synligt og renderet.
-            Loading-state vises som et sort overlay OVEN PÅ video.
-            Dermed er video-elementet aldrig i display:none når play() kaldes. */}
+        {/* Video */}
         <Grid item xs={12} md={5} minWidth={0}>
           <Box
             sx={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}
@@ -411,7 +454,9 @@ export default function ClientDetailsLivestreamSection({
               </Box>
             ) : (
               <Box sx={{ position: "relative", width: "100%" }}>
-                {/* Video altid renderet — aldrig display:none */}
+                {/* Video ALTID renderet og synlig — aldrig display:none.
+                    Chrome's MSE pipeline kræver at video-elementet er i DOM
+                    og synligt når afspilning initialiseres. */}
                 <video
                   ref={videoRef}
                   id="livestream-video"
@@ -433,14 +478,18 @@ export default function ClientDetailsLivestreamSection({
                   key={effectiveRefreshKey}
                 />
 
-                {/* Loading overlay — vises oven på video mens stream ikke er klar */}
+                {/* Loading overlay oven på video — erstatter display:none */}
                 {!manifestReady && (
                   <Box sx={{
                     position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     background: "#000", borderRadius: 8, zIndex: 5,
                   }}>
-                    <CircularProgress size={isMobile ? 24 : 32} color={streamStale ? "error" : "inherit"} sx={{ color: "#fff" }} />
+                    <CircularProgress
+                      size={isMobile ? 24 : 32}
+                      color={streamStale ? "error" : "inherit"}
+                      sx={{ color: "#fff" }}
+                    />
                     <Typography variant="body2" sx={{ color: "#fff", ml: 2, fontSize: isMobile ? 13 : undefined }}>
                       {loadingText}
                     </Typography>
@@ -454,14 +503,14 @@ export default function ClientDetailsLivestreamSection({
                     display: "flex", alignItems: "center", justifyContent: "center",
                     zIndex: 10, background: "rgba(0,0,0,0.45)", borderRadius: 8,
                   }}>
-                    <CircularProgress size={isMobile ? 20 : 40} color="inherit" sx={{ color: "#fff" }} />
+                    <CircularProgress size={isMobile ? 20 : 40} sx={{ color: "#fff" }} />
                     <Typography variant="body2" sx={{ color: "#fff", ml: isMobile ? 1 : 2, fontSize: isMobile ? 12 : undefined }}>
                       Buffering …
                     </Typography>
                   </Box>
                 )}
 
-                {/* Fullscreen knap */}
+                {/* Fullscreen */}
                 {manifestReady && (
                   <IconButton
                     onClick={handleFullscreen} aria-label="Fuld skærm"
@@ -521,22 +570,22 @@ export default function ClientDetailsLivestreamSection({
                   color: "#222", fontFamily: '"Courier New", Courier, monospace',
                   display: "block", fontSize: isMobile ? 11 : undefined
                 }}>
-                  <Tooltip title="hls.playingDate / video.seekable — faktisk wall-clock forsinkelse">
-                    <span>videoLag=<b>{formatLagValue(videoLag)}</b></span>
+                  spillerSeg=<b>{currentSegNum ?? "-"}</b>,{" "}
+                  sidsteSeg=<b>{lastSegNum ?? "-"}</b>,{" "}
+                  segSek=<b>{fragDuration}s</b>
+                </Typography>
+                <Typography variant="caption" sx={{
+                  color: "#222", fontFamily: '"Courier New", Courier, monospace',
+                  display: "block", fontSize: isMobile ? 11 : undefined
+                }}>
+                  <Tooltip title="(sidsteSeg - spillerSeg) × segSek + uploadAlder">
+                    <span>totalLag=<b>{formatLagValue(computedLag)}</b></span>
                   </Tooltip>
                   {" · "}
-                  <Tooltip title="Tid siden server modtog seneste segment (kun til debug)">
-                    <span>backendLag=<b>{formatLagValue(lastSegmentLag)}</b></span>
+                  <Tooltip title="Uploadalder på nyeste segment">
+                    <span>uploadAlder=<b>{formatLagValue(lastSegmentLag)}</b></span>
                   </Tooltip>
                 </Typography>
-                {clientOnline !== false && (
-                  <Typography variant="caption" sx={{
-                    color: "#444", fontFamily: '"Courier New", Courier, monospace',
-                    display: "block", mt: 0.5, fontSize: isMobile ? 11 : undefined
-                  }}>
-                    Segment: <b>{currentSegment}</b>
-                  </Typography>
-                )}
               </Box>
             </Stack>
           </Grid>
