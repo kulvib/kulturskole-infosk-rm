@@ -15,7 +15,7 @@ router = APIRouter()
 HLS_BASE_DIR = os.getenv("HLS_BASE_DIR", "/opt/render/project/src/backend/service1/hls")
 CHROME_STATUS_PATH = os.getenv("CHROME_STATUS_PATH", "/home/kulturskolenviborg/api/chrome_status.json")
 
-VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error"}
+VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error", "updating"}
 VALID_PENDING_CHROME_ACTION_SOURCES = {"actionbutton", "calendar"}
 
 
@@ -192,6 +192,53 @@ def get_chrome_command(id: int, session=Depends(get_session), user=Depends(get_c
     }
 
 
+@router.post("/clients/{id}/os-update")
+async def trigger_os_update(
+    id: int,
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user)
+):
+    """
+    Sætter pending_chrome_action = 'os_update' og pending_os_update = True
+    så klienten ved næste poll starter Ubuntu-opdateringsprocessen.
+    Kun tilgængelig for admin/superadmin.
+    """
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if not is_online(client):
+        raise HTTPException(status_code=400, detail="Klienten er offline — kan ikke starte opdatering")
+    if client.state == "updating":
+        raise HTTPException(status_code=400, detail="Klienten er allerede ved at opdatere")
+    client.pending_chrome_action = ChromeAction.OS_UPDATE
+    client.pending_os_update = True
+    client.state = "updating"
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return {
+        "ok": True,
+        "message": f"OS-opdatering bestilt for klient {id}",
+        "pending_chrome_action": client.pending_chrome_action.value,
+        "pending_os_update": client.pending_os_update,
+        "state": client.state,
+    }
+
+
+@router.get("/clients/{id}/ubuntu-updates")
+def get_ubuntu_updates(id: int, session=Depends(get_session), user=Depends(get_current_user)):
+    """Returnerer antal tilgængelige Ubuntu-opdateringer for klienten."""
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return {
+        "client_id": client.id,
+        "ubuntu_updates_available": client.ubuntu_updates_available or 0,
+        "pending_os_update": client.pending_os_update or False,
+        "ubuntu_version": client.ubuntu_version,
+    }
+
+
 @router.post("/clients/", response_model=Client)
 async def create_client(client_in: ClientCreate, session=Depends(get_session), user=Depends(get_current_user)):
     client = Client(
@@ -285,26 +332,6 @@ async def update_kiosk_url(id: int, data: dict = Body(...), session=Depends(get_
     session.commit()
     session.refresh(client)
     return client
-
-
-# NY: Request OS update endpoint — sætter pending_os_update = True
-# Klientscriptet poller dette og kører `apt-get upgrade` når det er True
-@router.post("/clients/{id}/request-os-update")
-async def request_os_update(
-    id: int,
-    session=Depends(get_session),
-    admin=Depends(get_current_admin_user)
-):
-    client = session.get(Client, id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    if not client.isOnline:
-        raise HTTPException(status_code=400, detail="Klienten er offline — kan ikke sende opdateringsanmodning")
-    client.pending_os_update = True
-    session.add(client)
-    session.commit()
-    session.refresh(client)
-    return {"ok": True, "pending_os_update": True, "client_id": id}
 
 
 def get_school_year_dates(season_start: int):
