@@ -18,6 +18,7 @@ class ChromeAction(str, Enum):
     NONE = "none"
     LIVESTREAM_START = "livestream_start"
     LIVESTREAM_STOP = "livestream_stop"
+    OS_UPDATE = "os_update"
 
 
 class School(SQLModel, table=True):
@@ -92,7 +93,6 @@ class Client(ClientBase, table=True):
     livestream_status: Optional[str] = "idle"
     livestream_last_segment: Optional[datetime] = None
     livestream_last_error: Optional[str] = None
-    # NY: Ubuntu opdateringsfelter
     ubuntu_updates_available: Optional[int] = Field(default=0)
     pending_os_update: Optional[bool] = Field(default=False)
 
