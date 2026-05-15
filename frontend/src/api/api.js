@@ -174,7 +174,6 @@ export async function deleteHoliday(id) {
 }
 
 export async function saveMarkedDays(payload) {
-  // payload.season er nu string fx "2025/2026"
   const res = await fetch(`${apiUrl}/api/calendar/marked-days`, {
     method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include", body: JSON.stringify(payload),
@@ -184,7 +183,6 @@ export async function saveMarkedDays(payload) {
   return await res.json();
 }
 
-// season er string fx "2025/2026" — startDate/endDate er YYYY-MM-DD strings
 export async function getMarkedDays(season, client_id, startDate, endDate) {
   const params = new URLSearchParams({ season, client_id });
   if (startDate) params.append("start_date", startDate);
@@ -221,7 +219,6 @@ export async function addSchool(name) {
   return await res.json();
 }
 
-// season er string fx "2025/2026" — bruger season-times endpoint hvis season er angivet
 export async function getSchoolTimes(schoolId, season) {
   const url = season
     ? `${apiUrl}/api/schools/${schoolId}/season-times/${encodeURIComponent(season)}`
@@ -232,7 +229,6 @@ export async function getSchoolTimes(schoolId, season) {
   return await res.json();
 }
 
-// season er string fx "2025/2026"
 export async function updateSchoolTimes(schoolId, season, updates) {
   const res = await fetch(`${apiUrl}/api/schools/${schoolId}/season-times/${encodeURIComponent(season)}`, {
     method: "PATCH", headers: authHeaders({ "Content-Type": "application/json" }),
@@ -240,6 +236,21 @@ export async function updateSchoolTimes(schoolId, season, updates) {
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok) throw new Error(await extractError(res, "Kunne ikke opdatere skoletider"));
+  return await res.json();
+}
+
+// NY: Overskriver alle klienters kalendermarkeringer med sæsonbaserede tider
+export async function applySeasonTimes(schoolId, season) {
+  const res = await fetch(
+    `${apiUrl}/api/schools/${schoolId}/apply-season-times/${encodeURIComponent(season)}`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+      credentials: "include",
+    }
+  );
+  if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
+  if (!res.ok) throw new Error(await extractError(res, "Kunne ikke anvende sæsontider på klienter"));
   return await res.json();
 }
 
