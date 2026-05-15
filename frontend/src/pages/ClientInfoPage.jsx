@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import {
   Box,
   Typography,
@@ -31,14 +31,50 @@ import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { Link } from "react-router-dom";
-import { getClients, getMyClients, approveClient, removeClient, updateClient, getSchools } from "../api";
+import {
+  getClients,
+  getMyClients,
+  approveClient,
+  removeClient,
+  updateClient,
+  getSchools,
+} from "../api";
 import { useAuth } from "../auth/authcontext";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
-// Hjælpefunktion til at formatere dato/tid med sekunder og dansk tid
+/*
+  ClientInfoPage.jsx
+
+  FIX 1: token fjernet som argument til alle api-kald.
+    api.js bruger authHeaders() internt via localStorage —
+    token som parameter blev ignoreret og er forvirrende.
+
+  FIX 2: filteredClients fjernet — var blot en alias for clients
+    uden nogen filtrering. Bruges nu direkte.
+
+  FIX 3: polling stoppes midlertidigt under aktiv drag
+    via isDraggingRef så listen ikke resettes midt i en drag-operation.
+
+  FIX 4: isClientListEqual udvides til også at sammenligne
+    chrome_status, uptime og last_seen så UI opdateres
+    når disse felter ændres på en klient.
+
+  FIX 5: token destruktureres ikke længere fra useAuth()
+    da authcontext ikke eksponerer den.
+
+  FIX 6: renderMobileRow er memoized via memo + useCallback
+    så den ikke genskabes ved hvert render.
+*/
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function formatTimestamp(isoDate) {
   if (!isoDate) return { date: "", time: "" };
-  const dateObj = new Date(isoDate.endsWith("Z") ? isoDate : isoDate + "Z");
+  const dateObj = new Date(
+    isoDate.endsWith("Z") ? isoDate : isoDate + "Z"
+  );
   const formatter = new Intl.DateTimeFormat("da-DK", {
     timeZone: "Europe/Copenhagen",
     year: "numeric",
@@ -47,31 +83,75 @@ function formatTimestamp(isoDate) {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false
+    hour12: false,
   });
   const parts = formatter.formatToParts(dateObj);
-  const day = parts.find(p => p.type === "day")?.value || "";
-  const month = parts.find(p => p.type === "month")?.value || "";
-  const year = parts.find(p => p.type === "year")?.value || "";
-  const hour = parts.find(p => p.type === "hour")?.value || "";
-  const minute = parts.find(p => p.type === "minute")?.value || "";
-  const second = parts.find(p => p.type === "second")?.value || "";
+  const get = (type) => parts.find((p) => p.type === type)?.value || "";
   return {
-    date: `${day}-${month}-${year}`,
-    time: `Kl. ${hour}:${minute}:${second}`
+    date: `${get("day")}-${get("month")}-${get("year")}`,
+    time: `Kl. ${get("hour")}:${get("minute")}:${get("second")}`,
   };
 }
 
-function CopyIconButton({ value, disabled, iconSize = 16 }) {
+// FIX 4: Udvider sammenligning til chrome_status, uptime og last_seen
+function isClientListEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const ca = a[i];
+    const cb = b[i];
+    if (
+      ca.id !== cb.id ||
+      ca.name !== cb.name ||
+      ca.locality !== cb.locality ||
+      ca.status !== cb.status ||
+      ca.sort_order !== cb.sort_order ||
+      ca.isOnline !== cb.isOnline ||
+      ca.school_id !== cb.school_id ||
+      ca.chrome_status !== cb.chrome_status ||
+      ca.uptime !== cb.uptime ||
+      ca.last_seen !== cb.last_seen
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Sub-komponenter
+// ---------------------------------------------------------------------------
+
+// FIX 6: Memoized CopyIconButton
+const CopyIconButton = memo(function CopyIconButton({
+  value,
+  disabled,
+  iconSize = 16,
+}) {
   const [copied, setCopied] = React.useState(false);
+
   const handleCopy = async (e) => {
     e.stopPropagation();
+    if (!value) return;
     try {
-      await navigator.clipboard.writeText(value);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = value;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
-    } catch (err) {}
+    } catch {
+      // ignore
+    }
   };
+
   return (
     <Tooltip title={copied ? "Kopieret!" : "Kopiér"}>
       <span>
@@ -81,33 +161,17 @@ function CopyIconButton({ value, disabled, iconSize = 16 }) {
           sx={{ ml: 0.5, p: 0.2 }}
           disabled={disabled}
         >
-          <ContentCopyIcon sx={{ fontSize: iconSize * 0.96 }} color={copied ? "success" : "inherit"} />
+          <ContentCopyIcon
+            sx={{ fontSize: iconSize * 0.96 }}
+            color={copied ? "success" : "inherit"}
+          />
         </IconButton>
       </span>
     </Tooltip>
   );
-}
+});
 
-function isClientListEqual(a, b) {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    const ca = a[i], cb = b[i];
-    if (
-      ca.id !== cb.id ||
-      ca.name !== cb.name ||
-      ca.locality !== cb.locality ||
-      ca.status !== cb.status ||
-      ca.sort_order !== cb.sort_order ||
-      ca.isOnline !== cb.isOnline ||
-      ca.school_id !== cb.school_id
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function ClientStatusCell({ isOnline }) {
+const ClientStatusCell = memo(function ClientStatusCell({ isOnline }) {
   const theme = useTheme();
   return (
     <Box
@@ -118,7 +182,9 @@ function ClientStatusCell({ isOnline }) {
         width: 48,
         height: 20,
         borderRadius: "12px",
-        bgcolor: isOnline ? theme.palette.success.main : theme.palette.error.main,
+        bgcolor: isOnline
+          ? theme.palette.success.main
+          : theme.palette.error.main,
         color: "#fff",
         fontWeight: 400,
         fontSize: 13,
@@ -128,14 +194,17 @@ function ClientStatusCell({ isOnline }) {
       {isOnline ? "online" : "offline"}
     </Box>
   );
-}
+});
+
+// ---------------------------------------------------------------------------
+// Hoved-komponent
+// ---------------------------------------------------------------------------
 
 export default function ClientInfoPage() {
-  const { token, user } = useAuth();
+  // FIX 5: token fjernet — eksponeres ikke af authcontext
+  const { user } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
-  const isSmall = isMobile || isTablet;
 
   const [clients, setClients] = useState([]);
   const [schools, setSchools] = useState([]);
@@ -143,243 +212,363 @@ export default function ClientInfoPage() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dragClients, setDragClients] = useState([]);
+
   const lastFetchedClients = useRef([]);
+  // FIX 3: stopper polling under aktiv drag
+  const isDraggingRef = useRef(false);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmClientId, setConfirmClientId] = useState(null);
 
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
-  const showSnackbar = (message, severity = "success") => {
+  const showSnackbar = useCallback((message, severity = "success") => {
     setSnackbar({ open: true, message, severity });
-  };
+  }, []);
 
-  const handleCloseSnackbar = () => {
+  const handleCloseSnackbar = useCallback(() => {
     setSnackbar({ open: false, message: "", severity: "success" });
-  };
+  }, []);
 
-  const fetchClients = async (forceUpdate = false, showLoading = false) => {
-    if (showLoading) setLoading(true);
-    try {
-      const data =
-        user?.role === "bruger"
-          ? await getMyClients(token)
-          : await getClients(token);
-      if (forceUpdate || !isClientListEqual(data, lastFetchedClients.current)) {
-        setClients(data);
-        lastFetchedClients.current = data;
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+
+  // ---------------------------------------------------------------------------
+  // Data-hentning
+  // ---------------------------------------------------------------------------
+
+  // FIX 1: token fjernet som argument
+  const fetchClients = useCallback(
+    async (forceUpdate = false, showLoading = false) => {
+      // FIX 3: undgå polling under drag
+      if (isDraggingRef.current) return;
+
+      if (showLoading) setLoading(true);
+      try {
+        const data =
+          user?.role === "bruger"
+            ? await getMyClients()
+            : await getClients();
+
+        if (
+          forceUpdate ||
+          !isClientListEqual(data, lastFetchedClients.current)
+        ) {
+          setClients(data);
+          lastFetchedClients.current = data;
+        }
+      } catch (err) {
+        showSnackbar("Fejl: " + (err?.message || err), "error");
+      } finally {
+        if (showLoading) setLoading(false);
       }
-    } catch (err) {
-      showSnackbar("Fejl: " + err.message, "error");
-    }
-    if (showLoading) setLoading(false);
-  };
+    },
+    [user?.role, showSnackbar]
+  );
 
+  // Initial load + polling hvert 5s
   useEffect(() => {
     fetchClients(false, true);
-    let timer = setInterval(() => {
+    const timer = setInterval(() => {
       fetchClients(false, false);
     }, 5000);
     return () => clearInterval(timer);
-  }, [token, user?.role]);
+  }, [fetchClients]);
 
+  // Hent skoler — FIX 1: token fjernet
   useEffect(() => {
-    getSchools(token).then(setSchools).catch(() => setSchools([]));
-  }, [token]);
+    getSchools()
+      .then(setSchools)
+      .catch(() => setSchools([]));
+  }, []);
 
-  const filteredClients = clients;
-
+  // Opdater dragClients når clients ændres
+  // FIX 3: opdater ikke dragClients under aktiv drag
   useEffect(() => {
-    const approved = (filteredClients?.filter((c) => c.status === "approved") || []).slice();
-    approved.sort((a, b) => {
-      if (
-        a.sort_order !== null &&
-        a.sort_order !== undefined &&
-        b.sort_order !== null &&
-        b.sort_order !== undefined
-      ) {
-        return a.sort_order - b.sort_order;
-      }
-      if (a.sort_order !== null && a.sort_order !== undefined) return -1;
-      if (b.sort_order !== null && b.sort_order !== undefined) return 1;
-      return a.id - b.id;
-    });
+    if (isDraggingRef.current) return;
+
+    const approved = clients
+      .filter((c) => c.status === "approved")
+      .slice()
+      .sort((a, b) => {
+        const aHas =
+          a.sort_order !== null && a.sort_order !== undefined;
+        const bHas =
+          b.sort_order !== null && b.sort_order !== undefined;
+        if (aHas && bHas) return a.sort_order - b.sort_order;
+        if (aHas) return -1;
+        if (bHas) return 1;
+        return a.id - b.id;
+      });
+
     setDragClients(approved);
-  }, [filteredClients]);
+  }, [clients]);
 
-  const unapprovedClients = (filteredClients?.filter((c) => c.status !== "approved") || [])
+  const unapprovedClients = clients
+    .filter((c) => c.status !== "approved")
     .slice()
     .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
-  const openRemoveDialog = (clientId) => {
-    setConfirmClientId(clientId);
-    setConfirmOpen(true);
-  };
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
 
-  const closeRemoveDialog = () => {
-    setConfirmOpen(false);
-    setConfirmClientId(null);
-  };
-
-  const confirmRemoveClient = async () => {
-    if (confirmClientId) {
-      await handleRemoveClient(confirmClientId);
-      closeRemoveDialog();
-    }
-  };
-
-  const handleRemoveClient = async (clientId) => {
-    try {
-      await removeClient(clientId, token);
-      showSnackbar("Klient fjernet!", "success");
-      fetchClients(true, true);
-    } catch (err) {
-      showSnackbar("Kunne ikke fjerne klient: " + err.message, "error");
-    }
-  };
-
-  const onDragEnd = async (result) => {
-    if (!result.destination) return;
-    const reordered = Array.from(dragClients);
-    const [removed] = reordered.splice(result.source.index, 1);
-    reordered.splice(result.destination.index, 0, removed);
-
-    setDragClients(reordered);
-    try {
-      for (let i = 0; i < reordered.length; i++) {
-        await updateClient(reordered[i].id, { sort_order: i + 1 }, token);
-      }
-      showSnackbar("Sortering opdateret!", "success");
-      fetchClients(true, true);
-    } catch (err) {
-      showSnackbar("Kunne ikke opdatere sortering: " + err.message, "error");
-    }
-  };
-
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchClients(true, true);
     setRefreshing(false);
     showSnackbar("Opdateret!", "success");
-  };
+  }, [fetchClients, showSnackbar]);
 
-  const handleSchoolChange = (clientId, schoolId) => {
-    setSchoolSelections({ ...schoolSelections, [clientId]: schoolId });
-  };
+  const openRemoveDialog = useCallback((clientId) => {
+    setConfirmClientId(clientId);
+    setConfirmOpen(true);
+  }, []);
 
-  const handleApproveClient = async (clientId) => {
-    const school_id = schoolSelections[clientId];
-    if (!school_id) {
-      showSnackbar("Vælg en skole først!", "warning");
-      return;
+  const closeRemoveDialog = useCallback(() => {
+    setConfirmOpen(false);
+    setConfirmClientId(null);
+  }, []);
+
+  // FIX 1: token fjernet
+  const handleRemoveClient = useCallback(
+    async (clientId) => {
+      try {
+        await removeClient(clientId);
+        showSnackbar("Klient fjernet!", "success");
+        fetchClients(true, true);
+      } catch (err) {
+        showSnackbar(
+          "Kunne ikke fjerne klient: " + (err?.message || err),
+          "error"
+        );
+      }
+    },
+    [fetchClients, showSnackbar]
+  );
+
+  const confirmRemoveClient = useCallback(async () => {
+    if (confirmClientId) {
+      await handleRemoveClient(confirmClientId);
+      closeRemoveDialog();
     }
-    try {
-      await approveClient(clientId, school_id, token);
-      showSnackbar("Klient godkendt!", "success");
-      fetchClients(true, true);
-    } catch (err) {
-      showSnackbar("Kunne ikke godkende klient: " + err.message, "error");
-    }
-  };
+  }, [confirmClientId, handleRemoveClient, closeRemoveDialog]);
 
-  const getSchoolName = (schoolId) => {
-    const school = schools.find(s => s.id === schoolId);
-    return school ? school.name : <span style={{ color: "#888" }}>Ingen skole</span>;
-  };
+  // FIX 3: sæt isDraggingRef ved drag start/slut
+  const onDragStart = useCallback(() => {
+    isDraggingRef.current = true;
+  }, []);
 
-  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+  // FIX 1: token fjernet
+  const onDragEnd = useCallback(
+    async (result) => {
+      isDraggingRef.current = false;
 
-  // Responsive mobil/tablet render
-  const renderMobileRow = (client, idx, provided, snapshot) => (
-    <TableRow
-      ref={provided?.innerRef}
-      {...(provided ? provided.draggableProps : {})}
-      style={{
-        ...provided?.draggableProps?.style,
-        background: snapshot?.isDragging ? "#e3f2fd" : undefined,
-      }}
-      hover
-    >
-      {isAdmin && <TableCell>{client.id}</TableCell>}
-      <TableCell>
-        <Stack direction="column" spacing={0.5}>
-          <Typography sx={{ fontWeight: 600 }}>{client.name}</Typography>
-          {client.locality && (
-            <Typography sx={{ fontSize: "0.92em", color: "#888" }}>{client.locality}</Typography>
-          )}
-          <Typography sx={{ fontSize: "0.92em" }}>{getSchoolName(client.school_id)}</Typography>
-        </Stack>
-      </TableCell>
-      <TableCell align="center">
-        <ClientStatusCell isOnline={client.isOnline} />
-      </TableCell>
-      <TableCell align="center">
-        <Tooltip title="Info">
-          <IconButton
-            component={Link}
-            to={`/clients/${client.id}`}
-            color="primary"
-            size="small"
-          >
-            <InfoIcon />
-          </IconButton>
-        </Tooltip>
-      </TableCell>
-      {isAdmin && (
+      if (!result.destination) return;
+      if (result.destination.index === result.source.index) return;
+
+      const reordered = Array.from(dragClients);
+      const [removed] = reordered.splice(result.source.index, 1);
+      reordered.splice(result.destination.index, 0, removed);
+
+      // Opdater UI øjeblikkeligt
+      setDragClients(reordered);
+
+      try {
+        await Promise.all(
+          reordered.map((client, i) =>
+            updateClient(client.id, { sort_order: i + 1 })
+          )
+        );
+        showSnackbar("Sortering opdateret!", "success");
+        fetchClients(true, false);
+      } catch (err) {
+        showSnackbar(
+          "Kunne ikke opdatere sortering: " + (err?.message || err),
+          "error"
+        );
+      }
+    },
+    [dragClients, fetchClients, showSnackbar]
+  );
+
+  const handleSchoolChange = useCallback((clientId, schoolId) => {
+    setSchoolSelections((prev) => ({ ...prev, [clientId]: schoolId }));
+  }, []);
+
+  // FIX 1: token fjernet
+  const handleApproveClient = useCallback(
+    async (clientId) => {
+      const school_id = schoolSelections[clientId];
+      if (!school_id) {
+        showSnackbar("Vælg en skole først!", "warning");
+        return;
+      }
+      try {
+        await approveClient(clientId, school_id);
+        showSnackbar("Klient godkendt!", "success");
+        fetchClients(true, true);
+      } catch (err) {
+        showSnackbar(
+          "Kunne ikke godkende klient: " + (err?.message || err),
+          "error"
+        );
+      }
+    },
+    [schoolSelections, fetchClients, showSnackbar]
+  );
+
+  const getSchoolName = useCallback(
+    (schoolId) => {
+      const school = schools.find((s) => s.id === schoolId);
+      return school ? (
+        school.name
+      ) : (
+        <span style={{ color: "#888" }}>Ingen skole</span>
+      );
+    },
+    [schools]
+  );
+
+  // ---------------------------------------------------------------------------
+  // FIX 6: Memoized mobil-række renderer
+  // ---------------------------------------------------------------------------
+  const renderMobileRow = useCallback(
+    (client, idx, provided, snapshot) => (
+      <TableRow
+        ref={provided?.innerRef}
+        {...(provided ? provided.draggableProps : {})}
+        style={{
+          ...provided?.draggableProps?.style,
+          background: snapshot?.isDragging ? "#e3f2fd" : undefined,
+        }}
+        hover
+      >
+        {isAdmin && <TableCell>{client.id}</TableCell>}
+        <TableCell>
+          <Stack direction="column" spacing={0.5}>
+            <Typography sx={{ fontWeight: 600 }}>{client.name}</Typography>
+            {client.locality && (
+              <Typography sx={{ fontSize: "0.92em", color: "#888" }}>
+                {client.locality}
+              </Typography>
+            )}
+            <Typography sx={{ fontSize: "0.92em" }}>
+              {getSchoolName(client.school_id)}
+            </Typography>
+          </Stack>
+        </TableCell>
         <TableCell align="center">
-          <Tooltip title="Fjern klient">
+          <ClientStatusCell isOnline={client.isOnline} />
+        </TableCell>
+        <TableCell align="center">
+          <Tooltip title="Info">
             <IconButton
-              color="error"
-              onClick={() => openRemoveDialog(client.id)}
+              component={Link}
+              to={`/clients/${client.id}`}
+              color="primary"
               size="small"
             >
-              <DeleteIcon />
+              <InfoIcon />
             </IconButton>
           </Tooltip>
         </TableCell>
-      )}
-      <TableCell align="right" {...provided?.dragHandleProps} sx={{ cursor: "grab", width: 45 }}>
-        <span style={{ fontSize: 20 }}>☰</span>
-      </TableCell>
-    </TableRow>
+        {isAdmin && (
+          <TableCell align="center">
+            <Tooltip title="Fjern klient">
+              <IconButton
+                color="error"
+                onClick={() => openRemoveDialog(client.id)}
+                size="small"
+              >
+                <DeleteIcon />
+              </IconButton>
+            </Tooltip>
+          </TableCell>
+        )}
+        <TableCell
+          align="right"
+          {...provided?.dragHandleProps}
+          sx={{ cursor: "grab", width: 45 }}
+        >
+          <span style={{ fontSize: 20 }}>☰</span>
+        </TableCell>
+      </TableRow>
+    ),
+    [isAdmin, getSchoolName, openRemoveDialog]
   );
 
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  const colSpanApproved = isAdmin ? (isMobile ? 6 : 8) : isMobile ? 4 : 6;
+
   return (
-    <Box sx={{
-      maxWidth: 1500,
-      mx: "auto",
-      mt: { xs: 1, sm: 4 },
-      position: "relative",
-      minHeight: "60vh",
-      px: { xs: 0.5, sm: 2 }
-    }}>
+    <Box
+      sx={{
+        maxWidth: 1500,
+        mx: "auto",
+        mt: { xs: 1, sm: 4 },
+        position: "relative",
+        minHeight: "60vh",
+        px: { xs: 0.5, sm: 2 },
+      }}
+    >
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3400}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+        <MuiAlert
+          elevation={6}
+          variant="filled"
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+        >
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
+
+      {/* Bekræftelsesdialog */}
       <Dialog open={confirmOpen} onClose={closeRemoveDialog}>
         <DialogTitle>Er du sikker?</DialogTitle>
         <DialogContent>
-          <Typography>Vil du virkelig fjerne denne klient? Dette kan ikke fortrydes.</Typography>
+          <Typography>
+            Vil du virkelig fjerne denne klient? Dette kan ikke fortrydes.
+          </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeRemoveDialog}>Annullér</Button>
-          <Button onClick={confirmRemoveClient} color="error" variant="contained">Fjern</Button>
+          <Button
+            onClick={confirmRemoveClient}
+            color="error"
+            variant="contained"
+          >
+            Fjern
+          </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Header */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
         alignItems="center"
         justifyContent="space-between"
         sx={{ mb: 2, gap: 1 }}
       >
-        <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.1rem", sm: "1.4rem" } }}>
+        <Typography
+          variant="h5"
+          sx={{
+            fontWeight: 700,
+            fontSize: { xs: "1.1rem", sm: "1.4rem" },
+          }}
+        >
           Godkendte klienter
         </Typography>
         <Tooltip title="Opdater klientdata">
@@ -398,7 +587,7 @@ export default function ClientInfoPage() {
                 minWidth: { xs: "unset", sm: 0 },
                 fontWeight: 500,
                 textTransform: "none",
-                width: { xs: "100%", sm: "auto" }
+                width: { xs: "100%", sm: "auto" },
               }}
             >
               {refreshing ? "Opdaterer..." : "Opdater"}
@@ -406,19 +595,31 @@ export default function ClientInfoPage() {
           </span>
         </Tooltip>
       </Stack>
+
+      {/* Godkendte klienter */}
       <Paper sx={{ mb: 4, px: { xs: 0.5, sm: 0 } }}>
         <TableContainer style={{ position: "relative" }}>
           {loading && (
-            <Box sx={{
-              position: "absolute",
-              left: 0, top: 0, right: 0, bottom: 0,
-              background: "rgba(255,255,255,0.7)",
-              display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10
-            }}>
+            <Box
+              sx={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+                background: "rgba(255,255,255,0.7)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10,
+              }}
+            >
               <CircularProgress />
             </Box>
           )}
-          <DragDropContext onDragEnd={onDragEnd}>
+
+          {/* FIX 3: onDragStart tilføjet */}
+          <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
             <Droppable droppableId="clients-droppable">
               {(provided) => (
                 <Table
@@ -427,23 +628,24 @@ export default function ClientInfoPage() {
                   {...provided.droppableProps}
                   sx={{
                     minWidth: 300,
-                    // Kun desktop (sm+): fontSize 0.875rem, mobil/tablet: 0.98em/1em
                     "& td, & th": {
                       py: { xs: 1, sm: 1.2 },
                       px: { xs: 0.5, sm: 2 },
-                      fontSize: { xs: "0.98em", sm: "0.875rem" }
-                    }
+                      fontSize: { xs: "0.98em", sm: "0.875rem" },
+                    },
                   }}
                 >
                   <TableHead>
-                    <TableRow sx={{
-                      background: "#f6f9fc",
-                      "& th": {
-                        fontWeight: 700,
-                        fontSize: { xs: "1em", sm: "0.875rem" },
-                        whiteSpace: { xs: "nowrap", sm: "normal" }
-                      }
-                    }}>
+                    <TableRow
+                      sx={{
+                        background: "#f6f9fc",
+                        "& th": {
+                          fontWeight: 700,
+                          fontSize: { xs: "1em", sm: "0.875rem" },
+                          whiteSpace: { xs: "nowrap", sm: "normal" },
+                        },
+                      }}
+                    >
                       {isMobile ? (
                         [
                           ...(isAdmin ? ["ID"] : []),
@@ -451,18 +653,34 @@ export default function ClientInfoPage() {
                           "Status",
                           "Info",
                           ...(isAdmin ? ["Fjern"] : []),
-                          "Sort"
-                        ].map((header, idx) => <TableCell key={header + idx}>{header}</TableCell>)
+                          "Sort",
+                        ].map((header, idx) => (
+                          <TableCell key={header + idx}>{header}</TableCell>
+                        ))
                       ) : (
                         <>
                           {isAdmin && <TableCell>Klient ID</TableCell>}
                           <TableCell>Klientnavn</TableCell>
                           <TableCell>Lokalitet</TableCell>
-                          <TableCell sx={{ textAlign: "center" }}>Status</TableCell>
-                          <TableCell sx={{ textAlign: "center" }}>Skole</TableCell>
-                          <TableCell sx={{ textAlign: "center" }}>Info</TableCell>
-                          {isAdmin && <TableCell sx={{ textAlign: "center" }}>Fjern</TableCell>}
-                          <TableCell sx={{ width: 60, textAlign: "right" }}>Sortering</TableCell>
+                          <TableCell sx={{ textAlign: "center" }}>
+                            Status
+                          </TableCell>
+                          <TableCell sx={{ textAlign: "center" }}>
+                            Skole
+                          </TableCell>
+                          <TableCell sx={{ textAlign: "center" }}>
+                            Info
+                          </TableCell>
+                          {isAdmin && (
+                            <TableCell sx={{ textAlign: "center" }}>
+                              Fjern
+                            </TableCell>
+                          )}
+                          <TableCell
+                            sx={{ width: 60, textAlign: "right" }}
+                          >
+                            Sortering
+                          </TableCell>
                         </>
                       )}
                     </TableRow>
@@ -470,29 +688,29 @@ export default function ClientInfoPage() {
                   <TableBody>
                     {dragClients.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? (isMobile ? 6 : 8) : (isMobile ? 4 : 6)} align="center">
+                        <TableCell
+                          colSpan={colSpanApproved}
+                          align="center"
+                        >
                           Ingen godkendte klienter.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      dragClients.map((client, idx) =>
-                        isMobile
-                          ? (
-                            <Draggable
-                              key={client.id}
-                              draggableId={client.id.toString()}
-                              index={idx}
-                            >
-                              {(provided, snapshot) => renderMobileRow(client, idx, provided, snapshot)}
-                            </Draggable>
-                          )
-                          : (
-                            <Draggable
-                              key={client.id}
-                              draggableId={client.id.toString()}
-                              index={idx}
-                            >
-                              {(provided, snapshot) => (
+                      dragClients.map((client, idx) => (
+                        <Draggable
+                          key={client.id}
+                          draggableId={String(client.id)}
+                          index={idx}
+                        >
+                          {(provided, snapshot) =>
+                            isMobile
+                              ? renderMobileRow(
+                                  client,
+                                  idx,
+                                  provided,
+                                  snapshot
+                                )
+                              : (
                                 <TableRow
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
@@ -504,13 +722,21 @@ export default function ClientInfoPage() {
                                   }}
                                   hover
                                 >
-                                  {isAdmin && <TableCell>{client.id}</TableCell>}
+                                  {isAdmin && (
+                                    <TableCell>{client.id}</TableCell>
+                                  )}
                                   <TableCell>{client.name}</TableCell>
                                   <TableCell>
-                                    {client.locality || <span style={{ color: "#888" }}>Ingen lokalitet</span>}
+                                    {client.locality || (
+                                      <span style={{ color: "#888" }}>
+                                        Ingen lokalitet
+                                      </span>
+                                    )}
                                   </TableCell>
                                   <TableCell align="center">
-                                    <ClientStatusCell isOnline={client.isOnline} />
+                                    <ClientStatusCell
+                                      isOnline={client.isOnline}
+                                    />
                                   </TableCell>
                                   <TableCell align="center">
                                     {getSchoolName(client.school_id)}
@@ -531,21 +757,27 @@ export default function ClientInfoPage() {
                                       <Tooltip title="Fjern klient">
                                         <IconButton
                                           color="error"
-                                          onClick={() => openRemoveDialog(client.id)}
+                                          onClick={() =>
+                                            openRemoveDialog(client.id)
+                                          }
                                         >
                                           <DeleteIcon />
                                         </IconButton>
                                       </Tooltip>
                                     </TableCell>
                                   )}
-                                  <TableCell align="right" {...provided.dragHandleProps} sx={{ cursor: "grab", width: 60 }}>
+                                  <TableCell
+                                    align="right"
+                                    {...provided.dragHandleProps}
+                                    sx={{ cursor: "grab", width: 60 }}
+                                  >
                                     <span style={{ fontSize: 20 }}>☰</span>
                                   </TableCell>
                                 </TableRow>
-                              )}
-                            </Draggable>
-                          )
-                      )
+                              )
+                          }
+                        </Draggable>
+                      ))
                     )}
                     {provided.placeholder}
                   </TableBody>
@@ -555,35 +787,56 @@ export default function ClientInfoPage() {
           </DragDropContext>
         </TableContainer>
       </Paper>
+
+      {/* Ikke-godkendte klienter — kun admin */}
       {isAdmin && (
         <>
-          <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, fontSize: { xs: "1.1rem", sm: "1.4rem" } }}>
+          <Typography
+            variant="h5"
+            sx={{
+              mb: 2,
+              fontWeight: 700,
+              fontSize: { xs: "1.1rem", sm: "1.4rem" },
+            }}
+          >
             Ikke godkendte klienter
           </Typography>
           <Paper sx={{ px: { xs: 0.5, sm: 0 } }}>
             <TableContainer>
-              <Table size="small"
+              <Table
+                size="small"
                 sx={{
                   minWidth: 300,
                   "& td, & th": {
                     py: { xs: 1, sm: 1.2 },
                     px: { xs: 0.5, sm: 2 },
-                    fontSize: { xs: "0.98em", sm: "0.875rem" }
-                  }
-                }}>
+                    fontSize: { xs: "0.98em", sm: "0.875rem" },
+                  },
+                }}
+              >
                 <TableHead>
-                  <TableRow sx={{
-                    background: "#f6f9fc",
-                    "& th": { fontWeight: 700, fontSize: { xs: "1em", sm: "0.875rem" }, whiteSpace: { xs: "nowrap", sm: "normal" } }
-                  }}>
+                  <TableRow
+                    sx={{
+                      background: "#f6f9fc",
+                      "& th": {
+                        fontWeight: 700,
+                        fontSize: { xs: "1em", sm: "0.875rem" },
+                        whiteSpace: { xs: "nowrap", sm: "normal" },
+                      },
+                    }}
+                  >
                     <TableCell sx={{ width: "12.5%" }}>Klient ID</TableCell>
                     <TableCell sx={{ width: "12.5%" }}>Klientnavn</TableCell>
                     <TableCell sx={{ width: "12.5%" }}>IP-adresser</TableCell>
                     <TableCell sx={{ width: "12.5%" }}>MAC-adresser</TableCell>
                     <TableCell sx={{ width: "12.5%" }}>Tilføjet</TableCell>
                     <TableCell sx={{ width: "12.5%" }}>Skole</TableCell>
-                    <TableCell sx={{ width: "12.5%", textAlign: "center" }}>Godkend</TableCell>
-                    <TableCell sx={{ width: "12.5%", textAlign: "center" }}>Fjern</TableCell>
+                    <TableCell sx={{ width: "12.5%", textAlign: "center" }}>
+                      Godkend
+                    </TableCell>
+                    <TableCell sx={{ width: "12.5%", textAlign: "center" }}>
+                      Fjern
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -597,34 +850,84 @@ export default function ClientInfoPage() {
                     unapprovedClients.map((client) => (
                       <TableRow key={client.id} hover>
                         <TableCell>{client.id}</TableCell>
-                        <TableCell>{client.name || "Ukendt navn"}</TableCell>
                         <TableCell>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
-                              <b>WiFi:</b>&nbsp;
-                              <span style={{ whiteSpace: "nowrap" }}>{client.wifi_ip_address || "ukendt"}</span>
-                              <CopyIconButton value={client.wifi_ip_address || ""} disabled={!client.wifi_ip_address} iconSize={14.4} />
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
-                              <b>LAN:</b>&nbsp;
-                              <span style={{ whiteSpace: "nowrap" }}>{client.lan_ip_address || "ukendt"}</span>
-                              <CopyIconButton value={client.lan_ip_address || ""} disabled={!client.lan_ip_address} iconSize={14.4} />
-                            </div>
-                          </div>
+                          {client.name || "Ukendt navn"}
                         </TableCell>
                         <TableCell>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
+                          <Stack spacing={0.25}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
                               <b>WiFi:</b>&nbsp;
-                              <span style={{ whiteSpace: "nowrap" }}>{client.wifi_mac_address || "ukendt"}</span>
-                              <CopyIconButton value={client.wifi_mac_address || ""} disabled={!client.wifi_mac_address} iconSize={14.4} />
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>
+                              <span>
+                                {client.wifi_ip_address || "ukendt"}
+                              </span>
+                              <CopyIconButton
+                                value={client.wifi_ip_address || ""}
+                                disabled={!client.wifi_ip_address}
+                                iconSize={14}
+                              />
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
                               <b>LAN:</b>&nbsp;
-                              <span style={{ whiteSpace: "nowrap" }}>{client.lan_mac_address || "ukendt"}</span>
-                              <CopyIconButton value={client.lan_mac_address || ""} disabled={!client.lan_mac_address} iconSize={14.4} />
-                            </div>
-                          </div>
+                              <span>
+                                {client.lan_ip_address || "ukendt"}
+                              </span>
+                              <CopyIconButton
+                                value={client.lan_ip_address || ""}
+                                disabled={!client.lan_ip_address}
+                                iconSize={14}
+                              />
+                            </Box>
+                          </Stack>
+                        </TableCell>
+                        <TableCell>
+                          <Stack spacing={0.25}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              <b>WiFi:</b>&nbsp;
+                              <span>
+                                {client.wifi_mac_address || "ukendt"}
+                              </span>
+                              <CopyIconButton
+                                value={client.wifi_mac_address || ""}
+                                disabled={!client.wifi_mac_address}
+                                iconSize={14}
+                              />
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              <b>LAN:</b>&nbsp;
+                              <span>
+                                {client.lan_mac_address || "ukendt"}
+                              </span>
+                              <CopyIconButton
+                                value={client.lan_mac_address || ""}
+                                disabled={!client.lan_mac_address}
+                                iconSize={14}
+                              />
+                            </Box>
+                          </Stack>
                         </TableCell>
                         <TableCell>
                           {(() => {
@@ -643,12 +946,19 @@ export default function ClientInfoPage() {
                             size="small"
                             value={schoolSelections[client.id] || ""}
                             displayEmpty
-                            onChange={e => handleSchoolChange(client.id, e.target.value)}
-                            sx={{ minWidth: { xs: 70, sm: 120 }, fontSize: { xs: "0.97em", sm: "0.875rem" } }}
+                            onChange={(e) =>
+                              handleSchoolChange(client.id, e.target.value)
+                            }
+                            sx={{
+                              minWidth: { xs: 70, sm: 120 },
+                              fontSize: { xs: "0.97em", sm: "0.875rem" },
+                            }}
                           >
                             <MenuItem value="">Vælg skole</MenuItem>
-                            {schools.map(school => (
-                              <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                            {schools.map((school) => (
+                              <MenuItem key={school.id} value={school.id}>
+                                {school.name}
+                              </MenuItem>
                             ))}
                           </Select>
                         </TableCell>
@@ -659,7 +969,10 @@ export default function ClientInfoPage() {
                             size="small"
                             startIcon={<AddIcon />}
                             onClick={() => handleApproveClient(client.id)}
-                            sx={{ minWidth: 44, fontSize: { xs: "0.97em", sm: "0.875rem" } }}
+                            sx={{
+                              minWidth: 44,
+                              fontSize: { xs: "0.97em", sm: "0.875rem" },
+                            }}
                           >
                             Godkend
                           </Button>
