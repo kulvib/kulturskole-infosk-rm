@@ -310,7 +310,15 @@ export default function ClientDetailsLivestreamSection({
   // -------------------------------------------------------------------------
   const handleRefreshClick = () => {
     if (!clientOnline) return;
-    setRefreshing(true); setServerReady(false); setStreamStale(false);
+    setRefreshing(true);
+    setServerReady(false);
+    setStreamStale(false);
+    // Nulstil lag-state så forsinkelsen ikke viser gamle værdier efter genstart
+    setCurrentSegNum(null);
+    setLastSegNum(null);
+    setLastSegmentLag(null);
+    setLastSegmentTimestamp(null);
+    setLastFetched(null);
     setLocalRefreshKey(k => k + 1);
     setTimeout(() => setRefreshing(false), 800);
   };
