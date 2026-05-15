@@ -206,7 +206,9 @@ async def create_client(client_in: ClientCreate, session=Depends(get_session), u
         pending_chrome_action=getattr(client_in, "pending_chrome_action", ChromeAction.NONE),
         pending_chrome_action_source=getattr(client_in, "pending_chrome_action_source", None),
         school_id=getattr(client_in, "school_id", None), state=getattr(client_in, "state", "normal"),
-        livestream_status="idle", livestream_last_segment=None, livestream_last_error=None
+        livestream_status="idle", livestream_last_segment=None, livestream_last_error=None,
+        ubuntu_updates_available=getattr(client_in, "ubuntu_updates_available", 0),
+        pending_os_update=getattr(client_in, "pending_os_update", False),
     )
     session.add(client)
     session.commit()
@@ -262,6 +264,8 @@ async def update_client(id: int, client_update: ClientUpdate, session=Depends(ge
     if "livestream_status" in fields: client.livestream_status = client_update.livestream_status
     if "livestream_last_segment" in fields: client.livestream_last_segment = client_update.livestream_last_segment
     if "livestream_last_error" in fields: client.livestream_last_error = client_update.livestream_last_error
+    if "ubuntu_updates_available" in fields: client.ubuntu_updates_available = client_update.ubuntu_updates_available
+    if "pending_os_update" in fields: client.pending_os_update = client_update.pending_os_update
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -281,6 +285,26 @@ async def update_kiosk_url(id: int, data: dict = Body(...), session=Depends(get_
     session.commit()
     session.refresh(client)
     return client
+
+
+# NY: Request OS update endpoint — sætter pending_os_update = True
+# Klientscriptet poller dette og kører `apt-get upgrade` når det er True
+@router.post("/clients/{id}/request-os-update")
+async def request_os_update(
+    id: int,
+    session=Depends(get_session),
+    admin=Depends(get_current_admin_user)
+):
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if not client.isOnline:
+        raise HTTPException(status_code=400, detail="Klienten er offline — kan ikke sende opdateringsanmodning")
+    client.pending_os_update = True
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return {"ok": True, "pending_os_update": True, "client_id": id}
 
 
 def get_school_year_dates(season_start: int):
@@ -314,14 +338,11 @@ async def approve_client(id: int, data: dict = Body(None), session=Depends(get_s
     session.commit()
     session.refresh(client)
 
-    # Nuværende sæson som string
     today = date.today()
     season_start = today.year if today.month >= 8 else today.year - 1
     season_str = f"{season_start}/{season_start + 1}"
 
     school = session.get(School, client.school_id) if client.school_id else None
-
-    # Prøv sæsonspecifikke tider, ellers brug skolens standardtider
     season_times = None
     if school:
         season_times = session.exec(
