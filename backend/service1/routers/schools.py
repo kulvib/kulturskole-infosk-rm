@@ -43,7 +43,6 @@ def _validate_season(season: str) -> str:
 
 
 def _get_school_year_dates(season: str):
-    """Returnerer alle datoer i skoleåret som date-objekter."""
     start_year = int(season.split("/")[0])
     dates = []
     for month in range(8, 13):
@@ -64,6 +63,45 @@ def _get_school_year_dates(season: str):
 @router.get("/schools/", response_model=list[School])
 def get_schools(session=Depends(get_session), user=Depends(get_current_user)):
     return session.exec(select(School)).all()
+
+
+@router.get("/schools/season-summary")
+def get_season_summary(session=Depends(get_session), user=Depends(get_current_user)):
+    """
+    Returnerer hvilke sæsoner der har kalenderdata og hvilke skoler per sæson.
+    En sæson/skole kombination tæller som 'har data' hvis der eksisterer
+    mindst én calendarmarking for en klient tilknyttet skolen i den sæson.
+    """
+    # Hent alle calendarmarkings
+    markings = session.exec(select(CalendarMarking)).all()
+    # Hent alle klienter med school_id
+    clients = session.exec(select(Client)).all()
+    client_school_map = {c.id: c.school_id for c in clients if c.school_id}
+    # Hent alle skoler
+    schools = session.exec(select(School)).all()
+    school_map = {s.id: s.name for s in schools}
+
+    # Byg sæson → set af school_ids
+    season_schools: dict[str, set] = {}
+    for marking in markings:
+        season = marking.season
+        school_id = client_school_map.get(marking.client_id)
+        if not season or not school_id:
+            continue
+        if season not in season_schools:
+            season_schools[season] = set()
+        season_schools[season].add(school_id)
+
+    # Byg resultat
+    result = {}
+    for season, school_ids in season_schools.items():
+        result[season] = [
+            {"id": sid, "name": school_map[sid]}
+            for sid in school_ids
+            if sid in school_map
+        ]
+
+    return result
 
 
 @router.post("/schools/", response_model=School)
@@ -225,93 +263,64 @@ def apply_season_times_to_clients(
     session=Depends(get_session),
     admin=Depends(get_current_admin_user)
 ):
-    """
-    Overskriver ALLE dage (både on og off) i calendarmarking for alle klienter
-    tilknyttet skolen i den valgte sæson med de sæsonbaserede tider.
-    Hverdage (ma-fr) bruger weekday_on/off, weekend (lø-sø) bruger weekend_on/off.
-    """
     _validate_season(season)
     _require_school_access(admin, school_id)
-
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
-
-    # Hent sæsonbaserede tider — kræv at de findes
     season_times = session.exec(
         select(SchoolSeasonTimes).where(
             SchoolSeasonTimes.school_id == school_id,
             SchoolSeasonTimes.season == season
         )
     ).first()
-
     if season_times:
         wd_on  = season_times.weekday_on
         wd_off = season_times.weekday_off
         we_on  = season_times.weekend_on
         we_off = season_times.weekend_off
     else:
-        # Fallback til skolens standardtider
         wd_on  = school.weekday_on  or "09:00"
         wd_off = school.weekday_off or "22:30"
         we_on  = school.weekend_on  or "08:00"
         we_off = school.weekend_off or "18:00"
 
-    # Alle datoer i sæsonen
     all_dates = _get_school_year_dates(season)
-
-    # Alle godkendte klienter tilknyttet skolen
     clients = session.exec(
         select(Client).where(
             Client.school_id == school_id,
             Client.status == "approved"
         )
     ).all()
-
     if not clients:
         raise HTTPException(status_code=404, detail="Ingen godkendte klienter fundet for denne skole")
 
     updated_clients = []
     for client in clients:
-        # Byg komplet markings-dict — ALLE dage sættes til "on" med korrekte tider
         new_markings = {}
         for d in all_dates:
-            is_weekend = d.weekday() >= 5  # 5=lørdag, 6=søndag
+            is_weekend = d.weekday() >= 5
             if is_weekend:
-                new_markings[d.isoformat()] = {
-                    "status": "on",
-                    "onTime": we_on,
-                    "offTime": we_off,
-                }
+                new_markings[d.isoformat()] = {"status": "on", "onTime": we_on, "offTime": we_off}
             else:
-                new_markings[d.isoformat()] = {
-                    "status": "on",
-                    "onTime": wd_on,
-                    "offTime": wd_off,
-                }
+                new_markings[d.isoformat()] = {"status": "on", "onTime": wd_on, "offTime": wd_off}
 
-        # Opdatér eller opret CalendarMarking
         existing = session.exec(
             select(CalendarMarking).where(
                 CalendarMarking.season == season,
                 CalendarMarking.client_id == client.id
             )
         ).first()
-
         if existing:
             existing.markings = new_markings
             session.add(existing)
         else:
             session.add(CalendarMarking(
-                season=season,
-                client_id=client.id,
-                markings=new_markings
+                season=season, client_id=client.id, markings=new_markings
             ))
-
         updated_clients.append(client.id)
 
     session.commit()
-
     return {
         "ok": True,
         "school_id": school_id,
