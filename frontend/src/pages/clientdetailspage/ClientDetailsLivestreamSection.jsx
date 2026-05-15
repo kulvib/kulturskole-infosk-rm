@@ -17,16 +17,16 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import { useTheme, alpha } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
-
 import { apiUrl } from "../../api";
 
-// Helper: hent auth-headers (Bearer token — Safari-fix)
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 function getAuthHeaders() {
   const token = localStorage.getItem("token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-// Helper: Retry utility
 async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -36,9 +36,7 @@ async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
         headers: { ...getAuthHeaders(), ...(options.headers || {}) },
         signal: AbortSignal.timeout(5000)
       });
-      if (resp.ok || attempt === maxAttempts) {
-        return resp;
-      }
+      if (resp.ok || attempt === maxAttempts) return resp;
       lastError = new Error(`HTTP ${resp.status}`);
     } catch (err) {
       lastError = err;
@@ -77,7 +75,7 @@ function getLagStatus(playerLag, lastSegmentLag) {
     lag = playerLag !== null ? playerLag : lastSegmentLag;
   }
   if (lag == null) return { text: "", color: "#888" };
-  if (lag < 2) return { text: "Live", color: "#43a047" };
+  if (lag < 2)  return { text: "Live", color: "#43a047" };
   if (lag < 10) return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#43a047" };
   if (lag < 30) return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#f90" };
   return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#e53935" };
@@ -88,6 +86,9 @@ function formatLagValue(val) {
   return Number(val).toFixed(3).replace(/(\.\d*?[1-9])0+$|\.0*$/, "$1");
 }
 
+// ---------------------------------------------------------------------------
+// Komponent
+// ---------------------------------------------------------------------------
 export default function ClientDetailsLivestreamSection({
   clientId,
   refreshing: parentRefreshing = false,
@@ -96,119 +97,145 @@ export default function ClientDetailsLivestreamSection({
   clientOnline = true
 }) {
   const videoRef = useRef(null);
-  const hlsRef = useRef(null);
-  const [manifestReady, setManifestReady] = useState(false);
-  const [error, setError] = useState("");
-  const [buffering, setBuffering] = useState(false);
-  const [currentSegment, setCurrentSegment] = useState("-");
-  const [lastFetched, setLastFetched] = useState(null);
-  const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
-  const [lastSegmentLag, setLastSegmentLag] = useState(null);
-  const [playerLag, setPlayerLag] = useState(null);
+  const hlsRef  = useRef(null);
 
-  const theme = useTheme();
+  const [manifestReady, setManifestReady]           = useState(false);
+  const [error, setError]                           = useState("");
+  const [buffering, setBuffering]                   = useState(false);
+  const [currentSegment, setCurrentSegment]         = useState("-");
+  const [lastFetched, setLastFetched]               = useState(null);
+  const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
+  const [lastSegmentLag, setLastSegmentLag]         = useState(null);
+  const [playerLag, setPlayerLag]                   = useState(null);
+  const [showControls, setShowControls]             = useState(false);
+  const [localRefreshKey, setLocalRefreshKey]       = useState(0);
+  const [refreshing, setRefreshing]                 = useState(false);
+
+  const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
-  const [showControls, setShowControls] = useState(false);
-  const [localRefreshKey, setLocalRefreshKey] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
 
   const effectiveRefreshKey = useMemo(() => {
-    return (typeof streamKey !== "undefined" && streamKey !== null) ? streamKey : localRefreshKey;
+    return (streamKey !== null && streamKey !== undefined) ? streamKey : localRefreshKey;
   }, [streamKey, localRefreshKey]);
 
+  // -------------------------------------------------------------------------
   // HLS.js lifecycle
+  // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !clientOnline) return;
     setManifestReady(false);
     setError("");
+
     const video = videoRef.current;
     if (!video) return;
 
-    const token = localStorage.getItem("token");
+    const token  = localStorage.getItem("token");
     const hlsUrl = token
       ? `${apiUrl}/hls/${clientId}/index.m3u8?token=${encodeURIComponent(token)}`
       : `${apiUrl}/hls/${clientId}/index.m3u8`;
 
-    let hls;
     let fatalErrorTimeout = null;
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Safari / native HLS
-      video.src = hlsUrl;
-      video.muted = true;
-      video.autoplay = true;
+      // --- Safari: native HLS ---
+      // FIX: Vent på loadedmetadata inden manifestReady sættes til true
+      video.src        = hlsUrl;
+      video.muted      = true;
+      video.autoplay   = true;
       video.playsInline = true;
-      setManifestReady(true);
+
+      const onLoaded = () => setManifestReady(true);
+      video.addEventListener("loadedmetadata", onLoaded, { once: true });
+
+      return () => {
+        video.removeEventListener("loadedmetadata", onLoaded);
+        try {
+          video.pause();
+          video.removeAttribute("src");
+          video.load();
+        } catch {}
+        setManifestReady(false);
+      };
+
     } else if (Hls.isSupported()) {
-      hls = new Hls({
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 6,
-        maxBufferLength: 20,
-        maxMaxBufferLength: 40,
-        liveBackBufferLength: 8,
-        enableWorker: true,
-        startLevel: -1,
-        lowLatencyMode: false,
-        xhrSetup: function (xhr) {
-          // Sæt Authorization header på alle HLS segment-requests
-          if (token) {
-            xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-          }
+      // --- HLS.js ---
+      // FIX: Tunet til 6-sekunders segmenter — reducerer unødvendig forsinkelse
+      const hls = new Hls({
+        liveSyncDurationCount:        2,   // 2 × 6s = 12s sync-mål
+        liveMaxLatencyDurationCount:  4,   // 4 × 6s = 24s max latency
+        maxBufferLength:              20,
+        maxMaxBufferLength:           40,
+        liveBackBufferLength:         8,
+        enableWorker:                 true,
+        startLevel:                   -1,
+        lowLatencyMode:               false,
+        xhrSetup(xhr) {
+          if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
         },
       });
+
       hlsRef.current = hls;
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => setManifestReady(true));
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setManifestReady(true);
+        setError(""); // Ryd evt. gammel fejl
+      });
+
       hls.on(Hls.Events.ERROR, (event, data) => {
         console.warn("[HLS Error]", data);
         if (data.fatal) {
           setError("Fatal streamfejl. Prøver automatisk at genstarte om lidt …");
           hls.destroy();
           hlsRef.current = null;
-          if (videoRef.current) {
-            try {
-              videoRef.current.pause();
-              videoRef.current.removeAttribute("src");
-              videoRef.current.load();
-            } catch {}
-          }
+          try {
+            video.pause();
+            video.removeAttribute("src");
+            video.load();
+          } catch {}
           setManifestReady(false);
-          fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 1000);
+          // FIX: Øget delay til 3s så backend kan nå at producere nyt segment
+          fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 3000);
         } else {
+          // FIX: Non-fatal fejl ryddes automatisk efter 5 sekunder
           setError(data.details || "Ukendt HLS-fejl");
+          setTimeout(() => setError(""), 5000);
         }
       });
-      hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
-        if (data && data.frag && typeof data.frag.sn === "number") {
-          setCurrentSegment(data.frag.sn);
-        }
-      });
-      video.muted = true;
-      video.autoplay = true;
-      video.playsInline = true;
-    }
 
-    return () => {
-      if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-      if (videoRef.current) {
+      hls.on(Hls.Events.FRAG_CHANGED, (event, data) => {
+        if (data?.frag && typeof data.frag.sn === "number") {
+          setCurrentSegment(data.frag.sn);
+          setError(""); // Stream virker — ryd evt. fejl
+        }
+      });
+
+      video.muted       = true;
+      video.autoplay    = true;
+      video.playsInline = true;
+
+      return () => {
+        if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+          hlsRef.current = null;
+        }
         try {
-          videoRef.current.pause();
-          videoRef.current.removeAttribute("src");
-          videoRef.current.load();
+          video.pause();
+          video.removeAttribute("src");
+          video.load();
         } catch {}
-      }
-      setManifestReady(false);
-    };
+        setManifestReady(false);
+      };
+    }
     // eslint-disable-next-line
   }, [clientId, effectiveRefreshKey, clientOnline]);
 
-  // Manual refresh
+  // -------------------------------------------------------------------------
+  // Manuel refresh
+  // -------------------------------------------------------------------------
   const handleRefreshClick = () => {
     if (!clientOnline) return;
     setRefreshing(true);
@@ -216,31 +243,41 @@ export default function ClientDetailsLivestreamSection({
     setTimeout(() => setRefreshing(false), 800);
   };
 
+  // -------------------------------------------------------------------------
   // Fullscreen
+  // -------------------------------------------------------------------------
   const handleFullscreen = () => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.requestFullscreen) video.requestFullscreen();
+    if      (video.requestFullscreen)       video.requestFullscreen();
     else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
-    else if (video.msRequestFullscreen) video.msRequestFullscreen();
+    else if (video.msRequestFullscreen)     video.msRequestFullscreen();
   };
 
+  // -------------------------------------------------------------------------
+  // Controls auto-hide
+  // -------------------------------------------------------------------------
   useEffect(() => {
     if (!showControls) return;
-    const timeout = setTimeout(() => setShowControls(false), 2200);
-    return () => clearTimeout(timeout);
+    const t = setTimeout(() => setShowControls(false), 2200);
+    return () => clearTimeout(t);
   }, [showControls]);
 
-  const handleMouseMove = () => setShowControls(true);
-  function handleVideoWaiting() { setBuffering(true); }
-  function handleVideoPlaying() { setBuffering(false); }
-  function handleVideoCanPlay() { setBuffering(false); }
+  // -------------------------------------------------------------------------
+  // Video events
+  // -------------------------------------------------------------------------
+  const handleMouseMove    = () => setShowControls(true);
+  function handleVideoWaiting()  { setBuffering(true);  }
+  function handleVideoPlaying()  { setBuffering(false); }
+  function handleVideoCanPlay()  { setBuffering(false); }
 
-  // LAG/BACKEND POLLING
+  // -------------------------------------------------------------------------
+  // Backend lag polling (hvert 2s — var 1s, unødvendigt aggressivt)
+  // -------------------------------------------------------------------------
   useEffect(() => {
-    if (!clientId || !manifestReady) return;
-    if (clientOnline === false) return;
+    if (!clientId || !manifestReady || clientOnline === false) return;
     let stop = false;
+
     async function pollLastSegment() {
       while (!stop) {
         try {
@@ -260,23 +297,25 @@ export default function ClientDetailsLivestreamSection({
               setLastSegmentLag(null);
             }
           }
-        } catch (e) {
+        } catch {
           setLastSegmentTimestamp(null);
           setLastSegmentLag(null);
         }
-        await new Promise(res => setTimeout(res, 1000));
+        // FIX: Reduceret fra 1s til 2s — lag-måling behøver ikke 1Hz opdatering
+        await new Promise(res => setTimeout(res, 2000));
       }
     }
+
     pollLastSegment();
     return () => { stop = true; };
   }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
-  // Player-reported lag
+  // -------------------------------------------------------------------------
+  // Player-reported lag (HLS.js latency)
+  // -------------------------------------------------------------------------
   useEffect(() => {
-    if (!manifestReady) return;
-    if (clientOnline === false) return;
-    let interval;
-    interval = setInterval(() => {
+    if (!manifestReady || clientOnline === false) return;
+    const interval = setInterval(() => {
       const hls = hlsRef.current;
       if (hls && typeof hls.latency === "number") {
         setPlayerLag(hls.latency);
@@ -289,31 +328,40 @@ export default function ClientDetailsLivestreamSection({
     return () => clearInterval(interval);
   }, [manifestReady, effectiveRefreshKey, clientOnline]);
 
-  let lagToShow = playerLag ?? lastSegmentLag;
-  let lagType = playerLag != null ? "player" : "backend";
-  let sanitizedLag = lagToShow;
-  if (sanitizedLag != null && sanitizedLag < 0) sanitizedLag = 0;
-  const lagStatus = getLagStatus(sanitizedLag, lastSegmentLag);
+  // -------------------------------------------------------------------------
+  // Afledte værdier
+  // -------------------------------------------------------------------------
+  const lagToShow     = playerLag ?? lastSegmentLag;
+  const lagType       = playerLag != null ? "player" : "backend";
+  const sanitizedLag  = lagToShow != null && lagToShow < 0 ? 0 : lagToShow;
+  const lagStatus     = getLagStatus(sanitizedLag, lastSegmentLag);
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
 
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
   return (
     <Card elevation={2} sx={{ borderRadius: 2, p: isMobile ? 1 : 2, ...disabledOverlay }}>
       <Grid container spacing={isMobile ? 1 : 2} alignItems="flex-start">
+
+        {/* --- Status kolonne --- */}
         <Grid item xs={12} md={3} minWidth={0}>
           <Stack spacing={1}>
             <Box sx={{ display: "flex", alignItems: "center" }}>
               <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>Stream</Typography>
-              <Box
-                sx={{
-                  width: isMobile ? 8 : 10,
-                  height: isMobile ? 8 : 10,
-                  borderRadius: "50%",
-                  bgcolor: clientOnline === false ? "#9e9e9e" : (manifestReady ? "#43a047" : "#e53935"),
-                  border: "1px solid #ddd",
-                  mr: 1,
-                  animation: (manifestReady && clientOnline !== false) ? "pulsate 2s infinite" : "none"
-                }}
-              />
+              <Box sx={{
+                width: isMobile ? 8 : 10,
+                height: isMobile ? 8 : 10,
+                borderRadius: "50%",
+                bgcolor: clientOnline === false
+                  ? "#9e9e9e"
+                  : (manifestReady ? "#43a047" : "#e53935"),
+                border: "1px solid #ddd",
+                mr: 1,
+                animation: (manifestReady && clientOnline !== false)
+                  ? "pulsate 2s infinite"
+                  : "none"
+              }} />
               <Tooltip title={clientOnline === false ? "Klienten er offline" : "Genindlæs stream"}>
                 <span>
                   <IconButton
@@ -329,9 +377,13 @@ export default function ClientDetailsLivestreamSection({
                 </span>
               </Tooltip>
             </Box>
+
             <Typography variant="body2" sx={{ color: lagStatus.color, fontSize: isMobile ? 13 : undefined }}>
-              {clientOnline === false ? "Klienten er offline — stream ikke tilgængelig" : (lagStatus.text || "Ingen status")}
+              {clientOnline === false
+                ? "Klienten er offline — stream ikke tilgængelig"
+                : (lagStatus.text || "Ingen status")}
             </Typography>
+
             <Box>
               {error && clientOnline !== false && (
                 <Alert severity="error" sx={{ mb: 1, fontSize: isMobile ? 12 : undefined }}>
@@ -342,29 +394,23 @@ export default function ClientDetailsLivestreamSection({
           </Stack>
         </Grid>
 
+        {/* --- Video kolonne --- */}
         <Grid item xs={12} md={5} minWidth={0}>
           <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              position: "relative"
-            }}
+            sx={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}
             onMouseMove={handleMouseMove}
             onMouseLeave={() => setShowControls(false)}
             tabIndex={0}
             onFocus={() => setShowControls(true)}
             onBlur={() => setShowControls(false)}
           >
-            <Box
-              sx={{
-                position: "relative",
-                width: "100%",
-                display: (manifestReady && clientOnline !== false) ? "flex" : "none",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-            >
+            <Box sx={{
+              position: "relative",
+              width: "100%",
+              display: (manifestReady && clientOnline !== false) ? "flex" : "none",
+              alignItems: "center",
+              justifyContent: "center"
+            }}>
               <video
                 ref={videoRef}
                 id="livestream-video"
@@ -388,14 +434,14 @@ export default function ClientDetailsLivestreamSection({
                 tabIndex={-1}
                 key={effectiveRefreshKey}
               />
+
               {manifestReady && clientOnline !== false && (
                 <IconButton
                   onClick={handleFullscreen}
                   aria-label="Fuld skærm"
                   sx={{
                     position: "absolute",
-                    bottom: 12,
-                    right: 12,
+                    bottom: 12, right: 12,
                     bgcolor: alpha("#222", 0.6),
                     color: "#fff",
                     borderRadius: "50%",
@@ -412,20 +458,19 @@ export default function ClientDetailsLivestreamSection({
                   <FullscreenIcon sx={{ fontSize: isMobile ? 26 : 32 }} />
                 </IconButton>
               )}
+
               {buffering && (
-                <Box
-                  sx={{
-                    position: "absolute",
-                    top: 0, left: 0,
-                    width: "100%", height: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 10,
-                    background: "rgba(0,0,0,0.18)",
-                    borderRadius: 8,
-                  }}
-                >
+                <Box sx={{
+                  position: "absolute",
+                  top: 0, left: 0,
+                  width: "100%", height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 10,
+                  background: "rgba(0,0,0,0.18)",
+                  borderRadius: 8,
+                }}>
                   <CircularProgress size={isMobile ? 20 : 40} color="inherit" />
                   <Typography variant="body2" sx={{ color: "#fff", ml: isMobile ? 1 : 2, fontSize: isMobile ? 12 : undefined }}>
                     Buffering …
@@ -434,7 +479,7 @@ export default function ClientDetailsLivestreamSection({
               )}
             </Box>
 
-            {!manifestReady || clientOnline === false ? (
+            {(!manifestReady || clientOnline === false) && (
               <Box sx={{
                 display: "flex",
                 alignItems: "center",
@@ -457,10 +502,11 @@ export default function ClientDetailsLivestreamSection({
                   </>
                 )}
               </Box>
-            ) : null}
+            )}
           </Box>
         </Grid>
 
+        {/* --- Debug kolonne (kun admin/superadmin) --- */}
         {(user?.role === "admin" || user?.role === "superadmin") && (
           <Grid item xs={12} md={4} minWidth={0}>
             <Stack spacing={1}>
@@ -479,10 +525,23 @@ export default function ClientDetailsLivestreamSection({
               )}
               <Divider sx={{ my: isMobile ? 0.5 : 1 }} />
               <Box sx={{ background: "#f7f7f7", borderRadius: 1, p: 1, mt: 1, mb: 1, display: "inline-block" }}>
-                <Typography variant="caption" sx={{ color: "#111", fontFamily: '"Courier New", Courier, monospace', fontWeight: 700, letterSpacing: 0.2, display: "block", mb: 0.5, fontSize: isMobile ? 11 : undefined }}>
+                <Typography variant="caption" sx={{
+                  color: "#111",
+                  fontFamily: '"Courier New", Courier, monospace',
+                  fontWeight: 700,
+                  letterSpacing: 0.2,
+                  display: "block",
+                  mb: 0.5,
+                  fontSize: isMobile ? 11 : undefined
+                }}>
                   Debug info:
                 </Typography>
-                <Typography variant="caption" sx={{ color: "#222", fontFamily: '"Courier New", Courier, monospace', display: "block", fontSize: isMobile ? 11 : undefined }}>
+                <Typography variant="caption" sx={{
+                  color: "#222",
+                  fontFamily: '"Courier New", Courier, monospace',
+                  display: "block",
+                  fontSize: isMobile ? 11 : undefined
+                }}>
                   <Tooltip title={`Råværdi: ${playerLag ?? "-"}`}>
                     <span>playerLag=<b>{formatLagValue(playerLag)}</b></span>
                   </Tooltip>
@@ -493,14 +552,25 @@ export default function ClientDetailsLivestreamSection({
                   , lagType=<b>{lagType}</b>
                 </Typography>
                 {!isSafari() && clientOnline !== false && (
-                  <Typography variant="caption" sx={{ color: "#444", fontFamily: '"Courier New", Courier, monospace', textAlign: "left", mt: 1, fontSize: isMobile ? 11 : undefined }}>
+                  <Typography variant="caption" sx={{
+                    color: "#444",
+                    fontFamily: '"Courier New", Courier, monospace',
+                    textAlign: "left",
+                    mt: 1,
+                    fontSize: isMobile ? 11 : undefined
+                  }}>
                     Segment: <b>{currentSegment}</b>
                   </Typography>
                 )}
                 {isSafari() && clientOnline !== false && (
                   <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
                     <span role="img" aria-label="advarsel" style={{ fontSize: "1.2em", marginRight: 4 }}>⚠️</span>
-                    <Typography variant="caption" sx={{ color: "#b25c00", fontFamily: '"Courier New", Courier, monospace', fontWeight: 700, fontSize: isMobile ? 11 : undefined }}>
+                    <Typography variant="caption" sx={{
+                      color: "#b25c00",
+                      fontFamily: '"Courier New", Courier, monospace',
+                      fontWeight: 700,
+                      fontSize: isMobile ? 11 : undefined
+                    }}>
                       Safari: Segmentnummer vises ikke. Forsinkelse er kun estimeret ud fra serverens sidste segment.
                     </Typography>
                   </Box>
@@ -511,15 +581,13 @@ export default function ClientDetailsLivestreamSection({
         )}
       </Grid>
 
-      <style>
-        {`
-          @keyframes pulsate {
-            0% { transform: scale(1); opacity: 1; background: #43a047; }
-            50% { transform: scale(1.25); opacity: 0.5; background: #43a047; }
-            100% { transform: scale(1); opacity: 1; background: #43a047; }
-          }
-        `}
-      </style>
+      <style>{`
+        @keyframes pulsate {
+          0%   { transform: scale(1);    opacity: 1;   background: #43a047; }
+          50%  { transform: scale(1.25); opacity: 0.5; background: #43a047; }
+          100% { transform: scale(1);    opacity: 1;   background: #43a047; }
+        }
+      `}</style>
     </Card>
   );
 }
