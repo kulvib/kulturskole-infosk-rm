@@ -99,7 +99,7 @@ export default function ClientDetailsLivestreamSection({
   const videoRef = useRef(null);
   const hlsRef   = useRef(null);
 
-  const [serverReady, setServerReady]               = useState(false); // FIX: venter på at server har segmenter
+  const [serverReady, setServerReady]               = useState(false);
   const [manifestReady, setManifestReady]           = useState(false);
   const [error, setError]                           = useState("");
   const [buffering, setBuffering]                   = useState(false);
@@ -121,9 +121,7 @@ export default function ClientDetailsLivestreamSection({
   }, [streamKey, localRefreshKey]);
 
   // -------------------------------------------------------------------------
-  // FIX: Poll /health indtil serveren har segmenter klar
-  // Forhindrer 404 på manifest fordi HLS.js prøver at loade
-  // inden første segment er uploadet efter /reset ved startup
+  // Poll /health indtil serveren har segmenter klar
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !clientOnline) return;
@@ -195,13 +193,15 @@ export default function ClientDetailsLivestreamSection({
       };
 
     } else if (Hls.isSupported()) {
-      // --- HLS.js: tunet til 6s segmenter ---
+      // --- HLS.js ---
+      // FIX: liveSyncDurationCount øget fra 2 til 3 for at undgå bufferStalledError
+      // 3 × 6s = 18s buffer giver spilleren nok plads mellem segmenter
       const hls = new Hls({
-        liveSyncDurationCount:       2,   // 2 × 6s = 12s sync-mål
-        liveMaxLatencyDurationCount: 4,   // 4 × 6s = 24s max latency
-        maxBufferLength:             20,
-        maxMaxBufferLength:          40,
-        liveBackBufferLength:        8,
+        liveSyncDurationCount:       3,   // var 2 → 3 × 6s = 18s buffer (eliminerer buffer stalls)
+        liveMaxLatencyDurationCount: 5,   // var 4 → 5 × 6s = 30s max latency
+        maxBufferLength:             30,  // var 20 → mere buffer
+        maxMaxBufferLength:          60,  // var 40
+        liveBackBufferLength:        12,  // var 8
         enableWorker:                true,
         startLevel:                  -1,
         lowLatencyMode:              false,
@@ -231,11 +231,11 @@ export default function ClientDetailsLivestreamSection({
             video.load();
           } catch {}
           setManifestReady(false);
-          // Sæt serverReady til false så health-polling starter forfra
           setServerReady(false);
           if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
           fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 3000);
         } else {
+          // Non-fatal (inkl. bufferStalledError) — log kun, ryd efter 5s
           setError(data.details || "Ukendt HLS-fejl");
           setTimeout(() => setError(""), 5000);
         }
@@ -373,7 +373,6 @@ export default function ClientDetailsLivestreamSection({
   const lagStatus    = getLagStatus(sanitizedLag, lastSegmentLag);
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
 
-  // Loading-tekst afhænger af hvor i processen vi er
   const loadingText = !serverReady
     ? "Venter på at stream starter …"
     : "Forbinder til stream …";
