@@ -59,7 +59,6 @@ function getLagStatus(lag) {
   return           { text: `Stream er ${Math.round(lag)} sekunder forsinket`,       color: "#e53935" };
 }
 
-// Maks 2 decimaler i debug-panelet
 function formatLagValue(val) {
   if (val == null) return "-";
   return Number(val).toFixed(2) + "s";
@@ -138,10 +137,6 @@ export default function ClientDetailsLivestreamSection({
 
   // -------------------------------------------------------------------------
   // HLS.js lifecycle
-  //
-  // HLS.js har forrang over native HLS i alle browsere inkl. Safari.
-  // Dette sikrer at FRAG_CHANGED events virker og lag-beregning er ensartet.
-  // Native HLS er kun fallback for meget gamle browsere uden HLS.js-support.
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !clientOnline || !serverReady) return;
@@ -162,9 +157,6 @@ export default function ClientDetailsLivestreamSection({
     let playTimeout       = null;
 
     if (Hls.isSupported()) {
-      // -----------------------------------------------------------------------
-      // HLS.js — Chrome, Firefox og Safari (alle moderne browsere)
-      // -----------------------------------------------------------------------
       const hls = new Hls({
         liveSyncDurationCount:        3,
         liveMaxLatencyDurationCount:  5,
@@ -180,7 +172,6 @@ export default function ClientDetailsLivestreamSection({
 
       hlsRef.current = hls;
 
-      // Sæt egenskaber FØR attachMedia
       video.muted       = true;
       video.autoplay    = true;
       video.playsInline = true;
@@ -230,9 +221,6 @@ export default function ClientDetailsLivestreamSection({
       };
 
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // -----------------------------------------------------------------------
-      // Native HLS — fallback for meget gamle browsere uden HLS.js-support
-      // -----------------------------------------------------------------------
       video.src = hlsUrl; video.muted = true; video.autoplay = true; video.playsInline = true;
       const onLoaded = () => {
         setManifestReady(true);
@@ -289,10 +277,7 @@ export default function ClientDetailsLivestreamSection({
   }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
   // -------------------------------------------------------------------------
-  // Forsinkelsesberegning — samme metode i alle browsere via HLS.js:
-  //   totalLag = (sidsteSeg - spillerSeg) × segSek + uploadAlder
-  //
-  // Fallback: vis uploadAlder alene hvis FRAG_CHANGED endnu ikke har fyret
+  // Forsinkelsesberegning
   // -------------------------------------------------------------------------
   const computedLag = useMemo(() => {
     if (lastSegNum != null && currentSegNum != null && lastSegmentLag != null) {
@@ -311,15 +296,34 @@ export default function ClientDetailsLivestreamSection({
   // -------------------------------------------------------------------------
   const handleRefreshClick = () => {
     if (!clientOnline) return;
-    setRefreshing(true);
+
+    // 1. Destruer HLS.js øjeblikkeligt — ikke via useEffect
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    // 2. Ryd video-elementet øjeblikkeligt
+    const video = videoRef.current;
+    if (video) {
+      try { video.pause(); video.removeAttribute("src"); video.load(); } catch {}
+    }
+
+    // 3. Nulstil AL state på én gang — som en hard refresh af sektionen
+    setManifestReady(false);
     setServerReady(false);
     setStreamStale(false);
-    // Nulstil lag-state så forsinkelsen ikke viser gamle værdier efter genstart
+    setError("");
+    setBuffering(false);
     setCurrentSegNum(null);
     setLastSegNum(null);
     setLastSegmentLag(null);
     setLastSegmentTimestamp(null);
     setLastFetched(null);
+    setFragDuration(8);
+
+    // 4. Trigger fuld geninitialisering
+    setRefreshing(true);
     setLocalRefreshKey(k => k + 1);
     setTimeout(() => setRefreshing(false), 800);
   };
@@ -420,7 +424,6 @@ export default function ClientDetailsLivestreamSection({
               </Box>
             ) : (
               <Box sx={{ position: "relative", width: "100%" }}>
-                {/* Video ALTID renderet og synlig — aldrig display:none */}
                 <video
                   ref={videoRef}
                   id="livestream-video"
