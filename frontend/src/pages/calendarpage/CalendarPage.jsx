@@ -27,9 +27,7 @@ function useAllSchoolTimes(schools) {
     ).then(results => {
       if (!isCurrent) return;
       const map = {};
-      results.forEach(({ id, times }) => {
-        map[id] = times;
-      });
+      results.forEach(({ id, times }) => { map[id] = times; });
       setSchoolTimesMap(map);
     });
     return () => { isCurrent = false; };
@@ -81,8 +79,7 @@ function getWeekNumber(date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  return weekNo;
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
 function mapRawDays(rawDays) {
@@ -230,11 +227,11 @@ function markedDaysReducer(state, action) {
       return { ...state, [action.clientId]: action.days };
     case "updateDay": {
       // FIX: Bevar eksisterende tider (onTime/offTime) når en dag toggles.
-      // Tidligere blev kun { status: mode } skrevet — tider gik tabt og
+      // Uden dette blev kun { status: mode } skrevet — tider gik tabt og
       // auto-save overskrev databasen med standardtider 1 sekund senere.
       const existing = state[action.clientId]?.[action.date] || {};
       const merged = { ...existing, ...action.dayData };
-      // Hvis dagen slukkes, fjern tider så de ikke fyldes på unødvendigt
+      // Hvis dagen slukkes, fjern tider — de er ikke relevante for "off"-dage
       if (action.dayData.status === "off") {
         delete merged.onTime;
         delete merged.offTime;
@@ -356,17 +353,14 @@ export default function CalendarPage() {
       })
       .catch(() => {
         if (isCurrent) {
-          dispatchMarkedDays({
-            type: "set",
-            clientId: activeClient,
-            days: {}
-          });
+          dispatchMarkedDays({ type: "set", clientId: activeClient, days: {} });
           setSnackbar({ open: true, message: "Kunne ikke hente kalender.", severity: "error" });
         }
       });
     return () => { isCurrent = false; };
   }, [selectedSeason, activeClient, token]);
 
+  // Auto-save: kør 1 sekund efter ændring, men kun hvis der rent faktisk er ændringer
   useEffect(() => {
     if (editDialogOpen || !activeClient) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
@@ -383,8 +377,15 @@ export default function CalendarPage() {
     };
   }, [markedDays[activeClient], activeClient, editDialogOpen]);
 
-  // FIX: Autoritativ kilde til standardtider — bruger altid API (allSchoolTimes),
-  // aldrig localStorage. Samme datakilde som DateTimeEditDialog nu bruger.
+  // FIX: Beregn korrekt sæson-startår ud fra en dato
+  // En dato i januar 2026 hører til sæson 2025 (skoleår 2025/2026)
+  function getSeasonFromDate(dateStr) {
+    const normDate = dateStr.split("T")[0];
+    const year = parseInt(normDate.substring(0, 4));
+    const month = parseInt(normDate.substring(5, 7));
+    return month >= 8 ? year : year - 1;
+  }
+
   function getDefaultTimes(dateStr, clientId) {
     const client = clients.find(c => c.id === clientId);
     if (!client) return { onTime: "09:00", offTime: "22:30" };
@@ -402,15 +403,13 @@ export default function CalendarPage() {
       : times?.weekday || fallback.weekday;
   }
 
-  // FIX: Bevar eksisterende onTime/offTime når en dag klikkes.
-  // Reducer håndterer merge — her sender vi kun status.
   const handleDayClick = useCallback((clientIds, dateString, mode, markedDaysState) => {
     clientIds.forEach(cid => {
       dispatchMarkedDays({
         type: "updateDay",
         clientId: cid,
         date: dateString,
-        dayData: { status: mode },
+        dayData: { status: mode }
       });
     });
   }, []);
@@ -443,6 +442,7 @@ export default function CalendarPage() {
     allDates.forEach(dateStr => {
       const md = markedDays[clientId]?.[dateStr];
       const defTimes = getDefaultTimes(dateStr, clientId);
+      // FIX: Brug gemte tider fra state — ikke standardtider — så de ikke overskrives
       payloadMarkedDays[String(clientId)][dateStr] = md && md.status === "on"
         ? { status: "on", onTime: md.onTime || defTimes.onTime, offTime: md.offTime || defTimes.offTime }
         : { status: "off" };
@@ -476,6 +476,8 @@ export default function CalendarPage() {
     }
   };
 
+  // Modificeret: DateTimeEditDialog sender den opdaterede dag (day) tilbage.
+  // Vi opdaterer lokal state direkte for at undgå race med autosave.
   const handleSaveDateTime = ({ date, clientId, day }) => {
     if (!clientId || !date) return;
     const normDate = date;
@@ -503,11 +505,7 @@ export default function CalendarPage() {
       try {
         const data = await getMarkedDays(selectedSeason, clientId);
         const mapped = mapRawDays(data.markedDays || {});
-        dispatchMarkedDays({
-          type: "set",
-          clientId: clientId,
-          days: mapped
-        });
+        dispatchMarkedDays({ type: "set", clientId: clientId, days: mapped });
         lastDialogSavedMarkedDays.current = {
           ...lastDialogSavedMarkedDays.current,
           [clientId]: mapped
@@ -542,7 +540,7 @@ export default function CalendarPage() {
       : "Automatisk"
   ), [activeClient, filteredClients, schools]);
 
-  // FIX: Krav sænket fra 2 til 1 klient — enkelt-klient-brugere kan nu også gemme
+  // FIX: Sænket krav fra 2 til 1 klient så enkelt-klient-brugere også kan gemme
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
       if (selectedClients.length < 1) {
@@ -569,6 +567,7 @@ export default function CalendarPage() {
         allDates.forEach(dateStr => {
           const sourceMd = markedDays[activeClient]?.[dateStr];
           const sourceDefTimes = getDefaultTimes(dateStr, activeClient);
+          // FIX: Brug gemte tider — ikke standardtider — så de ikke overskrives
           payloadMarkedDays[clientKey][dateStr] = sourceMd && sourceMd.status === "on"
             ? { status: "on", onTime: sourceMd.onTime || sourceDefTimes.onTime, offTime: sourceMd.offTime || sourceDefTimes.offTime }
             : { status: "off" };
@@ -595,19 +594,14 @@ export default function CalendarPage() {
               days: mapRawDays(data.markedDays || {})
             });
           } catch {
-            dispatchMarkedDays({
-              type: "set",
-              clientId: activeClient,
-              days: {}
-            });
+            dispatchMarkedDays({ type: "set", clientId: activeClient, days: {} });
           }
         }
         setSavingCalendar(false);
       } catch {
         setSavingCalendar(false);
       }
-    },
-    [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]
+    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]
   );
 
   useEffect(() => {
@@ -623,11 +617,6 @@ export default function CalendarPage() {
   const sortedSchools = useMemo(() => [...schools].sort((a, b) => a.name.localeCompare(b.name)), [schools]);
 
   const editDialogClientObj = clients.find(c => c.id === editDialogClient);
-
-  // FIX: Slå skoletider op til dialogen fra den autoritative API-kilde
-  const editDialogSchoolTimes = allSchoolTimes[
-    editDialogClientObj?.schoolId || editDialogClientObj?.school_id
-  ] || null;
 
   return (
     <Box sx={{
@@ -664,13 +653,7 @@ export default function CalendarPage() {
       </Box>
 
       {(user?.role === "admin" || user?.role === "superadmin") && (
-        <Paper elevation={2} sx={{
-          p: { xs: 1, sm: 2 },
-          mb: 3,
-          position: "relative",
-          display: "flex",
-          flexDirection: "column"
-        }}>
+        <Paper elevation={2} sx={{ p: { xs: 1, sm: 2 }, mb: 3, display: "flex", flexDirection: "column" }}>
           <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="flex-start">
             <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: { xs: "100%", sm: "auto" } }}>
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: "1rem", sm: "1.25rem" } }}>
@@ -705,17 +688,10 @@ export default function CalendarPage() {
         </MuiAlert>
       </Snackbar>
 
-      <Paper elevation={2} sx={{
-        p: { xs: 1, sm: 2 },
-        mb: 3,
-        position: "relative",
-        display: "flex",
-        flexDirection: "column"
-      }}>
+      <Paper elevation={2} sx={{ p: { xs: 1, sm: 2 }, mb: 3, position: "relative", display: "flex", flexDirection: "column" }}>
         {loadingClients && (
           <Box sx={{
-            position: "absolute",
-            left: 0, top: 0, right: 0, bottom: 0,
+            position: "absolute", left: 0, top: 0, right: 0, bottom: 0,
             background: "rgba(255,255,255,0.7)",
             display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10
           }}>
@@ -730,7 +706,7 @@ export default function CalendarPage() {
           disabled={false}
           selectedSchool={selectedSchool}
         />
-        {/* FIX: Vis gem-knap og info allerede ved 1 valgt klient */}
+        {/* FIX: Vis gem-knap og info også ved kun 1 valgt klient */}
         {selectedClients.length >= 1 && (
           <Box sx={{
             mt: 2,
@@ -745,10 +721,7 @@ export default function CalendarPage() {
                 Viser kalender for: {activeClientName}
               </Typography>
               {selectedClients.length > 1 && (
-                <Typography variant="body2" sx={{
-                  fontSize: { xs: "0.9rem", sm: "0.8rem" },
-                  color: "#555", fontWeight: 400
-                }}>
+                <Typography variant="body2" sx={{ fontSize: { xs: "0.9rem", sm: "0.8rem" }, color: "#555", fontWeight: 400 }}>
                   ændringerne slår også igennem på klienterne: {otherClientNames}
                 </Typography>
               )}
@@ -779,10 +752,7 @@ export default function CalendarPage() {
         gap: { xs: 1.5, sm: 0 },
         width: "100%",
       }}>
-        <Box sx={{
-          display: "flex", alignItems: "center", gap: 2, flex: 1,
-          justifyContent: { xs: "center", sm: "flex-start" }
-        }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: 1, justifyContent: { xs: "center", sm: "flex-start" } }}>
           <Typography variant="h6" sx={{ mr: 1, fontWeight: 700, fontSize: { xs: "1rem", sm: "1.15rem" } }}>
             Markering:
           </Typography>
@@ -807,9 +777,7 @@ export default function CalendarPage() {
             SLUKKET
           </Button>
         </Box>
-        <Box sx={{
-          flex: 1, display: "flex", justifyContent: { xs: "center", sm: "center" }, mb: { xs: 1, sm: 0 }
-        }}>
+        <Box sx={{ flex: 1, display: "flex", justifyContent: { xs: "center", sm: "center" }, mb: { xs: 1, sm: 0 } }}>
           <Button
             variant="outlined"
             color="primary"
@@ -821,13 +789,7 @@ export default function CalendarPage() {
             Vis liste
           </Button>
         </Box>
-        <Box sx={{
-          flex: 1,
-          display: "flex",
-          justifyContent: { xs: "center", sm: "flex-end" },
-          alignItems: "center",
-          gap: 1
-        }}>
+        <Box sx={{ flex: 1, display: "flex", justifyContent: { xs: "center", sm: "flex-end" }, alignItems: "center", gap: 1 }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
             {selectedSeason !== currentSeasonStartYear && (
               <Tooltip title="Ikke indeværende sæson" arrow>
@@ -838,10 +800,7 @@ export default function CalendarPage() {
               </Tooltip>
             )}
           </Box>
-          <Typography variant="h6" sx={{
-            fontWeight: 700, color: "#0a275c", mr: 2,
-            fontSize: { xs: "1rem", sm: "1.15rem" }
-          }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2, fontSize: { xs: "1rem", sm: "1.15rem" } }}>
             Vælg sæson:
           </Typography>
           <Select
@@ -852,9 +811,7 @@ export default function CalendarPage() {
             disabled={isDisabled}
           >
             {seasons.map(season => (
-              <MenuItem key={season.value} value={season.value}>
-                {season.label}
-              </MenuItem>
+              <MenuItem key={season.value} value={season.value}>{season.label}</MenuItem>
             ))}
           </Select>
         </Box>
@@ -896,7 +853,6 @@ export default function CalendarPage() {
         )}
       </Box>
 
-      {/* FIX: schoolTimes sendes nu med til dialogen — samme API-kilde som CalendarPage */}
       <DateTimeEditDialog
         open={editDialogOpen}
         onClose={() => setEditDialogOpen(false)}
@@ -905,7 +861,6 @@ export default function CalendarPage() {
         onSaved={handleSaveDateTime}
         localMarkedDays={markedDays[editDialogClient]}
         schoolId={editDialogClientObj?.schoolId || editDialogClientObj?.school_id}
-        schoolTimes={editDialogSchoolTimes}
       />
       <ClientCalendarDialog
         open={calendarDialogOpen}
@@ -916,18 +871,10 @@ export default function CalendarPage() {
   );
 }
 
-// MonthCalendar med native browser tooltip på dagene
+// ----------- MonthCalendar -----------
 const MonthCalendar = React.memo(function MonthCalendar({
-  name,
-  month,
-  year,
-  clientId,
-  markedDays,
-  markMode,
-  onDayClick,
-  onDateShiftLeftClick,
-  loadingDialogDate,
-  loadingDialogClient
+  name, month, year, clientId, markedDays, markMode,
+  onDayClick, onDateShiftLeftClick, loadingDialogDate, loadingDialogClient
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const draggedDates = useRef(new Set());
@@ -946,14 +893,10 @@ const MonthCalendar = React.memo(function MonthCalendar({
     while (weekStartIdx < cells.length) {
       const weekDays = cells.slice(weekStartIdx, weekStartIdx + 7);
       let firstDay = weekDays.find(d => !!d);
-      let dateObj;
-      if (firstDay) {
-        dateObj = new Date(year, month, firstDay);
-      } else {
-        dateObj = new Date(year, month, 1 + weekStartIdx - offset);
-      }
-      const weekNum = getWeekNumber(dateObj);
-      rows.push({ weekNum, weekDays });
+      let dateObj = firstDay
+        ? new Date(year, month, firstDay)
+        : new Date(year, month, 1 + weekStartIdx - offset);
+      rows.push({ weekNum: getWeekNumber(dateObj), weekDays });
       weekStartIdx += 7;
     }
     return rows;
@@ -972,20 +915,14 @@ const MonthCalendar = React.memo(function MonthCalendar({
   const handleMouseDown = (e, dateString) => {
     if (e.shiftKey && e.button === 0) {
       e.preventDefault();
-      if (
-        clientId &&
-        markedDays?.[clientId]?.[dateString]?.status === "on" &&
-        !loadingDialogDate
-      ) {
+      if (clientId && markedDays?.[clientId]?.[dateString]?.status === "on" && !loadingDialogDate) {
         onDateShiftLeftClick(clientId, dateString);
         return;
       }
     }
     setIsDragging(true);
     draggedDates.current = new Set([dateString]);
-    if (clientId) {
-      onDayClick([clientId], dateString, markMode, markedDays);
-    }
+    if (clientId) onDayClick([clientId], dateString, markMode, markedDays);
   };
 
   const handleMouseEnter = (e, dateString) => {
@@ -1021,11 +958,8 @@ const MonthCalendar = React.memo(function MonthCalendar({
           <Box />
           {weekdayNames.map(wd => (
             <Typography key={wd} variant="caption" sx={{
-              fontWeight: 700,
-              color: "#555",
-              textAlign: "center",
-              fontSize: { xs: "0.82rem", sm: "0.90rem" },
-              letterSpacing: "0.03em"
+              fontWeight: 700, color: "#555", textAlign: "center",
+              fontSize: { xs: "0.82rem", sm: "0.90rem" }, letterSpacing: "0.03em"
             }}>
               {wd}
             </Typography>
@@ -1037,20 +971,10 @@ const MonthCalendar = React.memo(function MonthCalendar({
           rowGap: "0.5rem"
         }}>
           {weekRows.map((row, rowIdx) => (
-            <Box key={rowIdx} sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(8, 1fr)",
-              columnGap: "0.08rem"
-            }}>
+            <Box key={rowIdx} sx={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", columnGap: "0.08rem" }}>
               <Box sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 400,
-                fontSize: { xs: "0.65rem", sm: "0.75rem" },
-                color: "#222",
-                background: "transparent",
-                minWidth: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 400, fontSize: { xs: "0.65rem", sm: "0.75rem" }, color: "#222"
               }}>
                 {row.weekNum}
               </Box>
@@ -1058,64 +982,43 @@ const MonthCalendar = React.memo(function MonthCalendar({
                 if (!day) return <Box key={idx + "-empty"} />;
                 const dateString = formatDate(year, month, day);
                 const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
+                // FIX: Vis tider i tooltip så bruger kan se hvad der er gemt
+                const cellOnTime = markedDays?.[clientId]?.[dateString]?.onTime;
+                const cellOffTime = markedDays?.[clientId]?.[dateString]?.offTime;
                 let bg = "#fff";
                 if (cellStatus === "on") bg = "#b4eeb4";
                 if (cellStatus === "off") bg = "#ffb7b7";
-                const isLoading =
-                  loadingDialogDate === dateString && loadingDialogClient === clientId;
+                const isLoading = loadingDialogDate === dateString && loadingDialogClient === clientId;
+                const tooltipText = cellStatus === "on"
+                  ? `Tændt${cellOnTime && cellOffTime ? ` (${cellOnTime}–${cellOffTime})` : ""} — shift+klik for at redigere tid`
+                  : "Slukket";
                 return (
-                  <Box key={idx} sx={{
-                    display: "flex", justifyContent: "center", alignItems: "center",
-                    p: 0.2, position: "relative"
-                  }}>
+                  <Box key={idx} sx={{ display: "flex", justifyContent: "center", alignItems: "center", p: 0.2, position: "relative" }}>
                     <Box
                       sx={{
-                        position: "relative",
-                        width: circleSize,
-                        height: circleSize,
+                        position: "relative", width: circleSize, height: circleSize,
                         cursor: clientId ? "pointer" : "default",
-                        opacity: clientId ? 1 : 0.55,
-                        userSelect: "none"
+                        opacity: clientId ? 1 : 0.55, userSelect: "none"
                       }}
                       onMouseDown={e => handleMouseDown(e, dateString)}
                       onMouseEnter={e => handleMouseEnter(e, dateString)}
-                      title={
-                        cellStatus === "on"
-                          ? "Tændt (shift+klik for tid)"
-                          : cellStatus === "off"
-                            ? "Slukket"
-                            : ""
-                      }
+                      title={tooltipText}
                     >
                       {isLoading && (
                         <CircularProgress
                           size={circleSize}
-                          sx={{
-                            position: "absolute",
-                            top: 0, left: 0,
-                            zIndex: 1,
-                            color: "#1976d2",
-                            background: "transparent"
-                          }}
+                          sx={{ position: "absolute", top: 0, left: 0, zIndex: 1, color: "#1976d2" }}
                         />
                       )}
                       <Box sx={{
-                        position: "absolute",
-                        top: 2, left: 2,
-                        width: innerCircleSize,
-                        height: innerCircleSize,
+                        position: "absolute", top: 2, left: 2,
+                        width: innerCircleSize, height: innerCircleSize,
                         borderRadius: "50%",
                         background: bg,
                         border: "1px solid #eee",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#0a275c",
-                        fontWeight: 500,
-                        fontSize: "1.15rem",
-                        zIndex: 2,
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                        userSelect: "none"
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: "#0a275c", fontWeight: 500, fontSize: "1.15rem",
+                        zIndex: 2, boxShadow: "0 1px 2px rgba(0,0,0,0.06)", userSelect: "none"
                       }}>
                         {day}
                       </Box>
