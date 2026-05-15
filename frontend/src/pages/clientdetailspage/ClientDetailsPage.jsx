@@ -13,14 +13,16 @@ import {
   openRemoteDesktop,
   getSchools,
   getChromeStatus,
-  getClient,
 } from "../../api";
 
-/*
-  ClientDetailsPage.js (opdateret)
-  - Preserves isOnline on merges; header handles local saves directly to backend.
-  - Snackbar messages standardized: "Lokation gemt", "Kiosk webadresse gemt", "Skole gemt"
-*/
+function mergeClientPreserveOnline(prev, updated) {
+  if (!updated) return prev;
+  return {
+    ...(prev || {}),
+    ...(updated || {}),
+    isOnline: (typeof updated.isOnline === "undefined") ? prev?.isOnline : updated.isOnline
+  };
+}
 
 export default function ClientDetailsPage({
   client,
@@ -40,7 +42,6 @@ export default function ClientDetailsPage({
   const [kioskUrlDirty, setKioskUrlDirty] = useState(false);
   const [savingKioskUrl, setSavingKioskUrl] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
-  const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
 
   const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status ?? "unknown");
   const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color ?? null);
@@ -48,7 +49,6 @@ export default function ClientDetailsPage({
   const [uptime, setUptime] = useState(client?.uptime ?? null);
 
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
-  const [pendingLivestream, setPendingLivestream] = useState(false);
   const [schools, setSchools] = useState([]);
 
   const lastPolledRef = useRef({
@@ -58,16 +58,6 @@ export default function ClientDetailsPage({
     uptime: client?.uptime ?? null,
   });
   const pollCountRef = useRef(0);
-
-  // Helper: merge updated client but preserve previous isOnline unless server explicitly returned it
-  function mergeClientPreserveOnline(prev, updated) {
-    if (!updated) return prev;
-    return {
-      ...(prev || {}),
-      ...(updated || {}),
-      isOnline: (typeof updated.isOnline === "undefined") ? prev?.isOnline : updated.isOnline
-    };
-  }
 
   useEffect(() => { setClientState(client); }, [client]);
 
@@ -92,14 +82,12 @@ export default function ClientDetailsPage({
     let cancelled = false;
     getSchools().then(data => {
       if (cancelled) return;
-      setSchools(Array.isArray(data) ? data : (data && data.schools) ? data.schools : []);
-    }).catch(() => {
-      if (cancelled) return;
-      setSchools([]);
-    });
+      setSchools(Array.isArray(data) ? data : (data?.schools || []));
+    }).catch(() => { if (!cancelled) setSchools([]); });
     return () => { cancelled = true; };
   }, []);
 
+  // FIX: Polling med korrekt cancelled-check + pause ved skjult tab
   useEffect(() => {
     if (!clientState?.id) return;
     let cancelled = false;
@@ -108,43 +96,61 @@ export default function ClientDetailsPage({
 
     const poll = async () => {
       if (cancelled) return;
+
+      // FIX: Pause polling når tab er skjult
+      if (document.visibilityState === "hidden") {
+        if (!cancelled) timerId = setTimeout(poll, 5000);
+        return;
+      }
+
       pollCountRef.current += 1;
       try {
         const json = await getChromeStatus(clientState.id, { fallbackToClient: true });
-        const message = json?.chrome_status ?? (json?.step && json.step.message) ?? null;
-        const color = json?.chrome_color ?? (json?.step && json.step.color) ?? null;
-        const timestamp = json?.chrome_last_updated ?? (json?.step && json.step.timestamp) ?? null;
+        if (cancelled) return; // FIX: Tjek cancelled EFTER await
+
+        const message = json?.chrome_status ?? (json?.step?.message) ?? null;
+        const color = json?.chrome_color ?? (json?.step?.color) ?? null;
+        const timestamp = json?.chrome_last_updated ?? (json?.step?.timestamp) ?? null;
         const lastSeenVal = json?.last_seen ?? json?.client?.last_seen ?? null;
         const uptimeVal = json?.uptime ?? json?.client?.uptime ?? null;
 
         const last = lastPolledRef.current;
         const changed =
-          (timestamp !== last.timestamp) ||
-          (message !== last.message) ||
-          (lastSeenVal !== last.lastSeen) ||
-          (uptimeVal !== last.uptime);
+          timestamp !== last.timestamp ||
+          message !== last.message ||
+          lastSeenVal !== last.lastSeen ||
+          uptimeVal !== last.uptime;
 
-        if (changed) {
+        if (changed && !cancelled) {
           lastPolledRef.current = { timestamp, message, lastSeen: lastSeenVal, uptime: uptimeVal };
-          if (!cancelled) {
-            if (message !== null) setLiveChromeStatus(message);
-            if (color !== null) setLiveChromeColor(color);
-            if (lastSeenVal !== undefined) setLastSeen(lastSeenVal);
-            if (uptimeVal !== undefined) setUptime(uptimeVal);
-          }
+          if (message !== null) setLiveChromeStatus(message);
+          if (color !== null) setLiveChromeColor(color);
+          if (lastSeenVal !== undefined) setLastSeen(lastSeenVal);
+          if (uptimeVal !== undefined) setUptime(uptimeVal);
         }
       } catch (err) {
+        if (cancelled) return;
         console.debug("[poll] getChromeStatus error:", err);
       } finally {
         if (!cancelled) timerId = setTimeout(poll, POLL_INTERVAL_MS);
       }
     };
 
+    // FIX: Lyt på visibility change for at genoptage polling
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && !cancelled) {
+        if (timerId) clearTimeout(timerId);
+        poll();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     poll();
 
     return () => {
       cancelled = true;
       if (timerId) clearTimeout(timerId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [clientState?.id]);
 
@@ -155,9 +161,7 @@ export default function ClientDetailsPage({
     try {
       if (!memoizedClientId) throw new Error("No client id");
       await apiClientAction(memoizedClientId, action);
-      if (typeof handleRefresh === "function") {
-        await handleRefresh();
-      }
+      if (typeof handleRefresh === "function") await handleRefresh();
       if (typeof showSnackbar === "function") showSnackbar({ message: "Handlingen blev udført!", severity: "success" });
     } catch (err) {
       if (typeof showSnackbar === "function") showSnackbar({ message: "Fejl: " + (err?.message || err), severity: "error" });
@@ -170,23 +174,23 @@ export default function ClientDetailsPage({
   const handleOpenRemoteDesktop = useCallback(() => { if (!memoizedClientId) return; openRemoteDesktop(memoizedClientId); }, [memoizedClientId]);
 
   const handleLocalityChange = (e) => { setLocality(e.target.value); setLocalityDirty(true); };
+
+  // FIX: Vis specifik snackbar altid — kald silent refresh bagefter
   const handleLocalitySave = async () => {
     if (!clientState?.id) return;
     setSavingLocality(true);
     try {
       const updated = await updateClient(clientState.id, { locality });
-      console.debug("updateClient(locality) response:", updated);
       if (updated) {
         setClientState(prev => mergeClientPreserveOnline(prev, updated));
       } else {
         setClientState(prev => prev ? ({ ...prev, locality }) : prev);
       }
       setLocalityDirty(false);
-
+      if (typeof showSnackbar === "function") showSnackbar({ message: "Lokation gemt", severity: "success" });
+      // FIX: Silent refresh — ingen snackbar fra handleRefresh
       if (typeof handleRefresh === "function") {
-        try { await handleRefresh(); } catch (e) { console.debug("handleRefresh after locality save failed:", e); }
-      } else {
-        if (typeof showSnackbar === "function") showSnackbar({ message: "Lokation gemt", severity: "success" });
+        try { await handleRefresh({ silent: true }); } catch { }
       }
     } catch (err) {
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke gemme lokation: " + (err?.message || err), severity: "error" });
@@ -196,24 +200,24 @@ export default function ClientDetailsPage({
   };
 
   const handleKioskUrlChange = (e) => { setKioskUrl(e.target.value); setKioskUrlDirty(true); };
+
+  // FIX: Vis specifik snackbar altid — kald silent refresh bagefter
   const handleKioskUrlSave = async () => {
     if (!clientState?.id) return;
     setSavingKioskUrl(true);
     try {
       const updated = await pushKioskUrl(clientState.id, kioskUrl);
-      console.debug("pushKioskUrl response:", updated);
       if (updated) {
         setClientState(prev => mergeClientPreserveOnline(prev, updated));
       } else {
         setClientState(prev => prev ? ({ ...prev, kiosk_url: kioskUrl }) : prev);
       }
-
-      if (typeof handleRefresh === "function") {
-        try { await handleRefresh(); } catch (e) { console.debug("handleRefresh after kioskUrl save failed:", e); }
-      }
-
       setKioskUrlDirty(false);
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kiosk webadresse gemt", severity: "success" });
+      // FIX: Silent refresh
+      if (typeof handleRefresh === "function") {
+        try { await handleRefresh({ silent: true }); } catch { }
+      }
     } catch (err) {
       if (typeof showSnackbar === "function") showSnackbar({ message: "Kunne ikke opdatere kiosk webadresse: " + (err?.message || err), severity: "error" });
     } finally {
@@ -288,7 +292,11 @@ export default function ClientDetailsPage({
         </Grid>
       </Grid>
 
-      <ClientCalendarDialog open={calendarDialogOpen} onClose={() => setCalendarDialogOpen(false)} clientId={clientState.id} />
+      <ClientCalendarDialog
+        open={calendarDialogOpen}
+        onClose={() => setCalendarDialogOpen(false)}
+        clientId={clientState.id}
+      />
     </Box>
   );
 }
