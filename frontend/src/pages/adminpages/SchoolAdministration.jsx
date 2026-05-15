@@ -12,7 +12,7 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import {
   getSchools, addSchool, getSchoolTimes, updateSchoolTimes,
-  deleteSchool, updateSchoolName, getSchoolClients,
+  deleteSchool, updateSchoolName, getSchoolClients, applySeasonTimes,
 } from "../../api";
 import { useAuth } from "../../auth/authcontext";
 
@@ -64,6 +64,10 @@ export default function SchoolAdministration() {
   const [editSchoolId, setEditSchoolId] = useState(null);
   const [editSchoolName, setEditSchoolName] = useState("");
   const [editSchoolError, setEditSchoolError] = useState("");
+
+  // NY: Anvend sæsontider dialog
+  const [applyDialogOpen, setApplyDialogOpen] = useState(false);
+  const [applyLoading, setApplyLoading] = useState(false);
 
   useEffect(() => {
     setLoadingSchools(true);
@@ -137,6 +141,23 @@ export default function SchoolAdministration() {
     }
   };
 
+  // NY: Anvend sæsontider på alle klienter
+  const handleApplySeasonTimes = async () => {
+    if (!selectedSchool || !selectedSeason) return;
+    setApplyLoading(true);
+    try {
+      const result = await applySeasonTimes(selectedSchool, selectedSeason);
+      setApplyDialogOpen(false);
+      showSnackbar(
+        `Tider anvendt på ${result.updated_clients.length} klient(er) for sæson ${selectedSeason}!`,
+        "success"
+      );
+    } catch (e) {
+      showSnackbar(e.message || "Kunne ikke anvende tider", "error");
+    }
+    setApplyLoading(false);
+  };
+
   const handleOpenDeleteDialog = (school) => {
     setDeleteError(""); setSchoolToDelete(school); setClientsToDelete([]);
     setDeleteDialogOpen(true); setLoadingClients(true); setDeleteStep(1);
@@ -186,6 +207,8 @@ export default function SchoolAdministration() {
     if (!isSuperadmin && user?.school_id) return all.filter(s => s.id === user.school_id);
     return all;
   };
+
+  const selectedSchoolName = schools.find(s => s.id === selectedSchool)?.name || "";
 
   const handleEditSchool = (school) => { setEditSchoolId(school.id); setEditSchoolName(school.name); setEditSchoolError(""); };
   const handleCancelEditSchool = () => { setEditSchoolId(null); setEditSchoolName(""); setEditSchoolError(""); };
@@ -300,14 +323,29 @@ export default function SchoolAdministration() {
                       disabled={!selectedSchool} />
                   </Stack>
                 </Box>
-                <Button
-                  variant="contained" size="large"
-                  sx={{ minWidth: 140, height: 40, alignSelf: "flex-end" }}
-                  onClick={handleSaveTimes}
-                  disabled={!selectedSchool}
-                >
-                  Gem tider
-                </Button>
+                <Stack direction="row" gap={1} alignItems="flex-end">
+                  <Button
+                    variant="contained" size="large"
+                    sx={{ minWidth: 140, height: 40 }}
+                    onClick={handleSaveTimes}
+                    disabled={!selectedSchool}
+                  >
+                    Gem tider
+                  </Button>
+                  {/* NY: Knap til at anvende tider på alle klienter */}
+                  <Tooltip title="Overskriver alle klienters kalender for den valgte skole og sæson med de gemte tider">
+                    <span>
+                      <Button
+                        variant="outlined" color="warning" size="large"
+                        sx={{ minWidth: 200, height: 40 }}
+                        onClick={() => setApplyDialogOpen(true)}
+                        disabled={!selectedSchool}
+                      >
+                        Opdater alle klienters tider
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </Stack>
               </Stack>
             )}
           </Box>
@@ -402,6 +440,45 @@ export default function SchoolAdministration() {
           </Stack>
         </Paper>
       )}
+
+      {/* NY: Bekræftelsesdialog — Opdater alle klienters tider */}
+      <Dialog open={applyDialogOpen} onClose={() => !applyLoading && setApplyDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Opdater alle klienters tider</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>
+            Du er ved at overskrive <b>alle dage</b> i kalenderen for alle klienter tilknyttet:
+          </Typography>
+          <Typography sx={{ mb: 1 }}>
+            <b>Skole:</b> {selectedSchoolName}
+          </Typography>
+          <Typography sx={{ mb: 2 }}>
+            <b>Sæson:</b> {selectedSeason}
+          </Typography>
+          <Typography sx={{ mb: 2 }}>
+            Alle dage — hverdage og weekender — sættes til <b>tændt</b> med følgende tider:
+          </Typography>
+          <Box sx={{ background: "#f5f5f5", borderRadius: 1, p: 2, mb: 2 }}>
+            <Typography variant="body2"><b>Hverdage:</b> {weekdayTimes.onTime} – {weekdayTimes.offTime}</Typography>
+            <Typography variant="body2"><b>Weekend:</b> {weekendTimes.onTime} – {weekendTimes.offTime}</Typography>
+          </Box>
+          <Typography color="error" sx={{ fontWeight: 600 }}>
+            Advarsel: Denne handling overskriver alle eksisterende kalendermarkeringer for alle klienter på denne skole i den valgte sæson. Dette kan ikke fortrydes!
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setApplyDialogOpen(false)} disabled={applyLoading}>
+            Annuller
+          </Button>
+          <Button
+            color="warning" variant="contained"
+            onClick={handleApplySeasonTimes}
+            disabled={applyLoading}
+            startIcon={applyLoading ? <CircularProgress size={18} color="inherit" /> : null}
+          >
+            {applyLoading ? "Opdaterer..." : "Ja, opdater alle klienters tider"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Slet-dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog} maxWidth="md" fullWidth>
