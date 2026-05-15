@@ -1,4 +1,3 @@
-// api.js
 export const apiUrl = import.meta.env.VITE_API_URL || "https://kulturskole-infosk-rm.onrender.com";
 
 function authHeaders(extra = {}) {
@@ -239,18 +238,23 @@ export async function updateSchoolTimes(schoolId, season, updates) {
   return await res.json();
 }
 
-// NY: Overskriver alle klienters kalendermarkeringer med sæsonbaserede tider
 export async function applySeasonTimes(schoolId, season) {
   const res = await fetch(
     `${apiUrl}/api/schools/${schoolId}/apply-season-times/${encodeURIComponent(season)}`,
-    {
-      method: "POST",
-      headers: authHeaders(),
-      credentials: "include",
-    }
+    { method: "POST", headers: authHeaders(), credentials: "include" }
   );
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok) throw new Error(await extractError(res, "Kunne ikke anvende sæsontider på klienter"));
+  return await res.json();
+}
+
+// NY: Henter hvilke sæsoner der har kalenderdata og hvilke skoler per sæson
+export async function getSeasonSummary() {
+  const res = await fetch(`${apiUrl}/api/schools/season-summary`, {
+    headers: authHeaders(), credentials: "include",
+  });
+  if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
+  if (!res.ok) throw new Error(await extractError(res, "Kunne ikke hente sæson-oversigt"));
   return await res.json();
 }
 
