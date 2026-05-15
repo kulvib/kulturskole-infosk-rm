@@ -202,16 +202,16 @@ export default function ClientDetailsLivestreamSection({
     } else if (Hls.isSupported()) {
       // --- HLS.js ---
       // Tunet til 8s segmenter:
-      // liveSyncDurationCount:4       → 4 × 8s = 32s bag live-kant (undgår buffer stalls)
+      // liveSyncDurationCount:4       → 4 × 8s = 32s bag live-kant
       // liveMaxLatencyDurationCount:6 → 6 × 8s = 48s max latency
-      // initialLiveManifestSize:3     → vent på 3 segmenter klar inden afspilning starter
+      // initialLiveManifestSize:3     → vent på 3 segmenter inden afspilning starter
       const hls = new Hls({
-        liveSyncDurationCount:       4,   // var 3 → 4 × 8s = 32s bag live-kant
-        liveMaxLatencyDurationCount: 6,   // var 5 → 6 × 8s = 48s max latency
-        initialLiveManifestSize:     3,   // FIX: vent på 3 segmenter inden start
-        maxBufferLength:             40,  // var 30 → mere buffer
-        maxMaxBufferLength:          80,  // var 60
-        liveBackBufferLength:        16,  // var 12
+        liveSyncDurationCount:       4,
+        liveMaxLatencyDurationCount: 6,
+        initialLiveManifestSize:     3,
+        maxBufferLength:             40,
+        maxMaxBufferLength:          80,
+        liveBackBufferLength:        16,
         enableWorker:                true,
         startLevel:                  -1,
         lowLatencyMode:              false,
@@ -230,7 +230,6 @@ export default function ClientDetailsLivestreamSection({
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
-        console.warn("[HLS Error]", data);
         if (data.fatal) {
           setError("Fatal streamfejl. Prøver automatisk at genstarte om lidt …");
           hls.destroy();
@@ -246,16 +245,9 @@ export default function ClientDetailsLivestreamSection({
           fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 3000);
         } else {
           // FIX: bufferStalledError er ikke-fatal — HLS.js genstarter selv.
-          // Søg til live-kanten for at hjælpe recovery. Vis IKKE fejl i UI.
-          if (data.details === "bufferStalledError") {
-            try {
-              if (video.duration && isFinite(video.duration)) {
-                video.currentTime = video.duration - 0.5;
-              }
-            } catch {}
-            return;
-          }
-          // Andre ikke-fatale fejl — vis kort i UI
+          // Ingen seek, ingen UI-fejl, ingen console.warn — bare ignorer.
+          if (data.details === "bufferStalledError") return;
+          console.warn("[HLS Error]", data);
           setError(data.details || "Ukendt HLS-fejl");
           setTimeout(() => setError(""), 5000);
         }
