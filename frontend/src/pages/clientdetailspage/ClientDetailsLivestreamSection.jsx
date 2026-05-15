@@ -180,35 +180,38 @@ export default function ClientDetailsLivestreamSection({
     } else if (Hls.isSupported()) {
       // -----------------------------------------------------------------------
       // Chrome + Firefox: HLS.js
-      //
-      // CHROME FIX: video-egenskaber sættes FØR attachMedia så Chrome's MSE
-      // pipeline læser dem korrekt ved binding.
-      // Derefter: attachMedia → MEDIA_ATTACHED → loadSource.
       // -----------------------------------------------------------------------
       const hls = new Hls({
-        liveSyncDurationCount:       3,
-        liveMaxLatencyDurationCount: 5,
-        initialLiveManifestSize:     3,
-        maxBufferLength:             20,
-        maxMaxBufferLength:          30,
-        liveBackBufferLength:        8,
-        enableWorker:                true,
-        startLevel:                  -1,
-        lowLatencyMode:              false,
+        liveSyncDurationCount:        3,
+        liveMaxLatencyDurationCount:  5,
+        initialLiveManifestSize:      3,
+        maxBufferLength:              20,
+        maxMaxBufferLength:           30,
+        liveBackBufferLength:         8,
+        enableWorker:                 true,
+        startLevel:                   -1,
+        lowLatencyMode:               false,
+        // FIX Chrome DTS-fejl:
+        // ffmpeg reset_timestamps=1 nulstiller DTS per segment (starter ved 0).
+        // Chrome's MSE tolker dette som et "discontinuity" og forsøger at
+        // tvinge et keyframe — hvilket fejler med:
+        // "CHUNK_DEMUXER_ERROR_APPEND_FAILED: Parsed buffers not in DTS sequence"
+        // forceKeyFrameOnDiscontinuity:false fortæller HLS.js at acceptere
+        // segmenterne som de er, uden at kræve keyframe ved hvert skift.
+        forceKeyFrameOnDiscontinuity: false,
       });
 
       hlsRef.current = hls;
 
-      // CHROME FIX: sæt egenskaber FØR attachMedia
+      // CHROME FIX: sæt egenskaber FØR attachMedia så Chrome's MSE
+      // pipeline læser dem korrekt ved binding.
       video.muted       = true;
       video.autoplay    = true;
       video.playsInline = true;
 
-      // CHROME FIX: attachMedia EFTER egenskaber er sat
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        // loadSource KUN efter media er attached
         hls.loadSource(hlsUrl);
       });
 
@@ -311,8 +314,7 @@ export default function ClientDetailsLivestreamSection({
   }, [manifestReady, effectiveRefreshKey, clientOnline]);
 
   // -------------------------------------------------------------------------
-  // Forsinkelsesberegning:
-  //   totalLag = (sidsteSeg - spillerSeg) × segSek + uploadAlder
+  // Forsinkelsesberegning
   // -------------------------------------------------------------------------
   const computedLag = useMemo(() => {
     if (isSafari()) {
@@ -454,7 +456,7 @@ export default function ClientDetailsLivestreamSection({
                   key={effectiveRefreshKey}
                 />
 
-                {/* Loading overlay oven på video */}
+                {/* Loading overlay */}
                 {!manifestReady && (
                   <Box sx={{
                     position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
