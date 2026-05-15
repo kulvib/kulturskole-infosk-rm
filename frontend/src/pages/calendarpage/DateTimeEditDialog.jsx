@@ -24,43 +24,30 @@ const EARLIEST = "00:00";
 const LATEST = "23:59";
 
 // FIX: Beregn korrekt sæson-startår ud fra dato.
-// En dato i jan–jul hører til FORRIGE skoleårs sæson.
-// Eksempel: 2026-01-15 → sæson 2025 (skoleår 2025/2026 starter aug 2025)
+// Datoer i jan-jul hører til forrige sæson (fx jan 2026 → sæson 2025).
 function getSeasonFromDate(dateStr) {
   const normDate = dateStr.split("T")[0];
-  const year = parseInt(normDate.substring(0, 4), 10);
-  const month = parseInt(normDate.substring(5, 7), 10);
+  const year = parseInt(normDate.substring(0, 4));
+  const month = parseInt(normDate.substring(5, 7));
   return month >= 8 ? year : year - 1;
 }
 
-// Hent standardtider fra localStorage (kun som fallback når DB ikke har tider)
-function getDefaultTimes(dateStr, schoolId) {
+// FIX: Standardtider hentes udelukkende fra schoolTimes-prop (API-kilde).
+// localStorage bruges ikke længere — det var årsagen til uoverensstemmelse
+// mellem SchoolAdministration og DateTimeEditDialog.
+function getDefaultTimes(dateStr, schoolTimes) {
   const date = new Date(dateStr);
   const day = date.getDay();
-  const TIMES_STORAGE_KEY = schoolId
-    ? `standard_times_settings_${schoolId}`
-    : "standard_times_settings";
-
-  let defaultTimes = {
+  const fallback = {
     weekday: { onTime: "09:00", offTime: "22:30" },
     weekend: { onTime: "08:00", offTime: "18:00" }
   };
-
-  try {
-    const saved = localStorage.getItem(TIMES_STORAGE_KEY);
-    if (saved) {
-      const settings = JSON.parse(saved);
-      defaultTimes = {
-        weekday: settings.weekday || defaultTimes.weekday,
-        weekend: settings.weekend || defaultTimes.weekend
-      };
-    }
-  } catch {}
-
-  return (day === 0 || day === 6) ? defaultTimes.weekend : defaultTimes.weekday;
+  const times = schoolTimes || fallback;
+  return (day === 0 || day === 6)
+    ? times?.weekend || fallback.weekend
+    : times?.weekday || fallback.weekday;
 }
 
-// FIX: Slår dato op med både kort format (YYYY-MM-DD) og fuld format (YYYY-MM-DDT00:00:00)
 function findDayObj(markedDays, normDate) {
   if (markedDays[normDate]) return markedDays[normDate];
   const key = Object.keys(markedDays).find(k => k.startsWith(normDate));
@@ -68,7 +55,12 @@ function findDayObj(markedDays, normDate) {
 }
 
 export default function DateTimeEditDialog({
-  open, onClose, date, clientId, onSaved, schoolId,
+  open,
+  onClose,
+  date,
+  clientId,
+  onSaved,
+  schoolTimes,  // FIX: Modtages fra CalendarPage — autoritativ API-kilde
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
@@ -77,9 +69,11 @@ export default function DateTimeEditDialog({
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const closeTimer = useRef(null);
 
-  const handleCloseSnackbar = () => setSnackbar(s => ({ ...s, open: false }));
+  const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
-  function isValidTimeFormat(t) { return /^\d{2}:\d{2}$/.test(t); }
+  function isValidTimeFormat(t) {
+    return /^\d{2}:\d{2}$/.test(t);
+  }
   function isOnBeforeOff(on, off) {
     return isValidTimeFormat(on) && isValidTimeFormat(off) && on <= off;
   }
@@ -91,7 +85,6 @@ export default function DateTimeEditDialog({
     setOffTime("");
 
     const normDate = date.split("T")[0];
-    // FIX: Brug korrekt sæson-startår i stedet for bare år-delen af datoen
     const season = getSeasonFromDate(normDate);
 
     fetch(
@@ -102,25 +95,30 @@ export default function DateTimeEditDialog({
       .then(data => {
         const dayObj = findDayObj(data.markedDays || {}, normDate);
         if (dayObj.onTime && dayObj.offTime) {
+          // Eksisterende tider fra databasen — brug dem direkte
           setOnTime(dayObj.onTime);
           setOffTime(dayObj.offTime);
         } else {
-          const def = getDefaultTimes(normDate, schoolId);
+          // FIX: Standardtider fra API via schoolTimes-prop — ikke localStorage
+          const def = getDefaultTimes(normDate, schoolTimes);
           setOnTime(def.onTime);
           setOffTime(def.offTime);
         }
       })
       .catch(() => {
         setSnackbar({ open: true, message: "Fejl ved hentning!", severity: "error" });
-        const def = getDefaultTimes(normDate, schoolId);
+        // FIX: Standardtider fra API via schoolTimes-prop — ikke localStorage
+        const def = getDefaultTimes(normDate, schoolTimes);
         setOnTime(def.onTime);
         setOffTime(def.offTime);
       })
       .finally(() => setLoading(false));
-  }, [open, date, clientId, schoolId]);
+  }, [open, date, clientId, schoolTimes]);
 
   useEffect(() => {
-    return () => { if (closeTimer.current) clearTimeout(closeTimer.current); };
+    return () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
   }, []);
 
   const validate = () => {
@@ -151,7 +149,6 @@ export default function DateTimeEditDialog({
     setSaving(true);
     try {
       const normDate = date.split("T")[0];
-      // FIX: Brug korrekt sæson-startår
       const season = getSeasonFromDate(normDate);
 
       const resGet = await fetch(
@@ -164,7 +161,6 @@ export default function DateTimeEditDialog({
         serverData = data.markedDays || {};
       }
 
-      // FIX: Find eksisterende nøgle (kan være YYYY-MM-DD eller YYYY-MM-DDT00:00:00)
       let updateKey = normDate;
       const existingKey = Object.keys(serverData).find(k => k.startsWith(normDate));
       if (existingKey) updateKey = existingKey;
@@ -186,7 +182,7 @@ export default function DateTimeEditDialog({
       });
       if (!res.ok) throw new Error("Gemning fejlede");
 
-      // Hent nyeste server-tilstand efter POST og returnér til CalendarPage
+      // Hent nyeste server-tilstand efter POST
       let returnedDay = updatedDays[updateKey];
       try {
         const resGet2 = await fetch(
@@ -203,12 +199,12 @@ export default function DateTimeEditDialog({
           }
         }
       } catch {
-        // Ignorer fetch2-fejl — bruger updatedDays som fallback
+        // Ignorer fetch2-fejl — vi har stadig updatedDays
       }
 
       if (onSaved) onSaved({ date: normDate, clientId, day: returnedDay });
-      setSnackbar({ open: true, message: "Gemt!", severity: "success" });
 
+      setSnackbar({ open: true, message: "Gemt!", severity: "success" });
       closeTimer.current = setTimeout(() => {
         setSnackbar({ open: false, message: "", severity: "success" });
         if (onClose) onClose();
@@ -223,7 +219,7 @@ export default function DateTimeEditDialog({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle sx={{ pb: 0 }}>
-        <Box sx={{ display: "flex", alignItems: "center" }}>
+        <Box sx={{ display: "flex", alignItems: "center", position: "relative" }}>
           <span style={{ margin: "0 auto" }}>
             {date ? `Rediger tid for ${formatFullDate(date)}` : "Rediger tid"}
           </span>
@@ -247,7 +243,12 @@ export default function DateTimeEditDialog({
                   value={onTime}
                   onChange={e => setOnTime(e.target.value)}
                   InputProps={{ style: { backgroundColor: "#f6f6f6" } }}
-                  inputProps={{ min: EARLIEST, max: onTimeMax, step: 300, title: "Angiv her hvornår klienten tænder" }}
+                  inputProps={{
+                    min: EARLIEST,
+                    max: onTimeMax,
+                    step: 300,
+                    title: "Angiv her hvornår klienten tænder",
+                  }}
                 />
               </Box>
               <Box sx={{ flex: 1 }}>
@@ -260,7 +261,12 @@ export default function DateTimeEditDialog({
                   value={offTime}
                   onChange={e => setOffTime(e.target.value)}
                   InputProps={{ style: { backgroundColor: "#f6f6f6" } }}
-                  inputProps={{ min: offTimeMin, max: LATEST, step: 300, title: "Angiv her hvornår klienten slukker" }}
+                  inputProps={{
+                    min: offTimeMin,
+                    max: LATEST,
+                    step: 300,
+                    title: "Angiv her hvornår klienten slukker",
+                  }}
                 />
               </Box>
             </Box>
