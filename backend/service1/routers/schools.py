@@ -5,6 +5,7 @@ from models import School, SchoolCreate, Client, CalendarMarking, User, SchoolSe
 from pydantic import BaseModel
 from typing import Optional
 from auth import get_current_user, get_current_admin_user
+from datetime import date
 
 router = APIRouter()
 
@@ -21,7 +22,6 @@ class SchoolNameUpdate(BaseModel):
 
 
 def _require_school_access(user, school_id: int):
-    """Superadmin har adgang til alle skoler. Admin kun til sin egen."""
     if user.is_superadmin:
         return
     if user.is_admin and user.school_id == school_id:
@@ -40,6 +40,25 @@ def _validate_season(season: str) -> str:
     except ValueError:
         raise HTTPException(status_code=400, detail="Ugyldig sæson — brug format '2025/2026'")
     return season
+
+
+def _get_school_year_dates(season: str):
+    """Returnerer alle datoer i skoleåret som date-objekter."""
+    start_year = int(season.split("/")[0])
+    dates = []
+    for month in range(8, 13):
+        for day in range(1, 32):
+            try:
+                dates.append(date(start_year, month, day))
+            except ValueError:
+                continue
+    for month in range(1, 8):
+        for day in range(1, 32):
+            try:
+                dates.append(date(start_year + 1, month, day))
+            except ValueError:
+                continue
+    return dates
 
 
 @router.get("/schools/", response_model=list[School])
@@ -96,7 +115,6 @@ def update_school_times(
     session=Depends(get_session),
     admin=Depends(get_current_admin_user)
 ):
-    """Bagudkompatibelt endpoint — opdaterer skolens standardtider (ikke sæsonbaseret)."""
     _require_school_access(admin, school_id)
     school = session.get(School, school_id)
     if not school:
@@ -133,7 +151,6 @@ def get_school_season_times(
     session=Depends(get_session),
     user=Depends(get_current_user)
 ):
-    """Henter sæsonbaserede tider. Falder tilbage til skolens standardtider."""
     _validate_season(season)
     school = session.get(School, school_id)
     if not school:
@@ -163,7 +180,6 @@ def update_school_season_times(
     session=Depends(get_session),
     admin=Depends(get_current_admin_user)
 ):
-    """Gemmer sæsonbaserede tider. Superadmin: alle skoler. Admin: kun egen skole."""
     _validate_season(season)
     _require_school_access(admin, school_id)
     school = session.get(School, school_id)
@@ -199,6 +215,109 @@ def update_school_season_times(
         "weekend": {"onTime": season_times.weekend_on, "offTime": season_times.weekend_off},
         "school_id": school_id,
         "season": season,
+    }
+
+
+@router.post("/schools/{school_id}/apply-season-times/{season:path}")
+def apply_season_times_to_clients(
+    school_id: int,
+    season: str,
+    session=Depends(get_session),
+    admin=Depends(get_current_admin_user)
+):
+    """
+    Overskriver ALLE dage (både on og off) i calendarmarking for alle klienter
+    tilknyttet skolen i den valgte sæson med de sæsonbaserede tider.
+    Hverdage (ma-fr) bruger weekday_on/off, weekend (lø-sø) bruger weekend_on/off.
+    """
+    _validate_season(season)
+    _require_school_access(admin, school_id)
+
+    school = session.get(School, school_id)
+    if not school:
+        raise HTTPException(status_code=404, detail="Skole ikke fundet")
+
+    # Hent sæsonbaserede tider — kræv at de findes
+    season_times = session.exec(
+        select(SchoolSeasonTimes).where(
+            SchoolSeasonTimes.school_id == school_id,
+            SchoolSeasonTimes.season == season
+        )
+    ).first()
+
+    if season_times:
+        wd_on  = season_times.weekday_on
+        wd_off = season_times.weekday_off
+        we_on  = season_times.weekend_on
+        we_off = season_times.weekend_off
+    else:
+        # Fallback til skolens standardtider
+        wd_on  = school.weekday_on  or "09:00"
+        wd_off = school.weekday_off or "22:30"
+        we_on  = school.weekend_on  or "08:00"
+        we_off = school.weekend_off or "18:00"
+
+    # Alle datoer i sæsonen
+    all_dates = _get_school_year_dates(season)
+
+    # Alle godkendte klienter tilknyttet skolen
+    clients = session.exec(
+        select(Client).where(
+            Client.school_id == school_id,
+            Client.status == "approved"
+        )
+    ).all()
+
+    if not clients:
+        raise HTTPException(status_code=404, detail="Ingen godkendte klienter fundet for denne skole")
+
+    updated_clients = []
+    for client in clients:
+        # Byg komplet markings-dict — ALLE dage sættes til "on" med korrekte tider
+        new_markings = {}
+        for d in all_dates:
+            is_weekend = d.weekday() >= 5  # 5=lørdag, 6=søndag
+            if is_weekend:
+                new_markings[d.isoformat()] = {
+                    "status": "on",
+                    "onTime": we_on,
+                    "offTime": we_off,
+                }
+            else:
+                new_markings[d.isoformat()] = {
+                    "status": "on",
+                    "onTime": wd_on,
+                    "offTime": wd_off,
+                }
+
+        # Opdatér eller opret CalendarMarking
+        existing = session.exec(
+            select(CalendarMarking).where(
+                CalendarMarking.season == season,
+                CalendarMarking.client_id == client.id
+            )
+        ).first()
+
+        if existing:
+            existing.markings = new_markings
+            session.add(existing)
+        else:
+            session.add(CalendarMarking(
+                season=season,
+                client_id=client.id,
+                markings=new_markings
+            ))
+
+        updated_clients.append(client.id)
+
+    session.commit()
+
+    return {
+        "ok": True,
+        "school_id": school_id,
+        "season": season,
+        "updated_clients": updated_clients,
+        "total_days": len(all_dates),
     }
 
 
