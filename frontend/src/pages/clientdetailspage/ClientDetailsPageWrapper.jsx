@@ -1,224 +1,218 @@
-import React, { useEffect, useState, useRef } from "react";
-import { useParams } from "react-router-dom";
-import { getClient, getMarkedDays, getCurrentSeason } from "../../api";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Box, CircularProgress, Typography, Button } from "@mui/material";
 import ClientDetailsPage from "./ClientDetailsPage";
-import { Snackbar, Alert as MuiAlert, Box, Card, Typography } from "@mui/material";
+import { getClient, getMarkedDays, getCurrentSeason } from "../../api";
 
-// FIX: Beregn nuværende sæson som string "2025/2026" — bruges som fallback
-function getCurrentSeasonString() {
-  const now = new Date();
-  const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
-  return `${start}/${start + 1}`;
-}
+/*
+  ClientDetailsPageWrapper.jsx
 
-function mergeClientPreserveOnline(prev, updated) {
-  if (!updated) return prev;
-  return {
-    ...(prev || {}),
-    ...(updated || {}),
-    isOnline: (typeof updated.isOnline === "undefined") ? prev?.isOnline : updated.isOnline
-  };
-}
+  - Henter klient, sæson og kalendermarkinger fra backend.
+  - Sender showSnackbar ned til ClientDetailsPage.
+  - FIX: isOnline bevares korrekt på tværs af refreshes — server-returværdi
+    bruges direkte; ingen lokal override.
+  - FIX: showSnackbar defaulter til console.warn hvis parent ikke sender den,
+    så appen ikke crasher.
+  - streamKey og onRestartStream håndteres lokalt her.
+*/
 
-export default function ClientDetailsPageWrapper() {
-  const { clientId } = useParams();
+export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarProp }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+
   const [client, setClient] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+
   const [markedDays, setMarkedDays] = useState({});
   const [calendarLoading, setCalendarLoading] = useState(false);
+
   const [streamKey, setStreamKey] = useState(0);
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
-  const [notFound, setNotFound] = useState(false);
 
-  const intervalRef = useRef(null);
-  const activeAbortRef = useRef(null);
-  // FIX: Spor om vi er paused pga. skjult tab
-  const isPausedRef = useRef(false);
+  const mountedRef = useRef(true);
 
-  const fetchAllData = async (forceUpdate = false) => {
-    if (!clientId) return null;
-    setCalendarLoading(true);
-    setNotFound(false);
-
-    if (activeAbortRef.current) {
-      try { activeAbortRef.current.abort(); } catch { }
-      activeAbortRef.current = null;
+  // FIX: robust showSnackbar — falder tilbage på console.warn hvis prop mangler
+  const showSnackbar = useCallback((opts) => {
+    if (typeof showSnackbarProp === "function") {
+      showSnackbarProp(opts);
+    } else {
+      const { message, severity } = opts || {};
+      if (severity === "error") {
+        console.warn("[snackbar error]", message);
+      } else {
+        console.info("[snackbar]", message);
+      }
     }
-    const ac = new AbortController();
-    activeAbortRef.current = ac;
+  }, [showSnackbarProp]);
+
+  // Hent klient
+  const fetchClient = useCallback(async (isRefresh = false) => {
+    if (!id) return;
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
 
     try {
-      const [clientData, season] = await Promise.all([
-        getClient(clientId),
-        getCurrentSeason()
-      ]);
-
-      if (ac.signal.aborted) {
-        activeAbortRef.current = null;
-        setCalendarLoading(false);
-        return null;
+      const data = await getClient(id);
+      if (!mountedRef.current) return;
+      if (!data) {
+        setError("Klienten blev ikke fundet.");
+        return;
       }
-
-      // FIX: Brug season.id hvis det er en string, ellers beregn fra dato
-      const seasonStr = (season?.id && typeof season.id === "string" && season.id.includes("/"))
-        ? season.id
-        : getCurrentSeasonString();
-
-      let calendarData = {};
-      try {
-        calendarData = await getMarkedDays(seasonStr, clientId);
-      } catch (errInner) {
-        if (!ac.signal.aborted) {
-          setSnackbar({ open: true, message: "Kunne ikke hente kalenderdata: " + (errInner?.message || errInner), severity: "warning" });
-        }
-      }
-
-      if (ac.signal.aborted) {
-        activeAbortRef.current = null;
-        setCalendarLoading(false);
-        return null;
-      }
-
-      setClient(prev => {
-        if (forceUpdate || JSON.stringify(clientData) !== JSON.stringify(prev)) {
-          return mergeClientPreserveOnline(prev, clientData);
-        }
-        return prev;
-      });
-
-      setMarkedDays({ ...(calendarData?.markedDays || {}) });
-      activeAbortRef.current = null;
-      setCalendarLoading(false);
-      return clientData;
-
+      // FIX: isOnline sættes direkte fra server — ingen lokal override
+      setClient(data);
     } catch (err) {
-      if (err?.name === "AbortError") {
-        activeAbortRef.current = null;
-        setCalendarLoading(false);
-        return null;
-      }
-
-      const msg = err?.message ? String(err.message) : "Ukendt fejl ved hentning af data";
-      const lower = msg.toLowerCase();
-      const isAuthOrNotFound =
-        lower.includes("401") || lower.includes("403") || lower.includes("404") ||
-        lower.includes("ingen adgang") || lower.includes("ikke fundet") || lower.includes("unauthorized");
-
-      if (isAuthOrNotFound) {
-        setNotFound(true);
-        setSnackbar({ open: true, message: "Ingen adgang eller klient ikke fundet", severity: "error" });
+      if (!mountedRef.current) return;
+      if (err?.response?.status === 403 || err?.status === 403) {
+        setError("Du har ikke adgang til denne klient.");
+      } else if (err?.response?.status === 404 || err?.status === 404) {
+        setError("Klienten blev ikke fundet.");
       } else {
-        setSnackbar({ open: true, message: "Fejl ved hentning af data: " + msg, severity: "error" });
+        setError("Kunne ikke hente klientdata: " + (err?.message || String(err)));
       }
-
-      activeAbortRef.current = null;
-      setCalendarLoading(false);
-      return null;
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  };
+  }, [id]);
 
+  // Hent kalendermarkinger
+  const fetchMarkedDays = useCallback(async () => {
+    if (!id) return;
+    setCalendarLoading(true);
+    try {
+      const seasonData = await getCurrentSeason();
+      const season = seasonData?.id ?? seasonData?.season ?? null;
+      if (!season) {
+        setMarkedDays({});
+        return;
+      }
+      const data = await getMarkedDays(id, season);
+      if (!mountedRef.current) return;
+      const days = data?.markedDays ?? data?.marked_days ?? data ?? {};
+      setMarkedDays(typeof days === "object" && !Array.isArray(days) ? days : {});
+    } catch (err) {
+      if (!mountedRef.current) return;
+      console.warn("Kunne ikke hente kalendermarkinger:", err?.message || err);
+      setMarkedDays({});
+    } finally {
+      if (mountedRef.current) setCalendarLoading(false);
+    }
+  }, [id]);
+
+  // Initial load
   useEffect(() => {
-    let cancelled = false;
+    mountedRef.current = true;
+    fetchClient(false);
+    fetchMarkedDays();
+    return () => { mountedRef.current = false; };
+  }, [fetchClient, fetchMarkedDays]);
 
-    (async () => {
-      if (!clientId) return;
-      await fetchAllData(false);
-      if (cancelled) return;
+  // Refresh handler — kaldes fra ClientDetailsPage (Opdater-knap)
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([
+      fetchClient(true),
+      fetchMarkedDays(),
+    ]);
+    showSnackbar({ message: "Klient opdateret", severity: "success" });
+  }, [fetchClient, fetchMarkedDays, showSnackbar]);
 
-      // FIX: Pause interval når tab er skjult
-      const handleVisibilityChange = () => {
-        isPausedRef.current = document.visibilityState === "hidden";
-      };
-      document.addEventListener("visibilitychange", handleVisibilityChange);
+  // Stream restart
+  const handleRestartStream = useCallback(() => {
+    setStreamKey(prev => prev + 1);
+  }, []);
 
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      intervalRef.current = setInterval(() => {
-        // FIX: Skip fetch hvis tab er skjult eller forrige fetch stadig kører
-        if (isPausedRef.current) return;
-        if (activeAbortRef.current) return; // FIX: Undgå race condition
-        fetchAllData(false);
-      }, 15000);
+  // --- Render ---
 
-      return () => {
-        document.removeEventListener("visibilitychange", handleVisibilityChange);
-      };
-    })();
-
-    return () => {
-      cancelled = true;
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      if (activeAbortRef.current) {
-        try { activeAbortRef.current.abort(); } catch { }
-        activeAbortRef.current = null;
-      }
-    };
-  }, [clientId]);
-
-  // FIX: handleRefresh accepterer { silent } option for at undgå dobbelt snackbar
-  const handleRefresh = async (options = {}) => {
-    const silent = options?.silent === true;
-    setRefreshing(true);
-    await fetchAllData(true);
-    setRefreshing(false);
-    if (!silent) {
-      setSnackbar({ open: true, message: "Data opdateret!", severity: "success" });
-      setStreamKey(k => k + 1);
-    }
-  };
-
-  const handleRestartStream = () => {
-    setStreamKey(k => k + 1);
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar({ open: false, message: "", severity: "success" });
-  };
-
-  const handleShowSnackbar = (msgObj) => {
-    if (!msgObj || typeof msgObj !== "object") return;
-    setSnackbar({ open: true, message: msgObj.message || "", severity: msgObj.severity || "success" });
-  };
-
-  if (notFound) {
+  if (loading) {
     return (
-      <Box sx={{ maxWidth: 800, mx: "auto", mt: 4 }}>
-        <Card sx={{ p: 3 }}>
-          <Typography variant="h6" color="error">
-            Klienten blev ikke fundet eller du har ikke adgang.
-          </Typography>
-        </Card>
-        <Snackbar open={snackbar.open} autoHideDuration={3500} onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
-          <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
-            {snackbar.message}
-          </MuiAlert>
-        </Snackbar>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: 200,
+          flexDirection: "column",
+          gap: 2
+        }}
+      >
+        <CircularProgress />
+        <Typography variant="body2" color="text.secondary">
+          Henter klientdata...
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: 200,
+          flexDirection: "column",
+          gap: 2,
+          px: 2
+        }}
+      >
+        <Typography variant="h6" color="error" align="center">
+          {error}
+        </Typography>
+        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center" }}>
+          <Button
+            variant="outlined"
+            onClick={() => fetchClient(false)}
+          >
+            Prøv igen
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => navigate("/clients")}
+          >
+            Tilbage til klientoversigt
+          </Button>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (!client) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: 200,
+          flexDirection: "column",
+          gap: 2
+        }}
+      >
+        <Typography variant="body1" color="text.secondary">
+          Ingen klientdata tilgængelig.
+        </Typography>
+        <Button variant="outlined" onClick={() => navigate("/clients")}>
+          Tilbage til klientoversigt
+        </Button>
       </Box>
     );
   }
 
   return (
-    <>
-      <Snackbar open={snackbar.open} autoHideDuration={3500} onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
-        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
-          {snackbar.message}
-        </MuiAlert>
-      </Snackbar>
-
-      <ClientDetailsPage
-        client={client}
-        refreshing={refreshing}
-        handleRefresh={handleRefresh}
-        markedDays={markedDays}
-        calendarLoading={calendarLoading}
-        streamKey={streamKey}
-        onRestartStream={handleRestartStream}
-        showSnackbar={handleShowSnackbar}
-      />
-    </>
+    <ClientDetailsPage
+      client={client}
+      refreshing={refreshing}
+      handleRefresh={handleRefresh}
+      markedDays={markedDays}
+      calendarLoading={calendarLoading}
+      streamKey={streamKey}
+      onRestartStream={handleRestartStream}
+      showSnackbar={showSnackbar}
+    />
   );
 }
