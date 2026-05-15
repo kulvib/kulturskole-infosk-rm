@@ -23,18 +23,15 @@ function formatFullDate(dateStr) {
 const EARLIEST = "00:00";
 const LATEST = "23:59";
 
-// FIX: Beregn korrekt sæson-startår ud fra dato.
-// Datoer i jan-jul hører til forrige sæson (fx jan 2026 → sæson 2025).
+// FIX: Returnerer string "2025/2026" i stedet for integer
 function getSeasonFromDate(dateStr) {
   const normDate = dateStr.split("T")[0];
   const year = parseInt(normDate.substring(0, 4));
   const month = parseInt(normDate.substring(5, 7));
-  return month >= 8 ? year : year - 1;
+  const startYear = month >= 8 ? year : year - 1;
+  return `${startYear}/${startYear + 1}`;
 }
 
-// FIX: Standardtider hentes udelukkende fra schoolTimes-prop (API-kilde).
-// localStorage bruges ikke længere — det var årsagen til uoverensstemmelse
-// mellem SchoolAdministration og DateTimeEditDialog.
 function getDefaultTimes(dateStr, schoolTimes) {
   const date = new Date(dateStr);
   const day = date.getDay();
@@ -60,7 +57,8 @@ export default function DateTimeEditDialog({
   date,
   clientId,
   onSaved,
-  schoolTimes,  // FIX: Modtages fra CalendarPage — autoritativ API-kilde
+  schoolTimes,
+  season, // FIX: modtages fra CalendarPage som string "2025/2026"
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
@@ -85,21 +83,20 @@ export default function DateTimeEditDialog({
     setOffTime("");
 
     const normDate = date.split("T")[0];
-    const season = getSeasonFromDate(normDate);
+    // FIX: Brug season-prop hvis tilgængelig, ellers beregn fra dato
+    const seasonStr = season || getSeasonFromDate(normDate);
 
     fetch(
-      `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
+      `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${encodeURIComponent(seasonStr)}`,
       { credentials: "include" }
     )
       .then(res => res.json())
       .then(data => {
         const dayObj = findDayObj(data.markedDays || {}, normDate);
         if (dayObj.onTime && dayObj.offTime) {
-          // Eksisterende tider fra databasen — brug dem direkte
           setOnTime(dayObj.onTime);
           setOffTime(dayObj.offTime);
         } else {
-          // FIX: Standardtider fra API via schoolTimes-prop — ikke localStorage
           const def = getDefaultTimes(normDate, schoolTimes);
           setOnTime(def.onTime);
           setOffTime(def.offTime);
@@ -107,13 +104,12 @@ export default function DateTimeEditDialog({
       })
       .catch(() => {
         setSnackbar({ open: true, message: "Fejl ved hentning!", severity: "error" });
-        // FIX: Standardtider fra API via schoolTimes-prop — ikke localStorage
         const def = getDefaultTimes(normDate, schoolTimes);
         setOnTime(def.onTime);
         setOffTime(def.offTime);
       })
       .finally(() => setLoading(false));
-  }, [open, date, clientId, schoolTimes]);
+  }, [open, date, clientId, schoolTimes, season]);
 
   useEffect(() => {
     return () => {
@@ -149,10 +145,11 @@ export default function DateTimeEditDialog({
     setSaving(true);
     try {
       const normDate = date.split("T")[0];
-      const season = getSeasonFromDate(normDate);
+      // FIX: seasonStr er altid string "2025/2026"
+      const seasonStr = season || getSeasonFromDate(normDate);
 
       const resGet = await fetch(
-        `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
+        `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${encodeURIComponent(seasonStr)}`,
         { credentials: "include" }
       );
       let serverData = {};
@@ -168,10 +165,11 @@ export default function DateTimeEditDialog({
       const updatedDays = { ...serverData };
       updatedDays[updateKey] = { status: "on", onTime, offTime };
 
+      // FIX: season sendes som string — ikke Number()
       const payload = {
         markedDays: { [String(clientId)]: updatedDays },
         clients: [clientId],
-        season: Number(season),
+        season: seasonStr,
       };
 
       const res = await fetch(`${apiUrl}/api/calendar/marked-days`, {
@@ -182,11 +180,10 @@ export default function DateTimeEditDialog({
       });
       if (!res.ok) throw new Error("Gemning fejlede");
 
-      // Hent nyeste server-tilstand efter POST
       let returnedDay = updatedDays[updateKey];
       try {
         const resGet2 = await fetch(
-          `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
+          `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${encodeURIComponent(seasonStr)}`,
           { credentials: "include" }
         );
         if (resGet2.ok) {
@@ -198,9 +195,7 @@ export default function DateTimeEditDialog({
             setOffTime(dayObj2.offTime || "");
           }
         }
-      } catch {
-        // Ignorer fetch2-fejl — vi har stadig updatedDays
-      }
+      } catch { }
 
       if (onSaved) onSaved({ date: normDate, clientId, day: returnedDay });
 
@@ -238,17 +233,10 @@ export default function DateTimeEditDialog({
                   Tænd tid
                 </Typography>
                 <TextField
-                  type="time"
-                  fullWidth
-                  value={onTime}
+                  type="time" fullWidth value={onTime}
                   onChange={e => setOnTime(e.target.value)}
                   InputProps={{ style: { backgroundColor: "#f6f6f6" } }}
-                  inputProps={{
-                    min: EARLIEST,
-                    max: onTimeMax,
-                    step: 300,
-                    title: "Angiv her hvornår klienten tænder",
-                  }}
+                  inputProps={{ min: EARLIEST, max: onTimeMax, step: 300 }}
                 />
               </Box>
               <Box sx={{ flex: 1 }}>
@@ -256,17 +244,10 @@ export default function DateTimeEditDialog({
                   Sluk tid
                 </Typography>
                 <TextField
-                  type="time"
-                  fullWidth
-                  value={offTime}
+                  type="time" fullWidth value={offTime}
                   onChange={e => setOffTime(e.target.value)}
                   InputProps={{ style: { backgroundColor: "#f6f6f6" } }}
-                  inputProps={{
-                    min: offTimeMin,
-                    max: LATEST,
-                    step: 300,
-                    title: "Angiv her hvornår klienten slukker",
-                  }}
+                  inputProps={{ min: offTimeMin, max: LATEST, step: 300 }}
                 />
               </Box>
             </Box>
@@ -282,9 +263,7 @@ export default function DateTimeEditDialog({
         </Button>
       </DialogActions>
       <Snackbar
-        open={snackbar.open}
-        autoHideDuration={1800}
-        onClose={handleCloseSnackbar}
+        open={snackbar.open} autoHideDuration={1800} onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
