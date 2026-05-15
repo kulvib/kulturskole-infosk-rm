@@ -88,10 +88,10 @@ export default function ClientDetailsLivestreamSection({
   const [manifestReady, setManifestReady]       = useState(false);
   const [error, setError]                       = useState("");
   const [buffering, setBuffering]               = useState(false);
-  const [currentSegNum, setCurrentSegNum]       = useState(null);  // nummer på segment der afspilles nu
-  const [fragDuration, setFragDuration]         = useState(8);     // segmentlængde i sekunder
-  const [lastSegNum, setLastSegNum]             = useState(null);  // nyeste segment på server
-  const [lastSegmentLag, setLastSegmentLag]     = useState(null);  // uploadalder på nyeste segment
+  const [currentSegNum, setCurrentSegNum]       = useState(null);
+  const [fragDuration, setFragDuration]         = useState(8);
+  const [lastSegNum, setLastSegNum]             = useState(null);
+  const [lastSegmentLag, setLastSegmentLag]     = useState(null);
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
   const [lastFetched, setLastFetched]           = useState(null);
   const [showControls, setShowControls]         = useState(false);
@@ -181,13 +181,9 @@ export default function ClientDetailsLivestreamSection({
       // -----------------------------------------------------------------------
       // Chrome + Firefox: HLS.js
       //
-      // CHROME FIX: korrekt initialiseringsrækkefølge:
-      //   1. attachMedia(video) — binder MSE pipeline til video-elementet
-      //   2. vent på MEDIA_ATTACHED event
-      //   3. loadSource(url) — starter manifest-fetch
-      //
-      // Forkert rækkefølge (loadSource → attachMedia) giver sort skærm i Chrome
-      // fordi MSE-buffere initialiseres inden video-elementet er klar.
+      // CHROME FIX: video-egenskaber sættes FØR attachMedia så Chrome's MSE
+      // pipeline læser dem korrekt ved binding.
+      // Derefter: attachMedia → MEDIA_ATTACHED → loadSource.
       // -----------------------------------------------------------------------
       const hls = new Hls({
         liveSyncDurationCount:       3,
@@ -199,13 +195,16 @@ export default function ClientDetailsLivestreamSection({
         enableWorker:                true,
         startLevel:                  -1,
         lowLatencyMode:              false,
-        // xhrSetup FJERNET — ingen Authorization-header på segment-requests
-        // → ingen CORS preflight OPTIONS → Firefox og Chrome virker
       });
 
       hlsRef.current = hls;
 
-      // CHROME FIX: attachMedia FØRST
+      // CHROME FIX: sæt egenskaber FØR attachMedia
+      video.muted       = true;
+      video.autoplay    = true;
+      video.playsInline = true;
+
+      // CHROME FIX: attachMedia EFTER egenskaber er sat
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
@@ -216,7 +215,6 @@ export default function ClientDetailsLivestreamSection({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setManifestReady(true);
         setError("");
-        // play() med lille delay så React når at re-rendre
         playTimeout = setTimeout(() => video.play().catch(() => {}), 100);
       });
 
@@ -244,8 +242,6 @@ export default function ClientDetailsLivestreamSection({
         }
       });
 
-      video.muted = true; video.autoplay = true; video.playsInline = true;
-
       return () => {
         if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
         if (playTimeout) clearTimeout(playTimeout);
@@ -259,7 +255,6 @@ export default function ClientDetailsLivestreamSection({
 
   // -------------------------------------------------------------------------
   // Backend polling — hvert 2s
-  // Henter nyeste segmentnummer + uploadalder fra serveren.
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !manifestReady || clientOnline === false) return;
@@ -275,14 +270,10 @@ export default function ClientDetailsLivestreamSection({
           if (resp.ok) {
             const data = await resp.json();
             setLastFetched(new Date());
-
-            // Nyeste segmentnummer på server
             const num = extractSegNum(data.segment);
             if (num !== null) setLastSegNum(num);
-
             if (data.timestamp) {
               setLastSegmentTimestamp(data.timestamp);
-              // uploadalder = tid siden server modtog nyeste segment
               setLastSegmentLag((Date.now() - new Date(data.timestamp).getTime()) / 1000);
             } else {
               setLastSegmentTimestamp(null);
@@ -312,7 +303,7 @@ export default function ClientDetailsLivestreamSection({
         const liveEdge = video.seekable.end(video.seekable.length - 1);
         const lag = liveEdge - video.currentTime;
         if (isFinite(lag) && lag >= 0 && lag < 600) {
-          setLastSegmentLag(lag); // brug som lag-kilde for Safari
+          setLastSegmentLag(lag);
         }
       }
     }, 1000);
@@ -320,24 +311,11 @@ export default function ClientDetailsLivestreamSection({
   }, [manifestReady, effectiveRefreshKey, clientOnline]);
 
   // -------------------------------------------------------------------------
-  // Beregning af faktisk forsinkelse
-  //
-  // FORKLARING:
-  //   lastSegNum    = nyeste segments nummer på server (fx 47)
-  //   currentSegNum = segment der afspilles nu i spilleren (fx 42)
-  //   fragDuration  = varighed pr. segment i sekunder (fra HLS.js, fx 8s)
-  //   lastSegmentLag = uploadalder på nyeste segment (tid siden server modtog det, fx 3s)
-  //
-  //   totalLag = (47 - 42) × 8 + 3 = 43s ✓
-  //
-  // Dette er den eneste metode der giver præcis forsinkelse uanset browser,
-  // clocksync eller EXT-X-PROGRAM-DATE-TIME i manifestet.
-  //
-  // Safari: bruger video.seekable.end - video.currentTime direkte.
+  // Forsinkelsesberegning:
+  //   totalLag = (sidsteSeg - spillerSeg) × segSek + uploadAlder
   // -------------------------------------------------------------------------
   const computedLag = useMemo(() => {
     if (isSafari()) {
-      // Safari bruger seekable-beregning sat i ovenstående interval
       return lastSegmentLag != null ? Math.round(lastSegmentLag) : null;
     }
     if (lastSegNum != null && currentSegNum != null && lastSegmentLag != null) {
@@ -454,9 +432,7 @@ export default function ClientDetailsLivestreamSection({
               </Box>
             ) : (
               <Box sx={{ position: "relative", width: "100%" }}>
-                {/* Video ALTID renderet og synlig — aldrig display:none.
-                    Chrome's MSE pipeline kræver at video-elementet er i DOM
-                    og synligt når afspilning initialiseres. */}
+                {/* Video ALTID renderet og synlig — aldrig display:none */}
                 <video
                   ref={videoRef}
                   id="livestream-video"
@@ -478,7 +454,7 @@ export default function ClientDetailsLivestreamSection({
                   key={effectiveRefreshKey}
                 />
 
-                {/* Loading overlay oven på video — erstatter display:none */}
+                {/* Loading overlay oven på video */}
                 {!manifestReady && (
                   <Box sx={{
                     position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
