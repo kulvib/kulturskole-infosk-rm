@@ -38,11 +38,22 @@ function formatFullDate(dateStr) {
 const EARLIEST = "00:00";
 const LATEST = "23:59";
 
+// FIX: Beregn korrekt sæson-startår ud fra dato
+// En dato i januar 2026 hører til sæson 2025 (skoleår 2025/2026)
+function getSeasonFromDate(dateStr) {
+  const normDate = dateStr.split("T")[0];
+  const year = parseInt(normDate.substring(0, 4));
+  const month = parseInt(normDate.substring(5, 7));
+  return month >= 8 ? year : year - 1;
+}
+
 // Hent standardtider for skoleId
 function getDefaultTimes(dateStr, schoolId) {
   const date = new Date(dateStr);
   const day = date.getDay();
-  const TIMES_STORAGE_KEY = schoolId ? `standard_times_settings_${schoolId}` : "standard_times_settings";
+  const TIMES_STORAGE_KEY = schoolId
+    ? `standard_times_settings_${schoolId}`
+    : "standard_times_settings";
 
   let defaultTimes = {
     weekday: { onTime: "09:00", offTime: "22:30" },
@@ -67,13 +78,21 @@ function getDefaultTimes(dateStr, schoolId) {
   }
 }
 
+function findDayObj(markedDays, normDate) {
+  // Prøv eksakt match først (kort format)
+  if (markedDays[normDate]) return markedDays[normDate];
+  // Prøv fuld datetime-nøgle (YYYY-MM-DDT00:00:00)
+  const key = Object.keys(markedDays).find(k => k.startsWith(normDate));
+  return key ? markedDays[key] : {};
+}
+
 export default function DateTimeEditDialog({
   open,
   onClose,
   date,
   clientId,
   onSaved,
-  schoolId // <-- NY PROP!
+  schoolId,
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
@@ -98,19 +117,19 @@ export default function DateTimeEditDialog({
     setSnackbar({ ...snackbar, open: false });
   };
 
-  function findDayObj(markedDays, normDate) {
-    if (markedDays[normDate]) return markedDays[normDate];
-    const key = Object.keys(markedDays).find(k => k.startsWith(normDate));
-    return key ? markedDays[key] : {};
-  }
-
   useEffect(() => {
     if (!open || !date || !clientId) return;
     setLoading(true);
-    setOnTime(""); setOffTime("");
+    setOnTime("");
+    setOffTime("");
+
     const normDate = date.split("T")[0];
+
+    // FIX: Brug korrekt sæson-startår (ikke bare årstallet fra datoen)
+    const season = getSeasonFromDate(normDate);
+
     fetch(
-      `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${normDate.slice(0, 4)}`,
+      `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
       { credentials: "include" }
     )
       .then(res => res.json())
@@ -120,7 +139,6 @@ export default function DateTimeEditDialog({
           setOnTime(dayObj.onTime);
           setOffTime(dayObj.offTime);
         } else {
-          // Brug standardtid for skole
           const def = getDefaultTimes(normDate, schoolId);
           setOnTime(def.onTime);
           setOffTime(def.offTime);
@@ -128,7 +146,6 @@ export default function DateTimeEditDialog({
       })
       .catch(() => {
         setSnackbar({ open: true, message: "Fejl ved hentning!", severity: "error" });
-        // Brug standardtid for skole ved fejl
         const def = getDefaultTimes(normDate, schoolId);
         setOnTime(def.onTime);
         setOffTime(def.offTime);
@@ -162,7 +179,7 @@ export default function DateTimeEditDialog({
     return true;
   };
 
-  // Dynamisk min/max for inputs:
+  // Dynamisk min/max for inputs
   const onTimeMax = offTime && isValidTimeFormat(offTime) ? offTime : LATEST;
   const offTimeMin = onTime && isValidTimeFormat(onTime) ? onTime : EARLIEST;
 
@@ -171,7 +188,9 @@ export default function DateTimeEditDialog({
     setSaving(true);
     try {
       const normDate = date.split("T")[0];
-      const season = normDate.substring(0, 4);
+
+      // FIX: Brug korrekt sæson-startår
+      const season = getSeasonFromDate(normDate);
 
       const resGet = await fetch(
         `${apiUrl}/api/calendar/marked-days?client_id=${encodeURIComponent(clientId)}&season=${season}`,
@@ -182,22 +201,25 @@ export default function DateTimeEditDialog({
         const data = await resGet.json();
         serverData = data.markedDays || {};
       }
+
+      // Find eksisterende nøgle (kan være YYYY-MM-DDT00:00:00 eller YYYY-MM-DD)
       let updateKey = normDate;
       const existingKey = Object.keys(serverData).find(k => k.startsWith(normDate));
       if (existingKey) updateKey = existingKey;
+
       const updatedDays = { ...serverData };
       updatedDays[updateKey] = {
         status: "on",
         onTime,
-        offTime
+        offTime,
       };
 
       const payload = {
         markedDays: {
-          [String(clientId)]: updatedDays
+          [String(clientId)]: updatedDays,
         },
         clients: [clientId],
-        season: Number(season)
+        season: Number(season),
       };
 
       const res = await fetch(
@@ -212,10 +234,9 @@ export default function DateTimeEditDialog({
           body: JSON.stringify(payload),
         }
       );
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error("Gemning fejlede");
 
-      // EFTER POST: hent den nyeste server-tilstand og opdater inputfelter,
-      // og returner den opdaterede dag via onSaved så caller får præcis hvad der blev gemt.
+      // Hent nyeste server-tilstand efter POST
       let returnedDay = updatedDays[updateKey];
       try {
         const resGet2 = await fetch(
@@ -231,11 +252,11 @@ export default function DateTimeEditDialog({
             setOffTime(dayObj2.offTime || "");
           }
         }
-      } catch (e) {
-        // ignore fetch2 error, we still have updatedDays
+      } catch {
+        // Ignorer fetch2-fejl — vi har stadig updatedDays
       }
 
-      // Send den præcise dag tilbage til CalendarPage, så den kan opdatere sin lokale state
+      // Send den præcise dag tilbage til CalendarPage
       if (onSaved) onSaved({ date: normDate, clientId, day: returnedDay });
 
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
@@ -252,12 +273,7 @@ export default function DateTimeEditDialog({
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="xs"
-      fullWidth
-    >
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle sx={{ pb: 0 }}>
         <Box sx={{ display: "flex", alignItems: "center", position: "relative" }}>
           <span style={{ margin: "0 auto" }}>
@@ -266,7 +282,6 @@ export default function DateTimeEditDialog({
         </Box>
       </DialogTitle>
       <DialogContent>
-        {/* Afstand fra overskriften til felterne er nu mt: 2 */}
         <Box sx={{ mt: 2 }}>
           {loading ? (
             <Box sx={{ minHeight: 80, display: "flex", alignItems: "center" }}>
@@ -275,10 +290,7 @@ export default function DateTimeEditDialog({
           ) : (
             <Box sx={{ display: "flex", gap: 2 }}>
               <Box sx={{ flex: 1 }}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ mb: 0.5, fontWeight: 500 }}
-                >
+                <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>
                   Tænd tid
                 </Typography>
                 <TextField
@@ -294,15 +306,12 @@ export default function DateTimeEditDialog({
                     min: EARLIEST,
                     max: onTimeMax,
                     step: 300,
-                    title: "Angiv her hvornår klienten tænder", // Mouseover tekst
+                    title: "Angiv her hvornår klienten tænder",
                   }}
                 />
               </Box>
               <Box sx={{ flex: 1 }}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ mb: 0.5, fontWeight: 500 }}
-                >
+                <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 500 }}>
                   Sluk tid
                 </Typography>
                 <TextField
@@ -318,7 +327,7 @@ export default function DateTimeEditDialog({
                     min: offTimeMin,
                     max: LATEST,
                     step: 300,
-                    title: "Angiv her hvornår klienten slukker", // Mouseover tekst
+                    title: "Angiv her hvornår klienten slukker",
                   }}
                 />
               </Box>
@@ -345,7 +354,12 @@ export default function DateTimeEditDialog({
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
+        <MuiAlert
+          elevation={6}
+          variant="filled"
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+        >
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
