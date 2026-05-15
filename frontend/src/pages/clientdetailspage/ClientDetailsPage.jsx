@@ -17,7 +17,9 @@ import ClientDetailsHeaderSection from "./ClientDetailsHeaderSection";
 import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
 import ClientDetailsActionsSection from "./DetailsActionsSection";
 import ClientDetailsLivestreamSection from "./ClientDetailsLivestreamSection";
-import ClientCalendarDialog from "./ClientCalendarDialog";
+
+// FIX: Korrekt sti — filen ligger i ../calendarpage/ ikke ./
+import ClientCalendarDialog from "../calendarpage/ClientCalendarDialog";
 
 import {
   getChromeStatus,
@@ -38,10 +40,9 @@ import {
     - getChromeStatus-polling (hvert 3s) synkroniserer basen med backend
       uden at resette tickeren.
 
-  FIX 2 (GET /api/clients/{id} ikke i Network):
-    - getMarkedDays i ClientDetailsPageWrapper blev kaldt med
-      (id, season) men signaturen er (season, client_id).
-    - Fikset i ClientDetailsPageWrapper.jsx nedenfor (se kommentar).
+  FIX 2 (ClientCalendarDialog sti):
+    - Rettet fra "./ClientCalendarDialog"
+      til "../calendarpage/ClientCalendarDialog"
 
   FIX 3 (showSnackbar):
     - Lokal Snackbar bruges hvis parent ikke sender showSnackbar prop.
@@ -100,7 +101,7 @@ export default function ClientDetailsPage({
   );
 
   // --- Dynamisk oppetid ---
-  // FIX: uptime vises dynamisk via lokal ticker.
+  // FIX 1: uptime vises dynamisk via lokal ticker.
   // uptimeBaseRef = sekunder fra seneste backend-svar.
   // uptimeFetchRef = Date.now() da basen blev sat.
   const [uptime, setUptime] = useState(null);
@@ -125,21 +126,21 @@ export default function ClientDetailsPage({
     if (client?.last_seen) setLastSeen(client.last_seen);
     if (client?.chrome_status != null) setLiveChromeStatus(client.chrome_status);
     if (client?.chrome_color != null) setLiveChromeColor(client.chrome_color);
-  }, [client?.id]); // kun ved nyt klient-id, ikke ved hver re-render
+  }, [client?.id]);
 
   // Lokal uptime ticker — tæller hvert sekund
   useEffect(() => {
-    // Start kun ticker hvis vi har en base
     if (uptimeBaseRef.current == null || uptimeFetchRef.current == null) return;
 
     const interval = setInterval(() => {
       if (!mountedRef.current) return;
-      const elapsed = Math.round((Date.now() - uptimeFetchRef.current) / 1000);
+      const elapsed = Math.round(
+        (Date.now() - uptimeFetchRef.current) / 1000
+      );
       setUptime(uptimeBaseRef.current + elapsed);
     }, 1000);
 
     return () => clearInterval(interval);
-    // Genstart ticker når klient-id skifter
   }, [client?.id]);
 
   // getChromeStatus polling — synkroniserer uptime-base med backend
@@ -162,15 +163,13 @@ export default function ClientDetailsPage({
             setLiveChromeColor(data.chrome_color);
           if (data?.last_seen != null) setLastSeen(data.last_seen);
 
-          // FIX: Synkronisér uptime-base med backend uden at resette ticker
-          // Backend returnerer uptime som sekunder-string
+          // Synkronisér uptime-base med backend uden at resette ticker
           if (data?.uptime != null) {
             const parsed = parseInt(String(data.uptime), 10);
             if (!isNaN(parsed) && parsed >= 0) {
               uptimeBaseRef.current = parsed;
               uptimeFetchRef.current = Date.now();
-              // Sæt IKKE setUptime her — tickeren beregner den korrekte værdi
-              // ved næste tick (maks 1s forsinkelse)
+              // Sæt IKKE setUptime her — tickeren beregner korrekt ved næste tick
             }
           }
         } catch {
@@ -200,7 +199,6 @@ export default function ClientDetailsPage({
     async (action) => {
       if (!client?.id) return;
       await clientAction(client.id, action);
-      // Giv klienten 1s til at reagere, refresh derefter
       setTimeout(() => {
         if (mountedRef.current) handleRefresh?.();
       }, 1000);
@@ -218,8 +216,7 @@ export default function ClientDetailsPage({
 
   const clientOnline = client?.isOnline ?? false;
 
-  // Effektiv uptime til visning — brug lokal ticker hvis tilgængelig,
-  // ellers client.uptime som fallback
+  // Effektiv uptime til visning
   const displayUptime =
     uptime != null ? uptime : client?.uptime ?? null;
 
