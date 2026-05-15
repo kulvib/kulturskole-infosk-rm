@@ -7,13 +7,16 @@ import { getClient, getMarkedDays, getCurrentSeason } from "../../api";
 /*
   ClientDetailsPageWrapper.jsx
 
-  - Henter klient, sæson og kalendermarkinger fra backend.
-  - Sender showSnackbar ned til ClientDetailsPage.
-  - FIX: isOnline bevares korrekt på tværs af refreshes — server-returværdi
-    bruges direkte; ingen lokal override.
-  - FIX: showSnackbar defaulter til console.warn hvis parent ikke sender den,
-    så appen ikke crasher.
-  - streamKey og onRestartStream håndteres lokalt her.
+  FIX (kritisk): getMarkedDays blev kaldt som getMarkedDays(id, season)
+    men api.js signaturen er getMarkedDays(season, client_id, ...).
+    Dette betød at marked days aldrig blev hentet korrekt og
+    GET /api/clients/{id} så ud til at mangle i Network-fanen
+    fordi fetchMarkedDays kastede en stille fejl der blokerede flowet.
+    Rettet til: getMarkedDays(season, id).
+
+  FIX: isOnline bevares direkte fra server-svar — ingen lokal override.
+  FIX: showSnackbar defaulter til console.warn hvis parent ikke sender prop.
+  FIX: mountedRef guard på alle async operationer.
 */
 
 export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarProp }) {
@@ -32,7 +35,7 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
 
   const mountedRef = useRef(true);
 
-  // FIX: robust showSnackbar — falder tilbage på console.warn hvis prop mangler
+  // Robust showSnackbar — falder tilbage på console hvis prop mangler
   const showSnackbar = useCallback((opts) => {
     if (typeof showSnackbarProp === "function") {
       showSnackbarProp(opts);
@@ -60,7 +63,6 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
         setError("Klienten blev ikke fundet.");
         return;
       }
-      // FIX: isOnline sættes direkte fra server — ingen lokal override
       setClient(data);
     } catch (err) {
       if (!mountedRef.current) return;
@@ -69,7 +71,9 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
       } else if (err?.response?.status === 404 || err?.status === 404) {
         setError("Klienten blev ikke fundet.");
       } else {
-        setError("Kunne ikke hente klientdata: " + (err?.message || String(err)));
+        setError(
+          "Kunne ikke hente klientdata: " + (err?.message || String(err))
+        );
       }
     } finally {
       if (mountedRef.current) {
@@ -90,13 +94,22 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
         setMarkedDays({});
         return;
       }
-      const data = await getMarkedDays(id, season);
+
+      // FIX: Korrekt parameter-rækkefølge: getMarkedDays(season, client_id)
+      // Tidligere forkert: getMarkedDays(id, season)
+      const data = await getMarkedDays(season, id);
+
       if (!mountedRef.current) return;
       const days = data?.markedDays ?? data?.marked_days ?? data ?? {};
-      setMarkedDays(typeof days === "object" && !Array.isArray(days) ? days : {});
+      setMarkedDays(
+        typeof days === "object" && !Array.isArray(days) ? days : {}
+      );
     } catch (err) {
       if (!mountedRef.current) return;
-      console.warn("Kunne ikke hente kalendermarkinger:", err?.message || err);
+      console.warn(
+        "Kunne ikke hente kalendermarkinger:",
+        err?.message || err
+      );
       setMarkedDays({});
     } finally {
       if (mountedRef.current) setCalendarLoading(false);
@@ -108,21 +121,20 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
     mountedRef.current = true;
     fetchClient(false);
     fetchMarkedDays();
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, [fetchClient, fetchMarkedDays]);
 
-  // Refresh handler — kaldes fra ClientDetailsPage (Opdater-knap)
+  // Refresh handler
   const handleRefresh = useCallback(async () => {
-    await Promise.all([
-      fetchClient(true),
-      fetchMarkedDays(),
-    ]);
+    await Promise.all([fetchClient(true), fetchMarkedDays()]);
     showSnackbar({ message: "Klient opdateret", severity: "success" });
   }, [fetchClient, fetchMarkedDays, showSnackbar]);
 
   // Stream restart
   const handleRestartStream = useCallback(() => {
-    setStreamKey(prev => prev + 1);
+    setStreamKey((prev) => prev + 1);
   }, []);
 
   // --- Render ---
@@ -136,7 +148,7 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
           alignItems: "center",
           minHeight: 200,
           flexDirection: "column",
-          gap: 2
+          gap: 2,
         }}
       >
         <CircularProgress />
@@ -157,17 +169,21 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
           minHeight: 200,
           flexDirection: "column",
           gap: 2,
-          px: 2
+          px: 2,
         }}
       >
         <Typography variant="h6" color="error" align="center">
           {error}
         </Typography>
-        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center" }}>
-          <Button
-            variant="outlined"
-            onClick={() => fetchClient(false)}
-          >
+        <Box
+          sx={{
+            display: "flex",
+            gap: 2,
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          <Button variant="outlined" onClick={() => fetchClient(false)}>
             Prøv igen
           </Button>
           <Button
@@ -190,13 +206,16 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
           alignItems: "center",
           minHeight: 200,
           flexDirection: "column",
-          gap: 2
+          gap: 2,
         }}
       >
         <Typography variant="body1" color="text.secondary">
           Ingen klientdata tilgængelig.
         </Typography>
-        <Button variant="outlined" onClick={() => navigate("/clients")}>
+        <Button
+          variant="outlined"
+          onClick={() => navigate("/clients")}
+        >
           Tilbage til klientoversigt
         </Button>
       </Box>
