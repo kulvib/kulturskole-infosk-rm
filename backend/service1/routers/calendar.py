@@ -20,23 +20,19 @@ class MarkedDaysRequest(BaseModel):
 
 
 def parse_iso8601_keys(d: Dict[str, Any]) -> Dict[str, Any]:
-    """Filtrerer ordbogen til kun at indeholde gyldige ISO 8601-datanøgler.
-    Nøgler der ikke er gyldige ISO 8601-datoer, afvises for at forhindre
-    ugyldige data i databasen."""
+    """Filtrerer ordbogen til kun at indeholde gyldige ISO 8601-datanøgler."""
     out = {}
     for k, v in d.items():
         try:
             datetime.fromisoformat(k)
             out[k] = v
         except (ValueError, TypeError):
-            # Ugyldig nøgle — afvises stilfærdigt
             pass
     return out
 
 
 def _is_safe_private_ip(ip_str: str) -> bool:
-    """Returnerer True hvis IP-adressen er en privat/loopback-adresse.
-    Forhindrer SSRF mod cloud-metadata-services og andre interne systemer."""
+    """Returnerer True hvis IP-adressen er en privat/loopback-adresse."""
     try:
         addr = ipaddress.ip_address(ip_str)
         return addr.is_private or addr.is_loopback
@@ -49,7 +45,6 @@ def publish_schedule_for_client(client: Client, markings: Dict[str, Any]):
     if not client_ip:
         print(f"Klient {client.id} har ingen IP-adresse - kan ikke sende kalender")
         return
-    # SSRF-beskyttelse: kun send til private IP-adresser (lokale netværk)
     if not _is_safe_private_ip(client_ip):
         print(f"SSRF-advarsel: Klient {client.id} har en offentlig IP ({client_ip}) — afviser")
         return
@@ -109,7 +104,9 @@ def get_marked_days(
     formatted = {}
     for k, v in markings.items():
         try:
-            iso_key = datetime.fromisoformat(k).isoformat()
+            # Normaliser altid til "YYYY-MM-DDT00:00:00" format for konsistens
+            parsed = datetime.fromisoformat(k)
+            iso_key = parsed.strftime("%Y-%m-%dT00:00:00")
             iso_date = iso_key[:10]
             # Filtrér efter start_date og end_date hvis angivet
             if start_date and iso_date < start_date:
@@ -126,7 +123,6 @@ def get_marked_days(
 def get_seasons_list(count: int = 20, user=Depends(get_current_user)):
     today = date.today()
     first_season = today.year if today.month >= 8 else today.year - 1
-    # Inkluder 2 historiske sæsoner for at give adgang til gammelt kalenderdata
     start = first_season - 2
     return [
         {"id": start + i, "label": f"{start + i}/{start + i + 1}"}
@@ -141,7 +137,13 @@ def get_current_season(user=Depends(get_current_user)):
         season_start, season_end = today.year, today.year + 1
     else:
         season_start, season_end = today.year - 1, today.year
-    return {"id": season_start, "label": f"{season_start}/{season_end}"}
+    return {
+        "id": season_start,
+        "label": f"{season_start}/{season_end}",
+        # FIX: Tilføjet start_date og end_date så frontend kan bruge dem til DatePicker-begrænsning
+        "start_date": date(season_start, 8, 1).isoformat(),
+        "end_date": date(season_end, 7, 31).isoformat(),
+    }
 
 
 @router.post("/calendar/cleanup-past-seasons")
