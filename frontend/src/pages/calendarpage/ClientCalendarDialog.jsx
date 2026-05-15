@@ -22,7 +22,6 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import daLocale from "date-fns/locale/da";
 import { getMarkedDays, getCurrentSeason } from "../../api";
 
-// Datoformat: Søndag 01.08 2025
 function formatDateLong(dt) {
   const weekdays = [
     "Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"
@@ -34,7 +33,8 @@ function formatDateLong(dt) {
   return `${weekday} ${day}.${month} ${year}`;
 }
 
-// FIX: Bruger altid "YYYY-MM-DDT00:00:00" format som backend nu altid returnerer
+// FIX: Slår op med både fuld nøgle (YYYY-MM-DDT00:00:00) og kort nøgle (YYYY-MM-DD)
+// så tabellen viser korrekte data uanset hvilket format backend returnerer.
 function getStatusAndTimesFromRaw(markedDays, dt) {
   const yyyy = dt.getFullYear();
   const mm = (dt.getMonth() + 1).toString().padStart(2, "0");
@@ -42,7 +42,6 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
   const dateKeyFull = `${yyyy}-${mm}-${dd}T00:00:00`;
   const dateKeyShort = `${yyyy}-${mm}-${dd}`;
 
-  // Prøv fuld nøgle først, derefter kort nøgle som fallback
   const data = markedDays[dateKeyFull] || markedDays[dateKeyShort];
 
   if (!data || !data.status || data.status === "off") {
@@ -94,16 +93,11 @@ function ClientPowerPeriodTable({ markedDays, days }) {
         </TableHead>
         <TableBody>
           {days.map((dt) => {
-            const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(
-              markedDays,
-              dt
-            );
+            const { status, powerOn, powerOff } = getStatusAndTimesFromRaw(markedDays, dt);
             return (
               <TableRow key={dt.toISOString().slice(0, 10)}>
                 <TableCell>{formatDateLong(dt)}</TableCell>
-                <TableCell>
-                  <StatusText status={status} />
-                </TableCell>
+                <TableCell><StatusText status={status} /></TableCell>
                 <TableCell>{powerOn}</TableCell>
                 <TableCell>{powerOff}</TableCell>
               </TableRow>
@@ -121,7 +115,7 @@ function addMonths(date, num) {
   return d;
 }
 
-// FIX: Formatér Date-objekt til YYYY-MM-DD string
+// FIX: Formatér Date-objekt til YYYY-MM-DD string til API-kald
 function formatDateToString(d) {
   if (!d) return undefined;
   const yyyy = d.getFullYear();
@@ -149,7 +143,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
           let start = today;
           let end = addMonths(today, 1);
 
-          // FIX: Bruger nu s.start_date og s.end_date som backend returnerer korrekt
+          // FIX: Klip datoer til sæson-grænser kun hvis backend returnerer dem
           if (s && s.start_date && s.end_date) {
             const seasonStart = new Date(s.start_date);
             const seasonEnd = new Date(s.end_date);
@@ -163,7 +157,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
           setEndDate(end);
           setMarkedDays({});
           setShowTable(false);
-        } catch (e) {
+        } catch {
           // Fallback: brug dags dato uden sæson-begrænsning
           setStartDate(new Date());
           setEndDate(addMonths(new Date(), 1));
@@ -191,7 +185,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
     setLoading(false);
   };
 
-  // Beregn sæson-grænser til DatePicker
+  // FIX: Beregn sæson-grænser til DatePicker fra backend-data
   const seasonStartDate = season?.start_date ? new Date(season.start_date) : undefined;
   const seasonEndDate = season?.end_date ? new Date(season.end_date) : undefined;
 
@@ -231,6 +225,7 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               label={<span style={{ fontWeight: 500 }}>Slutdato</span>}
               value={endDate}
               onChange={setEndDate}
+              // FIX: slutdato kan ikke være før startdato
               minDate={startDate || seasonStartDate}
               maxDate={seasonEndDate}
               format="dd/MM/yyyy"
@@ -249,11 +244,9 @@ export default function ClientCalendarDialog({ open, onClose, clientId }) {
               variant="contained"
               color="primary"
               size="large"
-              sx={{
-                minWidth: 165,
-                whiteSpace: "nowrap"
-              }}
+              sx={{ minWidth: 165, whiteSpace: "nowrap" }}
               onClick={handleFetch}
+              // FIX: Deaktiveret også hvis season ikke er hentet endnu
               disabled={loading || !startDate || !endDate || !season}
             >
               Vis kalender
