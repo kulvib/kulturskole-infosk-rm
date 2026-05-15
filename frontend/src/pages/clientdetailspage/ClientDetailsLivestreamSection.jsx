@@ -111,6 +111,7 @@ export default function ClientDetailsLivestreamSection({
   const [showControls, setShowControls]             = useState(false);
   const [localRefreshKey, setLocalRefreshKey]       = useState(0);
   const [refreshing, setRefreshing]                 = useState(false);
+  const [streamStale, setStreamStale]               = useState(false); // FIX: tracker forældet stream
 
   const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -121,11 +122,14 @@ export default function ClientDetailsLivestreamSection({
   }, [streamKey, localRefreshKey]);
 
   // -------------------------------------------------------------------------
-  // Poll /health indtil serveren har segmenter klar
+  // Poll /health indtil serveren har friske segmenter klar
+  // FIX: Respekterer is_stale fra backend — forhindrer at frontend prøver at
+  //      connecte til en stream der er gået ned men har gamle segmenter på disk
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !clientOnline) return;
     setServerReady(false);
+    setStreamStale(false);
     let stop = false;
 
     async function pollUntilReady() {
@@ -140,10 +144,19 @@ export default function ClientDetailsLivestreamSection({
           );
           if (resp.ok) {
             const data = await resp.json();
-            if (data.has_segments) {
-              if (!stop) setServerReady(true);
+
+            // FIX: Kun sæt serverReady=true hvis segmenter er friske (ikke forældede)
+            // is_stale=true betyder klienten er gået ned men segmenterne ligger stadig
+            if (data.has_segments && !data.is_stale) {
+              if (!stop) {
+                setServerReady(true);
+                setStreamStale(false);
+              }
               return;
             }
+
+            // Vis "forældet" besked hvis segmenter eksisterer men er gamle
+            if (!stop) setStreamStale(data.has_segments && data.is_stale);
           }
         } catch {}
         if (!stop) await new Promise(res => setTimeout(res, 2000));
@@ -194,14 +207,15 @@ export default function ClientDetailsLivestreamSection({
 
     } else if (Hls.isSupported()) {
       // --- HLS.js ---
-      // FIX: liveSyncDurationCount øget fra 2 til 3 for at undgå bufferStalledError
-      // 3 × 6s = 18s buffer giver spilleren nok plads mellem segmenter
+      // Tunet til 8s segmenter:
+      // liveSyncDurationCount:3       → 3 × 8s = 24s sync-mål (undgår buffer stalls)
+      // liveMaxLatencyDurationCount:5 → 5 × 8s = 40s max latency
       const hls = new Hls({
-        liveSyncDurationCount:       3,   // var 2 → 3 × 6s = 18s buffer (eliminerer buffer stalls)
-        liveMaxLatencyDurationCount: 5,   // var 4 → 5 × 6s = 30s max latency
-        maxBufferLength:             30,  // var 20 → mere buffer
-        maxMaxBufferLength:          60,  // var 40
-        liveBackBufferLength:        12,  // var 8
+        liveSyncDurationCount:       3,   // 3 × 8s = 24s buffer
+        liveMaxLatencyDurationCount: 5,   // 5 × 8s = 40s max latency
+        maxBufferLength:             30,
+        maxMaxBufferLength:          60,
+        liveBackBufferLength:        12,
         enableWorker:                true,
         startLevel:                  -1,
         lowLatencyMode:              false,
@@ -231,11 +245,13 @@ export default function ClientDetailsLivestreamSection({
             video.load();
           } catch {}
           setManifestReady(false);
+          // FIX: Sæt serverReady=false så health-polling starter forfra
+          // i stedet for at gå direkte til HLS.js igen med et potentielt forældet manifest
           setServerReady(false);
           if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
           fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 3000);
         } else {
-          // Non-fatal (inkl. bufferStalledError) — log kun, ryd efter 5s
+          // Non-fatal (inkl. bufferStalledError) — ryd efter 5s
           setError(data.details || "Ukendt HLS-fejl");
           setTimeout(() => setError(""), 5000);
         }
@@ -276,6 +292,7 @@ export default function ClientDetailsLivestreamSection({
     if (!clientOnline) return;
     setRefreshing(true);
     setServerReady(false);
+    setStreamStale(false);
     setLocalRefreshKey(k => k + 1);
     setTimeout(() => setRefreshing(false), 800);
   };
@@ -373,9 +390,12 @@ export default function ClientDetailsLivestreamSection({
   const lagStatus    = getLagStatus(sanitizedLag, lastSegmentLag);
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
 
-  const loadingText = !serverReady
-    ? "Venter på at stream starter …"
-    : "Forbinder til stream …";
+  // FIX: Tre tydelige loading-states
+  const loadingText = streamStale
+    ? "Stream er gået ned — venter på genstart …"
+    : !serverReady
+      ? "Venter på at stream starter …"
+      : "Forbinder til stream …";
 
   // -------------------------------------------------------------------------
   // Render
@@ -395,7 +415,13 @@ export default function ClientDetailsLivestreamSection({
                 borderRadius: "50%",
                 bgcolor: clientOnline === false
                   ? "#9e9e9e"
-                  : (manifestReady ? "#43a047" : (serverReady ? "#ff9800" : "#e53935")),
+                  : manifestReady
+                    ? "#43a047"
+                    : streamStale
+                      ? "#e53935"       // rød: stream er nede
+                      : serverReady
+                        ? "#ff9800"     // orange: HLS.js forbinder
+                        : "#9e9e9e",    // grå: venter på segmenter
                 border: "1px solid #ddd",
                 mr: 1,
                 animation: (manifestReady && clientOnline !== false)
@@ -535,8 +561,15 @@ export default function ClientDetailsLivestreamSection({
                   </Typography>
                 ) : (
                   <>
-                    <CircularProgress size={isMobile ? 24 : 32} />
-                    <Typography variant="body2" sx={{ ml: 2, fontSize: isMobile ? 13 : undefined }}>
+                    <CircularProgress
+                      size={isMobile ? 24 : 32}
+                      color={streamStale ? "error" : "inherit"}
+                    />
+                    <Typography variant="body2" sx={{
+                      ml: 2,
+                      fontSize: isMobile ? 13 : undefined,
+                      color: streamStale ? "#e53935" : undefined
+                    }}>
                       {loadingText}
                     </Typography>
                   </>
@@ -583,6 +616,7 @@ export default function ClientDetailsLivestreamSection({
                   fontSize: isMobile ? 11 : undefined
                 }}>
                   serverReady=<b>{serverReady ? "ja" : "nej"}</b>,{" "}
+                  isStale=<b>{streamStale ? "ja" : "nej"}</b>,{" "}
                   <Tooltip title={`Råværdi: ${playerLag ?? "-"}`}>
                     <span>playerLag=<b>{formatLagValue(playerLag)}</b></span>
                   </Tooltip>
