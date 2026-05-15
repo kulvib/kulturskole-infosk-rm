@@ -123,6 +123,7 @@ export default function ClientDetailsLivestreamSection({
 
   // -------------------------------------------------------------------------
   // Poll /health indtil serveren har friske segmenter klar
+  // Respekterer is_stale — forhindrer connect til en stream der er gået ned
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!clientId || !clientOnline) return;
@@ -204,6 +205,9 @@ export default function ClientDetailsLivestreamSection({
       // liveSyncDurationCount:5       → 5 × 6s = 30s bag live-kant
       // liveMaxLatencyDurationCount:8 → 8 × 6s = 48s max latency
       // initialLiveManifestSize:4     → vent på 4 segmenter (24s) inden start
+      // autoStartLoad:false           → vi kalder startLoad(-1) manuelt efter
+      //                                 manifest er parset så HLS.js starter
+      //                                 præcis ved liveSyncDurationCount-punktet
       const hls = new Hls({
         liveSyncDurationCount:       5,
         liveMaxLatencyDurationCount: 8,
@@ -211,6 +215,7 @@ export default function ClientDetailsLivestreamSection({
         maxBufferLength:             40,
         maxMaxBufferLength:          80,
         liveBackBufferLength:        12,
+        autoStartLoad:               false, // FIX: vi styrer startpunktet manuelt
         enableWorker:                true,
         startLevel:                  -1,
         lowLatencyMode:              false,
@@ -224,6 +229,10 @@ export default function ClientDetailsLivestreamSection({
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        // FIX: startLoad(-1) tvinger HLS.js til at starte afspilning præcis
+        // ved liveSyncDurationCount-punktet (30s bag live-kanten) i stedet for
+        // at lade HLS.js selv vælge et startpunkt tæt på live-kanten
+        hls.startLoad(-1);
         setManifestReady(true);
         setError("");
       });
