@@ -16,11 +16,10 @@ router = APIRouter()
 class MarkedDaysRequest(BaseModel):
     markedDays: Dict[str, Dict[str, Any]]
     clients: List[int]
-    season: int
+    season: str                              # fx "2025/2026"
 
 
 def parse_iso8601_keys(d: Dict[str, Any]) -> Dict[str, Any]:
-    """Filtrerer ordbogen til kun at indeholde gyldige ISO 8601-datanøgler."""
     out = {}
     for k, v in d.items():
         try:
@@ -32,7 +31,6 @@ def parse_iso8601_keys(d: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _is_safe_private_ip(ip_str: str) -> bool:
-    """Returnerer True hvis IP-adressen er en privat/loopback-adresse."""
     try:
         addr = ipaddress.ip_address(ip_str)
         return addr.is_private or addr.is_loopback
@@ -43,10 +41,10 @@ def _is_safe_private_ip(ip_str: str) -> bool:
 def publish_schedule_for_client(client: Client, markings: Dict[str, Any]):
     client_ip = client.lan_ip_address or client.wifi_ip_address
     if not client_ip:
-        print(f"Klient {client.id} har ingen IP-adresse - kan ikke sende kalender")
+        print(f"Klient {client.id} har ingen IP-adresse")
         return
     if not _is_safe_private_ip(client_ip):
-        print(f"SSRF-advarsel: Klient {client.id} har en offentlig IP ({client_ip}) — afviser")
+        print(f"SSRF-advarsel: Klient {client.id} har offentlig IP ({client_ip}) — afviser")
         return
     url = f"http://{client_ip}:8000/api/update_schedule"
     try:
@@ -57,24 +55,43 @@ def publish_schedule_for_client(client: Client, markings: Dict[str, Any]):
         print(f"Fejl ved send til klient {client.id} ({url}): {e}")
 
 
+def _validate_season(season: str) -> str:
+    """Validerer at season er på formatet 'YYYY/YYYY' fx '2025/2026'."""
+    parts = season.split("/")
+    if len(parts) != 2:
+        raise HTTPException(status_code=400, detail="Ugyldig sæson — brug format '2025/2026'")
+    try:
+        start, end = int(parts[0]), int(parts[1])
+        if end != start + 1:
+            raise HTTPException(status_code=400, detail="Ugyldig sæson — slut-år skal være start-år + 1")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Ugyldig sæson — brug format '2025/2026'")
+    return season
+
+
 @router.post("/calendar/marked-days")
 def save_marked_days(
     data: MarkedDaysRequest,
     session=Depends(get_session),
     user=Depends(get_current_user)
 ):
+    _validate_season(data.season)
     try:
         for client_id in data.clients:
             markings = parse_iso8601_keys(data.markedDays.get(str(client_id), {}))
             existing = session.exec(
-                select(CalendarMarking)
-                .where(CalendarMarking.season == data.season, CalendarMarking.client_id == client_id)
+                select(CalendarMarking).where(
+                    CalendarMarking.season == data.season,
+                    CalendarMarking.client_id == client_id
+                )
             ).first()
             if existing:
                 existing.markings = markings
                 session.add(existing)
             else:
-                session.add(CalendarMarking(season=data.season, client_id=client_id, markings=markings))
+                session.add(CalendarMarking(
+                    season=data.season, client_id=client_id, markings=markings
+                ))
         session.commit()
         for client_id in data.clients:
             client = session.exec(select(Client).where(Client.id == client_id)).first()
@@ -87,13 +104,14 @@ def save_marked_days(
 
 @router.get("/calendar/marked-days")
 def get_marked_days(
-    season: int = Query(...),
+    season: str = Query(..., description="Sæson fx '2025/2026'"),
     client_id: int = Query(...),
     start_date: Optional[str] = Query(None, description="Filtrer fra dato (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="Filtrer til dato (YYYY-MM-DD)"),
     session=Depends(get_session),
     user=Depends(get_current_user)
 ):
+    _validate_season(season)
     existing = session.exec(
         select(CalendarMarking).where(
             CalendarMarking.season == season,
@@ -104,11 +122,9 @@ def get_marked_days(
     formatted = {}
     for k, v in markings.items():
         try:
-            # Normaliser altid til "YYYY-MM-DDT00:00:00" format for konsistens
             parsed = datetime.fromisoformat(k)
             iso_key = parsed.strftime("%Y-%m-%dT00:00:00")
             iso_date = iso_key[:10]
-            # Filtrér efter start_date og end_date hvis angivet
             if start_date and iso_date < start_date:
                 continue
             if end_date and iso_date > end_date:
@@ -120,14 +136,20 @@ def get_marked_days(
 
 
 @router.get("/calendar/seasons")
-def get_seasons_list(count: int = 20, user=Depends(get_current_user)):
+def get_seasons_list(user=Depends(get_current_user)):
+    """Returnerer nuværende sæson + 2 fremtidige sæsoner."""
     today = date.today()
-    first_season = today.year if today.month >= 8 else today.year - 1
-    start = first_season - 2
-    return [
-        {"id": start + i, "label": f"{start + i}/{start + i + 1}"}
-        for i in range(count + 2)
-    ]
+    current_start = today.year if today.month >= 8 else today.year - 1
+    seasons = []
+    for i in range(3):
+        start = current_start + i
+        season_str = f"{start}/{start + 1}"
+        seasons.append({
+            "id": season_str,
+            "label": season_str,
+            "isCurrent": i == 0,
+        })
+    return seasons
 
 
 @router.get("/calendar/season")
@@ -137,10 +159,11 @@ def get_current_season(user=Depends(get_current_user)):
         season_start, season_end = today.year, today.year + 1
     else:
         season_start, season_end = today.year - 1, today.year
+    season_str = f"{season_start}/{season_end}"
     return {
-        "id": season_start,
-        "label": f"{season_start}/{season_end}",
-        # FIX: Tilføjet start_date og end_date så frontend kan bruge dem til DatePicker-begrænsning
+        "id": season_str,
+        "label": season_str,
+        "isCurrent": True,
         "start_date": date(season_start, 8, 1).isoformat(),
         "end_date": date(season_end, 7, 31).isoformat(),
     }
@@ -150,8 +173,10 @@ def get_current_season(user=Depends(get_current_user)):
 def cleanup_past_seasons(session=Depends(get_session), user=Depends(get_current_user)):
     today = date.today()
     if today.month > 8 or (today.month == 8 and today.day >= 10):
-        season_to_delete = today.year - 1
+        current_start = today.year if today.month >= 8 else today.year - 1
+        old_start = current_start - 2
+        season_to_delete = f"{old_start}/{old_start + 1}"
         session.exec(delete(CalendarMarking).where(CalendarMarking.season == season_to_delete))
         session.commit()
         return {"deleted_season": season_to_delete}
-    return {"deleted_season": None, "message": "Ingen sæson slettet - ikke efter 10. august"}
+    return {"deleted_season": None, "message": "Ingen sæson slettet — ikke efter 10. august"}
