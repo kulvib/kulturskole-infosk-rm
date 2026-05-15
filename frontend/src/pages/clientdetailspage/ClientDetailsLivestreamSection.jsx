@@ -201,17 +201,20 @@ export default function ClientDetailsLivestreamSection({
     } else if (Hls.isSupported()) {
       // --- HLS.js ---
       // Tunet til 6s segmenter med 15-segment vindue (90s):
-      // liveSyncDurationCount:5       → 5 × 6s = 30s bag live-kant
-      // liveMaxLatencyDurationCount:8 → 8 × 6s = 48s max latency
-      // initialLiveManifestSize:4     → vent på 4 segmenter (24s) inden start
-      // Med spiller ~37s bagud: fremad buffer = 90-37 = 53s = ~8 segmenter ✅
+      //
+      // liveSyncDurationCount:7  → spiller holdes 42s bag live-kanten
+      // liveMaxLatencyDuration:10 → maks 60s bagud inden HLS.js hopper frem
+      // maxBufferLength:12       → KUN 2 segmenter fremad — forhindrer at
+      //                            HLS.js "løber tør" ved live-kanten og staller
+      // maxMaxBufferLength:18    → absolut maks 3 segmenter fremad buffer
+      // liveBackBufferLength:6   → behold 1 segment bagud (til seek)
       const hls = new Hls({
-        liveSyncDurationCount:       5,
-        liveMaxLatencyDurationCount: 8,
+        liveSyncDurationCount:       7,
+        liveMaxLatencyDurationCount: 10,
         initialLiveManifestSize:     4,
-        maxBufferLength:             40,
-        maxMaxBufferLength:          80,
-        liveBackBufferLength:        12,
+        maxBufferLength:             12,
+        maxMaxBufferLength:          18,
+        liveBackBufferLength:        6,
         enableWorker:                true,
         startLevel:                  -1,
         lowLatencyMode:              false,
