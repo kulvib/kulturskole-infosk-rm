@@ -3,7 +3,7 @@ import re
 import time
 import traceback
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from fastapi import (
     APIRouter, WebSocket, WebSocketDisconnect,
@@ -50,17 +50,6 @@ def extract_num(filename: str, prefix: str = "segment_") -> int:
     return int(m.group(1)) if m else -1
 
 
-def extract_program_date_time(filename: str):
-    m = re.match(r"segment_\d+_([0-9TtZz]+)\.(mp4|ts)$", filename)
-    if not m:
-        return None
-    dt_str = m.group(1).replace("Z", "").replace("z", "")
-    try:
-        return datetime.strptime(dt_str, "%Y%m%dT%H%M%S")
-    except Exception:
-        return None
-
-
 def _normalize_segment_duration(value, default: int = 6, min_v: int = 1, max_v: int = 60) -> int:
     try:
         n = int(value)
@@ -69,45 +58,89 @@ def _normalize_segment_duration(value, default: int = 6, min_v: int = 1, max_v: 
         return default
 
 
+def _parse_captured_at(captured_at_str: Optional[str]) -> Optional[datetime]:
+    """
+    Parser captured_at streng fra klienten til datetime.
+    Klienten sender ISO 8601 UTC: "2026-05-15T10:30:00Z"
+    """
+    if not captured_at_str:
+        return None
+    try:
+        s = captured_at_str.strip().replace("Z", "+00:00")
+        return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
 def _write_manifest(
     manifest_path: str,
     segments: List[str],
     media_seq: int,
     segment_duration: int,
-    client_dir: str = ""
+    client_dir: str = "",
+    captured_at_map: Optional[Dict[str, datetime]] = None,
 ) -> None:
     """
-    Skriv manifest med EXT-X-PROGRAM-DATE-TIME på hvert segment.
-    FIX: Bruger fil-mtime som fallback når timestamp ikke er i filnavnet.
+    Skriv HLS-manifest med EXT-X-PROGRAM-DATE-TIME på hvert segment.
+
+    Timestamp-prioritet:
+    1. captured_at_map[seg] — sendt af klienten ved upload (= præcis optagelsestid)
+    2. fil-mtime - segment_duration — estimat baseret på uploadtidspunkt
+    3. Ingen tag — springer over
+
     EXT-X-PROGRAM-DATE-TIME er nødvendig for hls.playingDate i HLS.js
-    så frontend kan beregne præcis forsinkelse.
+    og for video.seekable-baseret lag-måling i Safari.
     """
+    if captured_at_map is None:
+        captured_at_map = {}
+
     with open(manifest_path, "w", encoding="utf-8", newline="\n") as m3u:
         m3u.write("#EXTM3U\n")
         m3u.write("#EXT-X-VERSION:3\n")
         m3u.write(f"#EXT-X-TARGETDURATION:{segment_duration}\n")
         m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
+
         for seg in segments:
-            # Forsøg først timestamp fra filnavn
-            dt = extract_program_date_time(seg)
-            if dt is not None:
-                m3u.write(f"#EXT-X-PROGRAM-DATE-TIME:{dt.isoformat()}Z\n")
-            elif client_dir:
-                # FIX: Fallback til mtime — segment start = mtime - segment_duration
-                # (mtime sættes når ffmpeg er færdig med at skrive segmentet)
+            dt = captured_at_map.get(seg)
+
+            if dt is None and client_dir:
+                # Fallback: mtime - segment_duration = approx optagelsesstart
                 try:
                     seg_path = os.path.join(client_dir, seg)
                     mtime     = os.path.getmtime(seg_path)
-                    seg_start = mtime - segment_duration
-                    dt_utc    = datetime.fromtimestamp(seg_start, tz=timezone.utc)
-                    m3u.write(f"#EXT-X-PROGRAM-DATE-TIME:{dt_utc.strftime('%Y-%m-%dT%H:%M:%S.000Z')}\n")
+                    dt = datetime.fromtimestamp(mtime - segment_duration, tz=timezone.utc)
                 except Exception:
                     pass
+
+            if dt is not None:
+                m3u.write(f"#EXT-X-PROGRAM-DATE-TIME:{dt.strftime('%Y-%m-%dT%H:%M:%S.000Z')}\n")
+
             m3u.write(f"#EXTINF:{segment_duration}.0,\n")
             m3u.write(f"{seg}\n")
 
 
-def update_manifest(client_dir: str, keep_n: int = KEEP_N, segment_duration: int = 6) -> None:
+# In-memory map: segment_filename → captured_at datetime
+# Bevares på tværs af requests så cleanup stadig kan skrive korrekte timestamps
+_captured_at_store: Dict[str, Dict[str, datetime]] = {}  # client_id → {seg_name → dt}
+
+
+def _store_captured_at(client_id: str, seg_name: str, dt: datetime) -> None:
+    if client_id not in _captured_at_store:
+        _captured_at_store[client_id] = {}
+    _captured_at_store[client_id][seg_name] = dt
+    # Ryd gamle entries (behold kun de seneste 50 per klient)
+    store = _captured_at_store[client_id]
+    if len(store) > 50:
+        oldest_keys = sorted(store.keys())[:-50]
+        for k in oldest_keys:
+            del store[k]
+
+
+def _get_captured_at_map(client_id: str) -> Dict[str, datetime]:
+    return _captured_at_store.get(client_id, {})
+
+
+def update_manifest(client_dir: str, client_id: str, keep_n: int = KEEP_N, segment_duration: int = 6) -> None:
     segment_duration = _normalize_segment_duration(segment_duration, default=6)
 
     for ext in [".ts", ".mp4"]:
@@ -126,7 +159,11 @@ def update_manifest(client_dir: str, keep_n: int = KEEP_N, segment_duration: int
         media_seq     = extract_num(manifest_segs[0], "segment_")
         manifest_path = os.path.join(client_dir, "index.m3u8")
 
-        _write_manifest(manifest_path, manifest_segs, media_seq, segment_duration, client_dir)
+        _write_manifest(
+            manifest_path, manifest_segs, media_seq, segment_duration,
+            client_dir=client_dir,
+            captured_at_map=_get_captured_at_map(client_id),
+        )
         print(f"[MANIFEST] Opdateret: {manifest_path} ({len(manifest_segs)} seg, duration={segment_duration}s)")
         return
 
@@ -141,6 +178,7 @@ async def upload_hls_file(
     file: UploadFile = File(...),
     client_id: str = Form(...),
     segment_duration: int = Form(6),
+    captured_at: Optional[str] = Form(default=None),  # FIX: modtag optagelsestidspunkt fra klient
     user=Depends(get_current_user)
 ):
     allowed_exts = [".ts", ".mp4"]
@@ -162,8 +200,22 @@ async def upload_hls_file(
     with open(seg_path, "wb") as f:
         f.write(content)
 
-    print(f"[UPLOAD] Gemt: {file.filename} ({len(content)} bytes), client={client_id}, duration={segment_duration}s")
-    update_manifest(client_dir, keep_n=KEEP_N, segment_duration=segment_duration)
+    # Gem captured_at i memory-store så manifest kan bruge det
+    dt = _parse_captured_at(captured_at)
+    if dt is not None:
+        _store_captured_at(client_id, file.filename, dt)
+    else:
+        # Fallback: brug server-mtime - segment_duration
+        try:
+            mtime = os.path.getmtime(seg_path)
+            dt_fallback = datetime.fromtimestamp(mtime - segment_duration, tz=timezone.utc)
+            _store_captured_at(client_id, file.filename, dt_fallback)
+        except Exception:
+            pass
+
+    print(f"[UPLOAD] Gemt: {file.filename} ({len(content)} bytes), client={client_id}, captured_at={captured_at}")
+    update_manifest(client_dir, client_id, keep_n=KEEP_N, segment_duration=segment_duration)
+
     return {"filename": file.filename, "client_id": client_id, "segment_duration": segment_duration}
 
 
@@ -204,8 +256,12 @@ async def cleanup_hls_files(
     if kept_in_manifest:
         media_seq     = extract_num(kept_in_manifest[0], "segment_")
         manifest_path = os.path.join(client_dir, "index.m3u8")
-        _write_manifest(manifest_path, kept_in_manifest, media_seq, segment_duration, client_dir)
-        print(f"[CLEANUP] Manifest skrevet med {len(kept_in_manifest)} kendte segmenter.")
+        _write_manifest(
+            manifest_path, kept_in_manifest, media_seq, segment_duration,
+            client_dir=client_dir,
+            captured_at_map=_get_captured_at_map(client_id),
+        )
+        print(f"[CLEANUP] Manifest skrevet med {len(kept_in_manifest)} segmenter.")
 
     return {"deleted": to_delete, "kept": kept_in_manifest, "segment_duration": segment_duration}
 
@@ -240,10 +296,12 @@ def get_last_segment_info(
     if not os.path.exists(seg_path):
         return {"error": "segment missing", "is_healthy": False}
 
-    dt = extract_program_date_time(last_segment)
-    if dt:
-        timestamp_iso = dt.isoformat() + "Z"
-        epoch         = dt.replace(tzinfo=timezone.utc).timestamp()
+    # Brug captured_at fra store hvis tilgængeligt — ellers mtime
+    captured_at_map = _get_captured_at_map(client_id)
+    dt = captured_at_map.get(last_segment)
+    if dt is not None:
+        timestamp_iso = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        epoch         = dt.timestamp()
     else:
         mtime         = os.path.getmtime(seg_path)
         dt_utc        = datetime.fromtimestamp(mtime, tz=timezone.utc)
@@ -305,14 +363,17 @@ def health_check(
 def reset_hls(client_id: str, response: Response, user=Depends(get_current_user)):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     client_dir = safe_client_dir(client_id)
+
+    # Ryd captured_at store for denne klient
+    if client_id in _captured_at_store:
+        del _captured_at_store[client_id]
+
     if not os.path.exists(client_dir):
         return {"message": "already cleaned", "success": True, "timestamp": utcnow().isoformat() + "Z"}
     try:
         for f in os.listdir(client_dir):
-            try:
-                os.remove(os.path.join(client_dir, f))
-            except Exception as e:
-                print(f"[RESET] Kunne ikke slette {f}: {e}")
+            try: os.remove(os.path.join(client_dir, f))
+            except Exception as e: print(f"[RESET] Kunne ikke slette {f}: {e}")
         return {"message": "reset done", "success": True, "timestamp": utcnow().isoformat() + "Z"}
     except Exception as e:
         return {"message": f"reset failed: {e}", "success": False, "timestamp": utcnow().isoformat() + "Z"}
@@ -380,20 +441,14 @@ async def livestream_endpoint(
                     await room.broadcaster.send_json(msg)
 
     except WebSocketDisconnect:
-        if websocket == room.broadcaster:
-            room.broadcaster = None
+        if websocket == room.broadcaster: room.broadcaster = None
         for vid, ws in list(room.viewers.items()):
-            if ws == websocket:
-                del room.viewers[vid]
+            if ws == websocket: del room.viewers[vid]
     except Exception as e:
         print(f"[WS] Fejl for client_id={client_id}: {e}")
         traceback.print_exc()
-        if websocket == room.broadcaster:
-            room.broadcaster = None
+        if websocket == room.broadcaster: room.broadcaster = None
         for vid, ws in list(room.viewers.items()):
-            if ws == websocket:
-                del room.viewers[vid]
-        try:
-            await websocket.close()
-        except Exception:
-            pass
+            if ws == websocket: del room.viewers[vid]
+        try: await websocket.close()
+        except Exception: pass
