@@ -202,14 +202,16 @@ export default function ClientDetailsLivestreamSection({
     } else if (Hls.isSupported()) {
       // --- HLS.js ---
       // Tunet til 8s segmenter:
-      // liveSyncDurationCount:3       → 3 × 8s = 24s sync-mål
-      // liveMaxLatencyDurationCount:5 → 5 × 8s = 40s max latency
+      // liveSyncDurationCount:4       → 4 × 8s = 32s bag live-kant (undgår buffer stalls)
+      // liveMaxLatencyDurationCount:6 → 6 × 8s = 48s max latency
+      // initialLiveManifestSize:3     → vent på 3 segmenter klar inden afspilning starter
       const hls = new Hls({
-        liveSyncDurationCount:       3,
-        liveMaxLatencyDurationCount: 5,
-        maxBufferLength:             30,
-        maxMaxBufferLength:          60,
-        liveBackBufferLength:        12,
+        liveSyncDurationCount:       4,   // var 3 → 4 × 8s = 32s bag live-kant
+        liveMaxLatencyDurationCount: 6,   // var 5 → 6 × 8s = 48s max latency
+        initialLiveManifestSize:     3,   // FIX: vent på 3 segmenter inden start
+        maxBufferLength:             40,  // var 30 → mere buffer
+        maxMaxBufferLength:          80,  // var 60
+        liveBackBufferLength:        16,  // var 12
         enableWorker:                true,
         startLevel:                  -1,
         lowLatencyMode:              false,
