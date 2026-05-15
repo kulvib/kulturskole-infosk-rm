@@ -55,6 +55,7 @@ function getSeasons() {
     return { label: `${start}/${end}`, value: start };
   });
 }
+
 function getSchoolYearMonths(seasonStart) {
   return [
     ...Array.from({ length: 5 }, (_, i) => ({
@@ -69,6 +70,7 @@ function getSchoolYearMonths(seasonStart) {
     })),
   ];
 }
+
 const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
 const formatDate = (year, month, day) =>
   `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -138,10 +140,7 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
           sx={{ width: { xs: "100%", sm: 220 } }}
         />
         <Button
-          sx={{
-            minWidth: 0, px: 2,
-            width: { xs: "100%", sm: "auto" }
-          }}
+          sx={{ minWidth: 0, px: 2, width: { xs: "100%", sm: "auto" } }}
           variant={allMarked ? "contained" : "outlined"}
           color={allMarked ? "success" : "primary"}
           onClick={handleToggleAll}
@@ -152,11 +151,7 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
       </Box>
       <Box sx={{
         display: "grid",
-        gridTemplateColumns: {
-          xs: "1fr",
-          sm: "1fr 1fr",
-          md: "repeat(5, 1fr)"
-        },
+        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(5, 1fr)" },
         gap: { xs: 1, sm: 2, md: 2 },
       }}>
         {filteredClients.map(client => (
@@ -185,10 +180,7 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
               checked={selected.includes(client.id)}
               tabIndex={-1}
               disableRipple
-              sx={{
-                p: 0, pr: 1,
-                minWidth: { xs: 32, sm: 28 }
-              }}
+              sx={{ p: 0, pr: 1, minWidth: { xs: 32, sm: 28 } }}
               inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
               disabled={disabled}
             />
@@ -236,14 +228,25 @@ function markedDaysReducer(state, action) {
   switch (action.type) {
     case "set":
       return { ...state, [action.clientId]: action.days };
-    case "updateDay":
+    case "updateDay": {
+      // FIX: Bevar eksisterende tider (onTime/offTime) når en dag toggles.
+      // Tidligere blev kun { status: mode } skrevet — tider gik tabt og
+      // auto-save overskrev databasen med standardtider 1 sekund senere.
+      const existing = state[action.clientId]?.[action.date] || {};
+      const merged = { ...existing, ...action.dayData };
+      // Hvis dagen slukkes, fjern tider så de ikke fyldes på unødvendigt
+      if (action.dayData.status === "off") {
+        delete merged.onTime;
+        delete merged.offTime;
+      }
       return {
         ...state,
         [action.clientId]: {
           ...(state[action.clientId] || {}),
-          [action.date]: action.dayData,
+          [action.date]: merged,
         }
       };
+    }
     case "reset":
       return {};
     default:
@@ -380,6 +383,8 @@ export default function CalendarPage() {
     };
   }, [markedDays[activeClient], activeClient, editDialogOpen]);
 
+  // FIX: Autoritativ kilde til standardtider — bruger altid API (allSchoolTimes),
+  // aldrig localStorage. Samme datakilde som DateTimeEditDialog nu bruger.
   function getDefaultTimes(dateStr, clientId) {
     const client = clients.find(c => c.id === clientId);
     if (!client) return { onTime: "09:00", offTime: "22:30" };
@@ -392,16 +397,20 @@ export default function CalendarPage() {
       weekend: { onTime: "08:00", offTime: "18:00" }
     };
     const times = schoolTimes || fallback;
-    return (day === 0 || day === 6) ? times?.weekend || fallback.weekend : times?.weekday || fallback.weekday;
+    return (day === 0 || day === 6)
+      ? times?.weekend || fallback.weekend
+      : times?.weekday || fallback.weekday;
   }
 
+  // FIX: Bevar eksisterende onTime/offTime når en dag klikkes.
+  // Reducer håndterer merge — her sender vi kun status.
   const handleDayClick = useCallback((clientIds, dateString, mode, markedDaysState) => {
     clientIds.forEach(cid => {
       dispatchMarkedDays({
         type: "updateDay",
         clientId: cid,
         date: dateString,
-        dayData: { status: mode }
+        dayData: { status: mode },
       });
     });
   }, []);
@@ -533,7 +542,7 @@ export default function CalendarPage() {
       : "Automatisk"
   ), [activeClient, filteredClients, schools]);
 
-  // FIX: Sænket krav fra 2 til 1 klient så enkelt-klient-brugere også kan gemme
+  // FIX: Krav sænket fra 2 til 1 klient — enkelt-klient-brugere kan nu også gemme
   const handleSave = useCallback(
     async (showSuccessFeedback = false) => {
       if (selectedClients.length < 1) {
@@ -597,7 +606,8 @@ export default function CalendarPage() {
       } catch {
         setSavingCalendar(false);
       }
-    }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]
+    },
+    [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]
   );
 
   useEffect(() => {
@@ -613,6 +623,11 @@ export default function CalendarPage() {
   const sortedSchools = useMemo(() => [...schools].sort((a, b) => a.name.localeCompare(b.name)), [schools]);
 
   const editDialogClientObj = clients.find(c => c.id === editDialogClient);
+
+  // FIX: Slå skoletider op til dialogen fra den autoritative API-kilde
+  const editDialogSchoolTimes = allSchoolTimes[
+    editDialogClientObj?.schoolId || editDialogClientObj?.school_id
+  ] || null;
 
   return (
     <Box sx={{
@@ -647,6 +662,7 @@ export default function CalendarPage() {
           </span>
         </Tooltip>
       </Box>
+
       {(user?.role === "admin" || user?.role === "superadmin") && (
         <Paper elevation={2} sx={{
           p: { xs: 1, sm: 2 },
@@ -656,9 +672,7 @@ export default function CalendarPage() {
           flexDirection: "column"
         }}>
           <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="flex-start">
-            <Box sx={{
-              display: "flex", alignItems: "center", gap: 2, width: { xs: "100%", sm: "auto" }
-            }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: { xs: "100%", sm: "auto" } }}>
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: "1rem", sm: "1.25rem" } }}>
                 Vælg skole:
               </Typography>
@@ -679,6 +693,7 @@ export default function CalendarPage() {
           </Stack>
         </Paper>
       )}
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={2000}
@@ -689,6 +704,7 @@ export default function CalendarPage() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
+
       <Paper elevation={2} sx={{
         p: { xs: 1, sm: 2 },
         mb: 3,
@@ -714,7 +730,7 @@ export default function CalendarPage() {
           disabled={false}
           selectedSchool={selectedSchool}
         />
-        {/* FIX: Vis gem-knap og info også ved kun 1 valgt klient */}
+        {/* FIX: Vis gem-knap og info allerede ved 1 valgt klient */}
         {selectedClients.length >= 1 && (
           <Box sx={{
             mt: 2,
@@ -754,6 +770,7 @@ export default function CalendarPage() {
           </Box>
         )}
       </Paper>
+
       <Box sx={{
         display: "flex",
         alignItems: { xs: "stretch", sm: "center" },
@@ -797,11 +814,7 @@ export default function CalendarPage() {
             variant="outlined"
             color="primary"
             size="medium"
-            sx={{
-              minWidth: 120,
-              fontWeight: 700,
-              width: { xs: "100%", sm: 120 }
-            }}
+            sx={{ minWidth: 120, fontWeight: 700, width: { xs: "100%", sm: 120 } }}
             onClick={() => setCalendarDialogOpen(true)}
             disabled={isDisabled}
           >
@@ -815,24 +828,18 @@ export default function CalendarPage() {
           alignItems: "center",
           gap: 1
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
             {selectedSeason !== currentSeasonStartYear && (
               <Tooltip title="Ikke indeværende sæson" arrow>
                 <WarningAmberIcon
                   color="warning"
-                  sx={{
-                    mr: 0.5,
-                    transition: "opacity 0.7s",
-                    opacity: fadeIn ? 1 : 0.2
-                  }}
+                  sx={{ mr: 0.5, transition: "opacity 0.7s", opacity: fadeIn ? 1 : 0.2 }}
                 />
               </Tooltip>
             )}
           </Box>
           <Typography variant="h6" sx={{
-            fontWeight: 700,
-            color: "#0a275c",
-            mr: 2,
+            fontWeight: 700, color: "#0a275c", mr: 2,
             fontSize: { xs: "1rem", sm: "1.15rem" }
           }}>
             Vælg sæson:
@@ -852,18 +859,13 @@ export default function CalendarPage() {
           </Select>
         </Box>
       </Box>
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            xs: "1fr",
-            sm: "1fr 1fr",
-            md: "repeat(4, 1fr)"
-          },
-          columnGap: { xs: "0.04rem", sm: "0.08rem", md: "0.08rem" },
-          rowGap: { xs: "0.5rem", sm: "0.5rem", md: "0.5rem" },
-        }}
-      >
+
+      <Box sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
+        columnGap: { xs: "0.04rem", sm: "0.08rem", md: "0.08rem" },
+        rowGap: { xs: "0.5rem", sm: "0.5rem", md: "0.5rem" },
+      }}>
         {!activeClient && (
           <Typography sx={{ mt: 4, textAlign: "center", gridColumn: "1/-1" }}>
             Vælg en klient for at se kalenderen.
@@ -893,6 +895,8 @@ export default function CalendarPage() {
           </Box>
         )}
       </Box>
+
+      {/* FIX: schoolTimes sendes nu med til dialogen — samme API-kilde som CalendarPage */}
       <DateTimeEditDialog
         open={editDialogOpen}
         onClose={() => setEditDialogOpen(false)}
@@ -901,6 +905,7 @@ export default function CalendarPage() {
         onSaved={handleSaveDateTime}
         localMarkedDays={markedDays[editDialogClient]}
         schoolId={editDialogClientObj?.schoolId || editDialogClientObj?.school_id}
+        schoolTimes={editDialogSchoolTimes}
       />
       <ClientCalendarDialog
         open={calendarDialogOpen}
@@ -1032,12 +1037,11 @@ const MonthCalendar = React.memo(function MonthCalendar({
           rowGap: "0.5rem"
         }}>
           {weekRows.map((row, rowIdx) => (
-            <Box key={rowIdx}
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(8, 1fr)",
-                columnGap: "0.08rem"
-              }}>
+            <Box key={rowIdx} sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(8, 1fr)",
+              columnGap: "0.08rem"
+            }}>
               <Box sx={{
                 display: "flex",
                 alignItems: "center",
@@ -1060,11 +1064,10 @@ const MonthCalendar = React.memo(function MonthCalendar({
                 const isLoading =
                   loadingDialogDate === dateString && loadingDialogClient === clientId;
                 return (
-                  <Box key={idx}
-                    sx={{
-                      display: "flex", justifyContent: "center", alignItems: "center",
-                      p: 0.2, position: "relative"
-                    }}>
+                  <Box key={idx} sx={{
+                    display: "flex", justifyContent: "center", alignItems: "center",
+                    p: 0.2, position: "relative"
+                  }}>
                     <Box
                       sx={{
                         position: "relative",
@@ -1096,26 +1099,24 @@ const MonthCalendar = React.memo(function MonthCalendar({
                           }}
                         />
                       )}
-                      <Box
-                        sx={{
-                          position: "absolute",
-                          top: 2, left: 2,
-                          width: innerCircleSize,
-                          height: innerCircleSize,
-                          borderRadius: "50%",
-                          background: bg,
-                          border: "1px solid #eee",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#0a275c",
-                          fontWeight: 500,
-                          fontSize: "1.15rem",
-                          zIndex: 2,
-                          boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                          userSelect: "none"
-                        }}
-                      >
+                      <Box sx={{
+                        position: "absolute",
+                        top: 2, left: 2,
+                        width: innerCircleSize,
+                        height: innerCircleSize,
+                        borderRadius: "50%",
+                        background: bg,
+                        border: "1px solid #eee",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#0a275c",
+                        fontWeight: 500,
+                        fontSize: "1.15rem",
+                        zIndex: 2,
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                        userSelect: "none"
+                      }}>
                         {day}
                       </Box>
                     </Box>
