@@ -248,13 +248,22 @@ export async function applySeasonTimes(schoolId, season) {
   return await res.json();
 }
 
-// NY: Henter hvilke sæsoner der har kalenderdata og hvilke skoler per sæson
 export async function getSeasonSummary() {
   const res = await fetch(`${apiUrl}/api/schools/season-summary`, {
     headers: authHeaders(), credentials: "include",
   });
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok) throw new Error(await extractError(res, "Kunne ikke hente sæson-oversigt"));
+  return await res.json();
+}
+
+// NY: Anmod om Ubuntu OS opdatering
+export async function requestOsUpdate(clientId) {
+  const res = await fetch(`${apiUrl}/api/clients/${clientId}/request-os-update`, {
+    method: "POST", headers: authHeaders(), credentials: "include",
+  });
+  if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
+  if (!res.ok) throw new Error(await extractError(res, "Kunne ikke anmode om OS opdatering"));
   return await res.json();
 }
 
