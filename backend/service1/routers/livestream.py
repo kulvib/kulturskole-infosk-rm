@@ -14,23 +14,25 @@ from models import utcnow
 from sqlmodel import Session
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SERVICE1_HLS_DIR = os.path.join(BASE_DIR, "..", "service1", "hls")
-ROOT_HLS_DIR = os.path.join(BASE_DIR, "..", "hls")
-if os.path.isdir(SERVICE1_HLS_DIR):
-    HLS_DIR = os.path.abspath(SERVICE1_HLS_DIR)
-else:
-    HLS_DIR = os.path.abspath(ROOT_HLS_DIR)
+# HLS_DIR er placeret ét niveau over routers/ (dvs. i service1/)
+HLS_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "hls"))
 os.makedirs(HLS_DIR, exist_ok=True)
 
 router = APIRouter()
 
 
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
 class HlsCleanupRequest(BaseModel):
     client_id: str
     keep_files: List[str]
-    segment_duration: int = 4
+    segment_duration: int = 6   # Rettet: var 4, skal matche klient default (SEGMENT_LENGTH=6)
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 def safe_client_dir(client_id: str) -> str:
     """Forhindrer path traversal ved at validere client_id."""
     if not re.match(r"^[a-zA-Z0-9_-]+$", client_id):
@@ -41,36 +43,41 @@ def safe_client_dir(client_id: str) -> str:
     return path
 
 
-def extract_num(filename, prefix="segment_"):
-    m = re.match(rf"{re.escape(prefix)}(\d+)(?:_([0-9TtZz]+))?\.(mp4|ts)$", filename)
+def extract_num(filename: str, prefix: str = "segment_") -> int:
+    """Udtræk sekvensnummer fra segment_NNNNN.ts eller segment_NNNNN_timestamp.ts"""
+    m = re.match(rf"{re.escape(prefix)}(\d+)(?:_[^.]+)?\.(mp4|ts)$", filename)
     return int(m.group(1)) if m else -1
 
 
-def extract_program_date_time(filename):
+def extract_program_date_time(filename: str):
+    """
+    Udtræk timestamp fra filnavn hvis det er på formen segment_NNNNN_YYYYMMDDTHHMMSSz.ts.
+    Hvis ikke → returnér None (backend bruger mtime som fallback).
+    """
     m = re.match(r"segment_\d+_([0-9TtZz]+)\.(mp4|ts)$", filename)
     if not m:
         return None
-    dt_str = m.group(1).replace("Z", "")
+    dt_str = m.group(1).replace("Z", "").replace("z", "")
     try:
         return datetime.strptime(dt_str, "%Y%m%dT%H%M%S")
     except Exception:
         return None
 
 
-def _normalize_segment_duration(value, default=4, min_v=1, max_v=60):
+def _normalize_segment_duration(value, default: int = 6, min_v: int = 1, max_v: int = 60) -> int:
     try:
         n = int(value)
-        if n < min_v:
-            return min_v
-        if n > max_v:
-            return max_v
-        return n
+        return max(min_v, min(max_v, n))
     except Exception:
         return default
 
 
-def update_manifest(client_dir, keep_n=6, segment_duration=4):
-    segment_duration = _normalize_segment_duration(segment_duration, default=4)
+def update_manifest(client_dir: str, keep_n: int = 10, segment_duration: int = 6) -> None:
+    """
+    Generer index.m3u8 fra de nyeste segmenter i client_dir.
+    Understøtter både .ts (foretrukket) og .mp4.
+    """
+    segment_duration = _normalize_segment_duration(segment_duration, default=6)
 
     for ext in [".ts", ".mp4"]:
         segs = sorted(
@@ -81,32 +88,39 @@ def update_manifest(client_dir, keep_n=6, segment_duration=4):
             ],
             key=lambda f: extract_num(f, "segment_")
         )
-        if segs:
-            manifest_segs = segs[-keep_n:]
-            media_seq = extract_num(manifest_segs[0], "segment_")
-            manifest_path = os.path.join(client_dir, "index.m3u8")
-            with open(manifest_path, "w", encoding="utf-8", newline="\n") as m3u:
-                m3u.write("#EXTM3U\n")
-                m3u.write("#EXT-X-VERSION:3\n")
-                m3u.write(f"#EXT-X-TARGETDURATION:{segment_duration}\n")
-                m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
-                for seg in manifest_segs:
-                    dt = extract_program_date_time(seg)
-                    if dt:
-                        m3u.write(f"#EXT-X-PROGRAM-DATE-TIME:{dt.isoformat()}Z\n")
-                    m3u.write(f"#EXTINF:{segment_duration}.0,\n")
-                    m3u.write(f"{seg}\n")
-            print(f"[MANIFEST] Opdateret: {manifest_path} (segment_duration={segment_duration})")
-            return
+        if not segs:
+            continue
+
+        manifest_segs = segs[-keep_n:]
+        media_seq = extract_num(manifest_segs[0], "segment_")
+        manifest_path = os.path.join(client_dir, "index.m3u8")
+
+        with open(manifest_path, "w", encoding="utf-8", newline="\n") as m3u:
+            m3u.write("#EXTM3U\n")
+            m3u.write("#EXT-X-VERSION:3\n")
+            m3u.write(f"#EXT-X-TARGETDURATION:{segment_duration}\n")
+            m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
+            for seg in manifest_segs:
+                dt = extract_program_date_time(seg)
+                if dt:
+                    m3u.write(f"#EXT-X-PROGRAM-DATE-TIME:{dt.isoformat()}Z\n")
+                m3u.write(f"#EXTINF:{segment_duration}.0,\n")
+                m3u.write(f"{seg}\n")
+
+        print(f"[MANIFEST] Opdateret: {manifest_path} ({len(manifest_segs)} seg, duration={segment_duration}s)")
+        return
 
     print(f"[MANIFEST] Ingen segmenter fundet i {client_dir}")
 
 
+# ---------------------------------------------------------------------------
+# Upload
+# ---------------------------------------------------------------------------
 @router.post("/hls/upload")
 async def upload_hls_file(
     file: UploadFile = File(...),
     client_id: str = Form(...),
-    segment_duration: int = Form(4),
+    segment_duration: int = Form(6),   # Rettet: var 4, skal matche klient default
     user=Depends(get_current_user)
 ):
     allowed_exts = [".ts", ".mp4"]
@@ -115,7 +129,7 @@ async def upload_hls_file(
     if not re.match(r"^[a-zA-Z0-9_.-]+$", file.filename):
         raise HTTPException(status_code=400, detail="Ugyldigt filnavn")
 
-    segment_duration = _normalize_segment_duration(segment_duration, default=4)
+    segment_duration = _normalize_segment_duration(segment_duration, default=6)
 
     client_dir = safe_client_dir(client_id)
     os.makedirs(client_dir, exist_ok=True)
@@ -130,10 +144,10 @@ async def upload_hls_file(
         f.write(content)
 
     print(
-        f"[UPLOAD] Segment gemt: {seg_path}, størrelse: {len(content)} bytes, "
-        f"segment_duration={segment_duration}"
+        f"[UPLOAD] Gemt: {file.filename} ({len(content)} bytes), "
+        f"client={client_id}, duration={segment_duration}s"
     )
-    update_manifest(client_dir, segment_duration=segment_duration)
+    update_manifest(client_dir, keep_n=10, segment_duration=segment_duration)
     return {
         "filename": file.filename,
         "client_id": client_id,
@@ -141,15 +155,18 @@ async def upload_hls_file(
     }
 
 
+# ---------------------------------------------------------------------------
+# Cleanup
+# ---------------------------------------------------------------------------
 @router.post("/hls/cleanup")
 async def cleanup_hls_files(
     payload: HlsCleanupRequest,
-    keep_n: int = 6,
+    keep_n: int = 10,   # Rettet: var 6, skal matche MAX_SEGMENTS på klient
     user=Depends(get_current_user)
 ):
     client_id = payload.client_id
     keep_files = payload.keep_files
-    segment_duration = _normalize_segment_duration(payload.segment_duration, default=4)
+    segment_duration = _normalize_segment_duration(payload.segment_duration, default=6)
 
     client_dir = safe_client_dir(client_id)
     if not os.path.exists(client_dir):
@@ -167,6 +184,7 @@ async def cleanup_hls_files(
             print(f"[CLEANUP] Kunne ikke slette {seg}: {e}")
 
     update_manifest(client_dir, keep_n=keep_n, segment_duration=segment_duration)
+
     kept = sorted(
         [
             f for f in os.listdir(client_dir)
@@ -181,6 +199,9 @@ async def cleanup_hls_files(
     }
 
 
+# ---------------------------------------------------------------------------
+# Last segment info (bruges af frontend til lag-beregning)
+# ---------------------------------------------------------------------------
 @router.get("/hls/{client_id}/last-segment-info")
 def get_last_segment_info(
     client_id: str,
@@ -208,23 +229,29 @@ def get_last_segment_info(
     if not os.path.exists(seg_path):
         return {"error": "segment missing", "is_healthy": False}
 
+    # Forsøg timestamp fra filnavn — fallback til mtime
     dt = extract_program_date_time(last_segment)
     if dt:
         timestamp_iso = dt.isoformat() + "Z"
+        epoch = dt.replace(tzinfo=timezone.utc).timestamp()
     else:
         mtime = os.path.getmtime(seg_path)
-        dt = datetime.fromtimestamp(mtime, tz=timezone.utc).replace(tzinfo=None, microsecond=0)
-        timestamp_iso = dt.isoformat() + "Z"
+        dt_utc = datetime.fromtimestamp(mtime, tz=timezone.utc)
+        timestamp_iso = dt_utc.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        epoch = mtime
 
     return {
         "segment": last_segment,
         "timestamp": timestamp_iso,
-        "epoch": dt.timestamp() if dt else None,
+        "epoch": epoch,
         "segment_count": len(segment_files),
-        "is_healthy": True
+        "is_healthy": True,
     }
 
 
+# ---------------------------------------------------------------------------
+# Health check
+# ---------------------------------------------------------------------------
 @router.get("/hls/{client_id}/health")
 def health_check(
     client_id: str,
@@ -248,13 +275,16 @@ def health_check(
         )
         if has_segments:
             mtime = os.path.getmtime(manifest_path)
-            last_update = datetime.fromtimestamp(mtime, tz=timezone.utc).replace(tzinfo=None).isoformat() + "Z"
+            last_update = datetime.fromtimestamp(mtime, tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
             return {"online": True, "has_segments": True, "last_update": last_update, "message": "Stream er aktiv"}
         return {"online": True, "has_segments": False, "last_update": None, "message": "Manifest eksisterer, men ingen segmenter endnu"}
     except Exception as e:
         return {"online": False, "has_segments": False, "last_update": None, "message": f"Fejl: {str(e)}"}
 
 
+# ---------------------------------------------------------------------------
+# Reset
+# ---------------------------------------------------------------------------
 @router.post("/hls/{client_id}/reset")
 def reset_hls(
     client_id: str,
@@ -278,6 +308,10 @@ def reset_hls(
         return {"message": f"reset failed: {e}", "success": False, "timestamp": utcnow().isoformat() + "Z"}
 
 
+# ---------------------------------------------------------------------------
+# WebSocket signalling (bruges ikke af ny HLS-only livestream, men beholdes
+# for bagudkompatibilitet / evt. fremtidig WebRTC)
+# ---------------------------------------------------------------------------
 class Room:
     def __init__(self):
         self.broadcaster: WebSocket = None
