@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from sqlmodel import Session, select, text
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 
 load_dotenv()
@@ -40,7 +41,6 @@ ALLOWED_ORIGINS = [
 
 
 def migrate_legacy_user_roles():
-    """Idempotent migrering: admin→superadmin og elev→bruger."""
     with Session(engine) as session:
         users = session.exec(
             select(User).where(User.role.in_(["admin", "elev"]))
@@ -56,7 +56,7 @@ def migrate_legacy_user_roles():
             session.add(user)
         if changed:
             session.commit()
-            print(f"Rollemigration: {changed} brugere migreret (admin→superadmin, elev→bruger)")
+            print(f"Rollemigration: {changed} brugere migreret")
         else:
             print("Rollemigration: ingen forældede roller fundet")
 
@@ -106,7 +106,6 @@ app = FastAPI(
     openapi_url=None if os.getenv("ENVIRONMENT") == "production" else "/openapi.json",
 )
 
-# CORS — begræns til nødvendige metoder og headere
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -116,23 +115,48 @@ app.add_middleware(
 )
 
 
-# HLS middleware
+# ---------------------------------------------------------------------------
+# HLS CORS middleware
+# FIX: OPTIONS preflight håndteres SEPARAT og returnerer 204 med det samme.
+# Tidligere gik OPTIONS videre til StaticFiles → 405 → CORS headers
+# aldrig sat korrekt → Chrome/Firefox blokerede alle segment-requests.
+# Safari bruger native HLS og sender aldrig OPTIONS → virkede altid.
+# ---------------------------------------------------------------------------
 class HLSCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        response = await call_next(request)
         if request.url.path.startswith("/hls/"):
             origin = request.headers.get("origin", "")
-            if origin in ALLOWED_ORIGINS or not origin:
-                response.headers["Access-Control-Allow-Origin"] = origin or ALLOWED_ORIGINS[0]
-            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS, HEAD"
-            response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
+            allowed_origin = origin if origin in ALLOWED_ORIGINS else (ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else "*")
+
+            # FIX: Returner preflight-svar INDEN StaticFiles ser requesten
+            if request.method == "OPTIONS":
+                return Response(
+                    status_code=204,
+                    headers={
+                        "Access-Control-Allow-Origin":  allowed_origin,
+                        "Access-Control-Allow-Methods": "GET, OPTIONS, HEAD",
+                        "Access-Control-Allow-Headers": "Authorization, Content-Type, Range",
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Max-Age":       "86400",
+                    }
+                )
+
+            response = await call_next(request)
+            response.headers["Access-Control-Allow-Origin"]      = allowed_origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"]     = "GET, OPTIONS, HEAD"
+            response.headers["Access-Control-Allow-Headers"]     = "Authorization, Content-Type, Range"
+
             if request.url.path.endswith(".m3u8"):
                 response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-                response.headers["Pragma"] = "no-cache"
-                response.headers["Expires"] = "0"
+                response.headers["Pragma"]        = "no-cache"
+                response.headers["Expires"]       = "0"
             else:
                 response.headers["Cache-Control"] = "public, max-age=30, must-revalidate"
-        return response
+
+            return response
+
+        return await call_next(request)
 
 
 app.add_middleware(HLSCORSMiddleware)
@@ -154,30 +178,23 @@ app.mount("/hls", CustomStaticFiles(directory=HLS_DIR), name="hls")
 print(f"### main.py: Static mount for HLS på {HLS_DIR} ###")
 
 # Routers
-app.include_router(clients.router, prefix="/api")
-app.include_router(schools.router, prefix="/api")
-app.include_router(auth_router, prefix="/auth")
-app.include_router(calendar.router, prefix="/api")
-app.include_router(meta.router, prefix="/api")
-app.include_router(users.router, prefix="/api")
+app.include_router(clients.router,    prefix="/api")
+app.include_router(schools.router,    prefix="/api")
+app.include_router(auth_router,       prefix="/auth")
+app.include_router(calendar.router,   prefix="/api")
+app.include_router(meta.router,       prefix="/api")
+app.include_router(users.router,      prefix="/api")
 app.include_router(livestream.router, prefix="/api")
-app.include_router(holidays.router, prefix="/api")
+app.include_router(holidays.router,   prefix="/api")
 
-
-# ─── Health endpoints ─────────────────────────────────────────────────────────
 
 @app.get("/health")
 def health():
-    """Render healthcheck-endpoint."""
     return {"status": "ok"}
 
 
 @app.get("/health/db")
 def health_db():
-    """
-    Tjekker at databaseforbindelsen virker ved at køre SELECT 1.
-    Bruges af frontend til at vise konkret status til brugeren.
-    """
     try:
         with Session(engine) as session:
             session.exec(text("SELECT 1"))
