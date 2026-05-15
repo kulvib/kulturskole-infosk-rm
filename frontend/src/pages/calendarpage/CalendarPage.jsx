@@ -12,14 +12,15 @@ import DateTimeEditDialog from "./DateTimeEditDialog";
 import ClientCalendarDialog from "./ClientCalendarDialog";
 import { useAuth } from "../../auth/authcontext";
 
-function useAllSchoolTimes(schools) {
+// Henter sæsonbaserede tider for alle skoler — opdateres når schools eller season ændres
+function useAllSchoolTimes(schools, season) {
   const [schoolTimesMap, setSchoolTimesMap] = useState({});
   useEffect(() => {
-    if (!schools || schools.length === 0) return;
+    if (!schools || schools.length === 0 || !season) return;
     let isCurrent = true;
     Promise.all(
       schools.map(s =>
-        getSchoolTimes(s.id)
+        getSchoolTimes(s.id, season)
           .then(times => ({ id: s.id, times }))
           .catch(() => ({ id: s.id, times: null }))
       )
@@ -30,7 +31,7 @@ function useAllSchoolTimes(schools) {
       setSchoolTimesMap(map);
     });
     return () => { isCurrent = false; };
-  }, [schools]);
+  }, [schools, season]);
   return schoolTimesMap;
 }
 
@@ -54,16 +55,8 @@ function getSeasons() {
 
 function getSchoolYearMonths(seasonStart) {
   return [
-    ...Array.from({ length: 5 }, (_, i) => ({
-      name: monthNames[i],
-      month: i + 7,
-      year: seasonStart,
-    })),
-    ...Array.from({ length: 7 }, (_, i) => ({
-      name: monthNames[i + 5],
-      month: i,
-      year: seasonStart + 1,
-    })),
+    ...Array.from({ length: 5 }, (_, i) => ({ name: monthNames[i], month: i + 7, year: seasonStart })),
+    ...Array.from({ length: 7 }, (_, i) => ({ name: monthNames[i + 5], month: i, year: seasonStart + 1 })),
   ];
 }
 
@@ -82,9 +75,7 @@ function getWeekNumber(date) {
 
 function mapRawDays(rawDays) {
   const mapped = {};
-  Object.keys(rawDays).forEach(key => {
-    mapped[stripTimeFromDateKey(key)] = rawDays[key];
-  });
+  Object.keys(rawDays).forEach(key => { mapped[stripTimeFromDateKey(key)] = rawDays[key]; });
   return mapped;
 }
 
@@ -98,47 +89,34 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
 }) {
   const [search, setSearch] = useState("");
   const sortedClients = useMemo(() => [...clients].sort((a, b) =>
-    ((a.locality || a.name || "").toLowerCase())
-      .localeCompare((b.locality || b.name || "").toLowerCase())
+    ((a.locality || a.name || "").toLowerCase()).localeCompare((b.locality || b.name || "").toLowerCase())
   ), [clients]);
   const filteredClients = useMemo(() =>
-    sortedClients.filter(c =>
-      (c.locality || c.name || "").toLowerCase().includes(search.toLowerCase())
-    ), [sortedClients, search]);
+    sortedClients.filter(c => (c.locality || c.name || "").toLowerCase().includes(search.toLowerCase()))
+  , [sortedClients, search]);
   const allVisibleIds = filteredClients.map(c => c.id);
   const allMarked = allVisibleIds.length > 0 && allVisibleIds.every(id => selected.includes(id));
   const handleToggleAll = () => {
     if (disabled) return;
-    if (allMarked) {
-      onChange(selected.filter(id => !allVisibleIds.includes(id)));
-    } else {
-      onChange(Array.from(new Set([...selected, ...allVisibleIds])));
-    }
+    if (allMarked) onChange(selected.filter(id => !allVisibleIds.includes(id)));
+    else onChange(Array.from(new Set([...selected, ...allVisibleIds])));
   };
   return (
     <Box>
       <Box sx={{
-        display: "flex",
-        flexDirection: { xs: "column", sm: "row" },
-        alignItems: { xs: "stretch", sm: "center" },
-        mb: 2,
-        gap: { xs: 1, sm: 2 }
+        display: "flex", flexDirection: { xs: "column", sm: "row" },
+        alignItems: { xs: "stretch", sm: "center" }, mb: 2, gap: { xs: 1, sm: 2 }
       }}>
         <TextField
-          label="Søg klient"
-          variant="outlined"
-          size="small"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          disabled={disabled}
+          label="Søg klient" variant="outlined" size="small" value={search}
+          onChange={e => setSearch(e.target.value)} disabled={disabled}
           sx={{ width: { xs: "100%", sm: 220 } }}
         />
         <Button
           sx={{ minWidth: 0, px: 2, width: { xs: "100%", sm: "auto" } }}
           variant={allMarked ? "contained" : "outlined"}
           color={allMarked ? "success" : "primary"}
-          onClick={handleToggleAll}
-          disabled={disabled}
+          onClick={handleToggleAll} disabled={disabled}
         >
           {allMarked ? "Fjern alle" : "Markér alle"}
         </Button>
@@ -152,15 +130,11 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
           <Box
             key={client.id}
             sx={{
-              display: "flex",
-              alignItems: "center",
-              px: { xs: 0.5, sm: 1 },
-              py: { xs: 0.5, sm: 0.5 },
+              display: "flex", alignItems: "center",
+              px: { xs: 0.5, sm: 1 }, py: { xs: 0.5, sm: 0.5 },
               background: selected.includes(client.id) ? "#f0f4ff" : "transparent",
-              borderRadius: 1,
-              cursor: disabled ? "not-allowed" : "pointer",
+              borderRadius: 1, cursor: disabled ? "not-allowed" : "pointer",
               ":hover": { background: disabled ? "transparent" : "#f3f6fa" },
-              fontSize: { xs: "0.96rem", sm: "0.96rem", md: "0.875rem" }
             }}
             onClick={() => {
               if (disabled) return;
@@ -170,46 +144,34 @@ const ClientSelectorInline = React.memo(function ClientSelectorInline({
             }}
           >
             <Checkbox
-              edge="start"
-              checked={selected.includes(client.id)}
-              tabIndex={-1}
-              disableRipple
+              edge="start" checked={selected.includes(client.id)}
+              tabIndex={-1} disableRipple
               sx={{ p: 0, pr: 1, minWidth: { xs: 32, sm: 28 } }}
-              inputProps={{ "aria-label": client.locality || client.name || "Ingen lokalitet" }}
               disabled={disabled}
             />
-            {selectedSchool
-              ? (
+            {selectedSchool ? (
+              <Typography variant="body2" sx={{
+                fontWeight: 400, fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
+                lineHeight: 1.18, wordBreak: "break-word"
+              }}>
+                {client.locality || client.name || "Ingen lokalitet"}
+              </Typography>
+            ) : (
+              <Box sx={{ width: "100%" }}>
                 <Typography variant="body2" sx={{
-                  fontWeight: 400,
-                  fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
-                  lineHeight: 1.18,
-                  wordBreak: "break-word"
+                  fontWeight: 700, fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
+                  lineHeight: 1.18, wordBreak: "break-word"
+                }}>
+                  {getSchoolName(schools, client)}
+                </Typography>
+                <Typography variant="body2" sx={{
+                  fontWeight: 400, fontSize: { xs: "0.98rem", sm: "0.94rem", md: "0.88rem" },
+                  lineHeight: 1.12, wordBreak: "break-word"
                 }}>
                   {client.locality || client.name || "Ingen lokalitet"}
                 </Typography>
-              )
-              : (
-                <Box sx={{ width: "100%" }}>
-                  <Typography variant="body2" sx={{
-                    fontWeight: 700,
-                    fontSize: { xs: "1.05rem", sm: "0.98rem", md: "0.92rem" },
-                    lineHeight: 1.18,
-                    wordBreak: "break-word"
-                  }}>
-                    {getSchoolName(schools, client)}
-                  </Typography>
-                  <Typography variant="body2" sx={{
-                    fontWeight: 400,
-                    fontSize: { xs: "0.98rem", sm: "0.94rem", md: "0.88rem" },
-                    lineHeight: 1.12,
-                    wordBreak: "break-word"
-                  }}>
-                    {client.locality || client.name || "Ingen lokalitet"}
-                  </Typography>
-                </Box>
-              )
-            }
+              </Box>
+            )}
           </Box>
         ))}
       </Box>
@@ -224,22 +186,14 @@ function markedDaysReducer(state, action) {
     case "updateDay": {
       const existing = state[action.clientId]?.[action.date] || {};
       const merged = { ...existing, ...action.dayData };
-      if (action.dayData.status === "off") {
-        delete merged.onTime;
-        delete merged.offTime;
-      }
+      if (action.dayData.status === "off") { delete merged.onTime; delete merged.offTime; }
       return {
         ...state,
-        [action.clientId]: {
-          ...(state[action.clientId] || {}),
-          [action.date]: merged,
-        }
+        [action.clientId]: { ...(state[action.clientId] || {}), [action.date]: merged }
       };
     }
-    case "reset":
-      return {};
-    default:
-      return state;
+    case "reset": return {};
+    default: return state;
   }
 }
 
@@ -261,7 +215,6 @@ export default function CalendarPage() {
   const [loadingDialogClient, setLoadingDialogClient] = useState(null);
   const [savingCalendar, setSavingCalendar] = useState(false);
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
-
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const snackbarTimer = useRef(null);
   const autoSaveTimer = useRef(null);
@@ -272,8 +225,7 @@ export default function CalendarPage() {
   const currentSeasonStartYear = useMemo(() => {
     const now = new Date();
     return (now.getMonth() > 7 || (now.getMonth() === 7 && now.getDate() >= 1))
-      ? now.getFullYear()
-      : now.getFullYear() - 1;
+      ? now.getFullYear() : now.getFullYear() - 1;
   }, []);
 
   const [fadeIn, setFadeIn] = useState(true);
@@ -290,7 +242,9 @@ export default function CalendarPage() {
   useEffect(() => {
     getSchools(token).then(setSchools).catch(() => setSchools([]));
   }, [token]);
-  const allSchoolTimes = useAllSchoolTimes(schools);
+
+  // Henter sæsonbaserede tider for alle skoler
+  const allSchoolTimes = useAllSchoolTimes(schools, selectedSeason);
 
   const fetchClients = useCallback(async (showSuccess = false) => {
     setLoadingClients(true);
@@ -304,6 +258,7 @@ export default function CalendarPage() {
     }
     setLoadingClients(false);
   }, [token]);
+
   useEffect(() => { fetchClients(); }, [fetchClients]);
 
   const filteredClients = useMemo(() => {
@@ -333,13 +288,9 @@ export default function CalendarPage() {
     let isCurrent = true;
     getMarkedDays(selectedSeason, activeClient)
       .then(data => {
-        if (isCurrent) {
-          dispatchMarkedDays({
-            type: "set",
-            clientId: activeClient,
-            days: mapRawDays(data.markedDays || {})
-          });
-        }
+        if (isCurrent) dispatchMarkedDays({
+          type: "set", clientId: activeClient, days: mapRawDays(data.markedDays || {})
+        });
       })
       .catch(() => {
         if (isCurrent) {
@@ -358,15 +309,10 @@ export default function CalendarPage() {
       lastDialogSavedMarkedDays.current[activeClient]
     );
     if (!changedSinceDialog) return;
-    autoSaveTimer.current = setTimeout(() => {
-      handleSaveSingleClient(activeClient);
-    }, 1000);
-    return () => {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    };
+    autoSaveTimer.current = setTimeout(() => { handleSaveSingleClient(activeClient); }, 1000);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
   }, [markedDays[activeClient], activeClient, editDialogOpen]);
 
-  // FIX: Autoritativ kilde til standardtider — bruger altid API (allSchoolTimes), aldrig localStorage.
   function getDefaultTimes(dateStr, clientId) {
     const client = clients.find(c => c.id === clientId);
     if (!client) return { onTime: "09:00", offTime: "22:30" };
@@ -386,20 +332,12 @@ export default function CalendarPage() {
 
   const handleDayClick = useCallback((clientIds, dateString, mode) => {
     clientIds.forEach(cid => {
-      dispatchMarkedDays({
-        type: "updateDay",
-        clientId: cid,
-        date: dateString,
-        dayData: { status: mode },
-      });
+      dispatchMarkedDays({ type: "updateDay", clientId: cid, date: dateString, dayData: { status: mode } });
     });
   }, []);
 
   const handleDateShiftLeftClick = useCallback((clientId, date) => {
-    if (autoSaveTimer.current) {
-      clearTimeout(autoSaveTimer.current);
-      autoSaveTimer.current = null;
-    }
+    if (autoSaveTimer.current) { clearTimeout(autoSaveTimer.current); autoSaveTimer.current = null; }
     setLoadingDialogDate(date);
     setLoadingDialogClient(clientId);
     setTimeout(() => {
@@ -415,9 +353,7 @@ export default function CalendarPage() {
     if (!clientId) return;
     const allDates = [];
     getSchoolYearMonths(selectedSeason).forEach(({ month, year }) => {
-      for (let d = 1; d <= getDaysInMonth(month, year); d++) {
-        allDates.push(formatDate(year, month, d));
-      }
+      for (let d = 1; d <= getDaysInMonth(month, year); d++) allDates.push(formatDate(year, month, d));
     });
     const payloadMarkedDays = { [String(clientId)]: {} };
     allDates.forEach(dateStr => {
@@ -427,12 +363,10 @@ export default function CalendarPage() {
         ? { status: "on", onTime: md.onTime || defTimes.onTime, offTime: md.offTime || defTimes.offTime }
         : { status: "off" };
     });
-    const payload = { clients: [clientId], markedDays: payloadMarkedDays, season: selectedSeason };
     try {
-      await saveMarkedDays(payload);
+      await saveMarkedDays({ clients: [clientId], markedDays: payloadMarkedDays, season: selectedSeason });
       lastDialogSavedMarkedDays.current = {
-        ...lastDialogSavedMarkedDays.current,
-        [clientId]: markedDays[clientId]
+        ...lastDialogSavedMarkedDays.current, [clientId]: markedDays[clientId]
       };
       lastDialogSavedTimestamp.current = Date.now();
     } catch (e) {
@@ -445,33 +379,22 @@ export default function CalendarPage() {
       const skoleKlienter = filteredClients.map(c => c.id);
       const kunEgne = newSelected.filter(id => skoleKlienter.includes(id));
       setSelectedClients(kunEgne);
-      if (!kunEgne.includes(activeClient)) {
+      if (!kunEgne.includes(activeClient))
         setActiveClient(kunEgne.length > 0 ? kunEgne[kunEgne.length - 1] : null);
-      }
     } else {
       setSelectedClients(newSelected);
-      if (!newSelected.includes(activeClient)) {
+      if (!newSelected.includes(activeClient))
         setActiveClient(newSelected.length > 0 ? newSelected[newSelected.length - 1] : null);
-      }
     }
   };
 
   const handleSaveDateTime = ({ date, clientId, day }) => {
     if (!clientId || !date) return;
-    const normDate = date;
     if (day) {
-      dispatchMarkedDays({
-        type: "updateDay",
-        clientId,
-        date: normDate,
-        dayData: day,
-      });
+      dispatchMarkedDays({ type: "updateDay", clientId, date, dayData: day });
       lastDialogSavedMarkedDays.current = {
         ...lastDialogSavedMarkedDays.current,
-        [clientId]: {
-          ...(lastDialogSavedMarkedDays.current[clientId] || {}),
-          [normDate]: day
-        }
+        [clientId]: { ...(lastDialogSavedMarkedDays.current[clientId] || {}), [date]: day }
       };
       lastDialogSavedTimestamp.current = Date.now();
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
@@ -483,8 +406,7 @@ export default function CalendarPage() {
         const mapped = mapRawDays(data.markedDays || {});
         dispatchMarkedDays({ type: "set", clientId, days: mapped });
         lastDialogSavedMarkedDays.current = {
-          ...lastDialogSavedMarkedDays.current,
-          [clientId]: mapped
+          ...lastDialogSavedMarkedDays.current, [clientId]: mapped
         };
         lastDialogSavedTimestamp.current = Date.now();
         setSnackbar({ open: true, message: "Gemt!", severity: "success" });
@@ -501,8 +423,7 @@ export default function CalendarPage() {
       ? filteredClients
           .filter(c => selectedClients.includes(c.id) && c.id !== activeClient)
           .map(c => `${c.locality || c.name} – ${getSchoolName(schools, c)}`)
-          .filter(Boolean)
-          .join("; ")
+          .filter(Boolean).join("; ")
       : ""
   ), [selectedClients, filteredClients, activeClient, schools]);
 
@@ -516,69 +437,47 @@ export default function CalendarPage() {
       : "Automatisk"
   ), [activeClient, filteredClients, schools]);
 
-  const handleSave = useCallback(
-    async (showSuccessFeedback = false) => {
-      if (selectedClients.length < 1) {
-        setSnackbar({ open: true, message: "Vælg mindst én klient", severity: "error" });
-        return;
-      }
-      if (!activeClient) {
-        setSnackbar({ open: true, message: "Ingen aktiv klient valgt", severity: "error" });
-        return;
-      }
-      setSavingCalendar(true);
-
-      const allDates = [];
-      schoolYearMonths.forEach(({ month, year }) => {
-        for (let d = 1; d <= getDaysInMonth(month, year); d++) {
-          allDates.push(formatDate(year, month, d));
-        }
+  const handleSave = useCallback(async (showSuccessFeedback = false) => {
+    if (selectedClients.length < 1) {
+      setSnackbar({ open: true, message: "Vælg mindst én klient", severity: "error" }); return;
+    }
+    if (!activeClient) {
+      setSnackbar({ open: true, message: "Ingen aktiv klient valgt", severity: "error" }); return;
+    }
+    setSavingCalendar(true);
+    const allDates = [];
+    schoolYearMonths.forEach(({ month, year }) => {
+      for (let d = 1; d <= getDaysInMonth(month, year); d++) allDates.push(formatDate(year, month, d));
+    });
+    const payloadMarkedDays = {};
+    selectedClients.forEach(cid => {
+      const clientKey = String(cid);
+      payloadMarkedDays[clientKey] = {};
+      allDates.forEach(dateStr => {
+        const sourceMd = markedDays[activeClient]?.[dateStr];
+        const sourceDefTimes = getDefaultTimes(dateStr, activeClient);
+        payloadMarkedDays[clientKey][dateStr] = sourceMd && sourceMd.status === "on"
+          ? { status: "on", onTime: sourceMd.onTime || sourceDefTimes.onTime, offTime: sourceMd.offTime || sourceDefTimes.offTime }
+          : { status: "off" };
       });
-
-      const payloadMarkedDays = {};
-      selectedClients.forEach(cid => {
-        const clientKey = String(cid);
-        payloadMarkedDays[clientKey] = {};
-        allDates.forEach(dateStr => {
-          const sourceMd = markedDays[activeClient]?.[dateStr];
-          const sourceDefTimes = getDefaultTimes(dateStr, activeClient);
-          payloadMarkedDays[clientKey][dateStr] = sourceMd && sourceMd.status === "on"
-            ? { status: "on", onTime: sourceMd.onTime || sourceDefTimes.onTime, offTime: sourceMd.offTime || sourceDefTimes.offTime }
-            : { status: "off" };
-        });
-      });
-
-      const payload = { clients: selectedClients, markedDays: payloadMarkedDays, season: selectedSeason };
-
-      try {
-        await saveMarkedDays(payload);
-        if (showSuccessFeedback) {
-          setSnackbar({ open: true, message: "Gemt!", severity: "success" });
+    });
+    try {
+      await saveMarkedDays({ clients: selectedClients, markedDays: payloadMarkedDays, season: selectedSeason });
+      if (showSuccessFeedback) setSnackbar({ open: true, message: "Gemt!", severity: "success" });
+      if (activeClient) {
+        try {
+          const data = await getMarkedDays(selectedSeason, activeClient);
+          dispatchMarkedDays({ type: "set", clientId: activeClient, days: mapRawDays(data.markedDays || {}) });
+        } catch {
+          dispatchMarkedDays({ type: "set", clientId: activeClient, days: {} });
         }
-        if (activeClient) {
-          try {
-            const data = await getMarkedDays(selectedSeason, activeClient);
-            dispatchMarkedDays({
-              type: "set",
-              clientId: activeClient,
-              days: mapRawDays(data.markedDays || {})
-            });
-          } catch {
-            dispatchMarkedDays({ type: "set", clientId: activeClient, days: {} });
-          }
-        }
-        setSavingCalendar(false);
-      } catch {
-        setSavingCalendar(false);
       }
-    },
-    [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]
-  );
+    } catch { }
+    setSavingCalendar(false);
+  }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]);
 
   useEffect(() => {
-    return () => {
-      if (snackbarTimer.current) clearTimeout(snackbarTimer.current);
-    };
+    return () => { if (snackbarTimer.current) clearTimeout(snackbarTimer.current); };
   }, []);
 
   const clientMarkedDays = markedDays[activeClient];
@@ -586,10 +485,7 @@ export default function CalendarPage() {
   const handleCloseSnackbar = () => setSnackbar({ open: false, message: "", severity: "success" });
   const isDisabled = !activeClient;
   const sortedSchools = useMemo(() => [...schools].sort((a, b) => a.name.localeCompare(b.name)), [schools]);
-
   const editDialogClientObj = clients.find(c => c.id === editDialogClient);
-
-  // FIX: Slå skoletider op fra den autoritative API-kilde og send videre til dialogen
   const editDialogSchoolTimes = allSchoolTimes[
     editDialogClientObj?.schoolId || editDialogClientObj?.school_id
   ] || null;
@@ -597,30 +493,18 @@ export default function CalendarPage() {
   return (
     <Box sx={{
       maxWidth: { xs: "100%", sm: 1000, md: 1500 },
-      mx: "auto",
-      mt: { xs: 1, sm: 4 },
-      fontFamily: "inherit",
-      px: { xs: 0.5, sm: 2 }
+      mx: "auto", mt: { xs: 1, sm: 4 }, fontFamily: "inherit", px: { xs: 0.5, sm: 2 }
     }}>
       <Box sx={{
-        display: "flex",
-        flexDirection: { xs: "column", sm: "row" },
-        justifyContent: { xs: "center", sm: "flex-end" },
-        mb: 2,
-        alignItems: "center"
+        display: "flex", flexDirection: { xs: "column", sm: "row" },
+        justifyContent: { xs: "center", sm: "flex-end" }, mb: 2, alignItems: "center"
       }}>
         <Tooltip title="Opdater klienter">
           <span>
             <Button
               startIcon={loadingClients ? <CircularProgress size={20} /> : <RefreshIcon />}
-              onClick={() => fetchClients(true)}
-              disabled={loadingClients}
-              sx={{
-                minWidth: 0,
-                fontWeight: 500,
-                textTransform: "none",
-                width: { xs: "100%", sm: "auto" }
-              }}
+              onClick={() => fetchClients(true)} disabled={loadingClients}
+              sx={{ minWidth: 0, fontWeight: 500, textTransform: "none", width: { xs: "100%", sm: "auto" } }}
             >
               {loadingClients ? "Opdaterer..." : "Opdater"}
             </Button>
@@ -629,24 +513,15 @@ export default function CalendarPage() {
       </Box>
 
       {(user?.role === "admin" || user?.role === "superadmin") && (
-        <Paper elevation={2} sx={{
-          p: { xs: 1, sm: 2 },
-          mb: 3,
-          position: "relative",
-          display: "flex",
-          flexDirection: "column"
-        }}>
+        <Paper elevation={2} sx={{ p: { xs: 1, sm: 2 }, mb: 3 }}>
           <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="flex-start">
             <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: { xs: "100%", sm: "auto" } }}>
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: "1rem", sm: "1.25rem" } }}>
                 Vælg skole:
               </Typography>
               <Select
-                size="small"
-                value={selectedSchool}
-                displayEmpty
-                onChange={e => setSelectedSchool(e.target.value)}
-                sx={{ minWidth: 140, width: { xs: "100%", sm: 180 } }}
+                size="small" value={selectedSchool} displayEmpty
+                onChange={e => setSelectedSchool(e.target.value)} sx={{ minWidth: 140 }}
               >
                 <MenuItem value="">Alle skoler</MenuItem>
                 <MenuItem disabled>--------</MenuItem>
@@ -660,9 +535,7 @@ export default function CalendarPage() {
       )}
 
       <Snackbar
-        open={snackbar.open}
-        autoHideDuration={2000}
-        onClose={handleCloseSnackbar}
+        open={snackbar.open} autoHideDuration={2000} onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <MuiAlert elevation={6} variant="filled" onClose={handleCloseSnackbar} severity={snackbar.severity}>
@@ -670,38 +543,25 @@ export default function CalendarPage() {
         </MuiAlert>
       </Snackbar>
 
-      <Paper elevation={2} sx={{
-        p: { xs: 1, sm: 2 },
-        mb: 3,
-        position: "relative",
-        display: "flex",
-        flexDirection: "column"
-      }}>
+      <Paper elevation={2} sx={{ p: { xs: 1, sm: 2 }, mb: 3, position: "relative" }}>
         {loadingClients && (
           <Box sx={{
-            position: "absolute",
-            left: 0, top: 0, right: 0, bottom: 0,
-            background: "rgba(255,255,255,0.7)",
-            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10
+            position: "absolute", left: 0, top: 0, right: 0, bottom: 0,
+            background: "rgba(255,255,255,0.7)", display: "flex",
+            alignItems: "center", justifyContent: "center", zIndex: 10
           }}>
             <CircularProgress />
           </Box>
         )}
         <ClientSelectorInline
-          clients={filteredClients}
-          selected={selectedClients}
-          onChange={handleClientSelectorChange}
-          schools={schools}
-          disabled={false}
-          selectedSchool={selectedSchool}
+          clients={filteredClients} selected={selectedClients}
+          onChange={handleClientSelectorChange} schools={schools}
+          disabled={false} selectedSchool={selectedSchool}
         />
         {selectedClients.length >= 1 && (
           <Box sx={{
-            mt: 2,
-            display: "flex",
-            flexDirection: { xs: "column", sm: "row" },
-            alignItems: { xs: "stretch", sm: "center" },
-            justifyContent: "space-between",
+            mt: 2, display: "flex", flexDirection: { xs: "column", sm: "row" },
+            alignItems: { xs: "stretch", sm: "center" }, justifyContent: "space-between",
             gap: { xs: 1.5, sm: 0 }
           }}>
             <Box>
@@ -709,25 +569,16 @@ export default function CalendarPage() {
                 Viser kalender for: {activeClientName}
               </Typography>
               {selectedClients.length > 1 && (
-                <Typography variant="body2" sx={{
-                  fontSize: { xs: "0.9rem", sm: "0.8rem" },
-                  color: "#555", fontWeight: 400
-                }}>
+                <Typography variant="body2" sx={{ fontSize: { xs: "0.9rem", sm: "0.8rem" }, color: "#555" }}>
                   ændringerne slår også igennem på klienterne: {otherClientNames}
                 </Typography>
               )}
             </Box>
             <Button
-              variant="contained"
-              color="primary"
-              onClick={() => handleSave(true)}
+              variant="contained" color="primary" onClick={() => handleSave(true)}
               disabled={savingCalendar || selectedClients.length < 1}
               startIcon={savingCalendar ? <CircularProgress color="inherit" size={20} /> : null}
-              sx={{
-                minWidth: { xs: "100%", sm: 180 },
-                width: { xs: "100%", sm: 220 },
-                mt: { xs: 1, sm: 0 }
-              }}
+              sx={{ minWidth: { xs: "100%", sm: 180 }, width: { xs: "100%", sm: 220 }, mt: { xs: 1, sm: 0 } }}
             >
               {savingCalendar ? "Gemmer..." : "Gem kalender for valgte klienter"}
             </Button>
@@ -736,62 +587,34 @@ export default function CalendarPage() {
       </Paper>
 
       <Box sx={{
-        display: "flex",
-        alignItems: { xs: "stretch", sm: "center" },
-        mb: 3,
-        flexDirection: { xs: "column", sm: "row" },
-        gap: { xs: 1.5, sm: 0 },
-        width: "100%",
+        display: "flex", alignItems: { xs: "stretch", sm: "center" }, mb: 3,
+        flexDirection: { xs: "column", sm: "row" }, gap: { xs: 1.5, sm: 0 }, width: "100%"
       }}>
-        <Box sx={{
-          display: "flex", alignItems: "center", gap: 2, flex: 1,
-          justifyContent: { xs: "center", sm: "flex-start" }
-        }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: 1, justifyContent: { xs: "center", sm: "flex-start" } }}>
           <Typography variant="h6" sx={{ mr: 1, fontWeight: 700, fontSize: { xs: "1rem", sm: "1.15rem" } }}>
             Markering:
           </Typography>
           <Button
-            variant={markMode === "on" ? "contained" : "outlined"}
-            color="success"
-            size="medium"
-            disabled={isDisabled}
+            variant={markMode === "on" ? "contained" : "outlined"} color="success"
+            size="medium" disabled={isDisabled}
             sx={{ fontWeight: markMode === "on" ? 700 : 400, minWidth: 90 }}
             onClick={() => setMarkMode("on")}
-          >
-            TÆNDT
-          </Button>
+          >TÆNDT</Button>
           <Button
-            variant={markMode === "off" ? "contained" : "outlined"}
-            color="error"
-            size="medium"
-            disabled={isDisabled}
+            variant={markMode === "off" ? "contained" : "outlined"} color="error"
+            size="medium" disabled={isDisabled}
             sx={{ fontWeight: markMode === "off" ? 700 : 400, minWidth: 90 }}
             onClick={() => setMarkMode("off")}
-          >
-            SLUKKET
-          </Button>
+          >SLUKKET</Button>
         </Box>
-        <Box sx={{
-          flex: 1, display: "flex", justifyContent: { xs: "center", sm: "center" }, mb: { xs: 1, sm: 0 }
-        }}>
+        <Box sx={{ flex: 1, display: "flex", justifyContent: { xs: "center", sm: "center" }, mb: { xs: 1, sm: 0 } }}>
           <Button
-            variant="outlined"
-            color="primary"
-            size="medium"
+            variant="outlined" color="primary" size="medium"
             sx={{ minWidth: 120, fontWeight: 700, width: { xs: "100%", sm: 120 } }}
-            onClick={() => setCalendarDialogOpen(true)}
-            disabled={isDisabled}
-          >
-            Vis liste
-          </Button>
+            onClick={() => setCalendarDialogOpen(true)} disabled={isDisabled}
+          >Vis liste</Button>
         </Box>
-        <Box sx={{
-          flex: 1,
-          display: "flex",
-          justifyContent: { xs: "center", sm: "flex-end" },
-          alignItems: "center",
-          gap: 1
-        }}>
+        <Box sx={{ flex: 1, display: "flex", justifyContent: { xs: "center", sm: "flex-end" }, alignItems: "center", gap: 1 }}>
           <Box sx={{ display: "flex", alignItems: "center" }}>
             {selectedSeason !== currentSeasonStartYear && (
               <Tooltip title="Ikke indeværende sæson" arrow>
@@ -802,18 +625,13 @@ export default function CalendarPage() {
               </Tooltip>
             )}
           </Box>
-          <Typography variant="h6" sx={{
-            fontWeight: 700, color: "#0a275c", mr: 2,
-            fontSize: { xs: "1rem", sm: "1.15rem" }
-          }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2, fontSize: { xs: "1rem", sm: "1.15rem" } }}>
             Vælg sæson:
           </Typography>
           <Select
-            size="small"
-            value={selectedSeason}
+            size="small" value={selectedSeason}
             onChange={e => setSelectedSeason(Number(e.target.value))}
-            sx={{ minWidth: 100, width: { xs: 100, sm: 120 } }}
-            disabled={isDisabled}
+            sx={{ minWidth: 100 }} disabled={isDisabled}
           >
             {seasons.map(season => (
               <MenuItem key={season.value} value={season.value}>{season.label}</MenuItem>
@@ -833,23 +651,14 @@ export default function CalendarPage() {
             Vælg en klient for at se kalenderen.
           </Typography>
         )}
-        {activeClient && !loadingMarkedDays &&
-          schoolYearMonths.map(({ name, month, year }) => (
-            <MemoizedMonthCalendar
-              key={name + year}
-              name={name}
-              month={month}
-              year={year}
-              clientId={activeClient}
-              markedDays={markedDays}
-              markMode={markMode}
-              onDayClick={handleDayClick}
-              onDateShiftLeftClick={handleDateShiftLeftClick}
-              loadingDialogDate={loadingDialogDate}
-              loadingDialogClient={loadingDialogClient}
-            />
-          ))
-        }
+        {activeClient && !loadingMarkedDays && schoolYearMonths.map(({ name, month, year }) => (
+          <MemoizedMonthCalendar
+            key={name + year} name={name} month={month} year={year}
+            clientId={activeClient} markedDays={markedDays} markMode={markMode}
+            onDayClick={handleDayClick} onDateShiftLeftClick={handleDateShiftLeftClick}
+            loadingDialogDate={loadingDialogDate} loadingDialogClient={loadingDialogClient}
+          />
+        ))}
         {activeClient && loadingMarkedDays && (
           <Box sx={{ textAlign: "center", mt: 6, gridColumn: "1/-1" }}>
             <CircularProgress />
@@ -858,20 +667,15 @@ export default function CalendarPage() {
         )}
       </Box>
 
-      {/* FIX: schoolTimes sendes nu fra den autoritative API-kilde — ikke localStorage */}
       <DateTimeEditDialog
-        open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
-        date={editDialogDate}
-        clientId={editDialogClient}
-        onSaved={handleSaveDateTime}
-        localMarkedDays={markedDays[editDialogClient]}
+        open={editDialogOpen} onClose={() => setEditDialogOpen(false)}
+        date={editDialogDate} clientId={editDialogClient}
+        onSaved={handleSaveDateTime} localMarkedDays={markedDays[editDialogClient]}
         schoolId={editDialogClientObj?.schoolId || editDialogClientObj?.school_id}
         schoolTimes={editDialogSchoolTimes}
       />
       <ClientCalendarDialog
-        open={calendarDialogOpen}
-        onClose={() => setCalendarDialogOpen(false)}
+        open={calendarDialogOpen} onClose={() => setCalendarDialogOpen(false)}
         clientId={activeClient}
       />
     </Box>
@@ -898,8 +702,8 @@ const MonthCalendar = React.memo(function MonthCalendar({
     let weekStartIdx = 0;
     while (weekStartIdx < cells.length) {
       const weekDays = cells.slice(weekStartIdx, weekStartIdx + 7);
-      let firstDay = weekDays.find(d => !!d);
-      let dateObj = firstDay
+      const firstDay = weekDays.find(d => !!d);
+      const dateObj = firstDay
         ? new Date(year, month, firstDay)
         : new Date(year, month, 1 + weekStartIdx - offset);
       rows.push({ weekNum: getWeekNumber(dateObj), weekDays });
@@ -940,12 +744,8 @@ const MonthCalendar = React.memo(function MonthCalendar({
 
   return (
     <Card sx={{
-      borderRadius: "14px",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-      minWidth: 0,
-      background: "#f9fafc",
-      p: { xs: 0.5, sm: 1 },
-      userSelect: "none"
+      borderRadius: "14px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+      minWidth: 0, background: "#f9fafc", p: { xs: 0.5, sm: 1 }, userSelect: "none"
     }}>
       <CardContent sx={{ p: { xs: 1, sm: 2 } }}>
         <Typography variant="h6" sx={{
@@ -955,11 +755,8 @@ const MonthCalendar = React.memo(function MonthCalendar({
           {name} {year}
         </Typography>
         <Box sx={{
-          display: "grid",
-          gridTemplateColumns: "repeat(8, 1fr)",
-          columnGap: "0.08rem",
-          rowGap: "0.5rem",
-          mb: 0.5
+          display: "grid", gridTemplateColumns: "repeat(8, 1fr)",
+          columnGap: "0.08rem", rowGap: "0.5rem", mb: 0.5
         }}>
           <Box />
           {weekdayNames.map(wd => (
@@ -976,8 +773,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
             <Box key={rowIdx} sx={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", columnGap: "0.08rem" }}>
               <Box sx={{
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontWeight: 400, fontSize: { xs: "0.65rem", sm: "0.75rem" },
-                color: "#222", background: "transparent", minWidth: 0,
+                fontWeight: 400, fontSize: { xs: "0.65rem", sm: "0.75rem" }, color: "#222",
               }}>
                 {row.weekNum}
               </Box>
@@ -999,12 +795,11 @@ const MonthCalendar = React.memo(function MonthCalendar({
                       }}
                       onMouseDown={e => handleMouseDown(e, dateString)}
                       onMouseEnter={e => handleMouseEnter(e, dateString)}
-                      title={cellStatus === "on" ? "Tændt (shift+klik for tid)" : cellStatus === "off" ? "Slukket" : ""}
+                      title={cellStatus === "on" ? "Tændt (shift+klik for tid)" : "Slukket"}
                     >
                       {isLoading && (
                         <CircularProgress size={circleSize} sx={{
-                          position: "absolute", top: 0, left: 0, zIndex: 1,
-                          color: "#1976d2", background: "transparent"
+                          position: "absolute", top: 0, left: 0, zIndex: 1, color: "#1976d2"
                         }} />
                       )}
                       <Box sx={{
