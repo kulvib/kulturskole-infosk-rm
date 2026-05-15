@@ -32,7 +32,7 @@ class School(SQLModel, table=True):
 class SchoolSeasonTimes(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     school_id: int = Field(foreign_key="school.id", index=True)
-    season: str = Field(index=True)          # fx "2025/2026"
+    season: str = Field(index=True)
     weekday_on: str = Field(default="09:00")
     weekday_off: str = Field(default="22:30")
     weekend_on: str = Field(default="08:00")
@@ -92,6 +92,9 @@ class Client(ClientBase, table=True):
     livestream_status: Optional[str] = "idle"
     livestream_last_segment: Optional[datetime] = None
     livestream_last_error: Optional[str] = None
+    # NY: Ubuntu opdateringsfelter
+    ubuntu_updates_available: Optional[int] = Field(default=0)
+    pending_os_update: Optional[bool] = Field(default=False)
 
 
 class ClientCreate(ClientBase):
@@ -109,6 +112,8 @@ class ClientCreate(ClientBase):
     pending_chrome_action_source: Optional[str] = None
     school_id: Optional[int] = None
     state: Optional[str] = Field(default="normal")
+    ubuntu_updates_available: Optional[int] = 0
+    pending_os_update: Optional[bool] = False
 
 
 class ClientUpdate(SQLModel):
@@ -135,11 +140,13 @@ class ClientUpdate(SQLModel):
     livestream_status: Optional[str] = None
     livestream_last_segment: Optional[datetime] = None
     livestream_last_error: Optional[str] = None
+    ubuntu_updates_available: Optional[int] = None
+    pending_os_update: Optional[bool] = None
 
 
 class CalendarMarking(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    season: str = Field(index=True)          # fx "2025/2026"
+    season: str = Field(index=True)
     client_id: int = Field(index=True)
     markings: Dict[str, Any] = Field(sa_column=Column(JSON))
 
