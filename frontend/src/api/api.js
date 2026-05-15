@@ -164,43 +164,33 @@ export async function pushKioskUrl(id, url) {
 
 export async function clientAction(id, action) {
   let url, method, payload;
-
   if (action === "chrome-start") {
-    url = `${apiUrl}/api/clients/${id}/update`;
-    method = "PUT";
+    url = `${apiUrl}/api/clients/${id}/update`; method = "PUT";
     payload = { pending_chrome_action: "start", pending_chrome_action_source: "actionbutton" };
   } else if (action === "chrome-stop") {
-    url = `${apiUrl}/api/clients/${id}/update`;
-    method = "PUT";
+    url = `${apiUrl}/api/clients/${id}/update`; method = "PUT";
     payload = { pending_chrome_action: "stop", pending_chrome_action_source: "actionbutton" };
   } else if (action === "livestream_start") {
-    url = `${apiUrl}/api/clients/${id}/update`;
-    method = "PUT";
+    url = `${apiUrl}/api/clients/${id}/update`; method = "PUT";
     payload = { pending_chrome_action: "livestream_start", pending_chrome_action_source: "actionbutton" };
   } else if (action === "livestream_stop") {
-    url = `${apiUrl}/api/clients/${id}/update`;
-    method = "PUT";
+    url = `${apiUrl}/api/clients/${id}/update`; method = "PUT";
     payload = { pending_chrome_action: "livestream_stop", pending_chrome_action_source: "actionbutton" };
   } else if (action === "sleep") {
-    url = `${apiUrl}/api/clients/${id}/update`;
-    method = "PUT";
+    url = `${apiUrl}/api/clients/${id}/update`; method = "PUT";
     payload = { pending_chrome_action: "sleep", pending_chrome_action_source: "actionbutton" };
   } else if (action === "wakeup") {
-    url = `${apiUrl}/api/clients/${id}/update`;
-    method = "PUT";
+    url = `${apiUrl}/api/clients/${id}/update`; method = "PUT";
     payload = { pending_chrome_action: "wakeup", pending_chrome_action_source: "actionbutton" };
   } else if (action === "restart") {
-    url = `${apiUrl}/api/clients/${id}/update`;
-    method = "PUT";
+    url = `${apiUrl}/api/clients/${id}/update`; method = "PUT";
     payload = { pending_reboot: true };
   } else if (action === "shutdown") {
-    url = `${apiUrl}/api/clients/${id}/update`;
-    method = "PUT";
+    url = `${apiUrl}/api/clients/${id}/update`; method = "PUT";
     payload = { pending_shutdown: true };
   } else {
     throw new Error("Ukendt action: " + action);
   }
-
   const res = await fetch(url, {
     method,
     headers: authHeaders({ "Content-Type": "application/json" }),
@@ -227,11 +217,9 @@ export async function setClientState(id, state) {
 export function openTerminal(id) {
   window.open(`${apiUrl}/api/clients/${id}/terminal`, "_blank", "noopener");
 }
-
 export function openRemoteDesktop(id) {
   window.open(`${apiUrl}/api/clients/${id}/remote-desktop`, "_blank", "noopener");
 }
-
 export function getClientStream(id) {
   return `${apiUrl}/api/clients/${id}/stream`;
 }
@@ -280,8 +268,7 @@ export async function saveMarkedDays(payload) {
   return await res.json();
 }
 
-// FIX: startDate og endDate er allerede YYYY-MM-DD strings fra ClientCalendarDialog.
-// Kald IKKE .toISOString() på dem — det kaster TypeError på strings.
+// FIX: startDate og endDate er YYYY-MM-DD strings — kald ikke .toISOString()
 export async function getMarkedDays(season, client_id, startDate, endDate) {
   const params = new URLSearchParams({ season, client_id });
   if (startDate) params.append("start_date", startDate);
@@ -327,8 +314,12 @@ export async function addSchool(name) {
   return await res.json();
 }
 
-export async function getSchoolTimes(schoolId) {
-  const res = await fetch(`${apiUrl}/api/schools/${schoolId}/times`, {
+// NY: Henter sæsonbaserede tider — falder tilbage til skolens standardtider hvis ingen sæsonpost findes
+export async function getSchoolTimes(schoolId, season) {
+  const url = season
+    ? `${apiUrl}/api/schools/${schoolId}/season-times/${season}`
+    : `${apiUrl}/api/schools/${schoolId}/times`;
+  const res = await fetch(url, {
     headers: authHeaders(),
     credentials: "include",
   });
@@ -337,8 +328,9 @@ export async function getSchoolTimes(schoolId) {
   return await res.json();
 }
 
-export async function updateSchoolTimes(schoolId, updates) {
-  const res = await fetch(`${apiUrl}/api/schools/${schoolId}/times`, {
+// NY: Gemmer sæsonbaserede tider — kræver schoolId OG season
+export async function updateSchoolTimes(schoolId, season, updates) {
+  const res = await fetch(`${apiUrl}/api/schools/${schoolId}/season-times/${season}`, {
     method: "PATCH",
     headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
