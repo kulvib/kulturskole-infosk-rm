@@ -3,9 +3,25 @@ from sqlmodel import select
 from db import get_session
 from models import School, SchoolCreate, Client, CalendarMarking, User
 from pydantic import BaseModel
+from typing import Optional
 from auth import get_current_user, get_current_admin_user
 
 router = APIRouter()
+
+
+# FIX: Pydantic-model til opdatering af skoletider.
+# Tidligere blev individuelle Body()-parametre brugt, hvilket FastAPI
+# ikke parser korrekt fra et JSON-objekt — resulterede i at None blev
+# gemt i stedet for de rigtige tider.
+class SchoolTimesUpdate(BaseModel):
+    weekday_on: Optional[str] = None
+    weekday_off: Optional[str] = None
+    weekend_on: Optional[str] = None
+    weekend_off: Optional[str] = None
+
+
+class SchoolNameUpdate(BaseModel):
+    name: str
 
 
 @router.get("/schools/", response_model=list[School])
@@ -50,7 +66,7 @@ def delete_school(school_id: int, session=Depends(get_session), admin=Depends(ge
         for marking in markings:
             session.delete(marking)
         session.delete(client)
-    # Slet tilknyttede brugere (fjern skole-tilknytning)
+    # Fjern skole-tilknytning på brugere
     school_users = session.exec(select(User).where(User.school_id == school_id)).all()
     for school_user in school_users:
         school_user.school_id = None
@@ -59,27 +75,26 @@ def delete_school(school_id: int, session=Depends(get_session), admin=Depends(ge
     session.commit()
 
 
+# FIX: Bruger nu SchoolTimesUpdate Pydantic-model i stedet for individuelle
+# Body()-parametre. FastAPI parser JSON-body korrekt via modellen.
 @router.patch("/schools/{school_id}/times", response_model=School)
 def update_school_times(
     school_id: int,
-    weekday_on: str = Body(None),
-    weekday_off: str = Body(None),
-    weekend_on: str = Body(None),
-    weekend_off: str = Body(None),
+    times: SchoolTimesUpdate,
     session=Depends(get_session),
     admin=Depends(get_current_admin_user)
 ):
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
-    if weekday_on is not None:
-        school.weekday_on = weekday_on
-    if weekday_off is not None:
-        school.weekday_off = weekday_off
-    if weekend_on is not None:
-        school.weekend_on = weekend_on
-    if weekend_off is not None:
-        school.weekend_off = weekend_off
+    if times.weekday_on is not None:
+        school.weekday_on = times.weekday_on
+    if times.weekday_off is not None:
+        school.weekday_off = times.weekday_off
+    if times.weekend_on is not None:
+        school.weekend_on = times.weekend_on
+    if times.weekend_off is not None:
+        school.weekend_off = times.weekend_off
     session.add(school)
     session.commit()
     session.refresh(school)
@@ -95,10 +110,6 @@ def get_school_times(school_id: int, session=Depends(get_session), user=Depends(
         "weekday": {"onTime": school.weekday_on, "offTime": school.weekday_off},
         "weekend": {"onTime": school.weekend_on, "offTime": school.weekend_off},
     }
-
-
-class SchoolNameUpdate(BaseModel):
-    name: str
 
 
 @router.patch("/schools/{school_id}/", response_model=School)
