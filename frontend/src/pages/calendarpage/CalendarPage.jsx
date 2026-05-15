@@ -7,7 +7,7 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes } from "../../api";
+import { getClients, saveMarkedDays, getMarkedDays, getSchools, getSchoolTimes, getSeasonSummary } from "../../api";
 import DateTimeEditDialog from "./DateTimeEditDialog";
 import ClientCalendarDialog from "./ClientCalendarDialog";
 import { useAuth } from "../../auth/authcontext";
@@ -40,31 +40,16 @@ const monthNames = [
 ];
 const weekdayNames = ["Ma", "Ti", "On", "To", "Fr", "Lø", "Sø"];
 
-// FIX: season er nu string "2025/2026" — nuværende + 2 fremtidige
-function getSeasons() {
-  const now = new Date();
-  const currentStart = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
-  return [0, 1, 2].map(i => {
-    const start = currentStart + i;
-    return {
-      value: `${start}/${start + 1}`,
-      label: `${start}/${start + 1}`,
-      isCurrent: i === 0,
-    };
-  });
-}
-
-// FIX: Udtræk startår fra string "2025/2026" → 2025
-function seasonToStartYear(season) {
-  if (!season) return new Date().getFullYear();
-  if (typeof season === "number") return season;
-  return parseInt(season.split("/")[0], 10);
-}
-
 function getCurrentSeasonString() {
   const now = new Date();
   const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
   return `${start}/${start + 1}`;
+}
+
+function seasonToStartYear(season) {
+  if (!season) return new Date().getFullYear();
+  if (typeof season === "number") return season;
+  return parseInt(season.split("/")[0], 10);
 }
 
 function getSchoolYearMonths(season) {
@@ -98,6 +83,12 @@ function getSchoolName(schools, client) {
   const schoolId = client.schoolId || client.school_id;
   return schools.find(s => String(s.id) === String(schoolId))?.name || "Ukendt skole";
 }
+
+// Dagens dato til fremhævning
+const TODAY = new Date();
+const TODAY_STR = formatDate(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+const CURRENT_MONTH = TODAY.getMonth();
+const CURRENT_YEAR = TODAY.getFullYear();
 
 const ClientSelectorInline = React.memo(function ClientSelectorInline({
   clients, selected, onChange, schools, disabled, selectedSchool
@@ -212,15 +203,15 @@ function markedDaysReducer(state, action) {
   }
 }
 
-const SEASONS = getSeasons();
-const DEFAULT_SEASON = SEASONS[0].value;
-
 export default function CalendarPage() {
   const { user } = useAuth();
   const token = null;
+  const isSuperadmin = user?.role === "superadmin";
+  const isAdmin = user?.role === "admin";
 
-  // FIX: selectedSeason er nu string "2025/2026"
-  const [selectedSeason, setSelectedSeason] = useState(DEFAULT_SEASON);
+  const currentSeason = getCurrentSeasonString();
+
+  const [selectedSeason, setSelectedSeason] = useState(currentSeason);
   const [schools, setSchools] = useState([]);
   const [selectedSchool, setSelectedSchool] = useState("");
   const [clients, setClients] = useState([]);
@@ -241,8 +232,42 @@ export default function CalendarPage() {
   const lastDialogSavedMarkedDays = useRef({});
   const lastDialogSavedTimestamp = useRef(0);
 
-  // FIX: currentSeason er nu string til sammenligning
-  const currentSeason = getCurrentSeasonString();
+  // NY: sæson-summary til filtrering (kun superadmin/admin)
+  const [seasonSummary, setSeasonSummary] = useState({});
+  const [loadingSeasonSummary, setLoadingSeasonSummary] = useState(false);
+
+  useEffect(() => {
+    if (!isSuperadmin && !isAdmin) return;
+    setLoadingSeasonSummary(true);
+    getSeasonSummary()
+      .then(data => setSeasonSummary(data || {}))
+      .catch(() => setSeasonSummary({}))
+      .finally(() => setLoadingSeasonSummary(false));
+  }, [isSuperadmin, isAdmin]);
+
+  // Sæsoner med data — sorteret
+  const availableSeasons = useMemo(() => {
+    if (!isSuperadmin && !isAdmin) return [];
+    return Object.keys(seasonSummary).sort();
+  }, [seasonSummary, isSuperadmin, isAdmin]);
+
+  // Skoler med data i valgt sæson
+  const availableSchoolsForSeason = useMemo(() => {
+    if (!isSuperadmin && !isAdmin) return [];
+    const schoolsInSeason = seasonSummary[selectedSeason] || [];
+    return [...schoolsInSeason].sort((a, b) => a.name.localeCompare(b.name, "da"));
+  }, [seasonSummary, selectedSeason, isSuperadmin, isAdmin]);
+
+  // Når sæson ændres — reset skole og klient hvis skolen ikke findes i ny sæson
+  useEffect(() => {
+    if (!isSuperadmin && !isAdmin) return;
+    const schoolIds = (seasonSummary[selectedSeason] || []).map(s => String(s.id));
+    if (selectedSchool && !schoolIds.includes(String(selectedSchool))) {
+      setSelectedSchool("");
+      setSelectedClients([]);
+      setActiveClient(null);
+    }
+  }, [selectedSeason, seasonSummary]);
 
   const [fadeIn, setFadeIn] = useState(true);
   useEffect(() => {
@@ -505,6 +530,53 @@ export default function CalendarPage() {
     editDialogClientObj?.schoolId || editDialogClientObj?.school_id
   ] || null;
 
+  // Sæson-selector til ikke-superadmin (bruges nedenfor)
+  const seasonSelectorNonAdmin = (
+    <Box sx={{ flex: 1, display: "flex", justifyContent: { xs: "center", sm: "flex-end" }, alignItems: "center", gap: 1 }}>
+      <Box sx={{ display: "flex", alignItems: "center" }}>
+        {selectedSeason !== currentSeason && (
+          <Tooltip title="Ikke indeværende sæson" arrow>
+            <WarningAmberIcon
+              color="warning"
+              sx={{ mr: 0.5, transition: "opacity 0.7s", opacity: fadeIn ? 1 : 0.2 }}
+            />
+          </Tooltip>
+        )}
+      </Box>
+      <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2, fontSize: { xs: "1rem", sm: "1.15rem" } }}>
+        Vælg sæson:
+      </Typography>
+      <Select
+        size="small"
+        value={selectedSeason}
+        onChange={e => setSelectedSeason(e.target.value)}
+        sx={{ minWidth: 160 }}
+        renderValue={val => (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <span>{val}</span>
+            {val === currentSeason && (
+              <Chip label="Nuværende" size="small" color="primary" sx={{ height: 18, fontSize: "0.7rem" }} />
+            )}
+          </Box>
+        )}
+      >
+        {availableSeasons.length > 0
+          ? availableSeasons.map(s => (
+              <MenuItem key={s} value={s}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <span>{s}</span>
+                  {s === currentSeason && (
+                    <Chip label="Nuværende sæson" size="small" color="primary" sx={{ height: 20, fontSize: "0.72rem" }} />
+                  )}
+                </Box>
+              </MenuItem>
+            ))
+          : <MenuItem value={selectedSeason}>{selectedSeason}</MenuItem>
+        }
+      </Select>
+    </Box>
+  );
+
   return (
     <Box sx={{
       maxWidth: { xs: "100%", sm: 1000, md: 1500 },
@@ -527,28 +599,6 @@ export default function CalendarPage() {
         </Tooltip>
       </Box>
 
-      {(user?.role === "admin" || user?.role === "superadmin") && (
-        <Paper elevation={2} sx={{ p: { xs: 1, sm: 2 }, mb: 3 }}>
-          <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="flex-start">
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: { xs: "100%", sm: "auto" } }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: "1rem", sm: "1.25rem" } }}>
-                Vælg skole:
-              </Typography>
-              <Select
-                size="small" value={selectedSchool} displayEmpty
-                onChange={e => setSelectedSchool(e.target.value)} sx={{ minWidth: 140 }}
-              >
-                <MenuItem value="">Alle skoler</MenuItem>
-                <MenuItem disabled>--------</MenuItem>
-                {sortedSchools.map(school => (
-                  <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
-                ))}
-              </Select>
-            </Box>
-          </Stack>
-        </Paper>
-      )}
-
       <Snackbar
         open={snackbar.open} autoHideDuration={2000} onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
@@ -557,6 +607,90 @@ export default function CalendarPage() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
+
+      {/* Superadmin: sæson + skole i samme Paper */}
+      {(isSuperadmin || isAdmin) && (
+        <Paper elevation={2} sx={{ p: { xs: 1, sm: 2 }, mb: 3 }}>
+          {loadingSeasonSummary ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <CircularProgress size={20} />
+              <Typography variant="body2">Henter sæson-data...</Typography>
+            </Box>
+          ) : (
+            <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" gap={3} flexWrap="wrap">
+
+              {/* Vælg sæson */}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                {selectedSeason !== currentSeason && (
+                  <Tooltip title="Ikke indeværende sæson" arrow>
+                    <WarningAmberIcon
+                      color="warning"
+                      sx={{ transition: "opacity 0.7s", opacity: fadeIn ? 1 : 0.2 }}
+                    />
+                  </Tooltip>
+                )}
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: "1rem", sm: "1.15rem" }, whiteSpace: "nowrap" }}>
+                  Vælg sæson:
+                </Typography>
+                <Select
+                  size="small"
+                  value={selectedSeason}
+                  onChange={e => setSelectedSeason(e.target.value)}
+                  sx={{ minWidth: 160 }}
+                  renderValue={val => (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <span>{val}</span>
+                      {val === currentSeason && (
+                        <Chip label="Nuværende" size="small" color="primary" sx={{ height: 18, fontSize: "0.7rem" }} />
+                      )}
+                    </Box>
+                  )}
+                >
+                  {availableSeasons.length > 0
+                    ? availableSeasons.map(s => (
+                        <MenuItem key={s} value={s}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <span>{s}</span>
+                            {s === currentSeason && (
+                              <Chip label="Nuværende sæson" size="small" color="primary" sx={{ height: 20, fontSize: "0.72rem" }} />
+                            )}
+                          </Box>
+                        </MenuItem>
+                      ))
+                    : <MenuItem disabled>Ingen sæsoner med data</MenuItem>
+                  }
+                </Select>
+              </Box>
+
+              {/* Vælg skole */}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: "1rem", sm: "1.15rem" }, whiteSpace: "nowrap" }}>
+                  Vælg skole:
+                </Typography>
+                <Select
+                  size="small"
+                  value={selectedSchool}
+                  displayEmpty
+                  onChange={e => {
+                    setSelectedSchool(e.target.value);
+                    setSelectedClients([]);
+                    setActiveClient(null);
+                  }}
+                  sx={{ minWidth: 160 }}
+                  disabled={availableSchoolsForSeason.length === 0}
+                >
+                  <MenuItem value="">Alle skoler</MenuItem>
+                  <MenuItem disabled>--------</MenuItem>
+                  {availableSchoolsForSeason.map(school => (
+                    <MenuItem key={school.id} value={school.id}>{school.name}</MenuItem>
+                  ))}
+                </Select>
+              </Box>
+
+            </Stack>
+          )}
+        </Paper>
+      )}
 
       <Paper elevation={2} sx={{ p: { xs: 1, sm: 2 }, mb: 3, position: "relative" }}>
         {loadingClients && (
@@ -629,52 +763,8 @@ export default function CalendarPage() {
             onClick={() => setCalendarDialogOpen(true)} disabled={isDisabled}
           >Vis liste</Button>
         </Box>
-        <Box sx={{ flex: 1, display: "flex", justifyContent: { xs: "center", sm: "flex-end" }, alignItems: "center", gap: 1 }}>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            {/* FIX: sammenlign string med string */}
-            {selectedSeason !== currentSeason && (
-              <Tooltip title="Ikke indeværende sæson" arrow>
-                <WarningAmberIcon
-                  color="warning"
-                  sx={{ mr: 0.5, transition: "opacity 0.7s", opacity: fadeIn ? 1 : 0.2 }}
-                />
-              </Tooltip>
-            )}
-          </Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#0a275c", mr: 2, fontSize: { xs: "1rem", sm: "1.15rem" } }}>
-            Vælg sæson:
-          </Typography>
-          {/* FIX: onChange sætter string direkte — ikke Number() */}
-          <Select
-            size="small"
-            value={selectedSeason}
-            onChange={e => setSelectedSeason(e.target.value)}
-            sx={{ minWidth: 160 }}
-            disabled={isDisabled}
-            renderValue={val => {
-              const s = SEASONS.find(x => x.value === val);
-              return (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <span>{val}</span>
-                  {s?.isCurrent && (
-                    <Chip label="Nuværende" size="small" color="primary" sx={{ height: 18, fontSize: "0.7rem" }} />
-                  )}
-                </Box>
-              );
-            }}
-          >
-            {SEASONS.map(season => (
-              <MenuItem key={season.value} value={season.value}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <span>{season.label}</span>
-                  {season.isCurrent && (
-                    <Chip label="Nuværende sæson" size="small" color="primary" sx={{ height: 20, fontSize: "0.72rem" }} />
-                  )}
-                </Box>
-              </MenuItem>
-            ))}
-          </Select>
-        </Box>
+        {/* Sæson-selector kun for ikke-superadmin/admin */}
+        {!isSuperadmin && !isAdmin && seasonSelectorNonAdmin}
       </Box>
 
       <Box sx={{
@@ -735,6 +825,8 @@ const MonthCalendar = React.memo(function MonthCalendar({
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
+  const isCurrentMonth = month === CURRENT_MONTH && year === CURRENT_YEAR;
+
   const weekRows = useMemo(() => {
     const rows = [];
     let weekStartIdx = 0;
@@ -782,15 +874,30 @@ const MonthCalendar = React.memo(function MonthCalendar({
 
   return (
     <Card sx={{
-      borderRadius: "14px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-      minWidth: 0, background: "#f9fafc", p: { xs: 0.5, sm: 1 }, userSelect: "none"
+      borderRadius: "14px",
+      boxShadow: isCurrentMonth
+        ? "0 0 0 3px #1976d2, 0 2px 8px rgba(0,0,0,0.10)"
+        : "0 2px 8px rgba(0,0,0,0.06)",
+      minWidth: 0,
+      background: isCurrentMonth ? "#f0f4ff" : "#f9fafc",
+      p: { xs: 0.5, sm: 1 },
+      userSelect: "none",
     }}>
       <CardContent sx={{ p: { xs: 1, sm: 2 } }}>
         <Typography variant="h6" sx={{
-          color: "#0a275c", fontWeight: 700, textAlign: "center",
+          color: isCurrentMonth ? "#1976d2" : "#0a275c",
+          fontWeight: 700, textAlign: "center",
           fontSize: { xs: "1rem", sm: "1.08rem" }, mb: 1
         }}>
           {name} {year}
+          {isCurrentMonth && (
+            <Chip
+              label="Denne måned"
+              size="small"
+              color="primary"
+              sx={{ ml: 1, height: 18, fontSize: "0.68rem", verticalAlign: "middle" }}
+            />
+          )}
         </Typography>
         <Box sx={{
           display: "grid", gridTemplateColumns: "repeat(8, 1fr)",
@@ -818,6 +925,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
               {row.weekDays.map((day, idx) => {
                 if (!day) return <Box key={idx + "-empty"} />;
                 const dateString = formatDate(year, month, day);
+                const isToday = dateString === TODAY_STR;
                 const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
                 let bg = "#fff";
                 if (cellStatus === "on") bg = "#b4eeb4";
@@ -829,11 +937,13 @@ const MonthCalendar = React.memo(function MonthCalendar({
                       sx={{
                         position: "relative", width: circleSize, height: circleSize,
                         cursor: clientId ? "pointer" : "default",
-                        opacity: clientId ? 1 : 0.55, userSelect: "none"
+                        opacity: clientId ? 1 : 0.55, userSelect: "none",
+                        borderRadius: "50%",
+                        boxShadow: isToday ? "0 0 0 2.5px #1976d2" : "none",
                       }}
                       onMouseDown={e => handleMouseDown(e, dateString)}
                       onMouseEnter={e => handleMouseEnter(e, dateString)}
-                      title={cellStatus === "on" ? "Tændt (shift+klik for tid)" : "Slukket"}
+                      title={isToday ? "I dag" : cellStatus === "on" ? "Tændt (shift+klik for tid)" : "Slukket"}
                     >
                       {isLoading && (
                         <CircularProgress size={circleSize} sx={{
@@ -845,7 +955,9 @@ const MonthCalendar = React.memo(function MonthCalendar({
                         width: innerCircleSize, height: innerCircleSize,
                         borderRadius: "50%", background: bg, border: "1px solid #eee",
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        color: "#0a275c", fontWeight: 500, fontSize: "1.15rem",
+                        color: isToday ? "#1976d2" : "#0a275c",
+                        fontWeight: isToday ? 800 : 500,
+                        fontSize: "1.15rem",
                         zIndex: 2, boxShadow: "0 1px 2px rgba(0,0,0,0.06)", userSelect: "none"
                       }}>
                         {day}
