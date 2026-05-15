@@ -20,7 +20,6 @@ import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useTheme } from "@mui/material/styles";
 
-// Fælles StatusBadge med 2 sekunders puls animation
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", ml: isMobile ? 1 : 2 }}>
@@ -41,18 +40,9 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
         <style>
           {`
             @keyframes pulsate {
-              0% {
-                transform: scale(1);
-                opacity: 1;
-              }
-              50% {
-                transform: scale(1.25);
-                opacity: 0.5;
-              }
-              100% {
-                transform: scale(1);
-                opacity: 1;
-              }
+              0% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.25); opacity: 0.5; }
+              100% { transform: scale(1); opacity: 1; }
             }
           `}
         </style>
@@ -69,9 +59,19 @@ function formatDateShort(dt) {
   const year = dt.getFullYear();
   return `${dayName} ${day}.${month} ${year}`;
 }
+
+// FIX: Håndterer både YYYY-MM-DDT00:00:00 og YYYY-MM-DD nøgleformat
 function getStatusAndTimesFromRaw(markedDays, dt) {
-  const dateKey = `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}T00:00:00`;
-  const data = markedDays[dateKey];
+  const yyyy = dt.getFullYear();
+  const mm = (dt.getMonth() + 1).toString().padStart(2, "0");
+  const dd = dt.getDate().toString().padStart(2, "0");
+  const dateKeyShort = `${yyyy}-${mm}-${dd}`;
+  const dateKeyFull = `${dateKeyShort}T00:00:00`;
+
+  const data = markedDays[dateKeyFull]
+    || markedDays[dateKeyShort]
+    || Object.entries(markedDays || {}).find(([k]) => k.startsWith(dateKeyShort))?.[1];
+
   if (!data || !data.status || data.status === "off") {
     return { status: "off", powerOn: "", powerOff: "" };
   }
@@ -81,7 +81,8 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
     powerOff: data.offTime || ""
   };
 }
-function StatusText({ status, isMobile=false }) {
+
+function StatusText({ status, isMobile = false }) {
   return (
     <Typography
       variant="body2"
@@ -96,7 +97,8 @@ function StatusText({ status, isMobile=false }) {
     </Typography>
   );
 }
-function ClientPowerShortTable({ markedDays, isMobile=false }) {
+
+function ClientPowerShortTable({ markedDays, isMobile = false }) {
   const days = [];
   const now = new Date();
   for (let i = 0; i < 3; i++) {
@@ -105,6 +107,17 @@ function ClientPowerShortTable({ markedDays, isMobile=false }) {
     days.push(d);
   }
   const cellStyle = { whiteSpace: "nowrap", py: 0, px: isMobile ? 1 : 1.625, fontSize: isMobile ? 12 : 14 };
+
+  // FIX: Vis "Ingen kalenderdata" hvis markedDays er tomt
+  const hasData = markedDays && Object.keys(markedDays).length > 0;
+
+  if (!hasData) {
+    return (
+      <Typography variant="body2" sx={{ color: "#888", mt: 1, fontSize: isMobile ? 12 : 14 }}>
+        Ingen kalenderdata for denne klient.
+      </Typography>
+    );
+  }
 
   return (
     <TableContainer sx={isMobile ? { maxWidth: "100vw" } : {}}>
@@ -124,12 +137,8 @@ function ClientPowerShortTable({ markedDays, isMobile=false }) {
               <TableRow key={dt.toISOString().slice(0, 10)} sx={{ height: isMobile ? 22 : 30 }}>
                 <TableCell sx={cellStyle}>{formatDateShort(dt)}</TableCell>
                 <TableCell sx={cellStyle}><StatusText status={status} isMobile={isMobile} /></TableCell>
-                <TableCell sx={cellStyle}>
-                  {status === "on" && powerOn ? powerOn : ""}
-                </TableCell>
-                <TableCell sx={cellStyle}>
-                  {status === "on" && powerOff ? powerOff : ""}
-                </TableCell>
+                <TableCell sx={cellStyle}>{status === "on" && powerOn ? powerOn : ""}</TableCell>
+                <TableCell sx={cellStyle}>{status === "on" && powerOff ? powerOff : ""}</TableCell>
               </TableRow>
             );
           })}
@@ -138,6 +147,7 @@ function ClientPowerShortTable({ markedDays, isMobile=false }) {
     </TableContainer>
   );
 }
+
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
@@ -148,11 +158,8 @@ function formatDateTime(dateStr, withSeconds = false) {
   }
   const formatter = new Intl.DateTimeFormat("da-DK", {
     timeZone: "Europe/Copenhagen",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
     second: withSeconds ? "2-digit" : undefined,
     hour12: false
   });
@@ -167,26 +174,19 @@ function formatDateTime(dateStr, withSeconds = false) {
     ? `${day}.${month} ${year}, kl. ${hour}:${minute}:${second}`
     : `${day}.${month} ${year}, kl. ${hour}:${minute}`;
 }
+
 function formatUptime(uptimeStr) {
   if (!uptimeStr) return "ukendt";
   let totalSeconds = 0;
   if (uptimeStr.includes('-')) {
     const [d, hms] = uptimeStr.split('-');
     const [h = "0", m = "0", s = "0"] = hms.split(':');
-    totalSeconds =
-      parseInt(d, 10) * 86400 +
-      parseInt(h, 10) * 3600 +
-      parseInt(m, 10) * 60 +
-      parseInt(s, 10);
+    totalSeconds = parseInt(d, 10) * 86400 + parseInt(h, 10) * 3600 + parseInt(m, 10) * 60 + parseInt(s, 10);
   } else if (uptimeStr.includes(':')) {
     const parts = uptimeStr.split(':').map(Number);
-    if (parts.length === 3) {
-      totalSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-    } else if (parts.length === 2) {
-      totalSeconds = parts[0] * 60 + parts[1];
-    } else if (parts.length === 1) {
-      totalSeconds = parts[0];
-    }
+    if (parts.length === 3) totalSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    else if (parts.length === 2) totalSeconds = parts[0] * 60 + parts[1];
+    else if (parts.length === 1) totalSeconds = parts[0];
   } else {
     totalSeconds = parseInt(uptimeStr, 10);
   }
@@ -194,27 +194,18 @@ function formatUptime(uptimeStr) {
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const mins = Math.floor((totalSeconds % 3600) / 60);
   const secs = totalSeconds % 60;
-
   return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
 }
-function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
+
+function SystemInfoTable({ client, uptime, lastSeen, isMobile = false }) {
   const cellStyle = {
-    border: 0,
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5,
-    py: 0,
-    verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
-    fontSize: isMobile ? 12 : 14,
+    border: 0, fontWeight: 600, whiteSpace: "nowrap",
+    pr: isMobile ? 0.25 : 0.5, py: 0, verticalAlign: "middle",
+    height: isMobile ? 22 : 30, fontSize: isMobile ? 12 : 14,
   };
   const valueCellStyle = {
-    border: 0,
-    pl: isMobile ? 0.25 : 0.5,
-    py: 0,
-    verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
-    fontSize: isMobile ? 12 : 14,
+    border: 0, pl: isMobile ? 0.25 : 0.5, py: 0,
+    verticalAlign: "middle", height: isMobile ? 22 : 30, fontSize: isMobile ? 12 : 14,
   };
   return (
     <TableContainer>
@@ -223,33 +214,25 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Ubuntu version:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
-                {client.ubuntu_version || "ukendt"}
-              </Box>
+              <Box sx={{ display: "flex", alignItems: "center" }}>{client.ubuntu_version || "ukendt"}</Box>
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Oppetid:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
-                {formatUptime(uptime)}
-              </Box>
+              <Box sx={{ display: "flex", alignItems: "center" }}>{formatUptime(uptime)}</Box>
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Sidst set:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
-                {formatDateTime(lastSeen, true)}
-              </Box>
+              <Box sx={{ display: "flex", alignItems: "center" }}>{formatDateTime(lastSeen, true)}</Box>
             </TableCell>
           </TableRow>
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>Tilføjet:</TableCell>
             <TableCell sx={valueCellStyle}>
-              <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
-                {formatDateTime(client.created_at, true)}
-              </Box>
+              <Box sx={{ display: "flex", alignItems: "center" }}>{formatDateTime(client.created_at, true)}</Box>
             </TableCell>
           </TableRow>
         </TableBody>
@@ -258,10 +241,8 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile=false }) {
   );
 }
 
-// Helper for clipboard copy
-function CopyField({ value, isMobile=false }) {
+function CopyField({ value, isMobile = false }) {
   const [copied, setCopied] = React.useState(false);
-
   const handleCopy = async () => {
     if (!value || value === "ukendt") return;
     try {
@@ -279,22 +260,15 @@ function CopyField({ value, isMobile=false }) {
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 800);
-    } catch (err) {
-      // ignore copy errors
-    }
+    } catch { }
   };
-
   return (
-    <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
+    <Box sx={{ display: "flex", alignItems: "center" }}>
       <span style={{ fontSize: isMobile ? 12 : undefined }}>{value}</span>
       {value && value !== "ukendt" && (
         <Tooltip title={copied ? "Kopieret!" : "Kopier"} arrow>
-          <IconButton
-            aria-label="kopier"
-            onClick={handleCopy}
-            size={isMobile ? "small" : "small"}
-            sx={{ ml: 0.5, p: 0, height: isMobile ? "1em" : "1.4em", width: isMobile ? "1em" : "1.4em" }}
-          >
+          <IconButton aria-label="kopier" onClick={handleCopy} size="small"
+            sx={{ ml: 0.5, p: 0, height: isMobile ? "1em" : "1.4em", width: isMobile ? "1em" : "1.4em" }}>
             <ContentCopyIcon sx={{ fontSize: isMobile ? "0.8em" : "1em", verticalAlign: "middle" }} />
           </IconButton>
         </Tooltip>
@@ -303,24 +277,15 @@ function CopyField({ value, isMobile=false }) {
   );
 }
 
-function NetworkInfoTable({ client, isMobile=false }) {
+function NetworkInfoTable({ client, isMobile = false }) {
   const cellStyle = {
-    border: 0,
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5,
-    py: 0,
-    verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
-    fontSize: isMobile ? 12 : 14,
+    border: 0, fontWeight: 600, whiteSpace: "nowrap",
+    pr: isMobile ? 0.25 : 0.5, py: 0, verticalAlign: "middle",
+    height: isMobile ? 22 : 30, fontSize: isMobile ? 12 : 14,
   };
   const valueCellStyle = {
-    border: 0,
-    pl: isMobile ? 0.25 : 0.5,
-    py: 0,
-    verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
-    fontSize: isMobile ? 12 : 14,
+    border: 0, pl: isMobile ? 0.25 : 0.5, py: 0,
+    verticalAlign: "middle", height: isMobile ? 22 : 30, fontSize: isMobile ? 12 : 14,
   };
   return (
     <TableContainer>
@@ -328,27 +293,19 @@ function NetworkInfoTable({ client, isMobile=false }) {
         <TableBody>
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>IP-adresse WLAN:</TableCell>
-            <TableCell sx={valueCellStyle}>
-              <CopyField value={client.wifi_ip_address || "ukendt"} isMobile={isMobile} />
-            </TableCell>
+            <TableCell sx={valueCellStyle}><CopyField value={client.wifi_ip_address || "ukendt"} isMobile={isMobile} /></TableCell>
           </TableRow>
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse WLAN:</TableCell>
-            <TableCell sx={valueCellStyle}>
-              <CopyField value={client.wifi_mac_address || "ukendt"} isMobile={isMobile} />
-            </TableCell>
+            <TableCell sx={valueCellStyle}><CopyField value={client.wifi_mac_address || "ukendt"} isMobile={isMobile} /></TableCell>
           </TableRow>
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>IP-adresse LAN:</TableCell>
-            <TableCell sx={valueCellStyle}>
-              <CopyField value={client.lan_ip_address || "ukendt"} isMobile={isMobile} />
-            </TableCell>
+            <TableCell sx={valueCellStyle}><CopyField value={client.lan_ip_address || "ukendt"} isMobile={isMobile} /></TableCell>
           </TableRow>
           <TableRow sx={{ height: isMobile ? 22 : 30 }}>
             <TableCell sx={cellStyle}>MAC-adresse LAN:</TableCell>
-            <TableCell sx={valueCellStyle}>
-              <CopyField value={client.lan_mac_address || "ukendt"} isMobile={isMobile} />
-            </TableCell>
+            <TableCell sx={valueCellStyle}><CopyField value={client.lan_mac_address || "ukendt"} isMobile={isMobile} /></TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -363,18 +320,15 @@ export default function ClientDetailsInfoSection({
   lastSeen,
   calendarDialogOpen,
   setCalendarDialogOpen,
-  clientOnline // optional explicit prop; if omitted we fall back to client?.isOnline
+  clientOnline
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  // Determine offline explicitly: parent can pass clientOnline (false => offline),
-  // otherwise fall back to client?.isOnline === false
   const isOffline = (typeof clientOnline !== "undefined")
     ? clientOnline === false
     : client?.isOnline === false;
 
-  // Visual disabled styles when offline
   const disabledOverlay = isOffline ? { opacity: 0.65, filter: "grayscale(20%)", bgcolor: "#fafafa" } : {};
 
   return (
@@ -389,16 +343,12 @@ export default function ClientDetailsInfoSection({
               <Tooltip title="Vis kalender">
                 <span>
                   <Button
-                    size="small"
-                    variant="text"
+                    size="small" variant="text"
                     sx={{
-                      minWidth: 0,
-                      color: "text.secondary",
+                      minWidth: 0, color: "text.secondary",
                       fontSize: isMobile ? "0.8rem" : "0.85rem",
-                      textTransform: "none",
-                      px: isMobile ? 0.5 : 1,
-                      verticalAlign: "middle",
-                      borderRadius: isMobile ? 5 : 8
+                      textTransform: "none", px: isMobile ? 0.5 : 1,
+                      verticalAlign: "middle", borderRadius: isMobile ? 5 : 8
                     }}
                     onClick={() => setCalendarDialogOpen(true)}
                   >
@@ -419,7 +369,6 @@ export default function ClientDetailsInfoSection({
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
                 Systeminfo
               </Typography>
-              {/* StateBadge removed from here (moved to header) */}
             </Box>
             <SystemInfoTable client={client} uptime={uptime} lastSeen={lastSeen} isMobile={isMobile} />
           </CardContent>
@@ -433,7 +382,6 @@ export default function ClientDetailsInfoSection({
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
                 Netværksinfo
               </Typography>
-              {/* OnlineStatusBadge removed from here (moved to header) */}
             </Box>
             <NetworkInfoTable client={client} isMobile={isMobile} />
           </CardContent>
