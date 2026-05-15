@@ -59,10 +59,6 @@ def _normalize_segment_duration(value, default: int = 6, min_v: int = 1, max_v: 
 
 
 def _parse_captured_at(captured_at_str: Optional[str]) -> Optional[datetime]:
-    """
-    Parser captured_at streng fra klienten til datetime.
-    Klienten sender ISO 8601 UTC: "2026-05-15T10:30:00Z"
-    """
     if not captured_at_str:
         return None
     try:
@@ -81,15 +77,20 @@ def _write_manifest(
     captured_at_map: Optional[Dict[str, datetime]] = None,
 ) -> None:
     """
-    Skriv HLS-manifest med EXT-X-PROGRAM-DATE-TIME på hvert segment.
+    Skriv HLS-manifest med EXT-X-DISCONTINUITY + EXT-X-PROGRAM-DATE-TIME
+    på hvert segment.
 
-    Timestamp-prioritet:
-    1. captured_at_map[seg] — sendt af klienten ved upload (= præcis optagelsestid)
-    2. fil-mtime - segment_duration — estimat baseret på uploadtidspunkt
-    3. Ingen tag — springer over
+    CHROME FIX:
+    ffmpeg reset_timestamps=1 nulstiller DTS til 0 ved starten af hvert segment.
+    Chrome's MSE forventer monotone DTS-værdier på tværs af segmenter.
+    Når segment N+1 starter ved DTS=0 efter segment N sluttede ved DTS≈720000,
+    kaster Chrome: "CHUNK_DEMUXER_ERROR_APPEND_FAILED: Parsed buffers not in DTS sequence"
 
-    EXT-X-PROGRAM-DATE-TIME er nødvendig for hls.playingDate i HLS.js
-    og for video.seekable-baseret lag-måling i Safari.
+    Fix: tilføj #EXT-X-DISCONTINUITY før hvert segment (undtagen det første).
+    Dette signalerer til HLS.js at timestamps nulstilles, og HLS.js kompenserer
+    automatisk ved at tilføje en offset — Chrome's MSE ser dermed monotone timestamps.
+
+    Safari og Firefox er ikke påvirkede af dette tag.
     """
     if captured_at_map is None:
         captured_at_map = {}
@@ -99,15 +100,20 @@ def _write_manifest(
         m3u.write("#EXT-X-VERSION:3\n")
         m3u.write(f"#EXT-X-TARGETDURATION:{segment_duration}\n")
         m3u.write(f"#EXT-X-MEDIA-SEQUENCE:{media_seq}\n")
+        m3u.write(f"#EXT-X-DISCONTINUITY-SEQUENCE:{media_seq}\n")
 
-        for seg in segments:
+        for i, seg in enumerate(segments):
+            # CHROME FIX: #EXT-X-DISCONTINUITY før hvert segment (undtagen første)
+            # signalerer at DTS nulstilles — HLS.js tilføjer offset automatisk
+            if i > 0:
+                m3u.write("#EXT-X-DISCONTINUITY\n")
+
             dt = captured_at_map.get(seg)
 
             if dt is None and client_dir:
-                # Fallback: mtime - segment_duration = approx optagelsesstart
                 try:
                     seg_path = os.path.join(client_dir, seg)
-                    mtime     = os.path.getmtime(seg_path)
+                    mtime    = os.path.getmtime(seg_path)
                     dt = datetime.fromtimestamp(mtime - segment_duration, tz=timezone.utc)
                 except Exception:
                     pass
@@ -120,15 +126,13 @@ def _write_manifest(
 
 
 # In-memory map: segment_filename → captured_at datetime
-# Bevares på tværs af requests så cleanup stadig kan skrive korrekte timestamps
-_captured_at_store: Dict[str, Dict[str, datetime]] = {}  # client_id → {seg_name → dt}
+_captured_at_store: Dict[str, Dict[str, datetime]] = {}
 
 
 def _store_captured_at(client_id: str, seg_name: str, dt: datetime) -> None:
     if client_id not in _captured_at_store:
         _captured_at_store[client_id] = {}
     _captured_at_store[client_id][seg_name] = dt
-    # Ryd gamle entries (behold kun de seneste 50 per klient)
     store = _captured_at_store[client_id]
     if len(store) > 50:
         oldest_keys = sorted(store.keys())[:-50]
@@ -178,7 +182,7 @@ async def upload_hls_file(
     file: UploadFile = File(...),
     client_id: str = Form(...),
     segment_duration: int = Form(6),
-    captured_at: Optional[str] = Form(default=None),  # FIX: modtag optagelsestidspunkt fra klient
+    captured_at: Optional[str] = Form(default=None),
     user=Depends(get_current_user)
 ):
     allowed_exts = [".ts", ".mp4"]
@@ -200,12 +204,10 @@ async def upload_hls_file(
     with open(seg_path, "wb") as f:
         f.write(content)
 
-    # Gem captured_at i memory-store så manifest kan bruge det
     dt = _parse_captured_at(captured_at)
     if dt is not None:
         _store_captured_at(client_id, file.filename, dt)
     else:
-        # Fallback: brug server-mtime - segment_duration
         try:
             mtime = os.path.getmtime(seg_path)
             dt_fallback = datetime.fromtimestamp(mtime - segment_duration, tz=timezone.utc)
@@ -296,7 +298,6 @@ def get_last_segment_info(
     if not os.path.exists(seg_path):
         return {"error": "segment missing", "is_healthy": False}
 
-    # Brug captured_at fra store hvis tilgængeligt — ellers mtime
     captured_at_map = _get_captured_at_map(client_id)
     dt = captured_at_map.get(last_segment)
     if dt is not None:
@@ -364,7 +365,6 @@ def reset_hls(client_id: str, response: Response, user=Depends(get_current_user)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     client_dir = safe_client_dir(client_id)
 
-    # Ryd captured_at store for denne klient
     if client_id in _captured_at_store:
         del _captured_at_store[client_id]
 
