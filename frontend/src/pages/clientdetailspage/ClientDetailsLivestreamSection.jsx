@@ -67,17 +67,12 @@ function formatDateTimeWithDay(date) {
   return `${dayName} ${day}.${month} ${year}, kl. ${hour}:${min}:${sec}`;
 }
 
-function getLagStatus(playerLag, lastSegmentLag) {
-  let lag;
-  if (isSafari()) {
-    lag = lastSegmentLag;
-  } else {
-    lag = playerLag !== null ? playerLag : lastSegmentLag;
-  }
+function getLagStatus(lag) {
+  // BUG 1 FIX: modtager ét enkelt lag-tal (backendLag som primær)
   if (lag == null) return { text: "", color: "#888" };
-  if (lag < 2)  return { text: "Live", color: "#43a047" };
-  if (lag < 10) return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#43a047" };
-  if (lag < 30) return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#f90" };
+  if (lag < 5)  return { text: "Live", color: "#43a047" };
+  if (lag < 20) return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#43a047" };
+  if (lag < 45) return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#f90" };
   return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#e53935" };
 }
 
@@ -185,7 +180,10 @@ export default function ClientDetailsLivestreamSection({
       video.autoplay    = true;
       video.playsInline = true;
 
-      const onLoaded = () => setManifestReady(true);
+      const onLoaded = () => {
+        setManifestReady(true);
+        video.play().catch(() => {});
+      };
       video.addEventListener("loadedmetadata", onLoaded, { once: true });
 
       return () => {
@@ -199,21 +197,18 @@ export default function ClientDetailsLivestreamSection({
       };
 
     } else if (Hls.isSupported()) {
-      // --- HLS.js ---
+      // --- HLS.js (Chrome + Firefox) ---
       // Tunet til 6s segmenter med 15-segment vindue (90s):
-      //
-      // liveSyncDurationCount:7  → spiller holdes 42s bag live-kanten
-      // liveMaxLatencyDuration:10 → maks 60s bagud inden HLS.js hopper frem
-      // maxBufferLength:12       → KUN 2 segmenter fremad — forhindrer at
-      //                            HLS.js "løber tør" ved live-kanten og staller
-      // maxMaxBufferLength:18    → absolut maks 3 segmenter fremad buffer
-      // liveBackBufferLength:6   → behold 1 segment bagud (til seek)
+      // liveSyncDurationCount:7   → 7 × 6s = 42s bag live-kant
+      // liveMaxLatencyDuration:10 → 10 × 6s = 60s maks bagud
+      // maxBufferLength:20        → BUG 3 FIX: var 12 → 20s (Firefox kræver mere)
+      // maxMaxBufferLength:30     → var 18 → 30s
       const hls = new Hls({
         liveSyncDurationCount:       7,
         liveMaxLatencyDurationCount: 10,
         initialLiveManifestSize:     4,
-        maxBufferLength:             12,
-        maxMaxBufferLength:          18,
+        maxBufferLength:             20,  // BUG 3 FIX: Firefox kræver min 20s
+        maxMaxBufferLength:          30,
         liveBackBufferLength:        6,
         enableWorker:                true,
         startLevel:                  -1,
@@ -230,6 +225,9 @@ export default function ClientDetailsLivestreamSection({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setManifestReady(true);
         setError("");
+        // BUG 2 FIX: Chrome kræver eksplicit play() — autoplay-attribut alene
+        // er ikke nok når HLS.js styrer MediaSource
+        video.play().catch(() => {});
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
@@ -363,7 +361,7 @@ export default function ClientDetailsLivestreamSection({
   }, [clientId, manifestReady, effectiveRefreshKey, clientOnline]);
 
   // -------------------------------------------------------------------------
-  // Player-reported lag (HLS.js latency)
+  // Player-reported lag (HLS.js latency) — kun til debug
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!manifestReady || clientOnline === false) return;
@@ -382,11 +380,14 @@ export default function ClientDetailsLivestreamSection({
 
   // -------------------------------------------------------------------------
   // Afledte værdier
+  // BUG 1 FIX: backendLag er primær forsinkelseskilde — den måler præcist
+  // hvornår det seneste segment blev optaget på klienten.
+  // playerLag (hls.latency) er HLS.js's eget upræcise estimat — kun til debug.
   // -------------------------------------------------------------------------
-  const lagToShow    = playerLag ?? lastSegmentLag;
-  const lagType      = playerLag != null ? "player" : "backend";
+  const lagToShow    = lastSegmentLag ?? playerLag;
+  const lagType      = lastSegmentLag != null ? "backend" : "player";
   const sanitizedLag = lagToShow != null && lagToShow < 0 ? 0 : lagToShow;
-  const lagStatus    = getLagStatus(sanitizedLag, lastSegmentLag);
+  const lagStatus    = getLagStatus(sanitizedLag);
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
 
   const loadingText = streamStale
@@ -615,11 +616,11 @@ export default function ClientDetailsLivestreamSection({
                 }}>
                   serverReady=<b>{serverReady ? "ja" : "nej"}</b>,{" "}
                   isStale=<b>{streamStale ? "ja" : "nej"}</b>,{" "}
-                  <Tooltip title={`Råværdi: ${playerLag ?? "-"}`}>
+                  <Tooltip title={`Råværdi: ${playerLag ?? "-"} (kun til debug — bruges ikke til visning)`}>
                     <span>playerLag=<b>{formatLagValue(playerLag)}</b></span>
                   </Tooltip>
                   ,{" "}
-                  <Tooltip title={`Råværdi: ${lastSegmentLag ?? "-"}`}>
+                  <Tooltip title={`Råværdi: ${lastSegmentLag ?? "-"} (primær forsinkelseskilde)`}>
                     <span>backendLag=<b>{formatLagValue(lastSegmentLag)}</b></span>
                   </Tooltip>
                   , lagType=<b>{lagType}</b>
