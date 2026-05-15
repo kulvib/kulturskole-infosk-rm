@@ -190,8 +190,8 @@ export default function ClientDetailsLivestreamSection({
       // fordi MSE-buffere initialiseres inden video-elementet er klar.
       // -----------------------------------------------------------------------
       const hls = new Hls({
-        liveSyncDurationCount:       4,   // 4 × 8s = 32s bag live-kant (lavere forsinkelse)
-        liveMaxLatencyDurationCount: 6,   // 6 × 8s = 48s maks bagud
+        liveSyncDurationCount:       3,
+        liveMaxLatencyDurationCount: 5,
         initialLiveManifestSize:     3,
         maxBufferLength:             20,
         maxMaxBufferLength:          30,
