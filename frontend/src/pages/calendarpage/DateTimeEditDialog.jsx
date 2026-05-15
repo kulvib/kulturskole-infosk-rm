@@ -32,56 +32,42 @@ function formatFullDate(dateStr) {
   const day = d.getDate();
   const month = MONTHS[d.getMonth()];
   const year = d.getFullYear();
-  return `${weekday} d. ${day}.${month} ${year}`;
+  return `${weekday} d. ${day}. ${month} ${year}`;
 }
 
 const EARLIEST = "00:00";
 const LATEST = "23:59";
 
-// FIX: Beregn korrekt sæson-startår ud fra dato
-// En dato i januar 2026 hører til sæson 2025 (skoleår 2025/2026)
+// FIX: Beregn korrekt sæson-startår ud fra dato.
+// En dato i januar 2026 hører til sæson 2025 (skoleår 2025/2026).
+// Tidligere brugte koden bare årstallet direkte → forkert sæson for jan-jul.
 function getSeasonFromDate(dateStr) {
   const normDate = dateStr.split("T")[0];
-  const year = parseInt(normDate.substring(0, 4));
-  const month = parseInt(normDate.substring(5, 7));
+  const year = parseInt(normDate.substring(0, 4), 10);
+  const month = parseInt(normDate.substring(5, 7), 10);
   return month >= 8 ? year : year - 1;
 }
 
-// Hent standardtider for skoleId
-function getDefaultTimes(dateStr, schoolId) {
+// FIX: Bruger nu schoolTimes-prop fra CalendarPage (API-kilde) i stedet for
+// localStorage. Begge komponenter bruger dermed samme datakilde til standardtider,
+// hvilket eliminerer mismatch mellem dialog og kalender.
+function getDefaultTimes(dateStr, schoolTimes) {
   const date = new Date(dateStr);
   const day = date.getDay();
-  const TIMES_STORAGE_KEY = schoolId
-    ? `standard_times_settings_${schoolId}`
-    : "standard_times_settings";
-
-  let defaultTimes = {
+  const fallback = {
     weekday: { onTime: "09:00", offTime: "22:30" },
     weekend: { onTime: "08:00", offTime: "18:00" }
   };
-
-  const saved = localStorage.getItem(TIMES_STORAGE_KEY);
-  if (saved) {
-    try {
-      const settings = JSON.parse(saved);
-      defaultTimes = {
-        weekday: settings.weekday || defaultTimes.weekday,
-        weekend: settings.weekend || defaultTimes.weekend
-      };
-    } catch {}
-  }
-
+  const times = schoolTimes || fallback;
   if (day === 0 || day === 6) {
-    return defaultTimes.weekend;
-  } else {
-    return defaultTimes.weekday;
+    return times?.weekend || fallback.weekend;
   }
+  return times?.weekday || fallback.weekday;
 }
 
+// FIX: Slår op med både kort (YYYY-MM-DD) og fuld (YYYY-MM-DDT00:00:00) nøgle
 function findDayObj(markedDays, normDate) {
-  // Prøv eksakt match først (kort format)
   if (markedDays[normDate]) return markedDays[normDate];
-  // Prøv fuld datetime-nøgle (YYYY-MM-DDT00:00:00)
   const key = Object.keys(markedDays).find(k => k.startsWith(normDate));
   return key ? markedDays[key] : {};
 }
@@ -93,6 +79,9 @@ export default function DateTimeEditDialog({
   clientId,
   onSaved,
   schoolId,
+  // FIX: Ny prop — API-baserede skoletider sendt fra CalendarPage.
+  // Erstatter localStorage-opslag der gav inkonsistente standardtider.
+  schoolTimes,
 }) {
   const [onTime, setOnTime] = useState("");
   const [offTime, setOffTime] = useState("");
@@ -105,7 +94,6 @@ export default function DateTimeEditDialog({
   const onTimeRef = useRef(null);
   const offTimeRef = useRef(null);
 
-  // Validation helpers
   function isValidTimeFormat(t) {
     return /^\d{2}:\d{2}$/.test(t);
   }
@@ -114,7 +102,7 @@ export default function DateTimeEditDialog({
   }
 
   const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   useEffect(() => {
@@ -125,7 +113,7 @@ export default function DateTimeEditDialog({
 
     const normDate = date.split("T")[0];
 
-    // FIX: Brug korrekt sæson-startår (ikke bare årstallet fra datoen)
+    // FIX: Korrekt sæson-startår — ikke bare årstallet fra datoen
     const season = getSeasonFromDate(normDate);
 
     fetch(
@@ -139,19 +127,20 @@ export default function DateTimeEditDialog({
           setOnTime(dayObj.onTime);
           setOffTime(dayObj.offTime);
         } else {
-          const def = getDefaultTimes(normDate, schoolId);
+          // FIX: Brug API-baserede skoletider (schoolTimes prop) i stedet for localStorage
+          const def = getDefaultTimes(normDate, schoolTimes);
           setOnTime(def.onTime);
           setOffTime(def.offTime);
         }
       })
       .catch(() => {
         setSnackbar({ open: true, message: "Fejl ved hentning!", severity: "error" });
-        const def = getDefaultTimes(normDate, schoolId);
+        const def = getDefaultTimes(normDate, schoolTimes);
         setOnTime(def.onTime);
         setOffTime(def.offTime);
       })
       .finally(() => setLoading(false));
-  }, [open, date, clientId, schoolId]);
+  }, [open, date, clientId, schoolTimes]);
 
   useEffect(() => {
     return () => {
@@ -179,7 +168,6 @@ export default function DateTimeEditDialog({
     return true;
   };
 
-  // Dynamisk min/max for inputs
   const onTimeMax = offTime && isValidTimeFormat(offTime) ? offTime : LATEST;
   const offTimeMin = onTime && isValidTimeFormat(onTime) ? onTime : EARLIEST;
 
@@ -189,7 +177,7 @@ export default function DateTimeEditDialog({
     try {
       const normDate = date.split("T")[0];
 
-      // FIX: Brug korrekt sæson-startår
+      // FIX: Korrekt sæson-startår
       const season = getSeasonFromDate(normDate);
 
       const resGet = await fetch(
@@ -202,7 +190,7 @@ export default function DateTimeEditDialog({
         serverData = data.markedDays || {};
       }
 
-      // Find eksisterende nøgle (kan være YYYY-MM-DDT00:00:00 eller YYYY-MM-DD)
+      // Find eksisterende nøgle (YYYY-MM-DDT00:00:00 eller YYYY-MM-DD)
       let updateKey = normDate;
       const existingKey = Object.keys(serverData).find(k => k.startsWith(normDate));
       if (existingKey) updateKey = existingKey;
@@ -236,7 +224,7 @@ export default function DateTimeEditDialog({
       );
       if (!res.ok) throw new Error("Gemning fejlede");
 
-      // Hent nyeste server-tilstand efter POST
+      // Hent nyeste server-tilstand efter POST og opdater inputfelter
       let returnedDay = updatedDays[updateKey];
       try {
         const resGet2 = await fetch(
@@ -253,10 +241,10 @@ export default function DateTimeEditDialog({
           }
         }
       } catch {
-        // Ignorer fetch2-fejl — vi har stadig updatedDays
+        // Ignorer — vi har stadig updatedDays som fallback
       }
 
-      // Send den præcise dag tilbage til CalendarPage
+      // Send den præcise dag tilbage til CalendarPage så local state opdateres
       if (onSaved) onSaved({ date: normDate, clientId, day: returnedDay });
 
       setSnackbar({ open: true, message: "Gemt!", severity: "success" });
@@ -299,9 +287,7 @@ export default function DateTimeEditDialog({
                   value={onTime}
                   onChange={e => setOnTime(e.target.value)}
                   inputRef={onTimeRef}
-                  InputProps={{
-                    style: { backgroundColor: "#f6f6f6" }
-                  }}
+                  InputProps={{ style: { backgroundColor: "#f6f6f6" } }}
                   inputProps={{
                     min: EARLIEST,
                     max: onTimeMax,
@@ -320,9 +306,7 @@ export default function DateTimeEditDialog({
                   value={offTime}
                   onChange={e => setOffTime(e.target.value)}
                   inputRef={offTimeRef}
-                  InputProps={{
-                    style: { backgroundColor: "#f6f6f6" }
-                  }}
+                  InputProps={{ style: { backgroundColor: "#f6f6f6" } }}
                   inputProps={{
                     min: offTimeMin,
                     max: LATEST,
