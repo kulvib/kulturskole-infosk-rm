@@ -21,7 +21,7 @@ from routers import meta
 from routers import schools
 from routers import users
 from routers import livestream
-from routers import remote_desktop
+from routers.remote_desktop import router as remote_desktop_router
 from routers import holidays
 from routers.livestream import HLS_DIR
 
@@ -194,7 +194,7 @@ app.include_router(calendar.router,   prefix="/api")
 app.include_router(meta.router,       prefix="/api")
 app.include_router(users.router,      prefix="/api")
 app.include_router(livestream.router, prefix="/api")
-app.include_router(remote_desktop.router, prefix="/api")
+app.include_router(remote_desktop_router, prefix="/api")
 app.include_router(holidays.router,   prefix="/api")
 
 
