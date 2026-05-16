@@ -48,7 +48,7 @@ export default function ClientDetailsPage({
   refreshing,
   handleRefresh,
   silentRefresh,
-  onCancelActionPollRef,  // Ref fra Wrapper — sættes til cancelActionPoll fn
+  onCancelActionPollRef,
   markedDays,
   calendarLoading,
   streamKey,
@@ -204,15 +204,12 @@ export default function ClientDetailsPage({
   const [clientActionPending, setClientActionPending] = useState(false);
   const actionPollStopRef = useRef(false);
 
-  // cancelActionPoll — eksponeres til Wrapper via onCancelActionPollRef
-  // Bruges når brugeren klikker "Opdater" manuelt mens en action kører
   const cancelActionPoll = useCallback(() => {
     actionPollStopRef.current = true;
     setClientActionPending(false);
     setLocalPendingAction("none");
   }, []);
 
-  // Registrer cancelActionPoll i Wrapper-ref så Wrapper kan kalde den
   useEffect(() => {
     if (onCancelActionPollRef) {
       onCancelActionPollRef.current = cancelActionPoll;
@@ -227,6 +224,9 @@ export default function ClientDetailsPage({
 
     async function pollForConfirmation() {
       while (!actionPollStopRef.current && mountedRef.current) {
+        // Timeout-tjek øverst i løkken — ikke efter break
+        if (Date.now() - startTime > ACTION_POLL_MAX_MS) break;
+
         await new Promise((res) => setTimeout(res, ACTION_POLL_MS));
         if (actionPollStopRef.current || !mountedRef.current) break;
 
@@ -251,10 +251,8 @@ export default function ClientDetailsPage({
         const currentStep = String(liveStepRef.current ?? "").toLowerCase();
         if (BUSY_CHROME_STEPS.has(currentStep)) continue;
 
-        // Begge betingelser opfyldt
+        // Begge betingelser opfyldt — afslut polling
         break;
-
-        if (Date.now() - startTime > ACTION_POLL_MAX_MS) break;
       }
 
       if (mountedRef.current && !actionPollStopRef.current) {
@@ -315,6 +313,7 @@ export default function ClientDetailsPage({
     >
       <Box sx={{ display: "flex", flexDirection: "column", gap: isMobile ? 1 : 2 }}>
 
+        {/* 1 */}
         <ClientDetailsHeaderSection
           client={client}
           liveChromeStatus={liveChromeStatus}
@@ -325,6 +324,27 @@ export default function ClientDetailsPage({
           clientOnline={clientOnline}
         />
 
+        {/* 2 */}
+        <ClientDetailsLivestreamSection
+          clientId={client?.id}
+          streamKey={streamKey}
+          refreshing={refreshing}
+          onRestartStream={onRestartStream}
+          clientOnline={clientOnline}
+        />
+
+        {/* 3 */}
+        <ClientDetailsInfoSection
+          client={client}
+          markedDays={markedDays}
+          uptime={displayUptime}
+          lastSeen={lastSeen ?? client?.last_seen}
+          calendarDialogOpen={calendarDialogOpen}
+          setCalendarDialogOpen={setCalendarDialogOpen}
+          clientOnline={clientOnline}
+        />
+
+        {/* 4 */}
         <ClientDetailsActionsSection
           clientId={client?.id}
           clientState={effectiveClientState}
@@ -340,23 +360,6 @@ export default function ClientDetailsPage({
           liveChromeStatus={liveChromeStatus}
         />
 
-        <ClientDetailsInfoSection
-          client={client}
-          markedDays={markedDays}
-          uptime={displayUptime}
-          lastSeen={lastSeen ?? client?.last_seen}
-          calendarDialogOpen={calendarDialogOpen}
-          setCalendarDialogOpen={setCalendarDialogOpen}
-          clientOnline={clientOnline}
-        />
-
-        <ClientDetailsLivestreamSection
-          clientId={client?.id}
-          streamKey={streamKey}
-          refreshing={refreshing}
-          onRestartStream={onRestartStream}
-          clientOnline={clientOnline}
-        />
       </Box>
 
       <ClientCalendarDialog
@@ -372,4 +375,14 @@ export default function ClientDetailsPage({
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
-          onClose={*
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Container>
+  );
+}
