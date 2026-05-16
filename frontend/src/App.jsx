@@ -10,7 +10,7 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import AdminRoute from "./auth/AdminRoute";
 import CalendarPage from "./pages/calendarpage/CalendarPage";
 import AdminPage from "./pages/adminpages/AdminPage";
-import RemoteDesktop from "./components/RemoteDesktop";
+import RemoteDesktop from "./pages/clientdetailspage/remotedesktop/RemoteDesktop";
 import ChangePassword from "./pages/ChangePassword";
 
 /*
@@ -51,7 +51,16 @@ export default function App() {
           }
         />
       </Route>
-      <Route path="/remote-desktop/:clientId" element={<RemoteDesktop />} />
+      <Route
+        path="/remote-desktop/:clientId"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <RemoteDesktop />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
