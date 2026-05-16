@@ -1,0 +1,36 @@
+--- api.js
++++ api.terminal-mvp.js
+@@ -37,6 +37,22 @@
+   localStorage.removeItem("user");
+   localStorage.removeItem("token");
+   window.location.href = "/login";
++}
++
++export function getAuthToken() {
++  return localStorage.getItem("token") || "";
++}
++
++export function getWsApiUrl() {
++  if (apiUrl.startsWith("https://")) return `wss://${apiUrl.slice("https://".length)}`;
++  if (apiUrl.startsWith("http://")) return `ws://${apiUrl.slice("http://".length)}`;
++  return apiUrl;
++}
++
++export function getTerminalBrowserWsUrl(clientId) {
++  const token = getAuthToken();
++  const qs = token ? `?token=${encodeURIComponent(token)}` : "";
++  return `${getWsApiUrl()}/api/terminal/browser/${encodeURIComponent(clientId)}/ws${qs}`;
+ }
+ 
+ async function extractError(res, fallback) {
+@@ -297,7 +313,9 @@
+ }
+ 
+ export function openTerminal(id) {
+-  window.open(`${apiUrl}/api/clients/${id}/terminal`, "_blank", "noopener");
++  // Gammel placeholder bevares for bagudkompatibilitet.
++  // Den rigtige terminal åbnes nu via ClientTerminalDialog + WebSocket.
++  return getTerminalBrowserWsUrl(id);
+ }
+ 
+ export function openRemoteDesktop(id) {
