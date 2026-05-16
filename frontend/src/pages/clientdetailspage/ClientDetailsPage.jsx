@@ -19,25 +19,34 @@ import {
 /*
   ClientDetailsPage.jsx
 
-  Arkitektur for at undgå blinking:
-  - getChromeStatus polles hvert 1s → kun liveChromeStatus/Color opdateres (ingen full re-render).
+  Arkitektur for at undgå blinking OG sikre korrekt lock:
+  - getChromeStatus polles hvert 1s → liveChromeStatus/Color/Step opdateres
+    uden full re-render. Step sendes til DetailsActionsSection som liveStep.
   - pending_chrome_action polles via getClient direkte under action-flow →
     opdaterer kun localPendingAction + localClientState, IKKE hele client-objektet.
-  - handleRefresh (full re-render) bruges KUN ved:
-      a) Manuel klik på "Opdater"-knappen
-      b) Én stille refresh EFTER action er bekræftet (via silentRefreshRef)
-  - Dynamisk uptime-ticker via uptimeBaseRef + setInterval.
+  - Lock holdes indtil BÅDE:
+      1) pending_chrome_action === "none"
+      2) chrome step er ikke i BUSY_CHROME_STEPS (countdown, clear_cookies osv.)
+  - Korrekt unlock-rækkefølge: silentRefresh() FØRST → unlock bagefter.
+  - handleRefresh (full re-render) bruges KUN ved manuel klik på "Opdater".
 */
 
-const CHROME_STATUS_POLL_MS = 1000;   // Live chrome-status hvert 1s
-const ACTION_POLL_MS        = 2000;   // Poll pca hvert 2s under handling
-const ACTION_POLL_MAX_MS    = 60_000; // Max ventetid: 60s
+const CHROME_STATUS_POLL_MS = 1000;
+const ACTION_POLL_MS        = 1500;
+const ACTION_POLL_MAX_MS    = 60_000;
+
+// Trin der indikerer at klienten stadig er i gang — lås skal holdes
+const BUSY_CHROME_STEPS = new Set([
+  "countdown",
+  "clear_cookies",
+  "system_reboot_countdown",
+]);
 
 export default function ClientDetailsPage({
   client,
   refreshing,
   handleRefresh,
-  silentRefresh,           // Stille refresh uden snackbar (fra Wrapper)
+  silentRefresh,
   markedDays,
   calendarLoading,
   streamKey,
@@ -78,6 +87,7 @@ export default function ClientDetailsPage({
 
   // ---------------------------------------------------------------------------
   // Live chrome-status — opdateres hvert 1s uden full re-render
+  // liveStep sendes til DetailsActionsSection så den kan vise aktuel status
   // ---------------------------------------------------------------------------
   const [liveChromeStatus, setLiveChromeStatus] = useState(
     client?.chrome_status ?? null
@@ -85,6 +95,10 @@ export default function ClientDetailsPage({
   const [liveChromeColor, setLiveChromeColor] = useState(
     client?.chrome_color ?? null
   );
+  const [liveStep, setLiveStep] = useState(null);
+
+  // Ref så pollForConfirmation kan læse seneste step uden at være i deps
+  const liveStepRef = useRef(null);
 
   // ---------------------------------------------------------------------------
   // Lokal pending_chrome_action + state
@@ -111,7 +125,6 @@ export default function ClientDetailsPage({
   const uptimeFetchRef          = useRef(null);
   const [lastSeen, setLastSeen] = useState(client?.last_seen ?? null);
 
-  // Sæt initial data fra client prop — kun ved client id-skift
   useEffect(() => {
     if (client?.uptime != null) {
       const parsed = parseInt(String(client.uptime), 10);
@@ -127,7 +140,7 @@ export default function ClientDetailsPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client?.id]);
 
-  // Lokal uptime ticker — tikker hvert sekund uden API-kald
+  // Lokal uptime ticker
   useEffect(() => {
     if (uptimeBaseRef.current == null || uptimeFetchRef.current == null) return;
     const interval = setInterval(() => {
@@ -139,7 +152,8 @@ export default function ClientDetailsPage({
 
   // ---------------------------------------------------------------------------
   // Chrome-status polling — hvert 1s
-  // Let endpoint der kun returnerer seneste step — ingen full re-render
+  // Opdaterer liveChromeStatus, liveChromeColor, liveStep, lastSeen, uptime
+  // liveStep holdes også i liveStepRef så pollForConfirmation kan læse den
   // ---------------------------------------------------------------------------
   const mountedRef = useRef(true);
 
@@ -157,6 +171,11 @@ export default function ClientDetailsPage({
           if (data?.chrome_status != null) setLiveChromeStatus(data.chrome_status);
           if (data?.chrome_color != null)  setLiveChromeColor(data.chrome_color);
           if (data?.last_seen != null)     setLastSeen(data.last_seen);
+
+          // Opdater liveStep + ref
+          const stepName = data?.step?.step ?? null;
+          setLiveStep(stepName);
+          liveStepRef.current = stepName;
 
           if (data?.uptime != null) {
             const parsed = parseInt(String(data.uptime), 10);
@@ -187,9 +206,13 @@ export default function ClientDetailsPage({
   // ---------------------------------------------------------------------------
   // Action-pending polling
   //
-  // Poller getClient direkte og opdaterer KUN localPendingAction + localClientState.
-  // Kalder IKKE handleRefresh under polling → ingen blinking.
-  // Kalder silentRefresh (eller handleRefresh) ÉN gang til sidst — stille.
+  // Lock holdes indtil BEGGE betingelser er opfyldt:
+  //   1) pending_chrome_action === "none"
+  //   2) chrome step er IKKE i BUSY_CHROME_STEPS
+  //
+  // Korrekt unlock-rækkefølge:
+  //   silentRefresh() FØRST → setClientActionPending(false) BAGEFTER
+  //   → knapper låses ikke op før parent state er opdateret
   // ---------------------------------------------------------------------------
   const [clientActionPending, setClientActionPending] = useState(false);
   const actionPollStopRef = useRef(false);
@@ -205,34 +228,44 @@ export default function ClientDetailsPage({
         await new Promise((res) => setTimeout(res, ACTION_POLL_MS));
         if (actionPollStopRef.current || !mountedRef.current) break;
 
+        // Tjek 1: pending_chrome_action
+        let pcaClear = false;
         try {
           const data = await getClient(client.id);
           if (!mountedRef.current) break;
 
           const pca = String(data?.pending_chrome_action ?? "").toLowerCase();
-
-          // Opdater lokal state — ingen parent re-render, ingen blinking
           setLocalPendingAction(pca);
           if (data?.state) setLocalClientState(data.state);
 
-          // Stop når handlingen er bekræftet af klienten
-          if (!pca || pca === "none") break;
+          pcaClear = !pca || pca === "none";
         } catch {
-          // Ignorer poll-fejl — fortsæt
+          // Fortsæt polling ved fejl
         }
 
-        if (Date.now() - startTime > ACTION_POLL_MAX_MS) break; // Timeout
+        if (!pcaClear) continue;
+
+        // Tjek 2: chrome step må ikke være i BUSY_CHROME_STEPS
+        // Bruger liveStepRef (opdateres af chrome-status poll hvert 1s)
+        const currentStep = String(liveStepRef.current ?? "").toLowerCase();
+        const stepBusy = BUSY_CHROME_STEPS.has(currentStep);
+
+        if (stepBusy) continue;
+
+        // Begge betingelser opfyldt — afslut polling
+        break;
       }
 
       if (mountedRef.current) {
-        setClientActionPending(false);
-        // Ét stille refresh efter bekræftelse — opdaterer parent state uden snackbar
+        // VIGTIGT: refresh FØRST så parent state er opdateret
+        // DEREFTER unlock — knapper åbner ikke før data er friske
         try {
           const refresh = silentRefresh ?? handleRefresh;
           await refresh();
         } catch {
           // Ignorer
         }
+        setClientActionPending(false);
       }
     }
 
@@ -246,9 +279,9 @@ export default function ClientDetailsPage({
     async (action) => {
       if (!client?.id) return;
       await clientAction(client.id, action);
-      // Optimistisk: sæt pending action med det samme lokalt
+      // Optimistisk: sæt pending action lokalt med det samme
       setLocalPendingAction(action);
-      // Start polling for bekræftelse fra klienten
+      // Start polling for bekræftelse
       startActionConfirmationPolling();
     },
     [client?.id, startActionConfirmationPolling]
@@ -268,7 +301,6 @@ export default function ClientDetailsPage({
   const clientOnline  = client?.isOnline ?? false;
   const displayUptime = uptime != null ? uptime : client?.uptime ?? null;
 
-  // Under action-flow: brug lokal state så parent re-render ikke nulstiller visning
   const effectivePendingAction = clientActionPending
     ? localPendingAction
     : (client?.pending_chrome_action ?? "none");
@@ -306,6 +338,8 @@ export default function ClientDetailsPage({
           showSnackbar={showSnackbar}
           clientOnline={clientOnline}
           clientActionPending={clientActionPending}
+          liveStep={liveStep}
+          liveChromeStatus={liveChromeStatus}
         />
 
         <ClientDetailsInfoSection
