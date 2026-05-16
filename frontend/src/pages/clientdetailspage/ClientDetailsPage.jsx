@@ -1,16 +1,5 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-} from "react";
-import {
-  Box,
-  Container,
-  Snackbar,
-  Alert,
-  useMediaQuery,
-} from "@mui/material";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Box, Container, Snackbar, Alert, useMediaQuery } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
 import ClientDetailsHeaderSection from "./ClientDetailsHeaderSection";
@@ -19,28 +8,23 @@ import ClientDetailsActionsSection from "./DetailsActionsSection";
 import ClientDetailsLivestreamSection from "./ClientDetailsLivestreamSection";
 import ClientCalendarDialog from "../calendarpage/ClientCalendarDialog";
 
-import {
-  getChromeStatus,
-  clientAction,
-  openTerminal,
-  openRemoteDesktop,
-} from "../../api";
+import { getChromeStatus, clientAction, openTerminal, openRemoteDesktop } from "../../api";
 
 /*
   ClientDetailsPage.jsx
 
-  FIX (disabled knapper): handleClientAction awaiter nu handleRefresh direkte
-    i stedet for setTimeout(..., 1000). Det sikrer at actionLoading forbliver
-    true under hele API-kald + refresh-cyklussen — knapperne forbliver disabled.
-
-  FIX (snackbar): handleRefresh kaldes med silent=true ved knap-handlinger
-    så der ikke vises "Klient opdateret" ved hvert klik.
-
-  FIX (oppetid dynamisk): uptimeBaseRef + uptimeFetchRef + lokal ticker.
-  FIX (CalendarDialog sti): ../calendarpage/ClientCalendarDialog
+  FIX 1: Dynamisk uptime-ticker via uptimeBaseRef + setInterval.
+  FIX 2: handleClientAction sætter actionPendingRef = true og starter
+         hurtig polling (hvert 2s) indtil pending_chrome_action === "none".
+         Dette sikrer at knapper i DetailsActionsSection forbliver låste
+         indtil klienten faktisk har bekræftet handlingen.
+  FIX 3: Opdaterknappen virker korrekt — den kalder handleRefresh fra parent
+         som henter friske data fra backend.
 */
 
 const CHROME_POLL_MS = 3000;
+const ACTION_POLL_MS = 2000;   // Hurtig polling mens handling afventer klient
+const ACTION_POLL_MAX_MS = 45000; // Max ventetid: 45s
 
 export default function ClientDetailsPage({
   client,
@@ -85,9 +69,22 @@ export default function ClientDetailsPage({
   // --- Sidst set ---
   const [lastSeen, setLastSeen] = useState(client?.last_seen ?? null);
 
+  // --- Pending action polling ---
+  // actionPendingRef sættes true når en handling sendes til klienten.
+  // actionPollStopRef bruges til at stoppe polling-løkken.
+  const actionPendingRef = useRef(false);
+  const actionPollStopRef = useRef(false);
+
+  // Vi eksponerer en callback som DetailsActionsSection kan kalde
+  // for at signalere at en handling er sendt — og en state vi passer ned
+  // som fortæller sektionen om den skal låse alle knapper.
+  const [clientActionPending, setClientActionPending] = useState(false);
+
   const mountedRef = useRef(true);
 
-  // Sæt initial uptime + chrome status fra client prop
+  // ---------------------------------------------------------------------------
+  // Sæt initial data fra client prop
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (client?.uptime != null) {
       const parsed = parseInt(String(client.uptime), 10);
@@ -102,7 +99,9 @@ export default function ClientDetailsPage({
     if (client?.chrome_color != null) setLiveChromeColor(client.chrome_color);
   }, [client?.id]);
 
-  // Lokal uptime ticker — tæller hvert sekund
+  // ---------------------------------------------------------------------------
+  // Lokal uptime ticker
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (uptimeBaseRef.current == null || uptimeFetchRef.current == null) return;
     const interval = setInterval(() => {
@@ -113,7 +112,9 @@ export default function ClientDetailsPage({
     return () => clearInterval(interval);
   }, [client?.id]);
 
-  // getChromeStatus polling — synkroniserer uptime-base med backend
+  // ---------------------------------------------------------------------------
+  // getChromeStatus polling — hvert 3s
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!client?.id) return;
     mountedRef.current = true;
@@ -124,9 +125,11 @@ export default function ClientDetailsPage({
         try {
           const data = await getChromeStatus(client.id, { fallbackToClient: true });
           if (cancelled || !mountedRef.current) break;
+
           if (data?.chrome_status != null) setLiveChromeStatus(data.chrome_status);
           if (data?.chrome_color != null) setLiveChromeColor(data.chrome_color);
           if (data?.last_seen != null) setLastSeen(data.last_seen);
+
           if (data?.uptime != null) {
             const parsed = parseInt(String(data.uptime), 10);
             if (!isNaN(parsed) && parsed >= 0) {
@@ -145,30 +148,83 @@ export default function ClientDetailsPage({
     return () => { cancelled = true; };
   }, [client?.id]);
 
+  // ---------------------------------------------------------------------------
   // Cleanup ved unmount
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+      actionPollStopRef.current = true;
+    };
   }, []);
 
-  // --- Handlinger ---
-  const handleClientAction = useCallback(
-    async (action) => {
-      if (!client?.id) return;
+  // ---------------------------------------------------------------------------
+  // Hurtig polling mens en handling afventer klient-bekræftelse
+  //
+  // Kaldes efter onActionSent() fra DetailsActionsSection.
+  // Poller handleRefresh hvert ACTION_POLL_MS indtil:
+  //   - client.pending_chrome_action === "none"  (bekræftet)
+  //   - eller ACTION_POLL_MAX_MS er overskredet  (timeout)
+  // ---------------------------------------------------------------------------
+  const startActionConfirmationPolling = useCallback(() => {
+    actionPendingRef.current = true;
+    actionPollStopRef.current = false;
+    setClientActionPending(true);
 
-      // Send kommando til backend
-      await clientAction(client.id, action);
+    const startTime = Date.now();
 
-      // FIX: Vent kort så backend kan behandle handlingen,
-      // derefter refresh SYNKRONT — actionLoading forbliver true hele vejen.
-      // silent=true forhindrer "Klient opdateret" snackbar ved hvert klik.
-      await new Promise((res) => setTimeout(res, 600));
-      if (mountedRef.current) {
-        await handleRefresh?.(true); // true = silent refresh
+    async function pollForConfirmation() {
+      while (!actionPollStopRef.current && mountedRef.current) {
+        await new Promise((res) => setTimeout(res, ACTION_POLL_MS));
+        if (actionPollStopRef.current || !mountedRef.current) break;
+
+        // Hent friske data
+        try {
+          await handleRefresh();
+        } catch {
+          // Ignorér fejl i polling
+        }
+
+        // handleRefresh opdaterer client prop via parent state
+        // Vi tjekker pending_chrome_action på det opdaterede client objekt
+        // via en separat ref check i useEffect nedenfor
+        if (Date.now() - startTime > ACTION_POLL_MAX_MS) {
+          // Timeout — lås op uanset hvad
+          break;
+        }
       }
-    },
-    [client?.id, handleRefresh]
-  );
+
+      if (mountedRef.current) {
+        actionPendingRef.current = false;
+        setClientActionPending(false);
+      }
+    }
+
+    pollForConfirmation();
+  }, [handleRefresh]);
+
+  // Overvåg client.pending_chrome_action — stop polling når den er "none"
+  useEffect(() => {
+    if (!actionPendingRef.current) return;
+    const pca = typeof client?.pending_chrome_action === "string"
+      ? client.pending_chrome_action.toLowerCase()
+      : "";
+    if (pca === "none" || pca === "") {
+      actionPollStopRef.current = true;
+      // setClientActionPending(false) sættes af pollForConfirmation-løkken
+    }
+  }, [client?.pending_chrome_action]);
+
+  // ---------------------------------------------------------------------------
+  // Handlinger
+  // ---------------------------------------------------------------------------
+  const handleClientAction = useCallback(async (action) => {
+    if (!client?.id) return;
+    await clientAction(client.id, action);
+    // Start hurtig polling for bekræftelse
+    startActionConfirmationPolling();
+  }, [client?.id, startActionConfirmationPolling]);
 
   const handleOpenTerminal = useCallback(() => {
     if (client?.id) openTerminal(client.id);
@@ -205,6 +261,9 @@ export default function ClientDetailsPage({
           refreshing={refreshing}
           showSnackbar={showSnackbar}
           clientOnline={clientOnline}
+          // FIX: ny prop — fortæller DetailsActionsSection at en handling
+          // afventer bekræftelse fra klienten → alle knapper låses
+          clientActionPending={clientActionPending}
         />
 
         <ClientDetailsInfoSection
