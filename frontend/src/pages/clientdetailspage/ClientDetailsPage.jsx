@@ -24,7 +24,7 @@ import {
   1. PCA skal være "none" i backend (klienten har modtaget handlingen)
 
   2. Step-timestamp valideres mod action-starttidspunkt.
-     Steps der er ældre end handlingen ignoreres — de tilhører en forrige handling.
+     Steps ældre end handlingen ignoreres — de tilhører en forrige handling.
 
   3. Chrome-step afgør unlock:
        BUSY-step     → altid låst (klienten er aktivt i gang)
@@ -33,11 +33,25 @@ import {
                        2–8s: låst (nyt step ikke ankommet endnu)
                        8s+:  unlock (PCA clear + ingen aktiv proces)
 
-  Faktiske step-navne fra chrome_kiosk.py:
-    BUSY:     clear_cookies, terminate_chrome, shutdown_chrome, countdown,
-              system_reboot_countdown, system_wake
-    TERMINAL: start_chrome (start færdig), chrome_closed_programmatically (stop færdig),
-              system_sleep (sleep færdig)
+  Faktiske step-navne fra chrome_kiosk.py / kiosk_sleep.py / kiosk_wake.py:
+
+  BUSY_CHROME_STEPS:
+    clear_cookies            — rydder cookies (start/stop/sleep)
+    terminate_chrome         — SIGTERM til Chrome
+    kill_chrome              — SIGKILL til Chrome (efter failed SIGTERM)
+    shutdown_chrome          — chrome shutdown bekræftet
+    countdown                — nedtælling før start eller sleep
+    system_reboot_countdown  — nedtælling før reboot efter wake
+    system_rebooting         — maskinen er ved at genstarte
+    system_shutting_down     — maskinen er ved at lukke ned
+
+  TERMINAL_CHROME_STEPS:
+    start_chrome                   — start-handling færdig
+    chrome_closed_programmatically — stop/sleep-handling færdig (watchdog)
+    chrome_closed_manual           — Chrome lukket manuelt (watchdog)
+    system_sleep                   — sleep-handling færdig
+    system_wake                    — wake-handling færdig (reboot følger)
+    error                          — scenario fejlede → processen stoppet
 
   Korrekt unlock-rækkefølge: silentRefresh() FØRST → unlock BAGEFTER.
 */
@@ -48,22 +62,26 @@ const ACTION_POLL_MAX_MS    = 60_000;
 const ACTION_MIN_LOCK_MS    = 2000; // 0–2s: altid låst
 const ACTION_NULL_STEP_MS   = 8000; // null-step låst indtil 8s, derefter unlock
 
-// Faktiske transiente steps fra chrome_kiosk.py — processen er stadig i gang
+// Faktiske transiente steps — processen er stadig i gang
 const BUSY_CHROME_STEPS = new Set([
-  "clear_cookies",
-  "terminate_chrome",
-  "shutdown_chrome",
-  "countdown",
-  "system_reboot_countdown",
-  "system_wake",
+  "clear_cookies",           // rydder cookies (start/stop/sleep)
+  "terminate_chrome",        // SIGTERM til Chrome
+  "kill_chrome",             // SIGKILL til Chrome (efter failed SIGTERM)
+  "shutdown_chrome",         // chrome shutdown bekræftet
+  "countdown",               // nedtælling før start eller sleep
+  "system_reboot_countdown", // nedtælling før reboot efter wake
+  "system_rebooting",        // maskinen er ved at genstarte
+  "system_shutting_down",    // maskinen er ved at lukke ned
 ]);
 
-// Faktiske terminale steps fra chrome_kiosk.py — processen er fuldt færdig
+// Faktiske terminale steps — processen er fuldt færdig
 const TERMINAL_CHROME_STEPS = new Set([
   "start_chrome",                   // start-handling færdig
-  "chrome_closed_programmatically", // stop-handling færdig
-  "chrome_closed_manual",           // watchdog: chrome lukket manuelt
+  "chrome_closed_programmatically", // stop/sleep-handling færdig (watchdog)
+  "chrome_closed_manual",           // Chrome lukket manuelt (watchdog)
   "system_sleep",                   // sleep-handling færdig
+  "system_wake",                    // wake-handling færdig (reboot følger straks)
+  "error",                          // scenario fejlede → processen stoppet
 ]);
 
 export default function ClientDetailsPage({
@@ -119,9 +137,9 @@ export default function ClientDetailsPage({
   const [liveChromeColor, setLiveChromeColor] = useState(
     client?.chrome_color ?? null
   );
-  const [liveStep, setLiveStep] = useState(null);
-  const liveStepRef             = useRef(null);
-  const liveStepTimestampRef    = useRef(null); // FIX: timestamp på seneste step
+  const [liveStep, setLiveStep]           = useState(null);
+  const liveStepRef                       = useRef(null);
+  const liveStepTimestampRef              = useRef(null); // timestamp på seneste step
 
   // ---------------------------------------------------------------------------
   // Lokal pending_chrome_action + state
@@ -196,7 +214,7 @@ export default function ClientDetailsPage({
           const stepTimestamp = data?.step?.timestamp ?? null;
           setLiveStep(stepName);
           liveStepRef.current          = stepName;
-          liveStepTimestampRef.current = stepTimestamp; // FIX: gem timestamp
+          liveStepTimestampRef.current = stepTimestamp;
 
           if (data?.uptime != null) {
             const parsed = parseInt(String(data.uptime), 10);
@@ -246,7 +264,7 @@ export default function ClientDetailsPage({
     actionPollStopRef.current = false;
     setClientActionPending(true);
 
-    // FIX: gem starttidspunkt i ms — bruges til at validere step-timestamps
+    // Gem starttidspunkt — bruges til at validere step-timestamps
     const startTime    = Date.now();
     const startTimeISO = new Date(startTime).toISOString();
 
@@ -279,7 +297,7 @@ export default function ClientDetailsPage({
         // Zone 0–2s: altid låst — klienten når ikke at reagere endnu
         if (elapsed < ACTION_MIN_LOCK_MS) continue;
 
-        // FIX: Valider step-timestamp mod action-starttidspunkt.
+        // Valider step-timestamp mod action-starttidspunkt.
         // scenario_system_start kalder write_status([]) og rydder filen —
         // backend falder derefter tilbage til DB-værdien som er et forældet step.
         // Ignorér step hvis dets timestamp er ældre end handlingens start.
@@ -287,7 +305,7 @@ export default function ClientDetailsPage({
         const stepIsStale   = !stepTimestamp || stepTimestamp < startTimeISO;
 
         const currentStep = stepIsStale
-          ? "" // behandl forældet step som null
+          ? "" // behandl forældet step som null/ukendt
           : String(liveStepRef.current ?? "").toLowerCase();
 
         // BUSY-step: processen er stadig i gang — altid låst
@@ -428,10 +446,4 @@ export default function ClientDetailsPage({
           severity={snackbar.severity}
           variant="filled"
           sx={{ width: "100%" }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Container>
-  );
-}
+        *
