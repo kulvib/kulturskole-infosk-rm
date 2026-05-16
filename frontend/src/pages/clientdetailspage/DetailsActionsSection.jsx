@@ -39,22 +39,37 @@ import { useAuth } from "../../auth/authcontext";
     busy-step — banneret følger headeren 1:1.
   - Ingen intern polling overhovedet.
 
-  Faktiske step-navne fra chrome_kiosk.py:
-    BUSY:     clear_cookies, terminate_chrome, shutdown_chrome, countdown,
-              system_reboot_countdown, system_wake
-    TERMINAL: start_chrome, chrome_closed_programmatically,
-              chrome_closed_manual, system_sleep
+  Faktiske step-navne fra chrome_kiosk.py / kiosk_sleep.py / kiosk_wake.py:
+
+  BUSY_CHROME_STEPS (låser knapper + viser banner):
+    clear_cookies            — rydder cookies (start/stop/sleep)
+    terminate_chrome         — SIGTERM til Chrome
+    kill_chrome              — SIGKILL til Chrome (efter failed SIGTERM)
+    shutdown_chrome          — chrome shutdown bekræftet
+    countdown                — nedtælling før start eller sleep
+    system_reboot_countdown  — nedtælling før reboot efter wake
+    system_rebooting         — maskinen er ved at genstarte
+    system_shutting_down     — maskinen er ved at lukke ned
+
+  TERMINAL_CHROME_STEPS (låser IKKE — processen er færdig):
+    start_chrome                   — start-handling færdig
+    chrome_closed_programmatically — stop/sleep-handling færdig (watchdog)
+    chrome_closed_manual           — Chrome lukket manuelt (watchdog)
+    system_sleep                   — sleep-handling færdig
+    system_wake                    — wake-handling færdig (reboot følger)
+    error                          — scenario fejlede → processen stoppet
 */
 
 // Skal matche BUSY_CHROME_STEPS i ClientDetailsPage.jsx
-// Faktiske transiente steps fra chrome_kiosk.py
 const BUSY_CHROME_STEPS = new Set([
   "clear_cookies",
   "terminate_chrome",
+  "kill_chrome",
   "shutdown_chrome",
   "countdown",
   "system_reboot_countdown",
-  "system_wake",
+  "system_rebooting",
+  "system_shutting_down",
 ]);
 
 // Oversæt faktiske chrome step-navne til læsbar dansk tekst
@@ -63,14 +78,19 @@ function getStepLabel(step, liveChromeStatus) {
   const s = String(step).toLowerCase();
   if (s === "clear_cookies")                   return "Rydder cookies…";
   if (s === "terminate_chrome")                return "Lukker browser…";
+  if (s === "kill_chrome")                     return "Tvangslukker browser…";
   if (s === "shutdown_chrome")                 return "Lukker browser…";
   if (s === "countdown")                       return "Tæller ned…";
-  if (s === "system_reboot_countdown")         return "Genstarter…";
-  if (s === "system_wake")                     return "Vågner op…";
+  if (s === "system_reboot_countdown")         return "Genstarter om lidt…";
+  if (s === "system_rebooting")                return "Genstarter maskinen…";
+  if (s === "system_shutting_down")            return "Lukker maskinen ned…";
+  // Terminale steps — vises kort i banneret inden det forsvinder
   if (s === "start_chrome")                    return "Browser startet";
   if (s === "chrome_closed_programmatically")  return "Browser lukket";
   if (s === "chrome_closed_manual")            return "Browser lukket manuelt";
   if (s === "system_sleep")                    return "Klient i dvale";
+  if (s === "system_wake")                     return "Klient vækket";
+  if (s === "error")                           return "Der opstod en fejl";
   // Fallback: brug liveChromeStatus tekst hvis tilgængelig
   if (liveChromeStatus)                        return liveChromeStatus;
   return null;
@@ -238,7 +258,7 @@ export default function ClientDetailsActionsSection({
   const pendingLabel = (() => {
     if (!clientActionPending && !hasPendingAction && !isLiveStepBusy) return null;
 
-    // Brug chrome step label hvis tilgængeligt (samme kilde som header)
+    // Brug chrome step label (samme datakilde som header)
     const stepLabel = getStepLabel(liveStep, liveChromeStatus);
     if (stepLabel) return stepLabel;
 
@@ -410,6 +430,7 @@ export default function ClientDetailsActionsSection({
             Klienten er i dvale — brug "Væk fra dvale" for at aktivere den.
           </Typography>
         )}
+
       </CardContent>
 
       {/* Bekræftelsesdialog — sluk */}
