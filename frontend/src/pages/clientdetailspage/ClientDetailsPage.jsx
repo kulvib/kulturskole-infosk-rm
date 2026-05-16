@@ -29,20 +29,15 @@ import {
 /*
   ClientDetailsPage.jsx
 
-  FIX 1 — Dynamisk oppetid:
-    uptimeBaseRef  = sekunder fra seneste backend-svar.
-    uptimeFetchRef = Date.now() da basen blev sat.
-    Et setInterval på 1s beregner aktuel uptime som base + elapsed.
-    getChromeStatus-polling synkroniserer basen med backend uden at resette tickeren.
+  FIX (disabled knapper): handleClientAction awaiter nu handleRefresh direkte
+    i stedet for setTimeout(..., 1000). Det sikrer at actionLoading forbliver
+    true under hele API-kald + refresh-cyklussen — knapperne forbliver disabled.
 
-  FIX 2 — mountedRef håndteres ét sted (cleanup-effect).
-    Chrome-poll-loop bruger lokal `cancelled`-flag i stedet for at skrive
-    mountedRef.current = true inde i en effect (det var en fejl).
+  FIX (snackbar): handleRefresh kaldes med silent=true ved knap-handlinger
+    så der ikke vises "Klient opdateret" ved hvert klik.
 
-  FIX 3 — showSnackbar fallback til lokal Snackbar.
-
-  FIX 4 — handleRefresh: parent-prop-funktionen opdaterer client-data,
-    men chrome-status og lastSeen synkroniseres løbende via poll-loopen.
+  FIX (oppetid dynamisk): uptimeBaseRef + uptimeFetchRef + lokal ticker.
+  FIX (CalendarDialog sti): ../calendarpage/ClientCalendarDialog
 */
 
 const CHROME_POLL_MS = 3000;
@@ -60,82 +55,41 @@ export default function ClientDetailsPage({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  // -------------------------------------------------------------------------
-  // Lokal snackbar (fallback hvis parent ikke sender prop)
-  // -------------------------------------------------------------------------
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
+  // --- Lokal snackbar (fallback) ---
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  const showSnackbar = useCallback(
-    (opts) => {
-      if (typeof showSnackbarProp === "function") {
-        showSnackbarProp(opts);
-      } else {
-        setSnackbar({
-          open: true,
-          message: opts?.message ?? "",
-          severity: opts?.severity ?? "success",
-        });
-      }
-    },
-    [showSnackbarProp]
-  );
+  const showSnackbar = useCallback((opts) => {
+    if (typeof showSnackbarProp === "function") {
+      showSnackbarProp(opts);
+    } else {
+      setSnackbar({ open: true, message: opts?.message ?? "", severity: opts?.severity ?? "success" });
+    }
+  }, [showSnackbarProp]);
 
   const handleCloseSnackbar = useCallback(() => {
     setSnackbar((prev) => ({ ...prev, open: false }));
   }, []);
 
-  // -------------------------------------------------------------------------
-  // Kalender dialog
-  // -------------------------------------------------------------------------
+  // --- Kalender dialog ---
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
 
-  // -------------------------------------------------------------------------
-  // Live chrome-status
-  // -------------------------------------------------------------------------
-  const [liveChromeStatus, setLiveChromeStatus] = useState(
-    client?.chrome_status ?? null
-  );
-  const [liveChromeColor, setLiveChromeColor] = useState(
-    client?.chrome_color ?? null
-  );
+  // --- Live chrome status ---
+  const [liveChromeStatus, setLiveChromeStatus] = useState(client?.chrome_status ?? null);
+  const [liveChromeColor, setLiveChromeColor] = useState(client?.chrome_color ?? null);
 
-  // -------------------------------------------------------------------------
-  // Dynamisk oppetid
-  // uptimeBaseRef  = seneste kendte sekunder fra backend
-  // uptimeFetchRef = tidspunkt (ms) da basen blev sat
-  // -------------------------------------------------------------------------
+  // --- Dynamisk oppetid ---
   const [uptime, setUptime] = useState(null);
   const uptimeBaseRef = useRef(null);
   const uptimeFetchRef = useRef(null);
 
-  // -------------------------------------------------------------------------
-  // Sidst set
-  // -------------------------------------------------------------------------
+  // --- Sidst set ---
   const [lastSeen, setLastSeen] = useState(client?.last_seen ?? null);
 
-  // -------------------------------------------------------------------------
-  // mountedRef — sættes/ryddes ét sted
-  // -------------------------------------------------------------------------
   const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
-  // -------------------------------------------------------------------------
-  // Synkronisér initial data når client-prop skifter (nyt client-id)
-  // -------------------------------------------------------------------------
+  // Sæt initial uptime + chrome status fra client prop
   useEffect(() => {
-    if (!client) return;
-
-    // Uptime
-    if (client.uptime != null) {
+    if (client?.uptime != null) {
       const parsed = parseInt(String(client.uptime), 10);
       if (!isNaN(parsed) && parsed >= 0) {
         uptimeBaseRef.current = parsed;
@@ -143,63 +97,36 @@ export default function ClientDetailsPage({
         setUptime(parsed);
       }
     }
+    if (client?.last_seen) setLastSeen(client.last_seen);
+    if (client?.chrome_status != null) setLiveChromeStatus(client.chrome_status);
+    if (client?.chrome_color != null) setLiveChromeColor(client.chrome_color);
+  }, [client?.id]);
 
-    // Sidst set
-    if (client.last_seen) setLastSeen(client.last_seen);
-
-    // Chrome-status
-    if (client.chrome_status != null) setLiveChromeStatus(client.chrome_status);
-    if (client.chrome_color != null) setLiveChromeColor(client.chrome_color);
-  }, [client?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // -------------------------------------------------------------------------
-  // Lokal uptime-ticker — tæller hvert sekund
-  // -------------------------------------------------------------------------
+  // Lokal uptime ticker — tæller hvert sekund
   useEffect(() => {
-    if (
-      uptimeBaseRef.current == null ||
-      uptimeFetchRef.current == null
-    ) {
-      return;
-    }
-
+    if (uptimeBaseRef.current == null || uptimeFetchRef.current == null) return;
     const interval = setInterval(() => {
       if (!mountedRef.current) return;
-      const elapsed = Math.round(
-        (Date.now() - uptimeFetchRef.current) / 1000
-      );
+      const elapsed = Math.round((Date.now() - uptimeFetchRef.current) / 1000);
       setUptime(uptimeBaseRef.current + elapsed);
     }, 1000);
-
     return () => clearInterval(interval);
-  }, [client?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [client?.id]);
 
-  // -------------------------------------------------------------------------
-  // getChromeStatus polling hvert 3s
-  // FIX: bruger lokal `cancelled`-flag — skriver IKKE mountedRef.current = true
-  // -------------------------------------------------------------------------
+  // getChromeStatus polling — synkroniserer uptime-base med backend
   useEffect(() => {
     if (!client?.id) return;
-
+    mountedRef.current = true;
     let cancelled = false;
 
     async function poll() {
       while (!cancelled && mountedRef.current) {
         try {
-          const data = await getChromeStatus(client.id, {
-            fallbackToClient: true,
-          });
-
+          const data = await getChromeStatus(client.id, { fallbackToClient: true });
           if (cancelled || !mountedRef.current) break;
-
-          if (data?.chrome_status != null)
-            setLiveChromeStatus(data.chrome_status);
-          if (data?.chrome_color != null)
-            setLiveChromeColor(data.chrome_color);
-          if (data?.last_seen != null)
-            setLastSeen(data.last_seen);
-
-          // Synkronisér uptime-base — tickeren beregner korrekt ved næste tick
+          if (data?.chrome_status != null) setLiveChromeStatus(data.chrome_status);
+          if (data?.chrome_color != null) setLiveChromeColor(data.chrome_color);
+          if (data?.last_seen != null) setLastSeen(data.last_seen);
           if (data?.uptime != null) {
             const parsed = parseInt(String(data.uptime), 10);
             if (!isNaN(parsed) && parsed >= 0) {
@@ -208,30 +135,37 @@ export default function ClientDetailsPage({
             }
           }
         } catch {
-          // Ignorer poll-fejl — prøv igen ved næste interval
+          // Ignorer poll-fejl
         }
-
         await new Promise((res) => setTimeout(res, CHROME_POLL_MS));
       }
     }
 
     poll();
-    return () => {
-      cancelled = true;
-    };
-  }, [client?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { cancelled = true; };
+  }, [client?.id]);
 
-  // -------------------------------------------------------------------------
-  // Handlinger
-  // -------------------------------------------------------------------------
+  // Cleanup ved unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // --- Handlinger ---
   const handleClientAction = useCallback(
     async (action) => {
       if (!client?.id) return;
+
+      // Send kommando til backend
       await clientAction(client.id, action);
-      // Giv backend 1s til at processere, refresh derefter
-      setTimeout(() => {
-        if (mountedRef.current) handleRefresh?.();
-      }, 1000);
+
+      // FIX: Vent kort så backend kan behandle handlingen,
+      // derefter refresh SYNKRONT — actionLoading forbliver true hele vejen.
+      // silent=true forhindrer "Klient opdateret" snackbar ved hvert klik.
+      await new Promise((res) => setTimeout(res, 600));
+      if (mountedRef.current) {
+        await handleRefresh?.(true); // true = silent refresh
+      }
     },
     [client?.id, handleRefresh]
   );
@@ -244,32 +178,13 @@ export default function ClientDetailsPage({
     if (client?.id) openRemoteDesktop(client.id);
   }, [client?.id]);
 
-  // -------------------------------------------------------------------------
-  // Afledte værdier
-  // -------------------------------------------------------------------------
   const clientOnline = client?.isOnline ?? false;
+  const displayUptime = uptime != null ? uptime : client?.uptime ?? null;
 
-  // Brug lokal ticker hvis tilgængelig, ellers fald tilbage på client-prop
-  const displayUptime =
-    uptime != null ? uptime : client?.uptime ?? null;
-
-  // -------------------------------------------------------------------------
-  // Render
-  // -------------------------------------------------------------------------
   return (
-    <Container
-      maxWidth="xl"
-      disableGutters
-      sx={{ px: isMobile ? 0.5 : 2, py: isMobile ? 0.5 : 2 }}
-    >
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          gap: isMobile ? 1 : 2,
-        }}
-      >
-        {/* Header: klientnavn, skole, lokation, kiosk-URL, chrome-status */}
+    <Container maxWidth="xl" disableGutters sx={{ px: isMobile ? 0.5 : 2, py: isMobile ? 0.5 : 2 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: isMobile ? 1 : 2 }}>
+
         <ClientDetailsHeaderSection
           client={client}
           liveChromeStatus={liveChromeStatus}
@@ -280,7 +195,6 @@ export default function ClientDetailsPage({
           clientOnline={clientOnline}
         />
 
-        {/* Handlinger: start/stop browser, sleep/wake, reboot, shutdown */}
         <ClientDetailsActionsSection
           clientId={client?.id}
           clientState={client?.state}
@@ -293,7 +207,6 @@ export default function ClientDetailsPage({
           clientOnline={clientOnline}
         />
 
-        {/* Info: kalender, systeminfo, netværk */}
         <ClientDetailsInfoSection
           client={client}
           markedDays={markedDays}
@@ -304,7 +217,6 @@ export default function ClientDetailsPage({
           clientOnline={clientOnline}
         />
 
-        {/* Livestream */}
         <ClientDetailsLivestreamSection
           clientId={client?.id}
           streamKey={streamKey}
@@ -314,26 +226,19 @@ export default function ClientDetailsPage({
         />
       </Box>
 
-      {/* Kalender dialog */}
       <ClientCalendarDialog
         open={calendarDialogOpen}
         onClose={() => setCalendarDialogOpen(false)}
         clientId={client?.id}
       />
 
-      {/* Lokal snackbar — bruges kun hvis parent ikke sender showSnackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{ width: "100%" }}
-        >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} variant="filled" sx={{ width: "100%" }}>
           {snackbar.message}
         </Alert>
       </Snackbar>
