@@ -94,7 +94,6 @@ export default function ClientDetailsActionsSection({
   refreshing,
   showSnackbar: showSnackbarProp,
   clientOnline = true,
-  // Prop fra ClientDetailsPage — true mens handling afventer klient-bekræftelse
   clientActionPending = false,
 }) {
   const theme = useTheme();
@@ -119,7 +118,6 @@ export default function ClientDetailsActionsSection({
     !!normalizedPendingAction && normalizedPendingAction !== "none";
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
-  // Lås alle knapper hvis: loading, refreshing, handling afventer klient, eller pending action
   const anyBusy = anyLoading || !!refreshing || clientActionPending || hasPendingAction;
 
   // ---------------------------------------------------------------------------
@@ -141,7 +139,7 @@ export default function ClientDetailsActionsSection({
   );
 
   // ---------------------------------------------------------------------------
-  // Kør handling — ingen intern polling (ClientDetailsPage håndterer det)
+  // Kør handling
   // ---------------------------------------------------------------------------
   const doAction = useCallback(
     async (action) => {
@@ -294,7 +292,11 @@ export default function ClientDetailsActionsSection({
 
         {/* Pending / waiting indicator */}
         {pendingLabel && (
-          <Alert severity="info" sx={{ mb: 1.5 }} icon={<CircularProgress size={16} />}>
+          <Alert
+            severity="info"
+            sx={{ mb: 1.5 }}
+            icon={<CircularProgress size={16} />}
+          >
             {pendingLabel}
           </Alert>
         )}
