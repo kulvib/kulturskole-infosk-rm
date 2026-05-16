@@ -1,8 +1,19 @@
 import React, { useState, useCallback } from "react";
 import {
-  Box, Card, CardContent, Typography, Button, CircularProgress,
-  Tooltip, Grid, useMediaQuery, Dialog, DialogTitle, DialogContent,
-  DialogContentText, DialogActions,
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  CircularProgress,
+  Tooltip,
+  Grid,
+  useMediaQuery,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -14,31 +25,32 @@ import TerminalIcon from "@mui/icons-material/Terminal";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
+import { getClient } from "../../api";
 
 /*
   DetailsActionsSection.jsx
 
-  FIX (central): clientActionPending prop bruges til at låse ALLE knapper
-  mens klienten behandler en kommando (fx mens browser åbner).
-  Tidligere låste vi kun under selve API-kaldet (~50ms), ikke mens klienten
-  faktisk udfører handlingen (kan tage 10-30s).
-
-  Flow:
-    1. Bruger klikker "Start browser"
-    2. API-kald sendes → pending_chrome_action = "start" i backend
-    3. clientActionPending = true → ALLE knapper disabled + spinner-indikator
-    4. ClientDetailsPage.jsx poller backend hvert 2s
-    5. Når klienten rapporterer pending_chrome_action = "none":
-       clientActionPending = false → knapper aktiveres igen
-    6. Timeout efter 45s uanset hvad (sikkerhedsnet)
+  - Viser handlingsknapper for en klient: start/stop browser, sleep/wake, reboot, shutdown.
+  - Kun admin/superadmin ser reboot, shutdown, terminal og remote desktop.
+  - "Genstart browser" knap er fjernet.
+  - FIX: Efter en handling polles backend hvert sekund indtil pending_chrome_action === "none".
+    Under polling vises "Venter på bekræftelse fra klient…" på knappen.
+  - FIX: Alle knapper er disabled mens en handling kører (actionLoading guard).
+  - FIX: Shutdown-bekræftelsesdialog er robust mod manglende showSnackbar prop.
+  - FIX: clientOnline bruges til at disable knapper når klienten er offline.
 */
+
+const POLL_INTERVAL_MS = 1000;
+const POLL_MAX_WAIT_MS = 30_000;
+
+// Handlinger der skal vente på pending_chrome_action === "none"
+const ACTIONS_NEEDING_CONFIRMATION = new Set(["start", "stop"]);
 
 const ACTION_LABELS = {
   start: "Start browser",
   stop: "Stop browser",
   sleep: "Sæt i dvale",
   wakeup: "Væk klient",
-  restart: "Genstart browser",
   reboot: "Genstart maskine",
   shutdown: "Sluk maskine",
 };
@@ -48,7 +60,6 @@ const ACTION_ICONS = {
   stop: <CloseIcon fontSize="small" />,
   sleep: <HotelIcon fontSize="small" />,
   wakeup: <WbSunnyIcon fontSize="small" />,
-  restart: <RestartAltIcon fontSize="small" />,
   reboot: <RestartAltIcon fontSize="small" />,
   shutdown: <PowerSettingsNewIcon fontSize="small" />,
 };
@@ -58,12 +69,14 @@ const ACTION_COLORS = {
   stop: "error",
   sleep: "primary",
   wakeup: "warning",
-  restart: "secondary",
   reboot: "warning",
   shutdown: "error",
 };
 
+// Knapper der kræver admin
 const ADMIN_ONLY_ACTIONS = new Set(["reboot", "shutdown"]);
+
+// Knapper der kræver bekræftelse
 const CONFIRM_ACTIONS = new Set(["shutdown", "reboot"]);
 
 const CONFIRM_TEXTS = {
@@ -77,23 +90,46 @@ const CONFIRM_TEXTS = {
   },
 };
 
-function ActionButton({ action, onClick, loading, disabled, isMobile, isAdmin }) {
+function ActionButton({
+  action,
+  onClick,
+  loading,
+  waiting,
+  disabled,
+  isMobile,
+  isAdmin,
+}) {
   if (ADMIN_ONLY_ACTIONS.has(action) && !isAdmin) return null;
 
   const label = ACTION_LABELS[action] ?? action;
   const icon = ACTION_ICONS[action] ?? null;
   const color = ACTION_COLORS[action] ?? "primary";
 
+  let buttonLabel;
+  if (waiting) {
+    buttonLabel = "Venter på bekræftelse fra klient…";
+  } else if (loading) {
+    buttonLabel = "Arbejder...";
+  } else {
+    buttonLabel = label;
+  }
+
+  const isActive = loading || waiting;
+
   return (
-    <Tooltip title={disabled && !loading ? "Ikke tilgængelig" : label} arrow>
+    <Tooltip title={disabled && !isActive ? "Ikke tilgængelig" : label} arrow>
       <span style={{ width: "100%" }}>
         <Button
           variant="outlined"
           color={color}
           size={isMobile ? "small" : "medium"}
-          startIcon={loading ? <CircularProgress size={isMobile ? 13 : 16} color="inherit" /> : icon}
+          startIcon={
+            isActive
+              ? <CircularProgress size={isMobile ? 13 : 16} color="inherit" />
+              : icon
+          }
           onClick={onClick}
-          disabled={disabled || loading}
+          disabled={disabled || isActive}
           fullWidth
           sx={{
             textTransform: "none",
@@ -105,7 +141,7 @@ function ActionButton({ action, onClick, loading, disabled, isMobile, isAdmin })
             minHeight: isMobile ? 34 : 40,
           }}
         >
-          {loading ? "Arbejder..." : label}
+          {buttonLabel}
         </Button>
       </span>
     </Tooltip>
@@ -122,8 +158,6 @@ export default function ClientDetailsActionsSection({
   refreshing,
   showSnackbar,
   clientOnline,
-  // FIX: ny prop fra ClientDetailsPage — true mens klienten behandler kommando
-  clientActionPending = false,
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -131,8 +165,10 @@ export default function ClientDetailsActionsSection({
 
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
-  // actionLoading: true mens selve API-kaldet er i gang
+  // actionLoading: true mens API-kaldet er i gang
   const [actionLoading, setActionLoading] = useState({});
+  // waitingAction: hvilken action vi venter på bekræftelse for (polling)
+  const [waitingAction, setWaitingAction] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, action: null });
 
   const isSleeping = typeof clientState === "string" &&
@@ -140,20 +176,51 @@ export default function ClientDetailsActionsSection({
 
   const isOffline = clientOnline === false;
 
-  // FIX: Global lås der dækker BÅDE selve API-kaldet OG klientens behandlingstid
-  // anyLoading: API-kald kører stadig
-  // clientActionPending: klienten er ved at behandle kommandoen (fra parent polling)
+  // Alle knapper disabled mens én handling kører eller vi venter på bekræftelse
   const anyLoading = Object.values(actionLoading).some(Boolean);
-  const globalLock = anyLoading || clientActionPending || refreshing;
+  const anyWaiting = waitingAction !== null;
+  const anyBusy = anyLoading || anyWaiting;
 
   const safeShowSnackbar = useCallback((opts) => {
-    if (typeof showSnackbar === "function") showSnackbar(opts);
-    else console.warn("[snackbar]", opts?.message);
+    if (typeof showSnackbar === "function") {
+      showSnackbar(opts);
+    } else {
+      console.warn("[snackbar]", opts?.message);
+    }
   }, [showSnackbar]);
+
+  // Poll backend hvert sekund indtil pending_chrome_action === "none" (eller timeout)
+  const pollUntilConfirmed = useCallback(async (action) => {
+    if (!ACTIONS_NEEDING_CONFIRMATION.has(action)) return;
+    if (!clientId) return;
+
+    setWaitingAction(action);
+    const start = Date.now();
+
+    try {
+      while (Date.now() - start < POLL_MAX_WAIT_MS) {
+        await new Promise(res => setTimeout(res, POLL_INTERVAL_MS));
+        try {
+          const data = await getClient(clientId);
+          const pca = data?.pending_chrome_action;
+          if (!pca || pca === "none") {
+            return;
+          }
+        } catch {
+          // Ignorer poll-fejl — prøv igen ved næste interval
+        }
+      }
+      // Timeout — vi stopper polling uden fejl
+      console.warn("[DetailsActionsSection] pollUntilConfirmed: timeout");
+    } finally {
+      setWaitingAction(null);
+    }
+  }, [clientId]);
 
   const onAction = useCallback(async (action) => {
     if (!clientId) return;
 
+    // Bekræftelsesdialog for farlige handlinger
     if (CONFIRM_ACTIONS.has(action)) {
       setConfirmDialog({ open: true, action });
       return;
@@ -162,16 +229,19 @@ export default function ClientDetailsActionsSection({
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
       await handleClientAction(action);
-      // handleClientAction starter nu polling i parent — vi rydder blot vores lokale loading
     } catch (err) {
       safeShowSnackbar({
         message: "Fejl ved handling: " + (err?.message || String(err)),
         severity: "error",
       });
+      return;
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
-  }, [clientId, handleClientAction, safeShowSnackbar]);
+
+    // Poll indtil bekræftet
+    await pollUntilConfirmed(action);
+  }, [clientId, handleClientAction, safeShowSnackbar, pollUntilConfirmed]);
 
   const onConfirmAction = useCallback(async () => {
     const action = confirmDialog.action;
@@ -186,44 +256,38 @@ export default function ClientDetailsActionsSection({
         message: "Fejl ved handling: " + (err?.message || String(err)),
         severity: "error",
       });
+      return;
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
-  }, [confirmDialog.action, handleClientAction, safeShowSnackbar]);
+
+    await pollUntilConfirmed(action);
+  }, [confirmDialog.action, handleClientAction, safeShowSnackbar, pollUntilConfirmed]);
 
   const onCancelConfirm = useCallback(() => {
     setConfirmDialog({ open: false, action: null });
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // isDisabled — beregner om en specifik knap skal disable
-  // ---------------------------------------------------------------------------
+  // Beregn hvilke knapper der er disabled
   const isDisabled = useCallback((action) => {
-    // FIX: globalLock låser ALT mens en handling afventer klient-bekræftelse
-    if (globalLock) return true;
+    if (anyBusy) return true;
+    if (refreshing) return true;
 
+    // Sleep/wake afhænger ikke af online-status
     if (action === "sleep") return isSleeping;
     if (action === "wakeup") return !isSleeping;
 
     // Reboot og shutdown kræver ikke nødvendigvis online
     if (action === "reboot" || action === "shutdown") return false;
 
+    // Resten kræver online
     if (isOffline) return true;
 
-    if (action === "start") {
-      // FIX: Korrekt logik — disabled hvis pending action er "start"
-      const pca = typeof pendingChromeAction === "string"
-        ? pendingChromeAction.toLowerCase()
-        : "";
-      return pca === "start";
-    }
-    if (action === "stop") return false;
-    if (action === "restart") return isOffline;
-
     return false;
-  }, [globalLock, isSleeping, isOffline, pendingChromeAction]);
+  }, [anyBusy, refreshing, isSleeping, isOffline]);
 
-  const userActions = ["start", "stop", "restart", "sleep", "wakeup"];
+  // Bruger-synlige handlinger — "restart" er fjernet
+  const userActions = ["start", "stop", "sleep", "wakeup"];
   const adminActions = ["reboot", "shutdown"];
 
   const confirmInfo = confirmDialog.action
@@ -233,29 +297,22 @@ export default function ClientDetailsActionsSection({
   return (
     <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2 }}>
       <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-        <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1, gap: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : undefined }}>
-            Handlinger
-          </Typography>
-          {/* FIX: Vis spinner + tekst mens klienten behandler kommandoen */}
-          {clientActionPending && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <CircularProgress size={isMobile ? 13 : 16} color="primary" />
-              <Typography variant="caption" color="primary" sx={{ fontSize: isMobile ? 11 : 13 }}>
-                Venter på bekræftelse fra klient…
-              </Typography>
-            </Box>
-          )}
-        </Box>
+        <Typography
+          variant="h6"
+          sx={{ fontWeight: 700, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? 16 : undefined }}
+        >
+          Handlinger
+        </Typography>
 
         {/* Bruger-handlinger */}
         <Grid container spacing={isMobile ? 0.5 : 1} sx={{ mb: isMobile ? 0.5 : 1 }}>
           {userActions.map(action => (
-            <Grid item xs={6} sm={4} md={2} key={action}>
+            <Grid item xs={6} sm={4} md={3} key={action}>
               <ActionButton
                 action={action}
                 onClick={() => onAction(action)}
                 loading={!!actionLoading[action]}
+                waiting={waitingAction === action}
                 disabled={isDisabled(action)}
                 isMobile={isMobile}
                 isAdmin={isAdmin}
@@ -268,11 +325,12 @@ export default function ClientDetailsActionsSection({
         {isAdmin && (
           <Grid container spacing={isMobile ? 0.5 : 1} sx={{ mb: isMobile ? 0.5 : 1 }}>
             {adminActions.map(action => (
-              <Grid item xs={6} sm={4} md={2} key={action}>
+              <Grid item xs={6} sm={4} md={3} key={action}>
                 <ActionButton
                   action={action}
                   onClick={() => onAction(action)}
                   loading={!!actionLoading[action]}
+                  waiting={waitingAction === action}
                   disabled={isDisabled(action)}
                   isMobile={isMobile}
                   isAdmin={isAdmin}
@@ -280,17 +338,27 @@ export default function ClientDetailsActionsSection({
               </Grid>
             ))}
 
-            <Grid item xs={6} sm={4} md={2}>
+            {/* Terminal */}
+            <Grid item xs={6} sm={4} md={3}>
               <Tooltip title="Åbn terminal" arrow>
                 <span style={{ width: "100%" }}>
                   <Button
-                    variant="outlined" color="inherit"
+                    variant="outlined"
+                    color="inherit"
                     size={isMobile ? "small" : "medium"}
                     startIcon={<TerminalIcon fontSize="small" />}
                     onClick={handleOpenTerminal}
-                    disabled={isOffline || globalLock}
+                    disabled={isOffline || anyBusy}
                     fullWidth
-                    sx={{ textTransform: "none", fontWeight: 500, fontSize: isMobile ? "0.82rem" : "0.9rem", justifyContent: "flex-start", px: isMobile ? 1 : 1.5, py: isMobile ? 0.5 : 0.75, minHeight: isMobile ? 34 : 40 }}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 500,
+                      fontSize: isMobile ? "0.82rem" : "0.9rem",
+                      justifyContent: "flex-start",
+                      px: isMobile ? 1 : 1.5,
+                      py: isMobile ? 0.5 : 0.75,
+                      minHeight: isMobile ? 34 : 40,
+                    }}
                   >
                     Terminal
                   </Button>
@@ -298,17 +366,27 @@ export default function ClientDetailsActionsSection({
               </Tooltip>
             </Grid>
 
-            <Grid item xs={6} sm={4} md={2}>
+            {/* Remote Desktop */}
+            <Grid item xs={6} sm={4} md={3}>
               <Tooltip title="Åbn fjernskrivebord" arrow>
                 <span style={{ width: "100%" }}>
                   <Button
-                    variant="outlined" color="inherit"
+                    variant="outlined"
+                    color="inherit"
                     size={isMobile ? "small" : "medium"}
                     startIcon={<DesktopWindowsIcon fontSize="small" />}
                     onClick={handleOpenRemoteDesktop}
-                    disabled={isOffline || globalLock}
+                    disabled={isOffline || anyBusy}
                     fullWidth
-                    sx={{ textTransform: "none", fontWeight: 500, fontSize: isMobile ? "0.82rem" : "0.9rem", justifyContent: "flex-start", px: isMobile ? 1 : 1.5, py: isMobile ? 0.5 : 0.75, minHeight: isMobile ? 34 : 40 }}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 500,
+                      fontSize: isMobile ? "0.82rem" : "0.9rem",
+                      justifyContent: "flex-start",
+                      px: isMobile ? 1 : 1.5,
+                      py: isMobile ? 0.5 : 0.75,
+                      minHeight: isMobile ? 34 : 40,
+                    }}
                   >
                     Fjernskrivebord
                   </Button>
@@ -318,27 +396,56 @@ export default function ClientDetailsActionsSection({
           </Grid>
         )}
 
+        {/* Offline-besked */}
         {isOffline && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}
+          >
             Klienten er offline — nogle handlinger er ikke tilgængelige.
           </Typography>
         )}
 
+        {/* Dvale-besked */}
         {isSleeping && !isOffline && (
-          <Typography variant="body2" color="primary" sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}>
+          <Typography
+            variant="body2"
+            color="primary"
+            sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}
+          >
             Klienten er i dvale — brug "Væk klient" for at aktivere den.
           </Typography>
         )}
       </CardContent>
 
-      <Dialog open={confirmDialog.open} onClose={onCancelConfirm} aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-description">
-        <DialogTitle id="confirm-dialog-title">{confirmInfo.title}</DialogTitle>
+      {/* Bekræftelsesdialog */}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={onCancelConfirm}
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby="confirm-dialog-description"
+      >
+        <DialogTitle id="confirm-dialog-title">
+          {confirmInfo.title}
+        </DialogTitle>
         <DialogContent>
-          <DialogContentText id="confirm-dialog-description">{confirmInfo.body}</DialogContentText>
+          <DialogContentText id="confirm-dialog-description">
+            {confirmInfo.body}
+          </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onCancelConfirm} color="inherit">Annuller</Button>
-          <Button onClick={onConfirmAction} color="error" variant="contained" autoFocus>Bekræft</Button>
+          <Button onClick={onCancelConfirm} color="inherit">
+            Annuller
+          </Button>
+          <Button
+            onClick={onConfirmAction}
+            color="error"
+            variant="contained"
+            autoFocus
+          >
+            Bekræft
+          </Button>
         </DialogActions>
       </Dialog>
     </Card>
