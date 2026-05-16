@@ -20,32 +20,19 @@ import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useTheme } from "@mui/material/styles";
 
-/*
-  ClientDetailsInfoSection.jsx
-
-  FIX: getStatusAndTimesFromRaw søger nu på både:
-    - "YYYY-MM-DDT00:00:00" (backend-format)
-    - "YYYY-MM-DD"          (kort format, bruges af ClientCalendarDialog)
-    - Prefix-match          (robusthed mod ekstra tegn i nøglen)
-  Dette sikrer at kalendertabellen viser korrekte data uanset
-  hvilket format backend returnerer nøglerne i.
-
-  FIX: formatUptime håndterer rent sekund-tal fra lokal ticker
-  samt D-HH:MM:SS, HH:MM:SS og MM:SS formater.
-*/
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+const UKEDAGE = [
+  "Søndag","Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag",
+];
+
 function formatDateShort(dt) {
-  const ukedage = [
-    "Søndag","Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag",
-  ];
-  const dayName = ukedage[dt.getDay()];
-  const day = dt.getDate().toString().padStart(2, "0");
+  const dayName = UKEDAGE[dt.getDay()];
+  const day   = dt.getDate().toString().padStart(2, "0");
   const month = (dt.getMonth() + 1).toString().padStart(2, "0");
-  const year = dt.getFullYear();
+  const year  = dt.getFullYear();
   return `${dayName} ${day}.${month} ${year}`;
 }
 
@@ -58,24 +45,22 @@ function formatDateShort(dt) {
  */
 function getStatusAndTimesFromRaw(markedDays, dt) {
   const yyyy = dt.getFullYear();
-  const mm = (dt.getMonth() + 1).toString().padStart(2, "0");
-  const dd = dt.getDate().toString().padStart(2, "0");
-  const dateKeyFull = `${yyyy}-${mm}-${dd}T00:00:00`;
+  const mm   = (dt.getMonth() + 1).toString().padStart(2, "0");
+  const dd   = dt.getDate().toString().padStart(2, "0");
+  const dateKeyFull  = `${yyyy}-${mm}-${dd}T00:00:00`;
   const dateKeyShort = `${yyyy}-${mm}-${dd}`;
 
   const data =
     markedDays[dateKeyFull] ||
     markedDays[dateKeyShort] ||
-    Object.entries(markedDays).find(([k]) =>
-      k.startsWith(dateKeyShort)
-    )?.[1];
+    Object.entries(markedDays).find(([k]) => k.startsWith(dateKeyShort))?.[1];
 
   if (!data || !data.status || data.status === "off") {
     return { status: "off", powerOn: "", powerOff: "" };
   }
   return {
     status: "on",
-    powerOn: data.onTime || "",
+    powerOn:  data.onTime  || "",
     powerOff: data.offTime || "",
   };
 }
@@ -124,10 +109,10 @@ function formatUptime(uptimeStr) {
 
   if (isNaN(totalSeconds) || totalSeconds < 0) return "ukendt";
 
-  const days = Math.floor(totalSeconds / 86400);
+  const days  = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const mins = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
+  const mins  = Math.floor((totalSeconds % 3600) / 60);
+  const secs  = totalSeconds % 60;
 
   return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
 }
@@ -135,35 +120,65 @@ function formatUptime(uptimeStr) {
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
-  if (
-    dateStr.endsWith("Z") ||
-    dateStr.match(/[\+\-]\d{2}:?\d{2}$/)
-  ) {
+  if (dateStr.endsWith("Z") || dateStr.match(/[\+\-]\d{2}:?\d{2}$/)) {
     d = new Date(dateStr);
   } else {
     d = new Date(dateStr + "Z");
   }
+  // FIX: Guard mod Invalid Date — vises som "ukendt" i stedet for at crashe
+  if (isNaN(d.getTime())) return "ukendt";
+
   const formatter = new Intl.DateTimeFormat("da-DK", {
     timeZone: "Europe/Copenhagen",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: withSeconds ? "2-digit" : undefined,
-    hour12: false,
+    year:     "numeric",
+    month:    "2-digit",
+    day:      "2-digit",
+    hour:     "2-digit",
+    minute:   "2-digit",
+    second:   withSeconds ? "2-digit" : undefined,
+    hour12:   false,
   });
-  const parts = formatter.formatToParts(d);
-  const get = (type) => parts.find((p) => p.type === type)?.value || "";
-  const day = get("day");
-  const month = get("month");
-  const year = get("year");
-  const hour = get("hour");
+  const parts  = formatter.formatToParts(d);
+  const get    = (type) => parts.find((p) => p.type === type)?.value || "";
+  const day    = get("day");
+  const month  = get("month");
+  const year   = get("year");
+  const hour   = get("hour");
   const minute = get("minute");
   const second = get("second");
   return withSeconds
     ? `${day}.${month} ${year}, kl. ${hour}:${minute}:${second}`
     : `${day}.${month} ${year}, kl. ${hour}:${minute}`;
+}
+
+// ---------------------------------------------------------------------------
+// Delte tabel-styles — defineret udenfor komponenter så de ikke genskabes
+// FIX: cellStyle og valueCellStyle var identisk duplikeret i SystemInfoTable
+// og NetworkInfoTable — nu delt som factory-funktioner
+// ---------------------------------------------------------------------------
+
+function makeCellStyle(isMobile) {
+  return {
+    border: 0,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    pr: isMobile ? 0.25 : 0.5,
+    py: 0,
+    verticalAlign: "middle",
+    height: isMobile ? 22 : 30,
+    fontSize: isMobile ? 12 : 14,
+  };
+}
+
+function makeValueCellStyle(isMobile) {
+  return {
+    border: 0,
+    pl: isMobile ? 0.25 : 0.5,
+    py: 0,
+    verticalAlign: "middle",
+    height: isMobile ? 22 : 30,
+    fontSize: isMobile ? 12 : 14,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -187,20 +202,23 @@ function StatusText({ status, isMobile = false }) {
 }
 
 function ClientPowerShortTable({ markedDays, isMobile = false }) {
-  const days = [];
-  const now = new Date();
-  for (let i = 0; i < 3; i++) {
-    const d = new Date(now);
-    d.setDate(now.getDate() + i);
-    days.push(d);
-  }
+  // FIX: useMemo — days-array genskabes ikke ved hver render
+  const days = React.useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 3 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(now.getDate() + i);
+      return d;
+    });
+  }, []);
 
-  const cellStyle = {
+  // FIX: useMemo — cellStyle genskabes ikke ved hver render
+  const cellStyle = React.useMemo(() => ({
     whiteSpace: "nowrap",
     py: 0,
     px: isMobile ? 1 : 1.625,
     fontSize: isMobile ? 12 : 14,
-  };
+  }), [isMobile]);
 
   return (
     <TableContainer sx={isMobile ? { maxWidth: "100vw" } : {}}>
@@ -222,9 +240,7 @@ function ClientPowerShortTable({ markedDays, isMobile = false }) {
                 key={dt.toISOString().slice(0, 10)}
                 sx={{ height: isMobile ? 22 : 30 }}
               >
-                <TableCell sx={cellStyle}>
-                  {formatDateShort(dt)}
-                </TableCell>
+                <TableCell sx={cellStyle}>{formatDateShort(dt)}</TableCell>
                 <TableCell sx={cellStyle}>
                   <StatusText status={status} isMobile={isMobile} />
                 </TableCell>
@@ -269,13 +285,7 @@ function CopyField({ value, isMobile = false }) {
   };
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        lineHeight: isMobile ? "22px" : "30px",
-      }}
-    >
+    <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
       <span style={{ fontSize: isMobile ? 12 : undefined }}>{value}</span>
       {value && value !== "ukendt" && (
         <Tooltip title={copied ? "Kopieret!" : "Kopier"} arrow>
@@ -287,14 +297,11 @@ function CopyField({ value, isMobile = false }) {
               ml: 0.5,
               p: 0,
               height: isMobile ? "1em" : "1.4em",
-              width: isMobile ? "1em" : "1.4em",
+              width:  isMobile ? "1em" : "1.4em",
             }}
           >
             <ContentCopyIcon
-              sx={{
-                fontSize: isMobile ? "0.8em" : "1em",
-                verticalAlign: "middle",
-              }}
+              sx={{ fontSize: isMobile ? "0.8em" : "1em", verticalAlign: "middle" }}
             />
           </IconButton>
         </Tooltip>
@@ -304,47 +311,18 @@ function CopyField({ value, isMobile = false }) {
 }
 
 function SystemInfoTable({ client, uptime, lastSeen, isMobile = false }) {
-  const cellStyle = {
-    border: 0,
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5,
-    py: 0,
-    verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
-    fontSize: isMobile ? 12 : 14,
-  };
-  const valueCellStyle = {
-    border: 0,
-    pl: isMobile ? 0.25 : 0.5,
-    py: 0,
-    verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
-    fontSize: isMobile ? 12 : 14,
-  };
+  // FIX: Delte style-factories i stedet for duplikeret kode
+  const cellStyle      = React.useMemo(() => makeCellStyle(isMobile),      [isMobile]);
+  const valueCellStyle = React.useMemo(() => makeValueCellStyle(isMobile), [isMobile]);
 
-  const rows = [
-    {
-      label: "Ubuntu version:",
-      value: client?.ubuntu_version || "ukendt",
-      copy: false,
-    },
-    {
-      label: "Oppetid:",
-      value: formatUptime(uptime),
-      copy: false,
-    },
-    {
-      label: "Sidst set:",
-      value: formatDateTime(lastSeen, true),
-      copy: false,
-    },
-    {
-      label: "Tilføjet:",
-      value: formatDateTime(client?.created_at, true),
-      copy: false,
-    },
-  ];
+  // FIX: useMemo — rows + dyre format-kald genskabes ikke ved hver render
+  // FIX: copy-feltet er fjernet — det blev defineret men aldrig brugt
+  const rows = React.useMemo(() => [
+    { label: "Ubuntu version:", value: client?.ubuntu_version || "ukendt" },
+    { label: "Oppetid:",        value: formatUptime(uptime) },
+    { label: "Sidst set:",      value: formatDateTime(lastSeen, true) },
+    { label: "Tilføjet:",       value: formatDateTime(client?.created_at, true) },
+  ], [client?.ubuntu_version, client?.created_at, uptime, lastSeen]);
 
   return (
     <TableContainer>
@@ -354,13 +332,7 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile = false }) {
             <TableRow key={label} sx={{ height: isMobile ? 22 : 30 }}>
               <TableCell sx={cellStyle}>{label}</TableCell>
               <TableCell sx={valueCellStyle}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    lineHeight: isMobile ? "22px" : "30px",
-                  }}
-                >
+                <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
                   {value}
                 </Box>
               </TableCell>
@@ -373,30 +345,16 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile = false }) {
 }
 
 function NetworkInfoTable({ client, isMobile = false }) {
-  const cellStyle = {
-    border: 0,
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5,
-    py: 0,
-    verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
-    fontSize: isMobile ? 12 : 14,
-  };
-  const valueCellStyle = {
-    border: 0,
-    pl: isMobile ? 0.25 : 0.5,
-    py: 0,
-    verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
-    fontSize: isMobile ? 12 : 14,
-  };
+  // FIX: Delte style-factories i stedet for duplikeret kode
+  const cellStyle      = React.useMemo(() => makeCellStyle(isMobile),      [isMobile]);
+  const valueCellStyle = React.useMemo(() => makeValueCellStyle(isMobile), [isMobile]);
 
+  // Konstant — defineres udenfor ville være endnu bedre, men rows afhænger ikke af props/state
   const rows = [
-    { label: "IP-adresse WLAN:", key: "wifi_ip_address" },
+    { label: "IP-adresse WLAN:",  key: "wifi_ip_address" },
     { label: "MAC-adresse WLAN:", key: "wifi_mac_address" },
-    { label: "IP-adresse LAN:", key: "lan_ip_address" },
-    { label: "MAC-adresse LAN:", key: "lan_mac_address" },
+    { label: "IP-adresse LAN:",   key: "lan_ip_address" },
+    { label: "MAC-adresse LAN:",  key: "lan_mac_address" },
   ];
 
   return (
@@ -407,10 +365,7 @@ function NetworkInfoTable({ client, isMobile = false }) {
             <TableRow key={key} sx={{ height: isMobile ? 22 : 30 }}>
               <TableCell sx={cellStyle}>{label}</TableCell>
               <TableCell sx={valueCellStyle}>
-                <CopyField
-                  value={client?.[key] || "ukendt"}
-                  isMobile={isMobile}
-                />
+                <CopyField value={client?.[key] || "ukendt"} isMobile={isMobile} />
               </TableCell>
             </TableRow>
           ))}
@@ -419,6 +374,14 @@ function NetworkInfoTable({ client, isMobile = false }) {
     </TableContainer>
   );
 }
+
+// Konstant — rows i NetworkInfoTable afhænger ikke af props → helt ud af komponenten
+const NETWORK_ROWS = [
+  { label: "IP-adresse WLAN:",  key: "wifi_ip_address" },
+  { label: "MAC-adresse WLAN:", key: "wifi_mac_address" },
+  { label: "IP-adresse LAN:",   key: "lan_ip_address" },
+  { label: "MAC-adresse LAN:",  key: "lan_mac_address" },
+];
 
 // ---------------------------------------------------------------------------
 // Hoved-komponent
@@ -429,11 +392,12 @@ export default function ClientDetailsInfoSection({
   markedDays,
   uptime,
   lastSeen,
-  calendarDialogOpen,
+  // FIX: calendarDialogOpen fjernet — prop'en blev modtaget men aldrig brugt i JSX.
+  // Dialog-tilstand styres udelukkende af parent via setCalendarDialogOpen.
   setCalendarDialogOpen,
   clientOnline,
 }) {
-  const theme = useTheme();
+  const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const isOffline =
@@ -441,26 +405,30 @@ export default function ClientDetailsInfoSection({
       ? clientOnline === false
       : client?.isOnline === false;
 
-  const disabledOverlay = isOffline
-    ? { opacity: 0.65, filter: "grayscale(20%)", bgcolor: "#fafafa" }
-    : {};
+  // FIX: useMemo — genskabes ikke ved hver render
+  const disabledOverlay = React.useMemo(() =>
+    isOffline
+      ? { opacity: 0.65, filter: "grayscale(20%)", bgcolor: "#fafafa" }
+      : {},
+    [isOffline]
+  );
 
-  const cardSx = {
+  const cardSx = React.useMemo(() => ({
     borderRadius: isMobile ? 1 : 2,
     height: "100%",
     ...disabledOverlay,
-  };
+  }), [isMobile, disabledOverlay]);
 
-  const contentSx = {
+  const contentSx = React.useMemo(() => ({
     px: isMobile ? 1 : 2,
     py: isMobile ? 1 : 2,
-  };
+  }), [isMobile]);
 
-  const headingSx = {
+  const headingSx = React.useMemo(() => ({
     fontWeight: 700,
     flexGrow: 1,
     fontSize: isMobile ? 16 : undefined,
-  };
+  }), [isMobile]);
 
   return (
     <Grid container spacing={isMobile ? 0.5 : 1}>
@@ -468,13 +436,7 @@ export default function ClientDetailsInfoSection({
       <Grid item xs={12} md={4}>
         <Card elevation={2} sx={cardSx}>
           <CardContent sx={contentSx}>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                mb: isMobile ? 0.5 : 1,
-              }}
-            >
+            <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
               <Typography variant="h6" sx={headingSx}>
                 Kalender
               </Typography>
@@ -493,9 +455,7 @@ export default function ClientDetailsInfoSection({
                     }}
                     onClick={() => setCalendarDialogOpen(true)}
                   >
-                    <ArrowForwardIosIcon
-                      sx={{ fontSize: isMobile ? 13 : 16 }}
-                    />
+                    <ArrowForwardIosIcon sx={{ fontSize: isMobile ? 13 : 16 }} />
                   </Button>
                 </span>
               </Tooltip>
@@ -512,13 +472,7 @@ export default function ClientDetailsInfoSection({
       <Grid item xs={12} md={4}>
         <Card elevation={2} sx={cardSx}>
           <CardContent sx={contentSx}>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                mb: isMobile ? 0.5 : 1,
-              }}
-            >
+            <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
               <Typography variant="h6" sx={headingSx}>
                 Systeminfo
               </Typography>
@@ -537,13 +491,7 @@ export default function ClientDetailsInfoSection({
       <Grid item xs={12} md={4}>
         <Card elevation={2} sx={cardSx}>
           <CardContent sx={contentSx}>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                mb: isMobile ? 0.5 : 1,
-              }}
-            >
+            <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
               <Typography variant="h6" sx={headingSx}>
                 Netværksinfo
               </Typography>
