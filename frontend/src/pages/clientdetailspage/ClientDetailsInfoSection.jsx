@@ -635,7 +635,7 @@ function SystemInfoTable({
 
           <Alert severity={updateCount > 0 ? "warning" : "info"} sx={{ mb: 1.5 }}>
             {updateCount > 0
-              ? `${confirmPackageText} installeres. Klienten kan genstarte automatisk bagefter.`
+              ? `${confirmPackageText} installeres. Klienten genstarter automatisk, hvis opdateringen kræver det.`
               : "Der er aktuelt ingen registrerede opdateringer, men klienten tjekker igen, når handlingen startes."}
           </Alert>
 
