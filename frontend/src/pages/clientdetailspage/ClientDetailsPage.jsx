@@ -7,11 +7,11 @@ import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
 import ClientDetailsActionsSection from "./DetailsActionsSection";
 import ClientDetailsLivestreamSection from "./ClientDetailsLivestreamSection";
 import ClientCalendarDialog from "../calendarpage/ClientCalendarDialog";
+import ClientTerminalDialog from "./ClientTerminalDialog";
 
 import {
   getChromeStatus,
   clientAction,
-  openTerminal,
   openRemoteDesktop,
   getClient,
 } from "../../api";
@@ -184,6 +184,9 @@ export default function ClientDetailsPage({
 
   // --- Kalender dialog ---
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
+
+  // --- Remote terminal dialog ---
+  const [terminalDialogOpen, setTerminalDialogOpen] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Live chrome-status — opdateres hvert 1s uden full re-render
@@ -403,7 +406,7 @@ export default function ClientDetailsPage({
   );
 
   const handleOpenTerminal = useCallback(() => {
-    if (client?.id) openTerminal(client.id);
+    if (client?.id) setTerminalDialogOpen(true);
   }, [client?.id]);
 
   const handleOpenRemoteDesktop = useCallback(() => {
@@ -485,6 +488,12 @@ export default function ClientDetailsPage({
         open={calendarDialogOpen}
         onClose={() => setCalendarDialogOpen(false)}
         clientId={client?.id}
+      />
+
+      <ClientTerminalDialog
+        open={terminalDialogOpen}
+        onClose={() => setTerminalDialogOpen(false)}
+        client={client}
       />
 
       <Snackbar
