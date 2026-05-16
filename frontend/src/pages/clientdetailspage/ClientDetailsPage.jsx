@@ -26,55 +26,46 @@ import {
   2. Step-timestamp valideres mod action-starttidspunkt.
      Steps ældre end handlingen ignoreres — de tilhører en forrige handling.
 
-  3. Chrome-step afgør unlock — nu handlings-specifikt:
-       BUSY-step     → altid låst (klienten er aktivt i gang)
-       TERMINAL-step → unlock øjeblikkeligt (klienten er færdig)
-                       Men hvilke steps der er "terminal" afhænger af action:
-                         start   → kun "start_chrome" (ikke chrome_closed_*)
-                         stop    → "chrome_closed_programmatically", "chrome_closed_manual"
-                         sleep   → "system_sleep", "chrome_closed_programmatically"
-                         wakeup  → "system_wake"
-                         reboot  → "system_rebooting"
-                         shutdown→ "system_shutting_down"
-       null/ukendt   → 0–2s: altid låst
-                       2–8s: låst (nyt step ikke ankommet endnu)
-                       8s+:  unlock (PCA clear + ingen aktiv proces)
+  3. Chrome-step afgør unlock — handlings-specifikt via TERMINAL_STEPS_BY_ACTION.
+     Terminal tjekkes ALTID før busy — vigtigt for reboot/shutdown hvor
+     system_rebooting/system_shutting_down er i BUSY_CHROME_STEPS (for banneret)
+     men skal være terminal for deres respektive actions.
 
-  PROBLEM DER LØSES:
-    scenario_system_start() kører:
-      write_status([])                     ← rydder steps
-      clear_cookies_and_profile()          ← skriver "clear_cookies" (BUSY ✓)
-      shutdown_chrome()                    ← dræber Chrome
-        → watchdog skriver                 ← "chrome_closed_programmatically" (TERMINAL 💥)
-      countdown-loop                       ← skriver "countdown" (BUSY ✓)
-      start_chrome()                       ← skriver "start_chrome" (TERMINAL ✓)
+  PROBLEMS DER LØSES:
 
-    chrome_closed_programmatically skrives MIDT i start-sekvensen og var
-    tidligere i den globale TERMINAL_CHROME_STEPS — knappen åbnede for tidligt.
-    Med handlings-specifikke terminal-steps er dette rettet:
-    start-action venter udelukkende på "start_chrome".
+  A) "start" — chrome_closed_programmatically må ikke være terminal:
+       clear_cookies (BUSY) → shutdown_chrome (BUSY)
+       → watchdog: chrome_closed_programmatically   ← MÅ IKKE UNLOCK
+       → countdown (BUSY) → start_chrome (TERMINAL ✓)
+
+  B) "sleep" — chrome_closed_programmatically må ikke være terminal:
+       shutdown_chrome_compat() → watchdog: chrome_closed_programmatically ← MÅ IKKE UNLOCK
+       → countdown (BUSY) → system_sleep (TERMINAL ✓)
+
+  C) "reboot"/"shutdown" — terminal skal tjekkes FØR busy:
+       shutdown_chrome (BUSY ✓) → system_rebooting  ← BUSY i sættet men TERMINAL for action
+       Uden fix: polling venter 60s timeout fordi BUSY altid vinder.
+       Med fix: terminal tjekkes først → unlock korrekt.
 
   Faktiske step-navne fra chrome_kiosk.py / kiosk_sleep.py / kiosk_wake.py:
 
-  BUSY_CHROME_STEPS:
-    clear_cookies            — rydder cookies (start/stop/sleep)
+  BUSY_CHROME_STEPS (låser knapper + banner i DetailsActionsSection):
+    clear_cookies            — rydder cookies
     terminate_chrome         — SIGTERM til Chrome
-    kill_chrome              — SIGKILL til Chrome (efter failed SIGTERM)
+    kill_chrome              — SIGKILL til Chrome
     shutdown_chrome          — chrome shutdown bekræftet
     countdown                — nedtælling før start eller sleep
     system_reboot_countdown  — nedtælling før reboot efter wake
-    system_rebooting         — maskinen er ved at genstarte
-    system_shutting_down     — maskinen er ved at lukke ned
+    system_rebooting         — maskinen genstarter (også terminal for reboot-action)
+    system_shutting_down     — maskinen lukker ned (også terminal for shutdown-action)
 
-  TERMINAL_CHROME_STEPS (handlings-specifikke):
-    start   → start_chrome, error
-    stop    → chrome_closed_programmatically, chrome_closed_manual, error
-    sleep   → system_sleep, chrome_closed_programmatically, error
-    wakeup  → system_wake, error
-    reboot  → system_rebooting, error
-    shutdown→ system_shutting_down, error
-
-  Korrekt unlock-rækkefølge: silentRefresh() FØRST → unlock BAGEFTER.
+  TERMINAL_STEPS_BY_ACTION:
+    start    → start_chrome, error
+    stop     → chrome_closed_programmatically, chrome_closed_manual, error
+    sleep    → system_sleep, error
+    wakeup   → system_wake, error
+    reboot   → system_rebooting, error
+    shutdown → system_shutting_down, error
 */
 
 const CHROME_STATUS_POLL_MS = 1000;
@@ -94,14 +85,41 @@ const BUSY_CHROME_STEPS = new Set([
   "system_shutting_down",
 ]);
 
-// Handlings-specifikke terminal steps.
-// chrome_closed_programmatically MÅ IKKE være terminal for "start" —
-// det skrives af watchdog midt i start-sekvensen når den eksisterende
-// Chrome-instans dræbes som forberedelse til genstart.
+/*
+  Handlings-specifikke terminal steps.
+
+  start:
+    Venter KUN på start_chrome.
+    chrome_closed_programmatically skrives af watchdog midt i sekvensen
+    (når eksisterende Chrome dræbes som forberedelse til genstart) — må
+    ikke terminere polling, ellers låses knapper op under countdown.
+
+  stop:
+    chrome_closed_programmatically og chrome_closed_manual er korrekte
+    terminal steps — det er præcis hvad watchdog skriver når Chrome stoppes.
+
+  sleep:
+    Venter KUN på system_sleep.
+    chrome_closed_programmatically skrives af watchdog FØR countdown i
+    sleep-sekvensen — må ikke terminere polling:
+      shutdown_chrome_compat() → watchdog: chrome_closed_programmatically
+      → countdown (BUSY) → system_sleep (TERMINAL)
+
+  wakeup:
+    system_wake er terminal. Maskinen rebootes umiddelbart efter.
+
+  reboot:
+    system_rebooting er terminal for reboot — maskinen er ved at genstarte.
+    NB: system_rebooting er også i BUSY_CHROME_STEPS (for banneret i
+    DetailsActionsSection), men terminal tjekkes FØR busy i polling-loopen.
+
+  shutdown:
+    system_shutting_down er terminal for shutdown — samme princip som reboot.
+*/
 const TERMINAL_STEPS_BY_ACTION = {
   start:    new Set(["start_chrome", "error"]),
   stop:     new Set(["chrome_closed_programmatically", "chrome_closed_manual", "error"]),
-  sleep:    new Set(["system_sleep", "chrome_closed_programmatically", "error"]),
+  sleep:    new Set(["system_sleep", "error"]),
   wakeup:   new Set(["system_wake", "error"]),
   reboot:   new Set(["system_rebooting", "error"]),
   shutdown: new Set(["system_shutting_down", "error"]),
@@ -291,9 +309,6 @@ export default function ClientDetailsPage({
     }
   }, [onCancelActionPollRef, cancelActionPoll]);
 
-  // action-parameter sikrer at vi bruger de rigtige terminal-steps per handling.
-  // "start" venter fx kun på "start_chrome" og ignorerer "chrome_closed_programmatically"
-  // som watchdog skriver midt i sekvensen når den eksisterende Chrome dræbes.
   const startActionConfirmationPolling = useCallback((action) => {
     actionPollStopRef.current = false;
     setClientActionPending(true);
@@ -301,7 +316,7 @@ export default function ClientDetailsPage({
     const startTime    = Date.now();
     const startTimeISO = new Date(startTime).toISOString();
 
-    // Hent handlings-specifikke terminal steps — eller fallback til global liste
+    // Hent handlings-specifikke terminal steps — eller fallback
     const terminalSteps = TERMINAL_STEPS_BY_ACTION[action] ?? DEFAULT_TERMINAL_STEPS;
 
     async function pollForConfirmation() {
@@ -338,11 +353,16 @@ export default function ClientDetailsPage({
           ? ""
           : String(liveStepRef.current ?? "").toLowerCase();
 
-        if (BUSY_CHROME_STEPS.has(currentStep)) continue;
-
-        // Brug handlings-specifikke terminal steps
+        // VIGTIGT: Terminal tjekkes FØR busy.
+        // Reboot/shutdown har system_rebooting/system_shutting_down i både
+        // BUSY_CHROME_STEPS (for banner) og i deres terminal-sæt.
+        // Uden denne rækkefølge ville BUSY altid vinde og polling aldrig
+        // terminere for reboot/shutdown — de ville vente 60s timeout.
         if (terminalSteps.has(currentStep)) break;
 
+        if (BUSY_CHROME_STEPS.has(currentStep)) continue;
+
+        // Hverken terminal eller busy — step er ukendt/null
         if (elapsed < ACTION_NULL_STEP_MS) continue;
 
         break;
@@ -370,7 +390,7 @@ export default function ClientDetailsPage({
       if (!client?.id) return;
       await clientAction(client.id, action);
       setLocalPendingAction(action);
-      startActionConfirmationPolling(action); // ← sender action med
+      startActionConfirmationPolling(action); // ← action sendes med
     },
     [client?.id, startActionConfirmationPolling]
   );
