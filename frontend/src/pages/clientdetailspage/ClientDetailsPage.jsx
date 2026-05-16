@@ -59,29 +59,27 @@ import {
 const CHROME_STATUS_POLL_MS = 1000;
 const ACTION_POLL_MS        = 1500;
 const ACTION_POLL_MAX_MS    = 60_000;
-const ACTION_MIN_LOCK_MS    = 2000; // 0–2s: altid låst
-const ACTION_NULL_STEP_MS   = 8000; // null-step låst indtil 8s, derefter unlock
+const ACTION_MIN_LOCK_MS    = 2000;
+const ACTION_NULL_STEP_MS   = 8000;
 
-// Faktiske transiente steps — processen er stadig i gang
 const BUSY_CHROME_STEPS = new Set([
-  "clear_cookies",           // rydder cookies (start/stop/sleep)
-  "terminate_chrome",        // SIGTERM til Chrome
-  "kill_chrome",             // SIGKILL til Chrome (efter failed SIGTERM)
-  "shutdown_chrome",         // chrome shutdown bekræftet
-  "countdown",               // nedtælling før start eller sleep
-  "system_reboot_countdown", // nedtælling før reboot efter wake
-  "system_rebooting",        // maskinen er ved at genstarte
-  "system_shutting_down",    // maskinen er ved at lukke ned
+  "clear_cookies",
+  "terminate_chrome",
+  "kill_chrome",
+  "shutdown_chrome",
+  "countdown",
+  "system_reboot_countdown",
+  "system_rebooting",
+  "system_shutting_down",
 ]);
 
-// Faktiske terminale steps — processen er fuldt færdig
 const TERMINAL_CHROME_STEPS = new Set([
-  "start_chrome",                   // start-handling færdig
-  "chrome_closed_programmatically", // stop/sleep-handling færdig (watchdog)
-  "chrome_closed_manual",           // Chrome lukket manuelt (watchdog)
-  "system_sleep",                   // sleep-handling færdig
-  "system_wake",                    // wake-handling færdig (reboot følger straks)
-  "error",                          // scenario fejlede → processen stoppet
+  "start_chrome",
+  "chrome_closed_programmatically",
+  "chrome_closed_manual",
+  "system_sleep",
+  "system_wake",
+  "error",
 ]);
 
 export default function ClientDetailsPage({
@@ -137,9 +135,9 @@ export default function ClientDetailsPage({
   const [liveChromeColor, setLiveChromeColor] = useState(
     client?.chrome_color ?? null
   );
-  const [liveStep, setLiveStep]           = useState(null);
-  const liveStepRef                       = useRef(null);
-  const liveStepTimestampRef              = useRef(null); // timestamp på seneste step
+  const [liveStep, setLiveStep]      = useState(null);
+  const liveStepRef                  = useRef(null);
+  const liveStepTimestampRef         = useRef(null);
 
   // ---------------------------------------------------------------------------
   // Lokal pending_chrome_action + state
@@ -151,7 +149,6 @@ export default function ClientDetailsPage({
     client?.state ?? "normal"
   );
 
-  // Sync når parent client prop opdateres (manuel refresh)
   useEffect(() => {
     setLocalPendingAction(client?.pending_chrome_action ?? "none");
     setLocalClientState(client?.state ?? "normal");
@@ -180,7 +177,6 @@ export default function ClientDetailsPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client?.id]);
 
-  // Lokal uptime ticker
   useEffect(() => {
     if (uptimeBaseRef.current == null || uptimeFetchRef.current == null) return;
     const interval = setInterval(() => {
@@ -264,7 +260,6 @@ export default function ClientDetailsPage({
     actionPollStopRef.current = false;
     setClientActionPending(true);
 
-    // Gem starttidspunkt — bruges til at validere step-timestamps
     const startTime    = Date.now();
     const startTimeISO = new Date(startTime).toISOString();
 
@@ -275,7 +270,6 @@ export default function ClientDetailsPage({
         await new Promise((res) => setTimeout(res, ACTION_POLL_MS));
         if (actionPollStopRef.current || !mountedRef.current) break;
 
-        // Betingelse 1: pending_chrome_action skal være "none"
         let pcaClear = false;
         try {
           const data = await getClient(client.id);
@@ -294,36 +288,25 @@ export default function ClientDetailsPage({
 
         const elapsed = Date.now() - startTime;
 
-        // Zone 0–2s: altid låst — klienten når ikke at reagere endnu
         if (elapsed < ACTION_MIN_LOCK_MS) continue;
 
-        // Valider step-timestamp mod action-starttidspunkt.
-        // scenario_system_start kalder write_status([]) og rydder filen —
-        // backend falder derefter tilbage til DB-værdien som er et forældet step.
-        // Ignorér step hvis dets timestamp er ældre end handlingens start.
         const stepTimestamp = liveStepTimestampRef.current;
         const stepIsStale   = !stepTimestamp || stepTimestamp < startTimeISO;
 
         const currentStep = stepIsStale
-          ? "" // behandl forældet step som null/ukendt
+          ? ""
           : String(liveStepRef.current ?? "").toLowerCase();
 
-        // BUSY-step: processen er stadig i gang — altid låst
         if (BUSY_CHROME_STEPS.has(currentStep)) continue;
 
-        // TERMINAL-step: processen er fuldt færdig — unlock øjeblikkeligt
         if (TERMINAL_CHROME_STEPS.has(currentStep)) break;
 
-        // null/ukendt/forældet step:
-        // 2–8s: nyt step ikke ankommet endnu — vent
-        // 8s+:  PCA clear + ingen aktiv proces → unlock
         if (elapsed < ACTION_NULL_STEP_MS) continue;
 
         break;
       }
 
       if (mountedRef.current && !actionPollStopRef.current) {
-        // VIGTIGT: refresh FØRST → unlock BAGEFTER
         try {
           const refresh = silentRefresh ?? handleRefresh;
           await refresh();
@@ -400,7 +383,7 @@ export default function ClientDetailsPage({
           clientOnline={clientOnline}
         />
 
-        {/* 3 — FIX: calendarLoading sendes korrekt videre */}
+        {/* 3 */}
         <ClientDetailsInfoSection
           client={client}
           markedDays={markedDays}
@@ -446,4 +429,10 @@ export default function ClientDetailsPage({
           severity={snackbar.severity}
           variant="filled"
           sx={{ width: "100%" }}
-        *
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Container>
+  );
+}
