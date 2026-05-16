@@ -28,6 +28,10 @@ import {
   pushKioskUrl as apiPushKioskUrl
 } from "../../api";
 
+// ---------------------------------------------------------------------------
+// Konstanter udenfor komponenten — genskabes ikke ved re-renders
+// ---------------------------------------------------------------------------
+
 const COLOR_NAME_MAP = {
   red: "#e53935",
   green: "#43a047",
@@ -39,6 +43,19 @@ const COLOR_NAME_MAP = {
   black: "#000000",
   white: "#ffffff"
 };
+
+// FIX: Flyttet ud af komponenten — var en ny object reference ved hver render
+const NO_SCROLL_SX = {
+  overflowX: "hidden",
+  overflowY: "hidden",
+  msOverflowStyle: "none",
+  scrollbarWidth: "none",
+  "&::-webkit-scrollbar": { display: "none" }
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function resolveColor(theme, color) {
   if (!color) return theme.palette?.grey?.[400] || "#bdbdbd";
@@ -78,6 +95,10 @@ function resolveColor(theme, color) {
 
   return trimmed;
 }
+
+// ---------------------------------------------------------------------------
+// Sub-komponenter
+// ---------------------------------------------------------------------------
 
 function StatusBadge({ color, text, animate = false, isMobile = false }) {
   const theme = useTheme();
@@ -198,7 +219,7 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch (err) {
+    } catch {
       // ignore copy errors
     }
   };
@@ -233,8 +254,46 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   );
 }
 
-// FIX: Skoler hentes ét sted og én gang — udenfor hovedkomponenten
-// så hentningen ikke genstarter ved re-renders af ClientDetailsHeaderSection.
+// FIX: KioskBrowserDataRows som rigtig komponent i stedet for inline funktion
+function KioskBrowserDataRows({ data, isMobile, labelCellWidth }) {
+  if (!data || typeof data !== "object" || Object.keys(data).length === 0) return null;
+  return Object.entries(data).map(([key, value]) => (
+    <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
+      <TableCell
+        sx={{
+          fontWeight: 600,
+          whiteSpace: "nowrap",
+          pr: isMobile ? 0.5 : 1,
+          py: 0,
+          verticalAlign: "middle",
+          fontSize: isMobile ? 12 : 14,
+          borderBottom: "none",
+          width: labelCellWidth,
+          minWidth: labelCellWidth,
+        }}
+      >
+        {key}:
+      </TableCell>
+      <TableCell
+        sx={{
+          fontWeight: 400,
+          pl: isMobile ? 0.5 : 1.5,
+          py: 0,
+          verticalAlign: "middle",
+          fontSize: isMobile ? 12 : 14,
+          borderBottom: "none"
+        }}
+      >
+        {String(value)}
+      </TableCell>
+    </TableRow>
+  ));
+}
+
+// ---------------------------------------------------------------------------
+// Custom hook — skoler hentes stabilt uden blik
+// ---------------------------------------------------------------------------
+
 function useSchoolsList(schoolsProp) {
   const [schoolsList, setSchoolsList] = React.useState(
     Array.isArray(schoolsProp) && schoolsProp.length ? schoolsProp : []
@@ -272,12 +331,15 @@ function useSchoolsList(schoolsProp) {
     }
     load();
     return () => { cancelled = true; };
-    // Kør kun ved mount — schools-prop var tom på dette tidspunkt
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { schoolsList, loadingSchools, schoolsError };
 }
+
+// ---------------------------------------------------------------------------
+// Hoved-komponent
+// ---------------------------------------------------------------------------
 
 function ClientDetailsHeaderSection({
   client,
@@ -288,6 +350,8 @@ function ClientDetailsHeaderSection({
   handleRefresh,
   kioskBrowserData = {},
   showSnackbar,
+  // FIX: clientOnline modtages nu korrekt fra parent (ClientDetailsPage sender den)
+  clientOnline,
 }) {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -297,27 +361,49 @@ function ClientDetailsHeaderSection({
 
   const isDesktop = !isMobile && !isTablet;
 
+  // FIX: useMemo på layout-værdier — ændrer sig kun ved breakpoint-skift
+  const leftPaperWidth = React.useMemo(
+    () => isDesktop ? "40%" : isTablet ? "50%" : "100%",
+    [isDesktop, isTablet]
+  );
+  const rightPaperWidth = React.useMemo(
+    () => isDesktop ? "60%" : isTablet ? "50%" : "100%",
+    [isDesktop, isTablet]
+  );
+  const labelCellWidth = React.useMemo(
+    () => isDesktop ? 140 : isTablet ? 120 : 100,
+    [isDesktop, isTablet]
+  );
+
   const [localLocality, setLocalLocality] = React.useState(client?.locality ?? "");
   const [localKioskUrl, setLocalKioskUrl] = React.useState(client?.kiosk_url ?? "");
 
   const initialLocalityRef = React.useRef(client?.locality ?? "");
   const initialKioskUrlRef = React.useRef(client?.kiosk_url ?? "");
 
-  const leftPaperWidth = isDesktop ? "40%" : isTablet ? "50%" : "100%";
-  const rightPaperWidth = isDesktop ? "60%" : isTablet ? "50%" : "100%";
-  const labelCellWidth = isDesktop ? 140 : isTablet ? 120 : 100;
-
-  // FIX: Brug custom hook — skoler hentes stabilt uden at forårsage blik
+  // FIX: Brug custom hook — skoler hentes stabilt uden blik
   const { schoolsList, loadingSchools, schoolsError } = useSchoolsList(schools);
 
   const [selectedSchool, setSelectedSchool] = React.useState(client?.school_id ?? "");
   const [savingSchool, setSavingSchool] = React.useState(false);
   const [selectedSchoolDirty, setSelectedSchoolDirty] = React.useState(false);
-
   const initialSelectedSchoolRef = React.useRef(client?.school_id ?? "");
 
   const [savingLocality, setSavingLocality] = React.useState(false);
   const [savingKiosk, setSavingKiosk] = React.useState(false);
+
+  // FIX: isOffline bruger clientOnline prop hvis tilgængelig, ellers client.isOnline
+  const isOffline = clientOnline !== undefined
+    ? clientOnline === false
+    : client?.isOnline === false;
+
+  // FIX: useMemo på disabled-style — genskabes ikke ved hver render
+  const rightPaperDisabledStyle = React.useMemo(
+    () => isOffline
+      ? { opacity: 0.7, filter: "grayscale(30%)", bgcolor: "#fafafa" }
+      : {},
+    [isOffline]
+  );
 
   // Sync selectedSchool når parent client.school_id ændres
   React.useEffect(() => {
@@ -374,13 +460,10 @@ function ClientDetailsHeaderSection({
     }
   };
 
-  const onLocalityChange = (e) => {
-    setLocalLocality(e?.target?.value ?? "");
-  };
+  const onLocalityChange = (e) => setLocalLocality(e?.target?.value ?? "");
 
   const handleLocalitySave = async () => {
-    if (!client || !client.id) return;
-    if (!localityChanged) return;
+    if (!client || !client.id || !localityChanged) return;
     setSavingLocality(true);
     try {
       await apiUpdateClient(client.id, { locality: localLocality });
@@ -401,13 +484,10 @@ function ClientDetailsHeaderSection({
     }
   };
 
-  const onKioskUrlChange = (e) => {
-    setLocalKioskUrl(e?.target?.value ?? "");
-  };
+  const onKioskUrlChange = (e) => setLocalKioskUrl(e?.target?.value ?? "");
 
   const handleKioskUrlSave = async () => {
-    if (!client || !client.id) return;
-    if (!kioskUrlChanged) return;
+    if (!client || !client.id || !kioskUrlChanged) return;
     setSavingKiosk(true);
     try {
       await apiPushKioskUrl(client.id, localKioskUrl);
@@ -428,42 +508,8 @@ function ClientDetailsHeaderSection({
     }
   };
 
-  function renderKioskBrowserDataRows(data) {
-    if (!data || typeof data !== "object" || Object.keys(data).length === 0) return null;
-    return Object.entries(data).map(([key, value]) => (
-      <TableRow key={key} sx={{ height: isMobile ? 28 : 34 }}>
-        <TableCell
-          sx={{
-            fontWeight: 600,
-            whiteSpace: "nowrap",
-            pr: isMobile ? 0.5 : 1,
-            py: 0,
-            verticalAlign: "middle",
-            fontSize: isMobile ? 12 : 14,
-            borderBottom: "none",
-            width: labelCellWidth,
-            minWidth: labelCellWidth,
-          }}
-        >
-          {key}:
-        </TableCell>
-        <TableCell
-          sx={{
-            fontWeight: 400,
-            pl: isMobile ? 0.5 : 1.5,
-            py: 0,
-            verticalAlign: "middle",
-            fontSize: isMobile ? 12 : 14,
-            borderBottom: "none"
-          }}
-        >
-          {String(value)}
-        </TableCell>
-      </TableRow>
-    ));
-  }
-
-  const getSelectedSchoolName = React.useCallback(() => {
+  // FIX: Beregnet én gang — bruges til både value og disabled på CopyIconButton
+  const selectedSchoolName = React.useMemo(() => {
     if (!selectedSchool) return "";
     const s = (schoolsList || []).find(
       x => String(x.id) === String(selectedSchool)
@@ -471,19 +517,7 @@ function ClientDetailsHeaderSection({
     return s ? s.name : String(selectedSchool);
   }, [selectedSchool, schoolsList]);
 
-  const isOffline = client?.isOnline === false;
-
-  const rightPaperDisabledStyle = isOffline
-    ? { opacity: 0.7, filter: "grayscale(30%)", bgcolor: "#fafafa" }
-    : {};
-
-  const NO_SCROLL_SX = {
-    overflowX: "hidden",
-    overflowY: "hidden",
-    "-ms-overflow-style": "none",
-    scrollbarWidth: "none",
-    "&::-webkit-scrollbar": { display: "none" }
-  };
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
   return (
     <Box sx={{ width: "100%" }} data-testid="client-details-header">
@@ -563,7 +597,6 @@ function ClientDetailsHeaderSection({
             elevation={2}
             sx={{
               borderRadius: isMobile ? 1 : 2,
-              height: "auto",
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
@@ -630,7 +663,7 @@ function ClientDetailsHeaderSection({
                     </TableRow>
 
                     {/* Klient ID — kun admin */}
-                    {(user?.role === "admin" || user?.role === "superadmin") && (
+                    {isAdmin && (
                       <TableRow sx={{ height: isMobile ? 28 : 34 }}>
                         <TableCell
                           sx={{
@@ -663,7 +696,7 @@ function ClientDetailsHeaderSection({
                     )}
 
                     {/* Skole — kun admin */}
-                    {(user?.role === "admin" || user?.role === "superadmin") && (
+                    {isAdmin && (
                       <TableRow sx={{ height: isMobile ? 36 : 44 }}>
                         <TableCell
                           sx={{
@@ -697,10 +730,9 @@ function ClientDetailsHeaderSection({
                               value={selectedSchool ?? ""}
                               onChange={handleSchoolSelectChange}
                               // FIX: disabled KUN mens der gemmes — ikke mens skoler loader
-                              // Dette eliminerer blikket fra disabled → enabled cycling
+                              // FIX: disablePortal fjernet — undgår z-index klipning i Card
                               disabled={savingSchool}
                               fullWidth
-                              SelectProps={{ MenuProps: { disablePortal: true } }}
                               inputProps={{ "aria-label": "Skole" }}
                               error={!!selectedSchoolDirty}
                               onKeyDown={e => { if (e.key === "Enter") handleSchoolSave(); }}
@@ -732,7 +764,7 @@ function ClientDetailsHeaderSection({
                               }}
                             >
                               <MenuItem value=""><em>Ingen skole</em></MenuItem>
-                              {/* FIX: Vis loading-item i listen i stedet for at disable hele dropdown */}
+                              {/* FIX: Loading/fejl vises som inaktive items i stedet for at disable dropdown */}
                               {loadingSchools && (
                                 <MenuItem value="" disabled>
                                   <CircularProgress size={12} sx={{ mr: 1 }} /> Henter skoler…
@@ -748,9 +780,10 @@ function ClientDetailsHeaderSection({
                               ))}
                             </TextField>
 
+                            {/* FIX: selectedSchoolName beregnes én gang og genbruges */}
                             <CopyIconButton
-                              value={getSelectedSchoolName()}
-                              disabled={!getSelectedSchoolName()}
+                              value={selectedSchoolName}
+                              disabled={!selectedSchoolName}
                               iconSize={isMobile ? 13 : 15}
                               isMobile={isMobile}
                             />
@@ -790,7 +823,6 @@ function ClientDetailsHeaderSection({
             elevation={2}
             sx={{
               borderRadius: isMobile ? 1 : 2,
-              height: "auto",
               overflow: "hidden",
               ...rightPaperDisabledStyle,
               display: "flex",
@@ -812,7 +844,7 @@ function ClientDetailsHeaderSection({
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Infoskærm status
                 </Typography>
-                {client?.isOnline !== false && (
+                {!isOffline && (
                   <Box sx={{ ml: 1 }}>
                     <StateBadge state={client?.state} isMobile={isMobile} />
                   </Box>
@@ -1000,7 +1032,12 @@ function ClientDetailsHeaderSection({
                       </TableCell>
                     </TableRow>
 
-                    {renderKioskBrowserDataRows(kioskBrowserData)}
+                    {/* FIX: KioskBrowserDataRows er nu en rigtig komponent */}
+                    <KioskBrowserDataRows
+                      data={kioskBrowserData}
+                      isMobile={isMobile}
+                      labelCellWidth={labelCellWidth}
+                    />
                   </TableBody>
                 </Table>
               </TableContainer>
