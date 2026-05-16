@@ -19,7 +19,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import KeyboardIcon from "@mui/icons-material/Keyboard";
 import MouseIcon from "@mui/icons-material/Mouse";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
-import { apiUrl } from "../../../api";
+import { apiUrl, getClient } from "../../../api";
 
 function getAuthToken() {
   return localStorage.getItem("token") || "";
@@ -44,6 +44,8 @@ function clamp(n, min, max) {
 export default function RemoteDesktop() {
   const { clientId } = useParams();
 
+  const [client, setClient] = useState(null);
+
   const wsRef = useRef(null);
   const imgRef = useRef(null);
   const containerRef = useRef(null);
@@ -59,6 +61,25 @@ export default function RemoteDesktop() {
   const [textToType, setTextToType] = useState("");
 
   const canControl = connected && agentConnected && sessionId;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadClient() {
+      if (!clientId) return;
+      try {
+        const data = await getClient(clientId);
+        if (!cancelled) setClient(data || null);
+      } catch {
+        if (!cancelled) setClient(null);
+      }
+    }
+
+    loadClient();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
 
   const send = useCallback((payload) => {
     const ws = wsRef.current;
@@ -294,7 +315,7 @@ export default function RemoteDesktop() {
         </Stack>
 
         <Alert severity="warning">
-          Remote desktop giver skærm-, mus- og tastaturadgang til klienten. Bruges kun af superadmin.
+          Remote desktop - Klient ID: {clientId || "Ukendt"} - Lokation: {client?.locality || "Ikke angivet"}
         </Alert>
 
         {error && (
