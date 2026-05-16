@@ -55,15 +55,21 @@ import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
   FIX 3: polling stoppes midlertidigt under aktiv drag
     via isDraggingRef så listen ikke resettes midt i en drag-operation.
 
-  FIX 4: isClientListEqual udvides til også at sammenligne
-    chrome_status, uptime og last_seen så UI opdateres
-    når disse felter ændres på en klient.
+  FIX 4: isClientListEqual sammenligner kun felter, der faktisk bruges på
+    oversigten. Efter uptime-fixet ændres uptime/last_seen hvert heartbeat,
+    og de bør ikke tvinge hele listen til at re-rendere hvert 5. sekund.
 
   FIX 5: token destruktureres ikke længere fra useAuth()
     da authcontext ikke eksponerer den.
 
   FIX 6: renderMobileRow er memoized via memo + useCallback
     så den ikke genskabes ved hvert render.
+
+  FIX 7: Polling-fejl under baggrundsopdatering vises ikke som snackbar hvert
+    5. sekund. Fejl vises stadig ved initial load og manuel refresh.
+
+  FIX 8: Drag/sort holder polling pauset indtil sorteringen er gemt, så rækken
+    ikke hopper tilbage midt i save-processen.
 */
 
 // ---------------------------------------------------------------------------
@@ -72,9 +78,16 @@ import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
 function formatTimestamp(isoDate) {
   if (!isoDate) return { date: "", time: "" };
+
+  const raw = String(isoDate);
   const dateObj = new Date(
-    isoDate.endsWith("Z") ? isoDate : isoDate + "Z"
+    raw.endsWith("Z") || /[+\-]\d{2}:?\d{2}$/.test(raw) ? raw : raw + "Z"
   );
+
+  if (Number.isNaN(dateObj.getTime())) {
+    return { date: "", time: "" };
+  }
+
   const formatter = new Intl.DateTimeFormat("da-DK", {
     timeZone: "Europe/Copenhagen",
     year: "numeric",
@@ -85,20 +98,29 @@ function formatTimestamp(isoDate) {
     second: "2-digit",
     hour12: false,
   });
+
   const parts = formatter.formatToParts(dateObj);
   const get = (type) => parts.find((p) => p.type === type)?.value || "";
+
   return {
     date: `${get("day")}-${get("month")}-${get("year")}`,
     time: `Kl. ${get("hour")}:${get("minute")}:${get("second")}`,
   };
 }
 
-// FIX 4: Udvider sammenligning til chrome_status, uptime og last_seen
-function isClientListEqual(a, b) {
+function getClientSchoolId(client) {
+  return client?.school_id ?? client?.schoolId ?? "";
+}
+
+// Sammenlign kun felter, der bruges på denne oversigt.
+// uptime og last_seen ændres ofte via heartbeat, men vises ikke her.
+function isClientListEqual(a = [], b = []) {
   if (a.length !== b.length) return false;
+
   for (let i = 0; i < a.length; i++) {
-    const ca = a[i];
-    const cb = b[i];
+    const ca = a[i] || {};
+    const cb = b[i] || {};
+
     if (
       ca.id !== cb.id ||
       ca.name !== cb.name ||
@@ -106,14 +128,19 @@ function isClientListEqual(a, b) {
       ca.status !== cb.status ||
       ca.sort_order !== cb.sort_order ||
       ca.isOnline !== cb.isOnline ||
-      ca.school_id !== cb.school_id ||
-      ca.chrome_status !== cb.chrome_status ||
-      ca.uptime !== cb.uptime ||
-      ca.last_seen !== cb.last_seen
+      String(getClientSchoolId(ca)) !== String(getClientSchoolId(cb)) ||
+
+      // Felter vist for ikke-godkendte klienter
+      ca.wifi_ip_address !== cb.wifi_ip_address ||
+      ca.lan_ip_address !== cb.lan_ip_address ||
+      ca.wifi_mac_address !== cb.wifi_mac_address ||
+      ca.lan_mac_address !== cb.lan_mac_address ||
+      ca.created_at !== cb.created_at
     ) {
       return false;
     }
   }
+
   return true;
 }
 
@@ -131,13 +158,14 @@ const CopyIconButton = memo(function CopyIconButton({
 
   const handleCopy = async (e) => {
     e.stopPropagation();
-    if (!value) return;
+    if (disabled || value === null || value === undefined || value === "") return;
+    const text = String(value);
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
+        await navigator.clipboard.writeText(text);
       } else {
         const ta = document.createElement("textarea");
-        ta.value = value;
+        ta.value = text;
         ta.style.position = "fixed";
         ta.style.left = "-9999px";
         document.body.appendChild(ta);
@@ -212,6 +240,7 @@ export default function ClientInfoPage() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dragClients, setDragClients] = useState([]);
+  const [savingSort, setSavingSort] = useState(false);
 
   const lastFetchedClients = useRef([]);
   // FIX 3: stopper polling under aktiv drag
@@ -261,7 +290,9 @@ export default function ClientInfoPage() {
           lastFetchedClients.current = data;
         }
       } catch (err) {
-        showSnackbar("Fejl: " + (err?.message || err), "error");
+        if (forceUpdate || showLoading) {
+          showSnackbar("Fejl: " + (err?.message || err), "error");
+        }
       } finally {
         if (showLoading) setLoading(false);
       }
@@ -318,9 +349,12 @@ export default function ClientInfoPage() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchClients(true, true);
-    setRefreshing(false);
-    showSnackbar("Opdateret!", "success");
+    try {
+      await fetchClients(true, true);
+      showSnackbar("Opdateret!", "success");
+    } finally {
+      setRefreshing(false);
+    }
   }, [fetchClients, showSnackbar]);
 
   const openRemoveDialog = useCallback((clientId) => {
@@ -365,17 +399,23 @@ export default function ClientInfoPage() {
   // FIX 1: token fjernet
   const onDragEnd = useCallback(
     async (result) => {
-      isDraggingRef.current = false;
+      if (!result.destination) {
+        isDraggingRef.current = false;
+        return;
+      }
 
-      if (!result.destination) return;
-      if (result.destination.index === result.source.index) return;
+      if (result.destination.index === result.source.index) {
+        isDraggingRef.current = false;
+        return;
+      }
 
       const reordered = Array.from(dragClients);
       const [removed] = reordered.splice(result.source.index, 1);
       reordered.splice(result.destination.index, 0, removed);
 
-      // Opdater UI øjeblikkeligt
+      // Opdater UI øjeblikkeligt, men hold polling pauset indtil save er færdig.
       setDragClients(reordered);
+      setSavingSort(true);
 
       try {
         await Promise.all(
@@ -383,13 +423,23 @@ export default function ClientInfoPage() {
             updateClient(client.id, { sort_order: i + 1 })
           )
         );
+
         showSnackbar("Sortering opdateret!", "success");
-        fetchClients(true, false);
+
+        // Slip polling igen før forced refresh.
+        isDraggingRef.current = false;
+        await fetchClients(true, false);
       } catch (err) {
         showSnackbar(
           "Kunne ikke opdatere sortering: " + (err?.message || err),
           "error"
         );
+
+        isDraggingRef.current = false;
+        await fetchClients(true, false);
+      } finally {
+        isDraggingRef.current = false;
+        setSavingSort(false);
       }
     },
     [dragClients, fetchClients, showSnackbar]
@@ -423,7 +473,7 @@ export default function ClientInfoPage() {
 
   const getSchoolName = useCallback(
     (schoolId) => {
-      const school = schools.find((s) => s.id === schoolId);
+      const school = schools.find((s) => String(s.id) === String(schoolId));
       return school ? (
         school.name
       ) : (
@@ -457,7 +507,7 @@ export default function ClientInfoPage() {
               </Typography>
             )}
             <Typography sx={{ fontSize: "0.92em" }}>
-              {getSchoolName(client.school_id)}
+              {getSchoolName(getClientSchoolId(client))}
             </Typography>
           </Stack>
         </TableCell>
@@ -582,7 +632,7 @@ export default function ClientInfoPage() {
                 )
               }
               onClick={handleRefresh}
-              disabled={refreshing}
+              disabled={refreshing || savingSort}
               sx={{
                 minWidth: { xs: "unset", sm: 0 },
                 fontWeight: 500,
@@ -599,7 +649,7 @@ export default function ClientInfoPage() {
       {/* Godkendte klienter */}
       <Paper sx={{ mb: 4, px: { xs: 0.5, sm: 0 } }}>
         <TableContainer style={{ position: "relative" }}>
-          {loading && (
+          {(loading || savingSort) && (
             <Box
               sx={{
                 position: "absolute",
@@ -609,12 +659,19 @@ export default function ClientInfoPage() {
                 bottom: 0,
                 background: "rgba(255,255,255,0.7)",
                 display: "flex",
+                flexDirection: "column",
+                gap: 1,
                 alignItems: "center",
                 justifyContent: "center",
                 zIndex: 10,
               }}
             >
               <CircularProgress />
+              {savingSort && (
+                <Typography variant="body2">
+                  Gemmer sortering...
+                </Typography>
+              )}
             </Box>
           )}
 
@@ -701,6 +758,7 @@ export default function ClientInfoPage() {
                           key={client.id}
                           draggableId={String(client.id)}
                           index={idx}
+                          isDragDisabled={savingSort}
                         >
                           {(provided, snapshot) =>
                             isMobile
@@ -739,7 +797,7 @@ export default function ClientInfoPage() {
                                     />
                                   </TableCell>
                                   <TableCell align="center">
-                                    {getSchoolName(client.school_id)}
+                                    {getSchoolName(getClientSchoolId(client))}
                                   </TableCell>
                                   <TableCell align="center">
                                     <Tooltip title="Info">
