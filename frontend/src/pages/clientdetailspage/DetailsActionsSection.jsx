@@ -35,19 +35,19 @@ import { useAuth } from "../../auth/authcontext";
   - Viser handlingsknapper og håndterer klik.
   - Al polling og lock-logik ligger i ClientDetailsPage (undgår blinking).
   - clientActionPending (prop) låser alle knapper mens en handling afventer klient.
-  - liveStep + liveChromeStatus (props fra ClientDetailsPage) bruges til at vise
-    aktuel chrome-status i pending-banneret — samme kilde som ClientDetailsHeaderSection.
-  - Ingen intern polling — ClientDetailsPage ejer al polling-logik.
+  - liveStep + liveChromeStatus viser aktuel chrome-status i pending-banneret
+    — samme datakilde som ClientDetailsHeaderSection (hvert 1s).
+  - Ingen intern polling overhovedet.
 */
 
-// Steps der indikerer klienten er aktivt i gang
+// Steps der indikerer klienten stadig er aktivt i gang
 const BUSY_CHROME_STEPS = new Set([
   "countdown",
   "clear_cookies",
   "system_reboot_countdown",
 ]);
 
-// Læsbare labels til banner baseret på chrome step
+// Oversæt chrome step-navn til læsbar dansk tekst til banner
 function getStepLabel(step, liveChromeStatus) {
   if (!step) return null;
   const s = String(step).toLowerCase();
@@ -58,7 +58,9 @@ function getStepLabel(step, liveChromeStatus) {
   if (s === "chrome_stopping")         return "Stopper browser…";
   if (s === "system_sleep")            return "Sætter i dvale…";
   if (s === "system_wake")             return "Vågner op…";
-  // Fallback: brug liveChromeStatus hvis tilgængelig
+  if (s === "chrome_running")          return "Browser kører";
+  if (s === "chrome_stopped")          return "Browser stoppet";
+  // Fallback: brug liveChromeStatus tekst hvis tilgængelig
   if (liveChromeStatus)                return liveChromeStatus;
   return null;
 }
@@ -128,7 +130,7 @@ export default function ClientDetailsActionsSection({
   clientOnline = true,
   // Fra ClientDetailsPage — true mens handling afventer klient-bekræftelse
   clientActionPending = false,
-  // Fra ClientDetailsPage — seneste chrome step (opdateres hvert 1s)
+  // Fra ClientDetailsPage — seneste chrome step navn (opdateres hvert 1s)
   liveStep = null,
   // Fra ClientDetailsPage — seneste chrome status tekst (opdateres hvert 1s)
   liveChromeStatus = null,
@@ -139,18 +141,18 @@ export default function ClientDetailsActionsSection({
 
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
-  const [actionLoading, setActionLoading]   = useState({});
+  const [actionLoading, setActionLoading]         = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
-  const [localSnackbar, setLocalSnackbar]   = useState({
+  const [localSnackbar, setLocalSnackbar]         = useState({
     open: false,
     message: "",
     severity: "success",
   });
 
-  const normalizedClientState  = String(clientState || "").trim().toLowerCase();
-  const isSleeping             = normalizedClientState.startsWith("sleep");
+  const normalizedClientState   = String(clientState || "").trim().toLowerCase();
+  const isSleeping              = normalizedClientState.startsWith("sleep");
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
-  const hasPendingAction       =
+  const hasPendingAction        =
     !!normalizedPendingAction && normalizedPendingAction !== "none";
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
@@ -217,17 +219,16 @@ export default function ClientDetailsActionsSection({
 
   // ---------------------------------------------------------------------------
   // Pending-banner tekst
-  // Viser aktuel chrome step (samme kilde som ClientDetailsHeaderSection)
+  // Prioritet: chrome step label → liveChromeStatus → pending action navn
   // ---------------------------------------------------------------------------
-  const stepLabel = getStepLabel(liveStep, liveChromeStatus);
-
   const pendingLabel = (() => {
     if (!clientActionPending && !hasPendingAction) return null;
 
-    // Hvis vi har et aktivt chrome step — vis det
+    // Brug chrome step label hvis tilgængeligt (samme kilde som header)
+    const stepLabel = getStepLabel(liveStep, liveChromeStatus);
     if (stepLabel) return stepLabel;
 
-    // Ellers vis pending action navn
+    // Fallback: vis pending action navn
     const actionName = normalizedPendingAction !== "none"
       ? normalizedPendingAction
       : "handling";
