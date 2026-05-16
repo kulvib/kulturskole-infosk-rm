@@ -39,8 +39,6 @@ import { useAuth } from "../../auth/authcontext";
   - Det forhindrer render-crash og gør at sektionen kan opdatere korrekt.
 */
 
-const PENDING_BANNER_AUTO_HIDE_MS = 10_000;
-
 const BUSY_CHROME_STEPS = new Set([
   "clear_cookies",
   "terminate_chrome",
@@ -59,6 +57,16 @@ const SYSTEM_SLEEP_STEPS = new Set([
   "system_sleep",
   "system_sleep_complete",
 ]);
+
+// Kun reboot/shutdown-statusboksen skal auto-skjules efter 10 sekunder.
+// Alle andre statusbeskeder bliver vist som før.
+const AUTO_HIDE_BANNER_STEPS = new Set([
+  "system_reboot_countdown",
+  "system_rebooting",
+  "system_shutting_down",
+]);
+
+const PENDING_BANNER_AUTO_HIDE_MS = 10_000;
 
 const CHROME_RUNNING_STEPS = new Set([
   "start_chrome",
@@ -185,6 +193,8 @@ export default function ClientDetailsActionsSection({
 
   const liveStepNorm = String(liveStep ?? "").trim().toLowerCase();
 
+  const shouldAutoHidePendingBanner = AUTO_HIDE_BANNER_STEPS.has(liveStepNorm);
+
   // System-level handlinger må låse hele knap-panelet.
   // pending_reboot/pending_shutdown cleares hurtigt på klienten, så frontend
   // skal bruge liveStep som sandhed under selve reboot/shutdown-flowet.
@@ -278,15 +288,21 @@ export default function ClientDetailsActionsSection({
     return `Afventer klient: ${actionName}`;
   })();
 
-  // Skjuler kun infoboksen efter 10 sekunder.
-  // Selve busy-/låse-logikken bevares via anyBusy og isDisabledByState.
   const hasPendingLabel = !!pendingLabel;
-  const pendingBannerKey = `${normalizedPendingAction}|${liveStepNorm}|${
-    clientActionPending ? "pending" : "idle"
-  }|${hasPendingAction ? "has-pca" : "no-pca"}`;
+  const pendingBannerKey = [
+    liveStepNorm,
+    normalizedPendingAction,
+    liveChromeStatus || "",
+    pendingLabel || "",
+  ].join("|");
 
   useEffect(() => {
     if (!hasPendingLabel) {
+      setPendingBannerHidden(false);
+      return undefined;
+    }
+
+    if (!shouldAutoHidePendingBanner) {
       setPendingBannerHidden(false);
       return undefined;
     }
@@ -297,9 +313,10 @@ export default function ClientDetailsActionsSection({
     }, PENDING_BANNER_AUTO_HIDE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [pendingBannerKey, hasPendingLabel]);
+  }, [pendingBannerKey, hasPendingLabel, shouldAutoHidePendingBanner]);
 
-  const visiblePendingLabel = pendingBannerHidden ? null : pendingLabel;
+  const visiblePendingLabel =
+    pendingBannerHidden && shouldAutoHidePendingBanner ? null : pendingLabel;
 
   const row1 = [
     {
