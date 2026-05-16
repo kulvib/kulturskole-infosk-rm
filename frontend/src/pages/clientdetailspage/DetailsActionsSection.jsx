@@ -179,22 +179,26 @@ export default function ClientDetailsActionsSection({
   const normalizedClientState = String(clientState || "").trim().toLowerCase();
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
   const hasPendingAction = !!normalizedPendingAction && normalizedPendingAction !== "none";
+  const isOffline = clientOnline === false;
 
   const liveStepNorm = String(liveStep ?? "").trim().toLowerCase();
 
   // System-level handlinger må låse hele knap-panelet.
   // pending_reboot/pending_shutdown cleares hurtigt på klienten, så frontend
   // skal bruge liveStep som sandhed under selve reboot/shutdown-flowet.
-  const isSystemLocked =
-    SYSTEM_LOCK_STEPS.has(liveStepNorm) ||
+  const stateLooksSystemLocked =
     normalizedClientState.startsWith("reboot") ||
     normalizedClientState.startsWith("shut");
+
+  const isSystemLocked =
+    SYSTEM_LOCK_STEPS.has(liveStepNorm) ||
+    ((clientActionPending || hasPendingAction) && stateLooksSystemLocked);
 
   // Dvale skal ikke låse hele panelet; den skal kun efterlade "Væk fra dvale" aktiv.
   const isSleeping =
     normalizedClientState.startsWith("sleep") || SYSTEM_SLEEP_STEPS.has(liveStepNorm);
 
-  const isLiveStepBusy = BUSY_CHROME_STEPS.has(liveStepNorm) || isSystemLocked;
+  const isLiveStepBusy = !isOffline && (BUSY_CHROME_STEPS.has(liveStepNorm) || isSystemLocked);
 
   const chromeIsRunning = CHROME_RUNNING_STEPS.has(liveStepNorm)
     ? true
@@ -204,11 +208,12 @@ export default function ClientDetailsActionsSection({
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
   const anyBusy =
-    anyLoading ||
-    !!refreshing ||
-    clientActionPending ||
-    hasPendingAction ||
-    isLiveStepBusy;
+    !isOffline &&
+    (anyLoading ||
+      !!refreshing ||
+      clientActionPending ||
+      hasPendingAction ||
+      isLiveStepBusy);
 
   const notify = useCallback(
     (opts) => {
@@ -227,7 +232,7 @@ export default function ClientDetailsActionsSection({
 
   const doAction = useCallback(
     async (action) => {
-      if (clientOnline === false) {
+      if (isOffline) {
         notify({
           message: "Klienten er offline — handling afvist",
           severity: "warning",
@@ -247,12 +252,12 @@ export default function ClientDetailsActionsSection({
         setActionLoading((prev) => ({ ...prev, [action]: false }));
       }
     },
-    [clientOnline, handleClientAction, notify]
+    [isOffline, handleClientAction, notify]
   );
 
   const isDisabledByState = useCallback(
     (key) => {
-      if (clientOnline === false) return true;
+      if (isOffline) return true;
       if (isSystemLocked) return true;
       if (isSleeping) return key !== "wakeup";
       if (key === "wakeup") return true;
@@ -260,10 +265,13 @@ export default function ClientDetailsActionsSection({
       if (key === "stop" && chromeIsRunning === false) return true;
       return false;
     },
-    [clientOnline, isSystemLocked, isSleeping, chromeIsRunning]
+    [isOffline, isSystemLocked, isSleeping, chromeIsRunning]
   );
 
   const pendingLabel = (() => {
+    // Når klienten er offline under reboot/shutdown, skal den blå
+    // “Klient genstarter…”-tekst ikke blive hængende oven på offline-visningen.
+    if (isOffline) return null;
     if (!clientActionPending && !hasPendingAction && !isLiveStepBusy) return null;
     const stepLabel = getStepLabel(liveStep);
     if (stepLabel) {
@@ -337,7 +345,7 @@ export default function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => doAction("reboot"),
       loading: !!actionLoading["reboot"],
-      disabled: clientOnline === false,
+      disabled: isOffline,
       tooltip: "Genstart klient",
     },
     {
@@ -348,7 +356,7 @@ export default function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => setShutdownDialogOpen(true),
       loading: !!actionLoading["shutdown"],
-      disabled: clientOnline === false,
+      disabled: isOffline,
       tooltip: "Sluk klient — kræver fysisk tænding bagefter",
     },
     {
@@ -359,7 +367,7 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: handleOpenTerminal,
       loading: false,
-      disabled: clientOnline === false,
+      disabled: isOffline,
       tooltip: "Åbn terminal",
     },
     {
@@ -370,12 +378,12 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: handleOpenRemoteDesktop,
       loading: false,
-      disabled: clientOnline === false,
+      disabled: isOffline,
       tooltip: "Åbn fjernskrivebord",
     },
   ];
 
-  const cardStyle = clientOnline === false ? { opacity: 0.85 } : {};
+  const cardStyle = isOffline ? { opacity: 0.85 } : {};
 
   return (
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2, ...cardStyle }}>
@@ -411,7 +419,7 @@ export default function ClientDetailsActionsSection({
           </>
         )}
 
-        {clientOnline === false && (
+        {isOffline && (
           <Typography
             variant="body2"
             color="text.secondary"
@@ -421,7 +429,7 @@ export default function ClientDetailsActionsSection({
           </Typography>
         )}
 
-        {isSleeping && clientOnline !== false && (
+        {isSleeping && !isOffline && (
           <Typography
             variant="body2"
             color="primary"
@@ -455,7 +463,7 @@ export default function ClientDetailsActionsSection({
             }}
             color="error"
             variant="contained"
-            disabled={clientOnline === false || anyBusy}
+            disabled={isOffline || anyBusy}
           >
             Ja, sluk klienten
           </Button>
