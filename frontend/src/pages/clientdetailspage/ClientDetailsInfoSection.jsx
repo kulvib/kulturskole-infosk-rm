@@ -118,6 +118,46 @@ function formatUptime(uptimeStr) {
   return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
 }
 
+function formatUbuntuUpdates(client) {
+  const raw = client?.ubuntu_updates_available;
+
+  if (raw === null || raw === undefined || raw === "") {
+    return "ukendt";
+  }
+
+  const count = Number.parseInt(String(raw), 10);
+  if (!Number.isFinite(count) || count < 0) {
+    return "ukendt";
+  }
+
+  if (client?.pending_os_update || client?.state === "updating") {
+    return count > 0
+      ? `Opdatering i gang (${count} pakke(r))`
+      : "Opdatering i gang";
+  }
+
+  if (count === 0) {
+    return "Ingen opdateringer";
+  }
+
+  return `${count} pakke(r) klar`;
+}
+
+function getUbuntuUpdateColor(client) {
+  const raw = client?.ubuntu_updates_available;
+  const count = Number.parseInt(String(raw ?? ""), 10);
+
+  if (client?.pending_os_update || client?.state === "updating") {
+    return "warning.main";
+  }
+
+  if (!Number.isFinite(count) || count < 0) {
+    return "text.secondary";
+  }
+
+  return count > 0 ? "warning.main" : "success.main";
+}
+
 function formatDateTime(dateStr, withSeconds = false) {
   if (!dateStr) return "ukendt";
   let d;
@@ -327,20 +367,41 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile = false }) {
   // useMemo — rows + dyre format-kald genskabes ikke ved hver render
   const rows = React.useMemo(() => [
     { label: "Ubuntu version:", value: client?.ubuntu_version || "ukendt" },
+    {
+      label: "Ubuntu opdateringer:",
+      value: formatUbuntuUpdates(client),
+      color: getUbuntuUpdateColor(client),
+    },
     { label: "Oppetid:",        value: formatUptime(uptime) },
     { label: "Sidst set:",      value: formatDateTime(lastSeen, true) },
     { label: "Tilføjet:",       value: formatDateTime(client?.created_at, true) },
-  ], [client?.ubuntu_version, client?.created_at, uptime, lastSeen]);
+  ], [
+    client?.ubuntu_version,
+    client?.ubuntu_updates_available,
+    client?.pending_os_update,
+    client?.state,
+    client?.created_at,
+    uptime,
+    lastSeen,
+  ]);
 
   return (
     <TableContainer>
       <Table size="small" aria-label="systeminfo">
         <TableBody>
-          {rows.map(({ label, value }) => (
+          {rows.map(({ label, value, color }) => (
             <TableRow key={label} sx={{ height: isMobile ? 22 : 30 }}>
               <TableCell sx={cellStyle}>{label}</TableCell>
               <TableCell sx={valueCellStyle}>
-                <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    lineHeight: isMobile ? "22px" : "30px",
+                    color: color || "inherit",
+                    fontWeight: color ? 600 : 400,
+                  }}
+                >
                   {value}
                 </Box>
               </TableCell>
