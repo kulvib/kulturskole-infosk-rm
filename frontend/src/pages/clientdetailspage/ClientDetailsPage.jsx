@@ -78,6 +78,10 @@ const ACTION_POLL_MAX_MS    = 60_000;
 const ACTION_MIN_LOCK_MS    = 2000;
 const ACTION_NULL_STEP_MS   = 8000;
 
+function readBoolean(value) {
+  return typeof value === "boolean" ? value : null;
+}
+
 // FIX: shutdown_chrome er fjernet — det er terminal, ikke busy.
 // Skal matche BUSY_CHROME_STEPS i DetailsActionsSection.jsx.
 const BUSY_CHROME_STEPS = new Set([
@@ -140,92 +144,6 @@ const DEFAULT_TERMINAL_STEPS = new Set([
   "system_wake",
   "error",
 ]);
-
-const ONLINE_LAST_SEEN_MAX_AGE_MS = 20_000;
-const PREVIOUS_BOOT_STEP_GRACE_MS = 5_000;
-
-function parseTimestampMs(value) {
-  if (!value) return null;
-  if (value instanceof Date) {
-    const ms = value.getTime();
-    return Number.isFinite(ms) ? ms : null;
-  }
-  const ms = Date.parse(String(value));
-  return Number.isFinite(ms) ? ms : null;
-}
-
-function parseUptimeSeconds(value) {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number.parseInt(String(value), 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-}
-
-function isTimestampRecent(value, maxAgeMs = ONLINE_LAST_SEEN_MAX_AGE_MS) {
-  const ms = parseTimestampMs(value);
-  if (ms === null) return false;
-  const age = Date.now() - ms;
-  return age >= 0 && age <= maxAgeMs;
-}
-
-function boolFromUnknown(value) {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value === "string") {
-    const s = value.trim().toLowerCase();
-    if (["true", "1", "yes", "online"].includes(s)) return true;
-    if (["false", "0", "no", "offline"].includes(s)) return false;
-  }
-  return null;
-}
-
-function resolveOnlineFromPayload(payload, fallback = false) {
-  if (!payload) return !!fallback;
-
-  const lastSeenValue =
-    payload.last_seen ??
-    payload.lastSeen ??
-    payload.client?.last_seen ??
-    payload.client?.lastSeen;
-
-  // En frisk heartbeat/last_seen må vinde over en evt. stale isOnline=false
-  // fra den gamle client-prop. Det er netop det der sker efter reboot.
-  if (isTimestampRecent(lastSeenValue)) return true;
-
-  const explicit =
-    boolFromUnknown(payload.isOnline) ??
-    boolFromUnknown(payload.is_online) ??
-    boolFromUnknown(payload.online) ??
-    boolFromUnknown(payload.client_online) ??
-    boolFromUnknown(payload.client?.isOnline) ??
-    boolFromUnknown(payload.client?.is_online);
-
-  if (explicit !== null) return explicit;
-  return !!fallback;
-}
-
-function extractStepName(data) {
-  if (!data) return null;
-  if (typeof data.step === "string") return data.step;
-  return data.step?.step ?? data.chrome_step ?? data.chromeStep ?? null;
-}
-
-function extractStepTimestamp(data) {
-  if (!data) return null;
-  if (typeof data.step === "object" && data.step) {
-    return data.step.timestamp ?? data.step.created_at ?? null;
-  }
-  return data.step_timestamp ?? data.chrome_step_timestamp ?? data.chrome_last_updated ?? null;
-}
-
-function isStepFromPreviousBoot(stepTimestamp, uptimeValue) {
-  const stepMs = parseTimestampMs(stepTimestamp);
-  const uptimeSeconds = parseUptimeSeconds(uptimeValue);
-  if (stepMs === null || uptimeSeconds === null) return false;
-
-  const currentBootMs = Date.now() - uptimeSeconds * 1000;
-  return stepMs < currentBootMs - PREVIOUS_BOOT_STEP_GRACE_MS;
-}
-
 
 export default function ClientDetailsPage({
   client,
@@ -306,19 +224,9 @@ export default function ClientDetailsPage({
   const uptimeBaseRef           = useRef(null);
   const uptimeFetchRef          = useRef(null);
   const [lastSeen, setLastSeen] = useState(client?.last_seen ?? null);
-  const lastSeenRef = useRef(client?.last_seen ?? null);
-  const [liveClientOnline, setLiveClientOnline] = useState(() =>
-    resolveOnlineFromPayload(client, client?.isOnline ?? false)
+  const [liveClientOnline, setLiveClientOnline] = useState(
+    typeof client?.isOnline === "boolean" ? client.isOnline : null
   );
-  const liveClientOnlineRef = useRef(liveClientOnline);
-
-  useEffect(() => {
-    liveClientOnlineRef.current = liveClientOnline;
-  }, [liveClientOnline]);
-
-  useEffect(() => {
-    lastSeenRef.current = lastSeen;
-  }, [lastSeen]);
 
   useEffect(() => {
     if (client?.uptime != null) {
@@ -329,20 +237,12 @@ export default function ClientDetailsPage({
         setUptime(parsed);
       }
     }
-    if (client?.last_seen) {
-      setLastSeen(client.last_seen);
-      lastSeenRef.current = client.last_seen;
-    }
+    if (client?.last_seen)             setLastSeen(client.last_seen);
+    if (typeof client?.isOnline === "boolean") setLiveClientOnline(client.isOnline);
     if (client?.chrome_status != null) setLiveChromeStatus(client.chrome_status);
     if (client?.chrome_color != null)  setLiveChromeColor(client.chrome_color);
-
-    const nextOnline = resolveOnlineFromPayload(
-      client,
-      liveClientOnlineRef.current ?? client?.isOnline ?? false
-    );
-    setLiveClientOnline(nextOnline);
-    liveClientOnlineRef.current = nextOnline;
-  }, [client?.id, client?.isOnline, client?.last_seen, client?.uptime, client?.chrome_status, client?.chrome_color]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client?.id]);
 
   useEffect(() => {
     if (uptimeBaseRef.current == null || uptimeFetchRef.current == null) return;
@@ -369,81 +269,36 @@ export default function ClientDetailsPage({
           const data = await getChromeStatus(client.id, { fallbackToClient: true });
           if (cancelled || !mountedRef.current) break;
 
-          const nextLastSeen =
-            data?.last_seen ??
-            data?.lastSeen ??
-            data?.client?.last_seen ??
-            data?.client?.lastSeen ??
-            null;
+          if (data?.chrome_status != null) setLiveChromeStatus(data.chrome_status);
+          if (data?.chrome_color != null)  setLiveChromeColor(data.chrome_color);
+          if (data?.last_seen != null)     setLastSeen(data.last_seen);
 
-          if (nextLastSeen != null) {
-            setLastSeen(nextLastSeen);
-            lastSeenRef.current = nextLastSeen;
-          }
+          const onlineFromStatus =
+            readBoolean(data?.isOnline) ??
+            readBoolean(data?.is_online) ??
+            readBoolean(data?.online);
+          if (onlineFromStatus !== null) setLiveClientOnline(onlineFromStatus);
 
-          const nextOnline = resolveOnlineFromPayload(
-            { ...data, last_seen: nextLastSeen ?? data?.last_seen },
-            liveClientOnlineRef.current ?? client?.isOnline ?? false
-          );
-          setLiveClientOnline(nextOnline);
-          liveClientOnlineRef.current = nextOnline;
-
+          if (data?.state != null) setLocalClientState(data.state);
           if (data?.pending_chrome_action != null) {
-            setLocalPendingAction(data.pending_chrome_action);
-          }
-          if (data?.state != null) {
-            setLocalClientState(data.state);
+            setLocalPendingAction(data.pending_chrome_action || "none");
           }
 
-          const rawStepName      = extractStepName(data);
-          const rawStepTimestamp = extractStepTimestamp(data);
-          const stepFromPreviousBoot = isStepFromPreviousBoot(rawStepTimestamp, data?.uptime);
-
-          const stepName      = stepFromPreviousBoot ? null : rawStepName;
-          const stepTimestamp = stepFromPreviousBoot ? null : rawStepTimestamp;
-
+          const stepName      = data?.step?.step ?? null;
+          const stepTimestamp = data?.step?.timestamp ?? null;
           setLiveStep(stepName);
           liveStepRef.current          = stepName;
           liveStepTimestampRef.current = stepTimestamp;
-
-          // Når klienten er kommet op efter reboot, kan backend stadig have det
-          // gamle system_rebooting-step i chrome_status. Uptime afslører, at
-          // step'et er fra forrige boot, så vi rydder lokal action-lock/banner.
-          if (stepFromPreviousBoot && nextOnline) {
-            setClientActionPending(false);
-            setLocalPendingAction("none");
-            setLocalClientState((prev) => {
-              const p = String(prev || "").toLowerCase();
-              return p.startsWith("reboot") || p.startsWith("shut") ? "normal" : prev;
-            });
-          }
-
-          if (data?.chrome_status != null) {
-            setLiveChromeStatus(
-              stepFromPreviousBoot && nextOnline ? "Status opdateres…" : data.chrome_status
-            );
-          }
-          if (data?.chrome_color != null) {
-            setLiveChromeColor(
-              stepFromPreviousBoot && nextOnline ? "grey" : data.chrome_color
-            );
-          }
 
           if (data?.uptime != null) {
             const parsed = parseInt(String(data.uptime), 10);
             if (!isNaN(parsed) && parsed >= 0) {
               uptimeBaseRef.current  = parsed;
               uptimeFetchRef.current = Date.now();
-              setUptime(parsed);
             }
           }
         } catch {
-          // Hvis vi ikke kan hente status, må offline-vurderingen falde tilbage
-          // på seneste heartbeat/last_seen i stedet for at blive hængende.
-          if (!isTimestampRecent(lastSeenRef.current)) {
-            setLiveClientOnline(false);
-            liveClientOnlineRef.current = false;
-          }
+          // Ignorer poll-fejl
         }
         await new Promise((res) => setTimeout(res, CHROME_STATUS_POLL_MS));
       }
@@ -576,14 +431,19 @@ export default function ClientDetailsPage({
   // ---------------------------------------------------------------------------
   // Afledte værdier
   // ---------------------------------------------------------------------------
-  const clientOnline  = liveClientOnline;
+  const clientOnline =
+    liveClientOnline !== null && liveClientOnline !== undefined
+      ? liveClientOnline
+      : (client?.isOnline ?? false);
   const displayUptime = uptime != null ? uptime : client?.uptime ?? null;
 
   const effectivePendingAction = clientActionPending
     ? localPendingAction
-    : (localPendingAction ?? client?.pending_chrome_action ?? "none");
+    : (client?.pending_chrome_action ?? "none");
 
-  const effectiveClientState = localClientState || client?.state || "normal";
+  const effectiveClientState = clientActionPending
+    ? localClientState
+    : (client?.state ?? "normal");
 
   return (
     <Container
