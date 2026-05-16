@@ -18,7 +18,6 @@ CHROME_STATUS_PATH = os.getenv("CHROME_STATUS_PATH", "/home/kulturskolenviborg/a
 VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error", "updating"}
 VALID_PENDING_CHROME_ACTION_SOURCES = {"actionbutton", "calendar"}
 
-# Actions der betragtes som "aktive" og blokerer nye handlinger
 BLOCKING_ACTIONS = {"start", "stop", "sleep", "wakeup", "reboot", "shutdown"}
 
 
@@ -167,17 +166,10 @@ def set_chrome_command(
     action = data.get("action")
     source = data.get("source")
 
-    # Hent nuværende pending_chrome_action som string
     current_pca = getattr(client.pending_chrome_action, "value", None) or str(
         client.pending_chrome_action or "none"
     )
 
-    # -----------------------------------------------------------------------
-    # GUARD: Afvis ny handling hvis en blokerende handling allerede er aktiv.
-    # Dette forhindrer at frontend kan trigge start/stop flere gange mens
-    # klienten er i gang med countdown eller Chrome-start/stop.
-    # Livestream-actions blokerer/blokeres ikke af browser-actions.
-    # -----------------------------------------------------------------------
     if (
         action in BLOCKING_ACTIONS
         and current_pca in BLOCKING_ACTIONS
@@ -191,21 +183,18 @@ def set_chrome_command(
             ),
         )
 
-    # Særlig guard: samme action sendes igen (fx dobbelt-klik)
     if action in BLOCKING_ACTIONS and current_pca == action:
         raise HTTPException(
             status_code=409,
             detail=f"Handling '{action}' er allerede igang på klienten",
         )
 
-    # Livestream-specifik guard (bevaret fra original)
     if (
         action == "livestream_start"
         and current_pca == "livestream_start"
     ):
         raise HTTPException(status_code=400, detail="Livestream already requested")
 
-    # Valider action mod ChromeAction enum
     try:
         chrome_action = ChromeAction(action)
     except ValueError:
@@ -251,11 +240,6 @@ async def trigger_os_update(
     session=Depends(get_session),
     user=Depends(get_current_admin_user),
 ):
-    """
-    Sætter pending_chrome_action = 'os_update' og pending_os_update = True
-    så klienten ved næste poll starter Ubuntu-opdateringsprocessen.
-    Kun tilgængelig for admin/superadmin.
-    """
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -280,7 +264,6 @@ async def trigger_os_update(
 
 @router.get("/clients/{id}/ubuntu-updates")
 def get_ubuntu_updates(id: int, session=Depends(get_session), user=Depends(get_current_user)):
-    """Returnerer antal tilgængelige Ubuntu-opdateringer for klienten."""
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
