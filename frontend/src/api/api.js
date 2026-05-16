@@ -160,6 +160,8 @@ export async function getChromeStatus(id, { fallbackToClient = false } = {}) {
 
   const json = await res.json();
 
+  // FIX: Supplér last_seen + uptime fra getClient hvis chrome-status
+  // endpointet ikke returnerer dem (ikke alle backends gør det).
   if (fallbackToClient && (json?.last_seen == null || json?.uptime == null)) {
     try {
       const full = await getClient(id);
@@ -222,6 +224,20 @@ export async function pushKioskUrl(id, url) {
   return res.json();
 }
 
+/**
+ * Udfør en handling på en klient.
+ *
+ * Gyldige actions:
+ *   "start"            → pending_chrome_action: "start"
+ *   "stop"             → pending_chrome_action: "stop"
+ *   "restart"          → pending_reboot: true  (genstart maskine)
+ *   "reboot"           → pending_reboot: true
+ *   "shutdown"         → pending_shutdown: true
+ *   "sleep"            → pending_chrome_action: "sleep"
+ *   "wakeup"           → pending_chrome_action: "wakeup"
+ *   "livestream_start" → pending_chrome_action: "livestream_start"
+ *   "livestream_stop"  → pending_chrome_action: "livestream_stop"
+ */
 export async function clientAction(id, action) {
   let payload;
 
@@ -297,6 +313,8 @@ export async function setClientState(id, state) {
 }
 
 export function openTerminal(id) {
+  // Gammel placeholder bevares for bagudkompatibilitet.
+  // Den rigtige terminal åbnes nu via ClientTerminalDialog + WebSocket.
   return getTerminalBrowserWsUrl(id);
 }
 
@@ -364,6 +382,18 @@ export async function saveMarkedDays(payload) {
   return res.json();
 }
 
+/**
+ * Hent markerede dage for en klient i en sæson.
+ *
+ * FIX: Parametrene er (season, client_id) — IKKE (client_id, season).
+ * ClientDetailsPageWrapper kaldte tidligere getMarkedDays(id, season)
+ * hvilket gav tomme resultater. Korrekt kald: getMarkedDays(season, id).
+ *
+ * @param {string|number} season      - Sæson ID
+ * @param {string|number} client_id   - Klient ID
+ * @param {string}        [startDate] - YYYY-MM-DD
+ * @param {string}        [endDate]   - YYYY-MM-DD
+ */
 export async function getMarkedDays(season, client_id, startDate, endDate) {
   const params = new URLSearchParams({
     season: String(season),
@@ -558,7 +588,7 @@ export async function deleteUser(id) {
 // ---------------------------------------------------------------------------
 
 export async function requestOsUpdate(clientId) {
-  const res = await fetch(`${apiUrl}/api/clients/${clientId}/os-update`, {
+  const res = await fetch(`${apiUrl}/api/clients/${clientId}/request-os-update`, {
     method: "POST",
     headers: authHeaders(),
     credentials: "include",
