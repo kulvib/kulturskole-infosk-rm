@@ -39,6 +39,8 @@ import { useAuth } from "../../auth/authcontext";
     busy-step — banneret følger headeren 1:1.
   - Ingen intern polling overhovedet.
 
+  Faktiske step-navne fra chrome_kiosk.py / kiosk_sleep.py / kiosk_wake.py:
+
   BUSY_CHROME_STEPS (låser knapper + viser banner):
     clear_cookies            — rydder cookies (start/stop/sleep)
     terminate_chrome         — SIGTERM til Chrome
@@ -55,6 +57,7 @@ import { useAuth } from "../../auth/authcontext";
   terminere polling for reboot/shutdown-actions korrekt.
 */
 
+// Skal matche BUSY_CHROME_STEPS i ClientDetailsPage.jsx
 const BUSY_CHROME_STEPS = new Set([
   "clear_cookies",
   "terminate_chrome",
@@ -66,6 +69,7 @@ const BUSY_CHROME_STEPS = new Set([
   "system_shutting_down",
 ]);
 
+// Oversæt faktiske chrome step-navne til læsbar dansk tekst
 function getStepLabel(step, liveChromeStatus) {
   if (!step) return null;
   const s = String(step).toLowerCase();
@@ -77,12 +81,14 @@ function getStepLabel(step, liveChromeStatus) {
   if (s === "system_reboot_countdown")         return "Genstarter om lidt…";
   if (s === "system_rebooting")                return "Genstarter maskinen…";
   if (s === "system_shutting_down")            return "Lukker maskinen ned…";
+  // Terminale steps — vises kort i banneret inden det forsvinder
   if (s === "start_chrome")                    return "Browser startet";
   if (s === "chrome_closed_programmatically")  return "Browser lukket";
   if (s === "chrome_closed_manual")            return "Browser lukket manuelt";
   if (s === "system_sleep")                    return "Klient i dvale";
   if (s === "system_wake")                     return "Klient vækket";
   if (s === "error")                           return "Der opstod en fejl";
+  // Fallback: brug liveChromeStatus tekst hvis tilgængelig
   if (liveChromeStatus)                        return liveChromeStatus;
   return null;
 }
@@ -173,10 +179,13 @@ export default function ClientDetailsActionsSection({
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
   const hasPendingAction        = !!normalizedPendingAction && normalizedPendingAction !== "none";
 
+  // Låser knapper + viser banner hvis liveStep er et aktivt busy-step.
   const isLiveStepBusy = BUSY_CHROME_STEPS.has(String(liveStep ?? "").toLowerCase());
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
 
+  // Lås alle knapper hvis: loading, refreshing, handling afventer klient,
+  // pending action i backend, ELLER liveStep er et busy-step
   const anyBusy = anyLoading || !!refreshing || clientActionPending || hasPendingAction || isLiveStepBusy;
 
   // ---------------------------------------------------------------------------
@@ -198,7 +207,7 @@ export default function ClientDetailsActionsSection({
   );
 
   // ---------------------------------------------------------------------------
-  // Kør handling
+  // Kør handling — ingen intern polling (ClientDetailsPage håndterer det)
   // ---------------------------------------------------------------------------
   const doAction = useCallback(
     async (action) => {
@@ -209,6 +218,7 @@ export default function ClientDetailsActionsSection({
         });
         return;
       }
+
       setActionLoading((prev) => ({ ...prev, [action]: true }));
       try {
         await handleClientAction(action);
@@ -238,11 +248,16 @@ export default function ClientDetailsActionsSection({
 
   // ---------------------------------------------------------------------------
   // Pending-banner tekst
+  // Vises så længe clientActionPending, hasPendingAction ELLER isLiveStepBusy.
   // ---------------------------------------------------------------------------
   const pendingLabel = (() => {
     if (!clientActionPending && !hasPendingAction && !isLiveStepBusy) return null;
+
+    // Brug chrome step label (samme datakilde som header)
     const stepLabel = getStepLabel(liveStep, liveChromeStatus);
     if (stepLabel) return stepLabel;
+
+    // Fallback: vis pending action navn
     const actionName = normalizedPendingAction !== "none"
       ? normalizedPendingAction
       : "handling";
@@ -355,7 +370,7 @@ export default function ClientDetailsActionsSection({
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2, ...cardStyle }}>
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
 
-        {/* Pending / waiting indicator */}
+        {/* Pending / waiting indicator — følger headeren 1:1 */}
         {pendingLabel && (
           <Alert
             severity="info"
