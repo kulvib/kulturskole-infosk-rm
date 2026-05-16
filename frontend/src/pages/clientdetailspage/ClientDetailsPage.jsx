@@ -26,16 +26,17 @@ import {
     opdaterer kun localPendingAction + localClientState, IKKE hele client-objektet.
   - Lock holdes indtil BÅDE:
       1) pending_chrome_action === "none"
-      2) chrome step er ikke i BUSY_CHROME_STEPS (countdown, clear_cookies osv.)
+      2) chrome step er ikke i BUSY_CHROME_STEPS
   - Korrekt unlock-rækkefølge: silentRefresh() FØRST → unlock bagefter.
   - handleRefresh (full re-render) bruges KUN ved manuel klik på "Opdater".
+  - cancelActionPoll eksponeres via prop-callback så Wrapper kan stoppe
+    action-polling ved manuel refresh.
 */
 
 const CHROME_STATUS_POLL_MS = 1000;
 const ACTION_POLL_MS        = 1500;
 const ACTION_POLL_MAX_MS    = 60_000;
 
-// Trin der indikerer at klienten stadig er i gang — lås skal holdes
 const BUSY_CHROME_STEPS = new Set([
   "countdown",
   "clear_cookies",
@@ -47,6 +48,7 @@ export default function ClientDetailsPage({
   refreshing,
   handleRefresh,
   silentRefresh,
+  onCancelActionPollRef,  // Ref fra Wrapper — sættes til cancelActionPoll fn
   markedDays,
   calendarLoading,
   streamKey,
@@ -87,7 +89,6 @@ export default function ClientDetailsPage({
 
   // ---------------------------------------------------------------------------
   // Live chrome-status — opdateres hvert 1s uden full re-render
-  // liveStep sendes til DetailsActionsSection så den kan vise aktuel status
   // ---------------------------------------------------------------------------
   const [liveChromeStatus, setLiveChromeStatus] = useState(
     client?.chrome_status ?? null
@@ -96,13 +97,10 @@ export default function ClientDetailsPage({
     client?.chrome_color ?? null
   );
   const [liveStep, setLiveStep] = useState(null);
-
-  // Ref så pollForConfirmation kan læse seneste step uden at være i deps
-  const liveStepRef = useRef(null);
+  const liveStepRef             = useRef(null);
 
   // ---------------------------------------------------------------------------
   // Lokal pending_chrome_action + state
-  // Polles direkte under action-flow — undgår full parent re-render
   // ---------------------------------------------------------------------------
   const [localPendingAction, setLocalPendingAction] = useState(
     client?.pending_chrome_action ?? "none"
@@ -152,8 +150,6 @@ export default function ClientDetailsPage({
 
   // ---------------------------------------------------------------------------
   // Chrome-status polling — hvert 1s
-  // Opdaterer liveChromeStatus, liveChromeColor, liveStep, lastSeen, uptime
-  // liveStep holdes også i liveStepRef så pollForConfirmation kan læse den
   // ---------------------------------------------------------------------------
   const mountedRef = useRef(true);
 
@@ -172,7 +168,6 @@ export default function ClientDetailsPage({
           if (data?.chrome_color != null)  setLiveChromeColor(data.chrome_color);
           if (data?.last_seen != null)     setLastSeen(data.last_seen);
 
-          // Opdater liveStep + ref
           const stepName = data?.step?.step ?? null;
           setLiveStep(stepName);
           liveStepRef.current = stepName;
@@ -205,17 +200,24 @@ export default function ClientDetailsPage({
 
   // ---------------------------------------------------------------------------
   // Action-pending polling
-  //
-  // Lock holdes indtil BEGGE betingelser er opfyldt:
-  //   1) pending_chrome_action === "none"
-  //   2) chrome step er IKKE i BUSY_CHROME_STEPS
-  //
-  // Korrekt unlock-rækkefølge:
-  //   silentRefresh() FØRST → setClientActionPending(false) BAGEFTER
-  //   → knapper låses ikke op før parent state er opdateret
   // ---------------------------------------------------------------------------
   const [clientActionPending, setClientActionPending] = useState(false);
   const actionPollStopRef = useRef(false);
+
+  // cancelActionPoll — eksponeres til Wrapper via onCancelActionPollRef
+  // Bruges når brugeren klikker "Opdater" manuelt mens en action kører
+  const cancelActionPoll = useCallback(() => {
+    actionPollStopRef.current = true;
+    setClientActionPending(false);
+    setLocalPendingAction("none");
+  }, []);
+
+  // Registrer cancelActionPoll i Wrapper-ref så Wrapper kan kalde den
+  useEffect(() => {
+    if (onCancelActionPollRef) {
+      onCancelActionPollRef.current = cancelActionPoll;
+    }
+  }, [onCancelActionPollRef, cancelActionPoll]);
 
   const startActionConfirmationPolling = useCallback(() => {
     actionPollStopRef.current = false;
@@ -246,19 +248,17 @@ export default function ClientDetailsPage({
         if (!pcaClear) continue;
 
         // Tjek 2: chrome step må ikke være i BUSY_CHROME_STEPS
-        // Bruger liveStepRef (opdateres af chrome-status poll hvert 1s)
         const currentStep = String(liveStepRef.current ?? "").toLowerCase();
-        const stepBusy = BUSY_CHROME_STEPS.has(currentStep);
+        if (BUSY_CHROME_STEPS.has(currentStep)) continue;
 
-        if (stepBusy) continue;
-
-        // Begge betingelser opfyldt — afslut polling
+        // Begge betingelser opfyldt
         break;
+
+        if (Date.now() - startTime > ACTION_POLL_MAX_MS) break;
       }
 
-      if (mountedRef.current) {
-        // VIGTIGT: refresh FØRST så parent state er opdateret
-        // DEREFTER unlock — knapper åbner ikke før data er friske
+      if (mountedRef.current && !actionPollStopRef.current) {
+        // VIGTIGT: refresh FØRST → unlock BAGEFTER
         try {
           const refresh = silentRefresh ?? handleRefresh;
           await refresh();
@@ -279,9 +279,7 @@ export default function ClientDetailsPage({
     async (action) => {
       if (!client?.id) return;
       await clientAction(client.id, action);
-      // Optimistisk: sæt pending action lokalt med det samme
       setLocalPendingAction(action);
-      // Start polling for bekræftelse
       startActionConfirmationPolling();
     },
     [client?.id, startActionConfirmationPolling]
@@ -374,14 +372,4 @@ export default function ClientDetailsPage({
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{ width: "100%" }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Container>
-  );
-}
+          onClose={*
