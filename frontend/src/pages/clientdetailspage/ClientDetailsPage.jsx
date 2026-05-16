@@ -24,31 +24,35 @@ import {
     uden full re-render. Step sendes til DetailsActionsSection som liveStep.
   - pending_chrome_action polles via getClient direkte under action-flow →
     opdaterer kun localPendingAction + localClientState, IKKE hele client-objektet.
-  - Lock holdes indtil ALLE betingelser er opfyldt:
-      1) pending_chrome_action === "none"
-      2) chrome step er ikke i BUSY_CHROME_STEPS
-      3) Mindst ACTION_MIN_LOCK_MS er gået siden action-start
-         (klienten rydder PCA øjeblikkeligt — vi venter på første chrome-step)
+  - Lock holdes indtil betingelser er opfyldt — tre tidszoner:
+      0–2s:  Altid låst (minimum — klienten når ikke at reagere endnu)
+      2–8s:  Låst hvis step er null ELLER et busy-step
+             (null = vi ved endnu ikke hvad klienten laver)
+      8s+:   Kun låst hvis step er eksplicit busy
+             (null efter 8s = PCA clear + ingen aktiv proces → unlock)
+  - Kendte busy-steps blokerer uden tidsbegrænsning — de er eksplicitte
+    signaler fra klienten om at processen stadig kører.
   - Korrekt unlock-rækkefølge: silentRefresh() FØRST → unlock bagefter.
   - handleRefresh (full re-render) bruges KUN ved manuel klik på "Opdater".
   - cancelActionPoll eksponeres via prop-callback så Wrapper kan stoppe
     action-polling ved manuel refresh.
 */
 
-const CHROME_STATUS_POLL_MS = 1000;
-const ACTION_POLL_MS        = 1500;
-const ACTION_POLL_MAX_MS    = 60_000;
-const ACTION_MIN_LOCK_MS    = 5000; // FIX: klienten rydder PCA straks — vent mindst 5s på første chrome-step
+const CHROME_STATUS_POLL_MS  = 1000;
+const ACTION_POLL_MS         = 1500;
+const ACTION_POLL_MAX_MS     = 60_000;
+const ACTION_MIN_LOCK_MS     = 2000; // 0–2s: altid låst
+const ACTION_NULL_STEP_MS    = 8000; // 2–8s: null-step = låst; 8s+: null-step = unlock
 
-// FIX: Udvidet med alle transiente steps som klientkoden skriver
+// Busy-steps blokerer uden tidsbegrænsning — eksplicitte signaler fra klienten
 const BUSY_CHROME_STEPS = new Set([
   "countdown",
   "clear_cookies",
   "system_reboot_countdown",
-  "chrome_starting",   // FIX: skrives under scenario_system_start
-  "chrome_stopping",   // FIX: skrives under scenario_manual_shutdown
-  "system_sleep",      // FIX: skrives under sleep-flow
-  "system_wake",       // FIX: skrives under wake-flow
+  "chrome_starting",
+  "chrome_stopping",
+  "system_sleep",
+  "system_wake",
 ]);
 
 export default function ClientDetailsPage({
@@ -254,15 +258,21 @@ export default function ClientDetailsPage({
 
         if (!pcaClear) continue;
 
-        // FIX: Håndhæv minimumsventetid — klienten rydder PCA øjeblikkeligt
-        // ved modtagelse, men handlingen er endnu ikke startet.
-        // Vent mindst ACTION_MIN_LOCK_MS så klienten når at sende første chrome-step.
-        if (Date.now() - startTime < ACTION_MIN_LOCK_MS) continue;
+        const elapsed = Date.now() - startTime;
 
-        // FIX: null/tom step = vi ved ikke hvad klienten laver → fortsæt polling
-        // Tidligere brød dette straks ud og låste knapper op for tidligt.
+        // Zone 1 — 0–2s: altid låst
+        // Klienten når ikke at reagere på PCA inden for 2s
+        if (elapsed < ACTION_MIN_LOCK_MS) continue;
+
         const currentStep = String(liveStepRef.current ?? "").toLowerCase();
-        if (!currentStep || BUSY_CHROME_STEPS.has(currentStep)) continue;
+
+        // Busy-step blokerer altid — uanset tid
+        // Det er et eksplicit signal fra klienten om at processen kører
+        if (BUSY_CHROME_STEPS.has(currentStep)) continue;
+
+        // Zone 2 — 2–8s: null/tom step = vi ved ikke hvad klienten laver → vent
+        // Zone 3 — 8s+:  null/tom step = ingen aktiv proces → unlock
+        if (!currentStep && elapsed < ACTION_NULL_STEP_MS) continue;
 
         // Alle betingelser opfyldt — afslut polling
         break;
