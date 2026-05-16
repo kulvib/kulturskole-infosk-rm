@@ -7,11 +7,12 @@ import { getClient, getMarkedDays, getCurrentSeason } from "../../api";
 /*
   ClientDetailsPageWrapper.jsx
 
+  FIX (kritisk): Hvis id mangler/er undefined sættes loading = false
+    og en fejlbesked vises — i stedet for at returnere stille og lade
+    loading-spinneren køre for evigt.
+
   FIX (kritisk): getMarkedDays blev kaldt som getMarkedDays(id, season)
     men api.js signaturen er getMarkedDays(season, client_id, ...).
-    Dette betød at marked days aldrig blev hentet korrekt og
-    GET /api/clients/{id} så ud til at mangle i Network-fanen
-    fordi fetchMarkedDays kastede en stille fejl der blokerede flowet.
     Rettet til: getMarkedDays(season, id).
 
   FIX: isOnline bevares direkte fra server-svar — ingen lokal override.
@@ -51,7 +52,15 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
 
   // Hent klient
   const fetchClient = useCallback(async (isRefresh = false) => {
-    if (!id) return;
+    // FIX: Sæt loading = false og vis fejl hvis id mangler,
+    // i stedet for at returnere stille og lade spinneren køre for evigt.
+    if (!id) {
+      setLoading(false);
+      setRefreshing(false);
+      setError("Ugyldigt klient-ID — kontrollér URL'en.");
+      return;
+    }
+
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     setError(null);
