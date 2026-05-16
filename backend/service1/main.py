@@ -61,6 +61,22 @@ def migrate_legacy_user_roles():
             print("Rollemigration: ingen forældede roller fundet")
 
 
+def migrate_add_chrome_step():
+    """
+    Tilføj chrome_step kolonne til client-tabellen hvis den ikke allerede eksisterer.
+    chrome_step gemmer det seneste step-navn fra klienten (fx "countdown", "start_chrome")
+    så frontend kan bruge det til lock-logik uden at læse klientens lokale fil.
+    """
+    with Session(engine) as session:
+        try:
+            session.exec(text("ALTER TABLE client ADD COLUMN chrome_step VARCHAR"))
+            session.commit()
+            print("Migration: chrome_step kolonne tilføjet til client-tabel")
+        except Exception:
+            # Kolonnen eksisterer allerede — det er forventet ved genstart
+            pass
+
+
 def ensure_admin_user():
     with Session(engine) as session:
         admin_user_exists = session.exec(
@@ -93,6 +109,7 @@ def ensure_admin_user():
 async def lifespan(app: FastAPI):
     create_db_and_tables()
     migrate_legacy_user_roles()
+    migrate_add_chrome_step()
     ensure_admin_user()
     yield
 
@@ -115,20 +132,12 @@ app.add_middleware(
 )
 
 
-# ---------------------------------------------------------------------------
-# HLS CORS middleware
-# FIX: OPTIONS preflight håndteres SEPARAT og returnerer 204 med det samme.
-# Tidligere gik OPTIONS videre til StaticFiles → 405 → CORS headers
-# aldrig sat korrekt → Chrome/Firefox blokerede alle segment-requests.
-# Safari bruger native HLS og sender aldrig OPTIONS → virkede altid.
-# ---------------------------------------------------------------------------
 class HLSCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         if request.url.path.startswith("/hls/"):
             origin = request.headers.get("origin", "")
             allowed_origin = origin if origin in ALLOWED_ORIGINS else (ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else "*")
 
-            # FIX: Returner preflight-svar INDEN StaticFiles ser requesten
             if request.method == "OPTIONS":
                 return Response(
                     status_code=204,
@@ -177,7 +186,6 @@ class CustomStaticFiles(StaticFiles):
 app.mount("/hls", CustomStaticFiles(directory=HLS_DIR), name="hls")
 print(f"### main.py: Static mount for HLS på {HLS_DIR} ###")
 
-# Routers
 app.include_router(clients.router,    prefix="/api")
 app.include_router(schools.router,    prefix="/api")
 app.include_router(auth_router,       prefix="/auth")
