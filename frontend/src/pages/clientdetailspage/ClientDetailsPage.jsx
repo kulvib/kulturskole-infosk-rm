@@ -442,7 +442,6 @@ export default function ClientDetailsPage({
           liveChromeColor={liveChromeColor}
           refreshing={refreshing}
           handleRefresh={handleRefresh}
-          showSnackbar={showSnackbar}
           clientOnline={clientOnline}
         />
 
@@ -475,7 +474,6 @@ export default function ClientDetailsPage({
           handleOpenTerminal={handleOpenTerminal}
           handleOpenRemoteDesktop={handleOpenRemoteDesktop}
           refreshing={refreshing}
-          showSnackbar={showSnackbar}
           clientOnline={clientOnline}
           clientActionPending={clientActionPending}
           liveStep={liveStep}
