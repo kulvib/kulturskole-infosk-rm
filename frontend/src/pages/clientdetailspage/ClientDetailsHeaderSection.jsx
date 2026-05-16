@@ -350,7 +350,6 @@ function ClientDetailsHeaderSection({
   handleRefresh,
   kioskBrowserData = {},
   showSnackbar,
-  // FIX: clientOnline modtages nu korrekt fra parent (ClientDetailsPage sender den)
   clientOnline,
 }) {
   const navigate = useNavigate();
@@ -396,6 +395,12 @@ function ClientDetailsHeaderSection({
   const isOffline = clientOnline !== undefined
     ? clientOnline === false
     : client?.isOnline === false;
+
+  // FIX 4: Beregn isOnline konsistent fra samme kilde som isOffline,
+  // så OnlineStatusBadge og felternes disabled-tilstand altid er synkroniserede.
+  const resolvedIsOnline = clientOnline !== undefined
+    ? clientOnline === true
+    : client?.isOnline === true;
 
   // FIX: useMemo på disabled-style — genskabes ikke ved hver render
   const rightPaperDisabledStyle = React.useMemo(
@@ -617,8 +622,10 @@ function ClientDetailsHeaderSection({
                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 16 : 18 }}>
                   Klient info
                 </Typography>
+                {/* FIX 4: Bruger resolvedIsOnline så badge altid er synkroniseret
+                    med isOffline-variablen og felternes disabled-tilstand */}
                 <Box sx={{ ml: 1 }}>
-                  <OnlineStatusBadge isOnline={client?.isOnline} isMobile={isMobile} />
+                  <OnlineStatusBadge isOnline={resolvedIsOnline} isMobile={isMobile} />
                 </Box>
               </Box>
 
@@ -729,8 +736,6 @@ function ClientDetailsHeaderSection({
                               size="small"
                               value={selectedSchool ?? ""}
                               onChange={handleSchoolSelectChange}
-                              // FIX: disabled KUN mens der gemmes — ikke mens skoler loader
-                              // FIX: disablePortal fjernet — undgår z-index klipning i Card
                               disabled={savingSchool}
                               fullWidth
                               inputProps={{ "aria-label": "Skole" }}
@@ -764,7 +769,6 @@ function ClientDetailsHeaderSection({
                               }}
                             >
                               <MenuItem value=""><em>Ingen skole</em></MenuItem>
-                              {/* FIX: Loading/fejl vises som inaktive items i stedet for at disable dropdown */}
                               {loadingSchools && (
                                 <MenuItem value="" disabled>
                                   <CircularProgress size={12} sx={{ mr: 1 }} /> Henter skoler…
@@ -780,7 +784,6 @@ function ClientDetailsHeaderSection({
                               ))}
                             </TextField>
 
-                            {/* FIX: selectedSchoolName beregnes én gang og genbruges */}
                             <CopyIconButton
                               value={selectedSchoolName}
                               disabled={!selectedSchoolName}
