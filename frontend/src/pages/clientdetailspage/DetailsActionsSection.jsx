@@ -7,14 +7,13 @@ import {
   Button,
   CircularProgress,
   Tooltip,
-  Grid,
-  Divider,
   useMediaQuery,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogContentText,
   DialogActions,
+  Divider,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -30,33 +29,20 @@ import { useAuth } from "../../auth/authcontext";
 /*
   DetailsActionsSection.jsx
 
-  Gruppering:
-    1. Browser      — Start browser, Stop browser
-    2. Dvale        — Sæt i dvale, Væk klient
-    3. Maskine      — Genstart maskine, Sluk maskine       (kun admin)
-    4. Værktøjer    — Terminal, Fjernskrivebord            (kun admin)
+  Layout: To rækker med gruppeoverskrifter
+    Række 1 — Browser:  Start browser | Stop browser | Genstart browser
+    Række 1 — Dvale:    Sæt i dvale   | Væk klient
+    Række 2 — Maskine:  Genstart maskine | Sluk maskine        (kun admin)
+    Række 2 — Værktøjer: Terminal | Fjernskrivebord            (kun admin)
 
-  "Genstart browser" er fjernet.
-
-  Disabled-logik (tre lag):
-    Lag 1 — anyLoading / refreshing (frontend-guard)
-    Lag 2 — client.state / pending_chrome_action / pending_reboot / pending_shutdown
-    Lag 3 — clientOnline
-
-  Gyldige state-værdier fra backend:
-    normal | sleeping | wakeup | shutdown | error | updating
-
-  Gyldige pending_chrome_action-værdier fra backend:
-    start | stop | sleep | wakeup | shutdown | none |
-    livestream_start | livestream_stop | os_update | restart
+  FIX: Alle knapper er disabled når pendingChromeAction IKKE er "none"/"null"
+  — forhindrer at flere processer køres parallelt på klienten.
 */
 
-// ---------------------------------------------------------------------------
-// Konstanter
-// ---------------------------------------------------------------------------
 const ACTION_LABELS = {
   start:    "Start browser",
   stop:     "Stop browser",
+  restart:  "Genstart browser",
   sleep:    "Sæt i dvale",
   wakeup:   "Væk klient",
   reboot:   "Genstart maskine",
@@ -66,6 +52,7 @@ const ACTION_LABELS = {
 const ACTION_ICONS = {
   start:    <OpenInBrowserIcon fontSize="small" />,
   stop:     <CloseIcon fontSize="small" />,
+  restart:  <RestartAltIcon fontSize="small" />,
   sleep:    <HotelIcon fontSize="small" />,
   wakeup:   <WbSunnyIcon fontSize="small" />,
   reboot:   <RestartAltIcon fontSize="small" />,
@@ -75,6 +62,7 @@ const ACTION_ICONS = {
 const ACTION_COLORS = {
   start:    "success",
   stop:     "error",
+  restart:  "secondary",
   sleep:    "primary",
   wakeup:   "warning",
   reboot:   "warning",
@@ -87,61 +75,48 @@ const CONFIRM_ACTIONS    = new Set(["shutdown", "reboot"]);
 const CONFIRM_TEXTS = {
   shutdown: {
     title: "Bekræft nedlukning",
-    body:  "Er du sikker på at du vil slukke maskinen? Den skal tændes fysisk igen efterfølgende.",
+    body: "Er du sikker på at du vil slukke maskinen? Den skal tændes fysisk igen efterfølgende.",
   },
   reboot: {
     title: "Bekræft genstart",
-    body:  "Er du sikker på at du vil genstarte maskinen?",
+    body: "Er du sikker på at du vil genstarte maskinen?",
   },
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function normalizePca(pca) {
-  if (!pca) return "none";
-  return String(pca).toLowerCase().trim();
+// Er der en aktiv pending action på klienten (sendt fra backend)?
+function hasPendingAction(pendingChromeAction) {
+  if (!pendingChromeAction) return false;
+  const pca = String(pendingChromeAction).toLowerCase().trim();
+  return pca !== "" && pca !== "none";
 }
 
-function normalizeState(state) {
-  if (!state) return "normal";
-  return String(state).toLowerCase().trim();
-}
-
-// ---------------------------------------------------------------------------
-// ActionButton
-// ---------------------------------------------------------------------------
-function ActionButton({ action, onClick, loading, disabled, disabledReason, isMobile, isAdmin }) {
+function ActionButton({ action, onClick, loading, disabled, isMobile, isAdmin, variant = "outlined" }) {
   if (ADMIN_ONLY_ACTIONS.has(action) && !isAdmin) return null;
 
-  const label  = ACTION_LABELS[action] ?? action;
-  const icon   = ACTION_ICONS[action]  ?? null;
-  const color  = ACTION_COLORS[action] ?? "primary";
-  const tip    = loading ? label : (disabled && disabledReason) ? disabledReason : label;
+  const label = ACTION_LABELS[action] ?? action;
+  const icon  = ACTION_ICONS[action]  ?? null;
+  const color = ACTION_COLORS[action] ?? "primary";
 
   return (
-    <Tooltip title={tip} arrow>
-      <span style={{ width: "100%" }}>
+    <Tooltip title={disabled && !loading ? "Ikke tilgængelig" : label} arrow>
+      <span>
         <Button
-          variant="outlined"
+          variant={variant}
           color={color}
           size={isMobile ? "small" : "medium"}
-          startIcon={
-            loading
-              ? <CircularProgress size={isMobile ? 13 : 16} color="inherit" />
-              : icon
-          }
+          startIcon={loading
+            ? <CircularProgress size={isMobile ? 13 : 16} color="inherit" />
+            : icon}
           onClick={onClick}
           disabled={disabled || loading}
-          fullWidth
           sx={{
             textTransform: "none",
             fontWeight: 500,
-            fontSize: isMobile ? "0.82rem" : "0.9rem",
-            justifyContent: "flex-start",
+            fontSize: isMobile ? "0.80rem" : "0.88rem",
             px: isMobile ? 1 : 1.5,
-            py: isMobile ? 0.5 : 0.75,
-            minHeight: isMobile ? 34 : 40,
+            py: isMobile ? 0.4 : 0.65,
+            minHeight: isMobile ? 32 : 38,
+            whiteSpace: "nowrap",
           }}
         >
           {loading ? "Arbejder..." : label}
@@ -151,18 +126,15 @@ function ActionButton({ action, onClick, loading, disabled, disabledReason, isMo
   );
 }
 
-// ---------------------------------------------------------------------------
-// Gruppe-header
-// ---------------------------------------------------------------------------
 function GroupLabel({ label, isMobile }) {
   return (
     <Typography
       variant="caption"
       sx={{
-        fontWeight: 600,
+        fontWeight: 700,
         color: "text.secondary",
         textTransform: "uppercase",
-        letterSpacing: "0.08em",
+        letterSpacing: "0.06em",
         fontSize: isMobile ? 10 : 11,
         mb: 0.5,
         display: "block",
@@ -173,15 +145,10 @@ function GroupLabel({ label, isMobile }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Hoved-komponent
-// ---------------------------------------------------------------------------
 export default function ClientDetailsActionsSection({
   clientId,
   clientState,
   pendingChromeAction,
-  pendingReboot,
-  pendingShutdown,
   handleClientAction,
   handleOpenTerminal,
   handleOpenRemoteDesktop,
@@ -195,91 +162,40 @@ export default function ClientDetailsActionsSection({
 
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
-  const [actionLoading, setActionLoading] = useState({});
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, action: null });
+  const [actionLoading, setActionLoading]   = useState({});
+  const [confirmDialog, setConfirmDialog]   = useState({ open: false, action: null });
 
-  // Normaliserede state-værdier
-  const state      = normalizeState(clientState);
-  const pca        = normalizePca(pendingChromeAction);
-  const isSleeping = state.startsWith("sleep");
-  const isUpdating = state === "updating";
-  const isOffline  = clientOnline === false;
-  const anyLoading = Object.values(actionLoading).some(Boolean);
+  const isSleeping = typeof clientState === "string" &&
+    clientState.toLowerCase().startsWith("sleep");
+
+  const isOffline = clientOnline === false;
+
+  // FIX: Alle knapper disabled mens én lokal handling kører
+  const anyLocalLoading = Object.values(actionLoading).some(Boolean);
+
+  // FIX: Alle knapper disabled når klienten allerede har en igangværende pending action
+  const clientBusy = hasPendingAction(pendingChromeAction);
+
+  // Samlet blokering: lokalt loading, refresh, eller klient er optaget
+  const globalBlocked = anyLocalLoading || refreshing || clientBusy;
 
   const safeShowSnackbar = useCallback((opts) => {
-    if (typeof showSnackbar === "function") {
-      showSnackbar(opts);
-    } else {
-      console.warn("[snackbar]", opts?.message);
-    }
+    if (typeof showSnackbar === "function") showSnackbar(opts);
+    else console.warn("[snackbar]", opts?.message);
   }, [showSnackbar]);
 
-  // ---------------------------------------------------------------------------
-  // Disabled-logik pr. knap (lag 1 + 2 + 3)
-  // ---------------------------------------------------------------------------
-  const getDisabledInfo = useCallback((action) => {
-    // Lag 1: global guards
-    if (anyLoading)  return { disabled: true, reason: "En handling er allerede i gang" };
-    if (refreshing)  return { disabled: true, reason: "Opdaterer..." };
-
-    // Lag 2 + 3 pr. handling
-    switch (action) {
-      case "start": {
-        if (isOffline)   return { disabled: true, reason: "Klienten er offline" };
-        if (isSleeping)  return { disabled: true, reason: "Klienten er i dvale — væk den først" };
-        if (isUpdating)  return { disabled: true, reason: "Klienten opdaterer" };
-        if (pca !== "none" && pca !== "") {
-          return { disabled: true, reason: "En browserhandling er allerede i kø" };
-        }
-        return { disabled: false, reason: "" };
-      }
-      case "stop": {
-        if (isOffline)  return { disabled: true, reason: "Klienten er offline" };
-        if (isSleeping) return { disabled: true, reason: "Klienten er i dvale" };
-        if (isUpdating) return { disabled: true, reason: "Klienten opdaterer" };
-        return { disabled: false, reason: "" };
-      }
-      case "sleep": {
-        if (isUpdating) return { disabled: true, reason: "Klienten opdaterer" };
-        if (isSleeping) return { disabled: true, reason: "Klienten er allerede i dvale" };
-        return { disabled: false, reason: "" };
-      }
-      case "wakeup": {
-        if (!isSleeping) return { disabled: true, reason: "Klienten er ikke i dvale" };
-        return { disabled: false, reason: "" };
-      }
-      case "reboot": {
-        if (isUpdating)    return { disabled: true, reason: "Klienten opdaterer" };
-        if (pendingReboot) return { disabled: true, reason: "Genstart er allerede bestilt" };
-        return { disabled: false, reason: "" };
-      }
-      case "shutdown": {
-        if (isUpdating)      return { disabled: true, reason: "Klienten opdaterer" };
-        if (pendingShutdown) return { disabled: true, reason: "Nedlukning er allerede bestilt" };
-        return { disabled: false, reason: "" };
-      }
-      default:
-        return { disabled: false, reason: "" };
-    }
-  }, [anyLoading, refreshing, isOffline, isSleeping, isUpdating, pca, pendingReboot, pendingShutdown]);
-
-  // ---------------------------------------------------------------------------
-  // Handlers
-  // ---------------------------------------------------------------------------
   const onAction = useCallback(async (action) => {
     if (!clientId) return;
-
     if (CONFIRM_ACTIONS.has(action)) {
       setConfirmDialog({ open: true, action });
       return;
     }
-
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
       await handleClientAction(action);
     } catch (err) {
       safeShowSnackbar({
-        message:  "Fejl ved handling: " + (err?.message || String(err)),
+        message: "Fejl ved handling: " + (err?.message || String(err)),
         severity: "error",
       });
     } finally {
@@ -291,13 +207,12 @@ export default function ClientDetailsActionsSection({
     const action = confirmDialog.action;
     setConfirmDialog({ open: false, action: null });
     if (!action) return;
-
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
       await handleClientAction(action);
     } catch (err) {
       safeShowSnackbar({
-        message:  "Fejl ved handling: " + (err?.message || String(err)),
+        message: "Fejl ved handling: " + (err?.message || String(err)),
         severity: "error",
       });
     } finally {
@@ -309,193 +224,228 @@ export default function ClientDetailsActionsSection({
     setConfirmDialog({ open: false, action: null });
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // Hjælper til at rendere én gruppe af knapper
-  // ---------------------------------------------------------------------------
-  function renderActionButton(action) {
-    const { disabled, reason } = getDisabledInfo(action);
-    return (
-      <Grid item xs={6} sm={4} md={2} key={action}>
-        <ActionButton
-          action={action}
-          onClick={() => onAction(action)}
-          loading={!!actionLoading[action]}
-          disabled={disabled}
-          disabledReason={reason}
-          isMobile={isMobile}
-          isAdmin={isAdmin}
-        />
-      </Grid>
-    );
-  }
+  // Disabled-logik pr. action
+  const isDisabled = useCallback((action) => {
+    // Global blokering: lokal process, refresh, eller klient har pending action
+    if (globalBlocked) return true;
+
+    if (action === "sleep")   return isSleeping;
+    if (action === "wakeup")  return !isSleeping;
+
+    // Reboot/shutdown kræver ikke nødvendigvis online
+    if (action === "reboot" || action === "shutdown") return false;
+
+    // Alt andet kræver online
+    if (isOffline) return true;
+
+    return false;
+  }, [globalBlocked, isSleeping, isOffline]);
 
   const confirmInfo = confirmDialog.action
     ? (CONFIRM_TEXTS[confirmDialog.action] ?? { title: "Bekræft", body: "Er du sikker?" })
     : { title: "", body: "" };
 
-  // ---------------------------------------------------------------------------
-  // Status-beskeder
-  // ---------------------------------------------------------------------------
-  const statusMessages = [];
-  if (isOffline)  statusMessages.push({ text: "Klienten er offline — browser-handlinger er ikke tilgængelige.", color: "text.secondary" });
-  if (isSleeping) statusMessages.push({ text: 'Klienten er i dvale — brug "Væk klient" for at aktivere den.', color: "primary.main" });
-  if (isUpdating) statusMessages.push({ text: "Klienten opdaterer — handlinger er midlertidigt spærret.", color: "warning.main" });
-  if (pendingReboot)   statusMessages.push({ text: "Genstart er bestilt og afventer klienten.", color: "warning.main" });
-  if (pendingShutdown) statusMessages.push({ text: "Nedlukning er bestilt og afventer klienten.", color: "error.main" });
-  if (pca !== "none" && pca !== "" && !isSleeping && !isUpdating) {
-    statusMessages.push({ text: `Afventer browserhandling: "${pca}"`, color: "text.secondary" });
-  }
+  const rowGap = isMobile ? 0.5 : 1;
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
   return (
     <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2 }}>
       <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
         <Typography
           variant="h6"
-          sx={{ fontWeight: 700, mb: isMobile ? 1 : 1.5, fontSize: isMobile ? 16 : undefined }}
+          sx={{ fontWeight: 700, mb: isMobile ? 0.75 : 1.25, fontSize: isMobile ? 16 : undefined }}
         >
           Handlinger
         </Typography>
 
-        {/* ── Gruppe 1: Browser ── */}
-        <Box sx={{ mb: isMobile ? 1 : 1.5 }}>
-          <GroupLabel label="Browser" isMobile={isMobile} />
-          <Grid container spacing={isMobile ? 0.5 : 1}>
-            {renderActionButton("start")}
-            {renderActionButton("stop")}
-          </Grid>
+        {/* ── Række 1: Browser + Dvale ── */}
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            gap: isMobile ? 1 : 2,
+            mb: isMobile ? 1 : 1.5,
+            alignItems: isMobile ? "stretch" : "flex-start",
+          }}
+        >
+          {/* Gruppe: Browser */}
+          <Box>
+            <GroupLabel label="Browser" isMobile={isMobile} />
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: rowGap }}>
+              {["start", "stop", "restart"].map(action => (
+                <ActionButton
+                  key={action}
+                  action={action}
+                  onClick={() => onAction(action)}
+                  loading={!!actionLoading[action]}
+                  disabled={isDisabled(action)}
+                  isMobile={isMobile}
+                  isAdmin={isAdmin}
+                />
+              ))}
+            </Box>
+          </Box>
+
+          {!isMobile && (
+            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+          )}
+
+          {/* Gruppe: Dvale */}
+          <Box>
+            <GroupLabel label="Dvale" isMobile={isMobile} />
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: rowGap }}>
+              {["sleep", "wakeup"].map(action => (
+                <ActionButton
+                  key={action}
+                  action={action}
+                  onClick={() => onAction(action)}
+                  loading={!!actionLoading[action]}
+                  disabled={isDisabled(action)}
+                  isMobile={isMobile}
+                  isAdmin={isAdmin}
+                />
+              ))}
+            </Box>
+          </Box>
         </Box>
 
-        <Divider sx={{ my: isMobile ? 0.75 : 1 }} />
-
-        {/* ── Gruppe 2: Dvale ── */}
-        <Box sx={{ mb: isMobile ? 1 : 1.5 }}>
-          <GroupLabel label="Dvale" isMobile={isMobile} />
-          <Grid container spacing={isMobile ? 0.5 : 1}>
-            {renderActionButton("sleep")}
-            {renderActionButton("wakeup")}
-          </Grid>
-        </Box>
-
-        {/* ── Gruppe 3+4: Admin ── */}
+        {/* ── Række 2: Maskine + Værktøjer (kun admin) ── */}
         {isAdmin && (
           <>
-            <Divider sx={{ my: isMobile ? 0.75 : 1 }} />
+            <Divider sx={{ mb: isMobile ? 1 : 1.25 }} />
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: isMobile ? "column" : "row",
+                gap: isMobile ? 1 : 2,
+                alignItems: isMobile ? "stretch" : "flex-start",
+              }}
+            >
+              {/* Gruppe: Maskine */}
+              <Box>
+                <GroupLabel label="Maskine" isMobile={isMobile} />
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: rowGap }}>
+                  {["reboot", "shutdown"].map(action => (
+                    <ActionButton
+                      key={action}
+                      action={action}
+                      onClick={() => onAction(action)}
+                      loading={!!actionLoading[action]}
+                      disabled={isDisabled(action)}
+                      isMobile={isMobile}
+                      isAdmin={isAdmin}
+                    />
+                  ))}
+                </Box>
+              </Box>
 
-            {/* Maskine */}
-            <Box sx={{ mb: isMobile ? 1 : 1.5 }}>
-              <GroupLabel label="Maskine" isMobile={isMobile} />
-              <Grid container spacing={isMobile ? 0.5 : 1}>
-                {renderActionButton("reboot")}
-                {renderActionButton("shutdown")}
-              </Grid>
-            </Box>
+              {!isMobile && (
+                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+              )}
 
-            <Divider sx={{ my: isMobile ? 0.75 : 1 }} />
-
-            {/* Værktøjer */}
-            <Box>
-              <GroupLabel label="Værktøjer" isMobile={isMobile} />
-              <Grid container spacing={isMobile ? 0.5 : 1}>
-
-                {/* Terminal */}
-                <Grid item xs={6} sm={4} md={2}>
-                  <Tooltip title={isOffline ? "Klienten er offline" : "Åbn terminal"} arrow>
-                    <span style={{ width: "100%" }}>
+              {/* Gruppe: Værktøjer */}
+              <Box>
+                <GroupLabel label="Værktøjer" isMobile={isMobile} />
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: rowGap }}>
+                  <Tooltip title="Åbn terminal" arrow>
+                    <span>
                       <Button
                         variant="outlined"
                         color="inherit"
                         size={isMobile ? "small" : "medium"}
                         startIcon={<TerminalIcon fontSize="small" />}
                         onClick={handleOpenTerminal}
-                        disabled={isOffline || anyLoading || refreshing}
-                        fullWidth
+                        disabled={isOffline || globalBlocked}
                         sx={{
                           textTransform: "none",
                           fontWeight: 500,
-                          fontSize: isMobile ? "0.82rem" : "0.9rem",
-                          justifyContent: "flex-start",
+                          fontSize: isMobile ? "0.80rem" : "0.88rem",
                           px: isMobile ? 1 : 1.5,
-                          py: isMobile ? 0.5 : 0.75,
-                          minHeight: isMobile ? 34 : 40,
+                          py: isMobile ? 0.4 : 0.65,
+                          minHeight: isMobile ? 32 : 38,
+                          whiteSpace: "nowrap",
                         }}
                       >
                         Terminal
                       </Button>
                     </span>
                   </Tooltip>
-                </Grid>
 
-                {/* Fjernskrivebord */}
-                <Grid item xs={6} sm={4} md={2}>
-                  <Tooltip title={isOffline ? "Klienten er offline" : "Åbn fjernskrivebord"} arrow>
-                    <span style={{ width: "100%" }}>
+                  <Tooltip title="Åbn fjernskrivebord" arrow>
+                    <span>
                       <Button
                         variant="outlined"
                         color="inherit"
                         size={isMobile ? "small" : "medium"}
                         startIcon={<DesktopWindowsIcon fontSize="small" />}
                         onClick={handleOpenRemoteDesktop}
-                        disabled={isOffline || anyLoading || refreshing}
-                        fullWidth
+                        disabled={isOffline || globalBlocked}
                         sx={{
                           textTransform: "none",
                           fontWeight: 500,
-                          fontSize: isMobile ? "0.82rem" : "0.9rem",
-                          justifyContent: "flex-start",
+                          fontSize: isMobile ? "0.80rem" : "0.88rem",
                           px: isMobile ? 1 : 1.5,
-                          py: isMobile ? 0.5 : 0.75,
-                          minHeight: isMobile ? 34 : 40,
+                          py: isMobile ? 0.4 : 0.65,
+                          minHeight: isMobile ? 32 : 38,
+                          whiteSpace: "nowrap",
                         }}
                       >
                         Fjernskrivebord
                       </Button>
                     </span>
                   </Tooltip>
-                </Grid>
-
-              </Grid>
+                </Box>
+              </Box>
             </Box>
           </>
         )}
 
-        {/* ── Status-beskeder ── */}
-        {statusMessages.length > 0 && (
-          <Box sx={{ mt: isMobile ? 1 : 1.5, display: "flex", flexDirection: "column", gap: 0.5 }}>
-            {statusMessages.map(({ text, color }, i) => (
-              <Typography
-                key={i}
-                variant="body2"
-                sx={{ color, fontSize: isMobile ? 11 : 13 }}
-              >
-                {text}
-              </Typography>
-            ))}
-          </Box>
+        {/* Status-beskeder */}
+        {clientBusy && !anyLocalLoading && (
+          <Typography
+            variant="body2"
+            color="warning.main"
+            sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}
+          >
+            Klienten har en igangværende handling ({pendingChromeAction}) — vent til den er færdig.
+          </Typography>
+        )}
+
+        {isOffline && (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}
+          >
+            Klienten er offline — nogle handlinger er ikke tilgængelige.
+          </Typography>
+        )}
+
+        {isSleeping && !isOffline && (
+          <Typography
+            variant="body2"
+            color="primary"
+            sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}
+          >
+            Klienten er i dvale — brug "Væk klient" for at aktivere den.
+          </Typography>
         )}
       </CardContent>
 
-      {/* ── Bekræftelsesdialog ── */}
+      {/* Bekræftelsesdialog */}
       <Dialog
         open={confirmDialog.open}
         onClose={onCancelConfirm}
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-description"
       >
-        <DialogTitle id="confirm-dialog-title">
-          {confirmInfo.title}
-        </DialogTitle>
+        <DialogTitle id="confirm-dialog-title">{confirmInfo.title}</DialogTitle>
         <DialogContent>
           <DialogContentText id="confirm-dialog-description">
             {confirmInfo.body}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onCancelConfirm} color="inherit">
-            Annuller
-          </Button>
+          <Button onClick={onCancelConfirm} color="inherit">Annuller</Button>
           <Button onClick={onConfirmAction} color="error" variant="contained" autoFocus>
             Bekræft
           </Button>
