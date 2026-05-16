@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import {
   Box,
   Card,
@@ -31,25 +31,6 @@ import { useAuth } from "../../auth/authcontext";
 /*
   DetailsActionsSection.jsx
 
-  Ansvar:
-  - Viser handlingsknapper og håndterer klik.
-  - Al polling og lock-logik ligger i ClientDetailsPage (undgår blinking).
-  - clientActionPending (prop) låser alle knapper mens en handling afventer klient.
-  - isLiveStepBusy låser knapper + viser banner hvis liveStep er et aktivt
-    busy-step — banneret følger headeren 1:1.
-  - Ingen intern polling overhovedet.
-
-  FIX #1: "shutdown_chrome" er fjernet fra BUSY_CHROME_STEPS.
-  FIX #2: isDisabledByState bruger chromeIsRunning (udledt fra liveStep).
-  FIX #3: "system_rebooting" og "system_shutting_down" er fjernet fra
-    BUSY_CHROME_STEPS og flyttet til CHROME_STOPPED_STEPS.
-  FIX #4: pendingLabel viser "liveChromeStatus · stepLabel" når begge har værdi,
-    så headeren altid viser baseline-status + aktiv handling-tekst kombineret.
-  FIX #5: Optimistisk låsning ved reboot/shutdown — knapper deaktiveres STRAKS
-    ved klik uden at vente på næste poll-cyklus. localBlockAll sættes true ved
-    reboot/shutdown og ryddes automatisk når liveStep bekræfter terminal-tilstand
-    ELLER efter MAX_OPTIMISTIC_BLOCK_MS millisekunder (sikkerhedsventil).
-
   BUSY_CHROME_STEPS (låser knapper + viser banner — kun MENS handling kører):
     clear_cookies            — rydder cookies
     terminate_chrome         — SIGTERM til Chrome
@@ -64,27 +45,23 @@ import { useAuth } from "../../auth/authcontext";
     chrome_closed_manual           — Chrome lukket manuelt
     system_sleep                   — sleep-handling færdig
     system_wake                    — wake-handling færdig
-    system_rebooting               — reboot igangsat (terminal for reboot-action)
-    system_shutting_down           — shutdown igangsat (terminal for shutdown-action)
+    system_rebooting               — reboot igangsat
+    system_shutting_down           — shutdown igangsat
     error                          — scenario fejlede
 
-  CHROME_RUNNING_STEPS (Chrome er oppe):
+  CHROME_RUNNING_STEPS:
     start_chrome
     chrome_opened_manual
 
-  CHROME_STOPPED_STEPS (Chrome er nede):
+  CHROME_STOPPED_STEPS:
     chrome_closed_programmatically
     chrome_closed_manual
     shutdown_chrome
     kill_chrome
     system_sleep
-    system_rebooting       ← FIX #3: Chrome kører ikke under/efter reboot
-    system_shutting_down   ← FIX #3: Chrome kører ikke under/efter shutdown
+    system_rebooting
+    system_shutting_down
 */
-
-// Maksimal tid (ms) localBlockAll forbliver aktiv som sikkerhedsventil.
-// Hvis backend/klient ikke svarer inden for dette tidsrum, fjernes låsen automatisk.
-const MAX_OPTIMISTIC_BLOCK_MS = 30_000;
 
 const BUSY_CHROME_STEPS = new Set([
   "clear_cookies",
@@ -109,14 +86,6 @@ const CHROME_STOPPED_STEPS = new Set([
   "system_shutting_down",
 ]);
 
-// Terminal steps der bekræfter at reboot/shutdown er igangsat
-// — bruges til at rydde localBlockAll automatisk
-const REBOOT_SHUTDOWN_TERMINAL_STEPS = new Set([
-  "system_rebooting",
-  "system_shutting_down",
-]);
-
-// Oversæt faktiske chrome step-navne til læsbar dansk tekst.
 function getStepLabel(step) {
   if (!step) return null;
   const s = String(step).toLowerCase();
@@ -182,7 +151,7 @@ function ActionButton({ btn, isMobile, anyBusy }) {
   if (isMobile) return button;
   return (
     <Tooltip
-      title={isDisabled && !isActive ? "Ikke tilgængelig" : btn.tooltip}
+      title={isDisabled && !isActive ? (btn.tooltip || "Ikke tilgængelig") : btn.tooltip}
       arrow
     >
       {button}
@@ -212,38 +181,12 @@ export default function ClientDetailsActionsSection({
 
   const [actionLoading, setActionLoading]           = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
+  const [rebootDialogOpen, setRebootDialogOpen]     = useState(false);
   const [localSnackbar, setLocalSnackbar]           = useState({
     open: false,
     message: "",
     severity: "success",
   });
-
-  // FIX #5: Optimistisk låsning — sættes true ved reboot/shutdown-klik,
-  // ryddes automatisk når terminal-step bekræftes eller timeout udløber.
-  const [localBlockAll, setLocalBlockAll] = useState(false);
-  const localBlockTimerRef = useRef(null);
-
-  // Ryd localBlockAll automatisk ved terminal-step fra liveStep
-  useEffect(() => {
-    if (!localBlockAll) return;
-    const liveStepNormalized = String(liveStep ?? "").toLowerCase();
-    if (REBOOT_SHUTDOWN_TERMINAL_STEPS.has(liveStepNormalized)) {
-      setLocalBlockAll(false);
-      if (localBlockTimerRef.current) {
-        clearTimeout(localBlockTimerRef.current);
-        localBlockTimerRef.current = null;
-      }
-    }
-  }, [liveStep, localBlockAll]);
-
-  // Ryd timer ved unmount
-  useEffect(() => {
-    return () => {
-      if (localBlockTimerRef.current) {
-        clearTimeout(localBlockTimerRef.current);
-      }
-    };
-  }, []);
 
   const normalizedClientState   = String(clientState || "").trim().toLowerCase();
   const isSleeping              = normalizedClientState.startsWith("sleep");
@@ -260,9 +203,7 @@ export default function ClientDetailsActionsSection({
     : null;
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
-
-  // FIX #5: localBlockAll medtages i anyBusy
-  const anyBusy = anyLoading || !!refreshing || clientActionPending || hasPendingAction || isLiveStepBusy || localBlockAll;
+  const anyBusy    = anyLoading || !!refreshing || clientActionPending || hasPendingAction || isLiveStepBusy;
 
   // ---------------------------------------------------------------------------
   // Snackbar
@@ -284,46 +225,17 @@ export default function ClientDetailsActionsSection({
 
   // ---------------------------------------------------------------------------
   // Kør handling
-  // FIX #5: Ved reboot/shutdown sættes localBlockAll=true STRAKS (optimistisk
-  // låsning) så knapperne deaktiveres med det samme — uden at vente på poll.
   // ---------------------------------------------------------------------------
   const doAction = useCallback(
     async (action) => {
       if (clientOnline === false) {
-        notify({
-          message: "Klienten er offline — handling afvist",
-          severity: "warning",
-        });
+        notify({ message: "Klienten er offline — handling afvist", severity: "warning" });
         return;
       }
-
-      // FIX #5: Optimistisk låsning ved reboot og shutdown
-      const isRebootOrShutdown = action === "reboot" || action === "shutdown";
-      if (isRebootOrShutdown) {
-        setLocalBlockAll(true);
-        // Sikkerhedsventil: ryd låsen efter MAX_OPTIMISTIC_BLOCK_MS
-        // hvis klienten ikke svarer (fx offline/fejl)
-        if (localBlockTimerRef.current) {
-          clearTimeout(localBlockTimerRef.current);
-        }
-        localBlockTimerRef.current = setTimeout(() => {
-          setLocalBlockAll(false);
-          localBlockTimerRef.current = null;
-        }, MAX_OPTIMISTIC_BLOCK_MS);
-      }
-
       setActionLoading((prev) => ({ ...prev, [action]: true }));
       try {
         await handleClientAction(action);
       } catch (err) {
-        // Ryd optimistisk lås ved fejl så bruger kan prøve igen
-        if (isRebootOrShutdown) {
-          setLocalBlockAll(false);
-          if (localBlockTimerRef.current) {
-            clearTimeout(localBlockTimerRef.current);
-            localBlockTimerRef.current = null;
-          }
-        }
         notify({
           message: "Fejl: " + (err?.message || "Kunne ikke udføre handling"),
           severity: "error",
@@ -343,8 +255,8 @@ export default function ClientDetailsActionsSection({
       if (clientOnline === false) return true;
       if (isSleeping) return key !== "wakeup";
       if (key === "wakeup") return true;
-      if (key === "start" && chromeIsRunning === true) return true;
-      if (key === "stop" && chromeIsRunning === false) return true;
+      if (key === "start" && chromeIsRunning === true)  return true;
+      if (key === "stop"  && chromeIsRunning === false) return true;
       return false;
     },
     [clientOnline, isSleeping, chromeIsRunning]
@@ -352,36 +264,20 @@ export default function ClientDetailsActionsSection({
 
   // ---------------------------------------------------------------------------
   // Pending-banner tekst
-  // FIX #4: Kombinér liveChromeStatus og stepLabel når begge har værdi.
-  // FIX #5: Vis specifik tekst ved localBlockAll (reboot/shutdown igangsat).
   // ---------------------------------------------------------------------------
   const pendingLabel = (() => {
-    // Vis straks når localBlockAll er sat (optimistisk)
-    if (localBlockAll) {
-      const liveStepNorm2 = String(liveStep ?? "").toLowerCase();
-      if (REBOOT_SHUTDOWN_TERMINAL_STEPS.has(liveStepNorm2)) {
-        return getStepLabel(liveStep) || "Handling igangsat…";
-      }
-      // Endnu ikke bekræftet — vis generisk tekst
-      return liveChromeStatus
-        ? `${liveChromeStatus} · Sender kommando til klient…`
-        : "Sender kommando til klient…";
-    }
-
     if (!clientActionPending && !hasPendingAction && !isLiveStepBusy) return null;
     const stepLabel = getStepLabel(liveStep);
     if (stepLabel) {
       return liveChromeStatus ? `${liveChromeStatus} · ${stepLabel}` : stepLabel;
     }
     if (liveChromeStatus) return liveChromeStatus;
-    const actionName = normalizedPendingAction !== "none"
-      ? normalizedPendingAction
-      : "handling";
+    const actionName = normalizedPendingAction !== "none" ? normalizedPendingAction : "handling";
     return `Afventer klient: ${actionName}`;
   })();
 
   // ---------------------------------------------------------------------------
-  // Knap-definitioner — Række 1
+  // Knap-definitioner — Række 1: Chrome-kontrol
   // ---------------------------------------------------------------------------
   const row1 = [
     {
@@ -414,174 +310,214 @@ export default function ClientDetailsActionsSection({
       key: "sleep",
       label: "Sæt i dvale",
       icon: <NightlightIcon />,
-      color: "info",
+      color: "default",
       variant: "outlined",
       onClick: () => doAction("sleep"),
       loading: !!actionLoading["sleep"],
       disabled: isDisabledByState("sleep"),
-      tooltip: "Sæt klient i dvale",
+      tooltip: isSleeping ? "Klienten er allerede i dvale" : "Sæt klient i dvale",
     },
     {
       key: "wakeup",
-      label: "Væk fra dvale",
+      label: "Vågn op",
       icon: <WbSunnyIcon />,
-      color: "success",
+      color: "default",
       variant: "outlined",
       onClick: () => doAction("wakeup"),
       loading: !!actionLoading["wakeup"],
       disabled: isDisabledByState("wakeup"),
-      tooltip: "Væk klient fra dvale",
+      tooltip: !isSleeping ? "Klienten er ikke i dvale" : "Væk klient fra dvale",
     },
   ];
 
   // ---------------------------------------------------------------------------
-  // Knap-definitioner — Række 2 (kun admin)
+  // Knap-definitioner — Række 2: System + adgang
   // ---------------------------------------------------------------------------
-  const row2Admin = [
+  const row2 = [
     {
       key: "reboot",
-      label: "Genstart klient",
+      label: "Genstart",
       icon: <RestartAltIcon />,
       color: "warning",
-      variant: "contained",
-      onClick: () => doAction("reboot"),
+      variant: "outlined",
+      onClick: () => setRebootDialogOpen(true),
       loading: !!actionLoading["reboot"],
-      disabled: clientOnline === false,
-      tooltip: "Genstart klient",
+      disabled: clientOnline === false || isSleeping,
+      tooltip: clientOnline === false ? "Klienten er offline" : "Genstart klient",
     },
     {
       key: "shutdown",
-      label: "Sluk klient",
+      label: "Luk ned",
       icon: <PowerSettingsNewIcon />,
       color: "error",
-      variant: "contained",
+      variant: "outlined",
       onClick: () => setShutdownDialogOpen(true),
       loading: !!actionLoading["shutdown"],
-      disabled: clientOnline === false,
-      tooltip: "Sluk klient — kræver fysisk tænding bagefter",
+      disabled: clientOnline === false || isSleeping,
+      tooltip: clientOnline === false ? "Klienten er offline" : "Luk klient ned",
     },
     {
       key: "terminal",
       label: "Terminal",
       icon: <TerminalIcon />,
-      color: "inherit",
+      color: "default",
       variant: "outlined",
       onClick: handleOpenTerminal,
       loading: false,
-      disabled: clientOnline === false,
-      tooltip: "Åbn terminal",
+      disabled: !isAdmin || clientOnline === false,
+      tooltip: !isAdmin
+        ? "Kun for administratorer"
+        : clientOnline === false
+        ? "Klienten er offline"
+        : "Åbn terminal",
     },
     {
       key: "remote",
       label: "Fjernskrivebord",
       icon: <DesktopWindowsIcon />,
-      color: "inherit",
+      color: "default",
       variant: "outlined",
       onClick: handleOpenRemoteDesktop,
       loading: false,
-      disabled: clientOnline === false,
-      tooltip: "Åbn fjernskrivebord",
+      disabled: !isAdmin || clientOnline === false,
+      tooltip: !isAdmin
+        ? "Kun for administratorer"
+        : clientOnline === false
+        ? "Klienten er offline"
+        : "Åbn fjernskrivebord",
     },
   ];
 
-  const cardStyle = clientOnline === false ? { opacity: 0.85 } : {};
-
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
-    <Card elevation={2} sx={{ borderRadius: 2, mb: 2, ...cardStyle }}>
-      <CardContent sx={{ px: isMobile ? 1 : 2 }}>
+    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+      <CardContent sx={{ pb: "12px !important", pt: 1.5, px: isMobile ? 1 : 2 }}>
 
+        {/* Pending-banner */}
         {pendingLabel && (
           <Alert
             severity="info"
-            sx={{ mb: 1.5 }}
-            icon={<CircularProgress size={16} />}
+            icon={<CircularProgress size={18} color="inherit" />}
+            sx={{
+              mb: 1.5,
+              py: 0.5,
+              fontSize: "0.9rem",
+              alignItems: "center",
+              borderRadius: 2,
+            }}
           >
             {pendingLabel}
           </Alert>
         )}
 
-        <Grid container spacing={2} alignItems="center" justifyContent="center">
+        {/* Offline-banner */}
+        {clientOnline === false && (
+          <Alert severity="warning" sx={{ mb: 1.5, py: 0.5, fontSize: "0.9rem", borderRadius: 2 }}>
+            Klienten er offline — handlinger ikke tilgængelige
+          </Alert>
+        )}
+
+        {/* Dvale-banner */}
+        {isSleeping && !pendingLabel && (
+          <Alert severity="info" sx={{ mb: 1.5, py: 0.5, fontSize: "0.9rem", borderRadius: 2 }}>
+            Klienten er i dvale — brug "Vågn op" for at vække den
+          </Alert>
+        )}
+
+        {/* Række 1 */}
+        <Grid container spacing={1} sx={{ mb: 1 }}>
           {row1.map((btn) => (
-            <Grid item xs={12} sm={6} md={3} key={btn.key}>
+            <Grid item xs={6} sm={3} key={btn.key}>
               <ActionButton btn={btn} isMobile={isMobile} anyBusy={anyBusy} />
             </Grid>
           ))}
         </Grid>
 
-        {isAdmin && (
-          <>
-            <Box sx={{ height: 12 }} />
-            <Grid container spacing={2} alignItems="center" justifyContent="center">
-              {row2Admin.map((btn) => (
-                <Grid item xs={12} sm={6} md={3} key={btn.key}>
-                  <ActionButton btn={btn} isMobile={isMobile} anyBusy={anyBusy} />
-                </Grid>
-              ))}
+        {/* Række 2 */}
+        <Grid container spacing={1}>
+          {row2.map((btn) => (
+            <Grid item xs={6} sm={3} key={btn.key}>
+              <ActionButton btn={btn} isMobile={isMobile} anyBusy={anyBusy} />
             </Grid>
-          </>
-        )}
-
-        {clientOnline === false && (
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ mt: 1.5, fontSize: isMobile ? 11 : 13 }}
-          >
-            Klienten er offline — handlinger er ikke tilgængelige.
-          </Typography>
-        )}
-
-        {isSleeping && clientOnline !== false && (
-          <Typography
-            variant="body2"
-            color="primary"
-            sx={{ mt: 1.5, fontSize: isMobile ? 11 : 13 }}
-          >
-            Klienten er i dvale — brug "Væk fra dvale" for at aktivere den.
-          </Typography>
-        )}
-
+          ))}
+        </Grid>
       </CardContent>
 
+      {/* Reboot-bekræftelsesdialog */}
       <Dialog
-        open={shutdownDialogOpen}
-        onClose={() => setShutdownDialogOpen(false)}
+        open={rebootDialogOpen}
+        onClose={() => setRebootDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
       >
-        <DialogTitle>Bekræft slukning af klient</DialogTitle>
+        <DialogTitle>Bekræft genstart</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            <strong>Ved dette valg skal klienten startes manuelt lokalt.</strong>
-            <br />
-            Er du sikker på, at du vil slukke klienten?
+            Er du sikker på, at du vil genstarte klienten? Kiosk browseren lukkes og maskinen genstarter.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShutdownDialogOpen(false)} color="primary">
+          <Button onClick={() => setRebootDialogOpen(false)} color="inherit">
             Annuller
           </Button>
           <Button
-            onClick={async () => {
-              setShutdownDialogOpen(false);
-              await doAction("shutdown");
+            onClick={() => {
+              setRebootDialogOpen(false);
+              doAction("reboot");
             }}
-            color="error"
+            color="warning"
             variant="contained"
-            disabled={clientOnline === false || anyBusy}
+            autoFocus
           >
-            Ja, sluk klienten
+            Genstart
           </Button>
         </DialogActions>
       </Dialog>
 
+      {/* Shutdown-bekræftelsesdialog */}
+      <Dialog
+        open={shutdownDialogOpen}
+        onClose={() => setShutdownDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Bekræft nedlukning</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Er du sikker på, at du vil lukke klienten ned? Maskinen slukker og skal startes manuelt igen.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShutdownDialogOpen(false)} color="inherit">
+            Annuller
+          </Button>
+          <Button
+            onClick={() => {
+              setShutdownDialogOpen(false);
+              doAction("shutdown");
+            }}
+            color="error"
+            variant="contained"
+            autoFocus
+          >
+            Luk ned
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Lokal snackbar fallback */}
       <Snackbar
         open={localSnackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setLocalSnackbar((s) => ({ ...s, open: false }))}
+        autoHideDuration={4000}
+        onClose={() => setLocalSnackbar((p) => ({ ...p, open: false }))}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setLocalSnackbar((s) => ({ ...s, open: false }))}
+          onClose={() => setLocalSnackbar((p) => ({ ...p, open: false }))}
           severity={localSnackbar.severity}
+          variant="filled"
           sx={{ width: "100%" }}
         >
           {localSnackbar.message}
