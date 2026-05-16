@@ -4,6 +4,18 @@ import { Box, CircularProgress, Typography, Button } from "@mui/material";
 import ClientDetailsPage from "./ClientDetailsPage";
 import { getClient, getMarkedDays, getCurrentSeason } from "../../api";
 
+/*
+  ClientDetailsPageWrapper.jsx
+
+  Ansvar:
+  - Initial load + manuel refresh af client-data.
+  - silentRefresh: opdaterer client-data UDEN snackbar og UDEN refreshing=true.
+    Bruges af ClientDetailsPage efter en action er bekræftet — ingen blinking.
+  - handleRefresh: fuld refresh MED snackbar — kun ved manuel klik på "Opdater".
+  - Den hurtige poll-loop (hvert 2s ved aktiv PCA) er FJERNET —
+    ClientDetailsPage ejer den logik via lokal state (undgår blinking).
+*/
+
 export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarProp }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -31,7 +43,7 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
   }, [showSnackbarProp]);
 
   // ---------------------------------------------------------------------------
-  // Hent klient
+  // Hent klient — isRefresh=true viser spinner, isRefresh=false er initial load
   // ---------------------------------------------------------------------------
   const fetchClient = useCallback(async (isRefresh = false) => {
     if (!id) return;
@@ -54,6 +66,21 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
         setError("Kunne ikke hente klientdata: " + (err?.message || String(err)));
     } finally {
       if (mountedRef.current) { setLoading(false); setRefreshing(false); }
+    }
+  }, [id]);
+
+  // ---------------------------------------------------------------------------
+  // Stille refresh — opdaterer client state UDEN snackbar og UDEN refreshing=true
+  // Bruges af ClientDetailsPage efter action-bekræftelse (ingen blinking)
+  // ---------------------------------------------------------------------------
+  const silentRefresh = useCallback(async () => {
+    if (!id || !mountedRef.current) return;
+    try {
+      const data = await getClient(id);
+      if (!mountedRef.current) return;
+      if (data) setClient(data);
+    } catch {
+      // Ignorer fejl ved stille refresh
     }
   }, [id]);
 
@@ -91,35 +118,8 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
   }, [fetchClient, fetchMarkedDays]);
 
   // ---------------------------------------------------------------------------
-  // Hurtig poll mens pending_chrome_action er aktiv
-  // Poller getClient hvert 2s så DetailsActionsSection får frisk pendingChromeAction
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    if (!id) return;
-    const pca = String(client?.pending_chrome_action || "").toLowerCase();
-    if (!pca || pca === "none") return;
-
-    let cancelled = false;
-    const interval = setInterval(async () => {
-      if (cancelled || !mountedRef.current) return;
-      try {
-        const data = await getClient(id);
-        if (!cancelled && mountedRef.current && data) {
-          setClient(data);
-        }
-      } catch {
-        // ignorer poll-fejl
-      }
-    }, 2000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [id, client?.pending_chrome_action]);
-
-  // ---------------------------------------------------------------------------
-  // Refresh handler
+  // Manuel refresh — MED snackbar, MED refreshing=true (spinner i header)
+  // Kaldes KUN ved klik på "Opdater"-knappen
   // ---------------------------------------------------------------------------
   const handleRefresh = useCallback(async () => {
     await Promise.all([fetchClient(true), fetchMarkedDays()]);
@@ -168,6 +168,7 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
       client={client}
       refreshing={refreshing}
       handleRefresh={handleRefresh}
+      silentRefresh={silentRefresh}
       markedDays={markedDays}
       calendarLoading={calendarLoading}
       streamKey={streamKey}
