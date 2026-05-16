@@ -78,10 +78,6 @@ const ACTION_POLL_MAX_MS    = 60_000;
 const ACTION_MIN_LOCK_MS    = 2000;
 const ACTION_NULL_STEP_MS   = 8000;
 
-function readBoolean(value) {
-  return typeof value === "boolean" ? value : null;
-}
-
 // FIX: shutdown_chrome er fjernet — det er terminal, ikke busy.
 // Skal matche BUSY_CHROME_STEPS i DetailsActionsSection.jsx.
 const BUSY_CHROME_STEPS = new Set([
@@ -224,9 +220,6 @@ export default function ClientDetailsPage({
   const uptimeBaseRef           = useRef(null);
   const uptimeFetchRef          = useRef(null);
   const [lastSeen, setLastSeen] = useState(client?.last_seen ?? null);
-  const [liveClientOnline, setLiveClientOnline] = useState(
-    typeof client?.isOnline === "boolean" ? client.isOnline : null
-  );
 
   useEffect(() => {
     if (client?.uptime != null) {
@@ -238,7 +231,6 @@ export default function ClientDetailsPage({
       }
     }
     if (client?.last_seen)             setLastSeen(client.last_seen);
-    if (typeof client?.isOnline === "boolean") setLiveClientOnline(client.isOnline);
     if (client?.chrome_status != null) setLiveChromeStatus(client.chrome_status);
     if (client?.chrome_color != null)  setLiveChromeColor(client.chrome_color);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -273,17 +265,6 @@ export default function ClientDetailsPage({
           if (data?.chrome_color != null)  setLiveChromeColor(data.chrome_color);
           if (data?.last_seen != null)     setLastSeen(data.last_seen);
 
-          const onlineFromStatus =
-            readBoolean(data?.isOnline) ??
-            readBoolean(data?.is_online) ??
-            readBoolean(data?.online);
-          if (onlineFromStatus !== null) setLiveClientOnline(onlineFromStatus);
-
-          if (data?.state != null) setLocalClientState(data.state);
-          if (data?.pending_chrome_action != null) {
-            setLocalPendingAction(data.pending_chrome_action || "none");
-          }
-
           const stepName      = data?.step?.step ?? null;
           const stepTimestamp = data?.step?.timestamp ?? null;
           setLiveStep(stepName);
@@ -295,6 +276,7 @@ export default function ClientDetailsPage({
             if (!isNaN(parsed) && parsed >= 0) {
               uptimeBaseRef.current  = parsed;
               uptimeFetchRef.current = Date.now();
+              setUptime(parsed);
             }
           }
         } catch {
@@ -431,10 +413,7 @@ export default function ClientDetailsPage({
   // ---------------------------------------------------------------------------
   // Afledte værdier
   // ---------------------------------------------------------------------------
-  const clientOnline =
-    liveClientOnline !== null && liveClientOnline !== undefined
-      ? liveClientOnline
-      : (client?.isOnline ?? false);
+  const clientOnline  = client?.isOnline ?? false;
   const displayUptime = uptime != null ? uptime : client?.uptime ?? null;
 
   const effectivePendingAction = clientActionPending
