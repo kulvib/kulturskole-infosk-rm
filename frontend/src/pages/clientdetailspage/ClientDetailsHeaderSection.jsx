@@ -28,17 +28,6 @@ import {
   pushKioskUrl as apiPushKioskUrl
 } from "../../api";
 
-/*
-  ClientDetailsHeaderSection.jsx
-
-  - Styling og UX-ændringer: Ens højde på begge Cards, select-height fixes, spinnere på gem-knapper.
-  - Robust dirty-logik for skole-select via initialSelectedSchoolRef.
-  - Snackbar-tekster: "Skole gemt", "Lokation gemt", "Kiosk webadresse gemt".
-  - StateBadge håndterer "sleep" og "sleeping" (starter med "sleep") som blå (#1976d2).
-  - FIX: kioskBrowserData guard — vises kun hvis prop faktisk er sendt og ikke-tomt.
-  - Header håndterer lokation + kiosk-URL direkte mod backend (ingen parent-state opdatering).
-*/
-
 const COLOR_NAME_MAP = {
   red: "#e53935",
   green: "#43a047",
@@ -244,6 +233,52 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   );
 }
 
+// FIX: Skoler hentes ét sted og én gang — udenfor hovedkomponenten
+// så hentningen ikke genstarter ved re-renders af ClientDetailsHeaderSection.
+function useSchoolsList(schoolsProp) {
+  const [schoolsList, setSchoolsList] = React.useState(
+    Array.isArray(schoolsProp) && schoolsProp.length ? schoolsProp : []
+  );
+  const [loadingSchools, setLoadingSchools] = React.useState(false);
+  const [schoolsError, setSchoolsError] = React.useState(null);
+
+  // Hvis prop leverer skoler — brug dem direkte, ingen API-kald
+  React.useEffect(() => {
+    if (Array.isArray(schoolsProp) && schoolsProp.length) {
+      setSchoolsList(schoolsProp);
+      setLoadingSchools(false);
+    }
+  }, [schoolsProp]);
+
+  // Hent kun fra API hvis prop er tom/mangler — og kun én gang
+  React.useEffect(() => {
+    if (Array.isArray(schoolsProp) && schoolsProp.length) return;
+
+    let cancelled = false;
+    async function load() {
+      setLoadingSchools(true);
+      setSchoolsError(null);
+      try {
+        const data = await apiGetSchools();
+        if (cancelled) return;
+        if (Array.isArray(data)) setSchoolsList(data);
+        else if (Array.isArray(data?.schools)) setSchoolsList(data.schools);
+      } catch (err) {
+        if (cancelled) return;
+        setSchoolsError(err?.message || "Fejl ved hentning af skoler");
+      } finally {
+        if (!cancelled) setLoadingSchools(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+    // Kør kun ved mount — schools-prop var tom på dette tidspunkt
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return { schoolsList, loadingSchools, schoolsError };
+}
+
 function ClientDetailsHeaderSection({
   client,
   schools = [],
@@ -251,8 +286,6 @@ function ClientDetailsHeaderSection({
   liveChromeColor,
   refreshing,
   handleRefresh,
-  // FIX: kioskBrowserData er valgfri — vises kun hvis prop er sendt og ikke-tomt.
-  // ClientDetailsPage.jsx sender den ikke pt., så den defaulter til {} og vises ikke.
   kioskBrowserData = {},
   showSnackbar,
 }) {
@@ -274,11 +307,8 @@ function ClientDetailsHeaderSection({
   const rightPaperWidth = isDesktop ? "60%" : isTablet ? "50%" : "100%";
   const labelCellWidth = isDesktop ? 140 : isTablet ? 120 : 100;
 
-  const [schoolsList, setSchoolsList] = React.useState(
-    Array.isArray(schools) ? schools : []
-  );
-  const [loadingSchools, setLoadingSchools] = React.useState(false);
-  const [schoolsError, setSchoolsError] = React.useState(null);
+  // FIX: Brug custom hook — skoler hentes stabilt uden at forårsage blik
+  const { schoolsList, loadingSchools, schoolsError } = useSchoolsList(schools);
 
   const [selectedSchool, setSelectedSchool] = React.useState(client?.school_id ?? "");
   const [savingSchool, setSavingSchool] = React.useState(false);
@@ -288,13 +318,6 @@ function ClientDetailsHeaderSection({
 
   const [savingLocality, setSavingLocality] = React.useState(false);
   const [savingKiosk, setSavingKiosk] = React.useState(false);
-
-  // Sync schools prop -> state
-  React.useEffect(() => {
-    if (Array.isArray(schools) && schools.length) {
-      setSchoolsList(schools);
-    }
-  }, [schools]);
 
   // Sync selectedSchool når parent client.school_id ændres
   React.useEffect(() => {
@@ -315,29 +338,6 @@ function ClientDetailsHeaderSection({
     String(localLocality ?? "") !== String(initialLocalityRef.current ?? "");
   const kioskUrlChanged =
     String(localKioskUrl ?? "") !== String(initialKioskUrlRef.current ?? "");
-
-  // Hent skoler hvis ikke leveret via prop
-  React.useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (Array.isArray(schools) && schools.length) return;
-      setLoadingSchools(true);
-      setSchoolsError(null);
-      try {
-        const data = await apiGetSchools();
-        if (cancelled) return;
-        if (Array.isArray(data)) setSchoolsList(data);
-        else if (Array.isArray(data?.schools)) setSchoolsList(data.schools);
-      } catch (err) {
-        if (cancelled) return;
-        setSchoolsError(err?.message || "Fejl ved hentning af skoler");
-      } finally {
-        if (!cancelled) setLoadingSchools(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [schools]);
 
   const handleSchoolSelectChange = (e) => {
     const newVal = e.target.value;
@@ -428,7 +428,6 @@ function ClientDetailsHeaderSection({
     }
   };
 
-  // FIX: kioskBrowserData vises kun hvis prop faktisk indeholder data
   function renderKioskBrowserDataRows(data) {
     if (!data || typeof data !== "object" || Object.keys(data).length === 0) return null;
     return Object.entries(data).map(([key, value]) => (
@@ -697,7 +696,9 @@ function ClientDetailsHeaderSection({
                               size="small"
                               value={selectedSchool ?? ""}
                               onChange={handleSchoolSelectChange}
-                              disabled={loadingSchools}
+                              // FIX: disabled KUN mens der gemmes — ikke mens skoler loader
+                              // Dette eliminerer blikket fra disabled → enabled cycling
+                              disabled={savingSchool}
                               fullWidth
                               SelectProps={{ MenuProps: { disablePortal: true } }}
                               inputProps={{ "aria-label": "Skole" }}
@@ -731,6 +732,17 @@ function ClientDetailsHeaderSection({
                               }}
                             >
                               <MenuItem value=""><em>Ingen skole</em></MenuItem>
+                              {/* FIX: Vis loading-item i listen i stedet for at disable hele dropdown */}
+                              {loadingSchools && (
+                                <MenuItem value="" disabled>
+                                  <CircularProgress size={12} sx={{ mr: 1 }} /> Henter skoler…
+                                </MenuItem>
+                              )}
+                              {schoolsError && (
+                                <MenuItem value="" disabled sx={{ color: "error.main" }}>
+                                  {schoolsError}
+                                </MenuItem>
+                              )}
                               {(schoolsList || []).map(s => (
                                 <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
                               ))}
@@ -988,7 +1000,6 @@ function ClientDetailsHeaderSection({
                       </TableCell>
                     </TableRow>
 
-                    {/* FIX: Vises kun hvis kioskBrowserData faktisk har indhold */}
                     {renderKioskBrowserDataRows(kioskBrowserData)}
                   </TableBody>
                 </Table>
