@@ -18,6 +18,9 @@ CHROME_STATUS_PATH = os.getenv("CHROME_STATUS_PATH", "/home/kulturskolenviborg/a
 VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error", "updating"}
 VALID_PENDING_CHROME_ACTION_SOURCES = {"actionbutton", "calendar"}
 
+# Actions der betragtes som "aktive" og blokerer nye handlinger
+BLOCKING_ACTIONS = {"start", "stop", "sleep", "wakeup", "reboot", "shutdown"}
+
 
 def normalize_client_state(value: str) -> str:
     normalized = str(value).lower()
@@ -151,33 +154,83 @@ def get_client_state(id: int, session=Depends(get_session), user=Depends(get_cur
 
 
 @router.post("/clients/{id}/chrome-command")
-def set_chrome_command(id: int, data: dict = Body(...), session=Depends(get_session), user=Depends(get_current_user)):
+def set_chrome_command(
+    id: int,
+    data: dict = Body(...),
+    session=Depends(get_session),
+    user=Depends(get_current_user),
+):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+
     action = data.get("action")
     source = data.get("source")
-    if action == "livestream_start" and getattr(client.pending_chrome_action, "value", client.pending_chrome_action) == "livestream_start":
+
+    # Hent nuværende pending_chrome_action som string
+    current_pca = getattr(client.pending_chrome_action, "value", None) or str(
+        client.pending_chrome_action or "none"
+    )
+
+    # -----------------------------------------------------------------------
+    # GUARD: Afvis ny handling hvis en blokerende handling allerede er aktiv.
+    # Dette forhindrer at frontend kan trigge start/stop flere gange mens
+    # klienten er i gang med countdown eller Chrome-start/stop.
+    # Livestream-actions blokerer/blokeres ikke af browser-actions.
+    # -----------------------------------------------------------------------
+    if (
+        action in BLOCKING_ACTIONS
+        and current_pca in BLOCKING_ACTIONS
+        and current_pca != action
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Handling '{current_pca}' er allerede igang — "
+                f"vent til klienten har fuldført den, før du sender '{action}'"
+            ),
+        )
+
+    # Særlig guard: samme action sendes igen (fx dobbelt-klik)
+    if action in BLOCKING_ACTIONS and current_pca == action:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Handling '{action}' er allerede igang på klienten",
+        )
+
+    # Livestream-specifik guard (bevaret fra original)
+    if (
+        action == "livestream_start"
+        and current_pca == "livestream_start"
+    ):
         raise HTTPException(status_code=400, detail="Livestream already requested")
+
+    # Valider action mod ChromeAction enum
     try:
         chrome_action = ChromeAction(action)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Ugyldig action '{action}'")
+
     client.pending_chrome_action = chrome_action
+
     if source is not None:
         if not isinstance(source, str):
             raise HTTPException(status_code=400, detail="Ugyldig source-værdi")
         src_lower = source.lower()
         if src_lower not in VALID_PENDING_CHROME_ACTION_SOURCES:
-            raise HTTPException(status_code=400, detail=f"Ugyldig source '{source}'. Tilladte: {sorted(VALID_PENDING_CHROME_ACTION_SOURCES)}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ugyldig source '{source}'. Tilladte: {sorted(VALID_PENDING_CHROME_ACTION_SOURCES)}",
+            )
         client.pending_chrome_action_source = src_lower
+
     session.add(client)
     session.commit()
     session.refresh(client)
     return {
         "ok": True,
         "pending_chrome_action": client.pending_chrome_action.value,
-        "pending_chrome_action_source": getattr(client, "pending_chrome_action_source", None)
+        "pending_chrome_action_source": getattr(client, "pending_chrome_action_source", None),
     }
 
 
@@ -188,7 +241,7 @@ def get_chrome_command(id: int, session=Depends(get_session), user=Depends(get_c
         raise HTTPException(status_code=404, detail="Client not found")
     return {
         "action": client.pending_chrome_action.value if client.pending_chrome_action else None,
-        "source": getattr(client, "pending_chrome_action_source", None)
+        "source": getattr(client, "pending_chrome_action_source", None),
     }
 
 
@@ -196,7 +249,7 @@ def get_chrome_command(id: int, session=Depends(get_session), user=Depends(get_c
 async def trigger_os_update(
     id: int,
     session=Depends(get_session),
-    user=Depends(get_current_admin_user)
+    user=Depends(get_current_admin_user),
 ):
     """
     Sætter pending_chrome_action = 'os_update' og pending_os_update = True
@@ -242,18 +295,31 @@ def get_ubuntu_updates(id: int, session=Depends(get_session), user=Depends(get_c
 @router.post("/clients/", response_model=Client)
 async def create_client(client_in: ClientCreate, session=Depends(get_session), user=Depends(get_current_user)):
     client = Client(
-        name=client_in.name, locality=client_in.locality,
-        wifi_ip_address=client_in.wifi_ip_address, wifi_mac_address=client_in.wifi_mac_address,
-        lan_ip_address=client_in.lan_ip_address, lan_mac_address=client_in.lan_mac_address,
-        status="pending", isOnline=False, last_seen=None,
-        sort_order=client_in.sort_order, kiosk_url=getattr(client_in, "kiosk_url", None),
-        ubuntu_version=getattr(client_in, "ubuntu_version", None), uptime=getattr(client_in, "uptime", None),
-        chrome_status=getattr(client_in, "chrome_status", "unknown"), chrome_last_updated=None,
-        chrome_color=getattr(client_in, "chrome_color", None), pending_reboot=False, pending_shutdown=False,
+        name=client_in.name,
+        locality=client_in.locality,
+        wifi_ip_address=client_in.wifi_ip_address,
+        wifi_mac_address=client_in.wifi_mac_address,
+        lan_ip_address=client_in.lan_ip_address,
+        lan_mac_address=client_in.lan_mac_address,
+        status="pending",
+        isOnline=False,
+        last_seen=None,
+        sort_order=client_in.sort_order,
+        kiosk_url=getattr(client_in, "kiosk_url", None),
+        ubuntu_version=getattr(client_in, "ubuntu_version", None),
+        uptime=getattr(client_in, "uptime", None),
+        chrome_status=getattr(client_in, "chrome_status", "unknown"),
+        chrome_last_updated=None,
+        chrome_color=getattr(client_in, "chrome_color", None),
+        pending_reboot=False,
+        pending_shutdown=False,
         pending_chrome_action=getattr(client_in, "pending_chrome_action", ChromeAction.NONE),
         pending_chrome_action_source=getattr(client_in, "pending_chrome_action_source", None),
-        school_id=getattr(client_in, "school_id", None), state=getattr(client_in, "state", "normal"),
-        livestream_status="idle", livestream_last_segment=None, livestream_last_error=None,
+        school_id=getattr(client_in, "school_id", None),
+        state=getattr(client_in, "state", "normal"),
+        livestream_status="idle",
+        livestream_last_segment=None,
+        livestream_last_error=None,
         ubuntu_updates_available=getattr(client_in, "ubuntu_updates_available", 0),
         pending_os_update=getattr(client_in, "pending_os_update", False),
     )
@@ -264,7 +330,12 @@ async def create_client(client_in: ClientCreate, session=Depends(get_session), u
 
 
 @router.put("/clients/{id}/update", response_model=Client)
-async def update_client(id: int, client_update: ClientUpdate, session=Depends(get_session), user=Depends(get_current_user)):
+async def update_client(
+    id: int,
+    client_update: ClientUpdate,
+    session=Depends(get_session),
+    user=Depends(get_current_user),
+):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -280,8 +351,10 @@ async def update_client(id: int, client_update: ClientUpdate, session=Depends(ge
     if "lan_mac_address" in fields: client.lan_mac_address = client_update.lan_mac_address
     if "chrome_status" in fields: client.chrome_status = client_update.chrome_status
     if "chrome_color" in fields: client.chrome_color = client_update.chrome_color
-    if "chrome_last_updated" in fields: client.chrome_last_updated = client_update.chrome_last_updated
-    elif "chrome_status" in fields: client.chrome_last_updated = utcnow()
+    if "chrome_last_updated" in fields:
+        client.chrome_last_updated = client_update.chrome_last_updated
+    elif "chrome_status" in fields:
+        client.chrome_last_updated = utcnow()
     if "last_seen" in fields: client.last_seen = client_update.last_seen
     if "created_at" in fields: client.created_at = client_update.created_at
     if "pending_reboot" in fields: client.pending_reboot = client_update.pending_reboot
@@ -320,7 +393,12 @@ async def update_client(id: int, client_update: ClientUpdate, session=Depends(ge
 
 
 @router.put("/clients/{id}/kiosk_url", response_model=Client)
-async def update_kiosk_url(id: int, data: dict = Body(...), session=Depends(get_session), user=Depends(get_current_user)):
+async def update_kiosk_url(
+    id: int,
+    data: dict = Body(...),
+    session=Depends(get_session),
+    user=Depends(get_current_user),
+):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -338,17 +416,26 @@ def get_school_year_dates(season_start: int):
     dates = []
     for month in range(8, 13):
         for day in range(1, 32):
-            try: dates.append(date(season_start, month, day))
-            except ValueError: continue
+            try:
+                dates.append(date(season_start, month, day))
+            except ValueError:
+                continue
     for month in range(1, 8):
         for day in range(1, 32):
-            try: dates.append(date(season_start + 1, month, day))
-            except ValueError: continue
+            try:
+                dates.append(date(season_start + 1, month, day))
+            except ValueError:
+                continue
     return dates
 
 
 @router.post("/clients/{id}/approve", response_model=Client)
-async def approve_client(id: int, data: dict = Body(None), session=Depends(get_session), user=Depends(get_current_admin_user)):
+async def approve_client(
+    id: int,
+    data: dict = Body(None),
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user),
+):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -375,7 +462,7 @@ async def approve_client(id: int, data: dict = Body(None), session=Depends(get_s
         season_times = session.exec(
             select(SchoolSeasonTimes).where(
                 SchoolSeasonTimes.school_id == school.id,
-                SchoolSeasonTimes.season == season_str
+                SchoolSeasonTimes.season == season_str,
             )
         ).first()
 
@@ -404,7 +491,7 @@ async def approve_client(id: int, data: dict = Body(None), session=Depends(get_s
     existing = session.exec(
         select(CalendarMarking).where(
             CalendarMarking.season == season_str,
-            CalendarMarking.client_id == client.id
+            CalendarMarking.client_id == client.id,
         )
     ).first()
     if not existing:
@@ -460,7 +547,8 @@ def reset_hls(client_id: int, user=Depends(get_current_user)):
     deleted, errors = [], []
     for f in glob.glob(os.path.join(hls_dir, "*")):
         try:
-            os.remove(f); deleted.append(os.path.basename(f))
+            os.remove(f)
+            deleted.append(os.path.basename(f))
         except Exception as e:
             errors.append({"file": os.path.basename(f), "error": str(e)})
     return {"status": "ok", "deleted_files": deleted, "errors": errors}
@@ -474,7 +562,8 @@ def stop_hls(client_id: int, user=Depends(get_current_user)):
     deleted, errors = [], []
     for f in glob.glob(os.path.join(hls_dir, "*")):
         try:
-            os.remove(f); deleted.append(os.path.basename(f))
+            os.remove(f)
+            deleted.append(os.path.basename(f))
         except Exception as e:
             errors.append({"file": os.path.basename(f), "error": str(e)})
     return {"status": "ok", "deleted_files": deleted, "errors": errors}
