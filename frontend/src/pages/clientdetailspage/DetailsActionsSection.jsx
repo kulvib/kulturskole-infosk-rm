@@ -43,14 +43,8 @@ import { useAuth } from "../../auth/authcontext";
   FIX #2: isDisabledByState bruger chromeIsRunning (udledt fra liveStep).
   FIX #3: "system_rebooting" og "system_shutting_down" er fjernet fra
     BUSY_CHROME_STEPS og flyttet til CHROME_STOPPED_STEPS.
-
-    Årsag: Mens reboot/shutdown-handlingen kører er clientActionPending=true,
-    så banneret vises automatisk — disse steps behøver IKKE at være i
-    BUSY_CHROME_STEPS. Problemet var at når polling-løkken i ClientDetailsPage
-    terminerede (system_rebooting er terminal for reboot-action), blev
-    clientActionPending=false, men liveStep="system_rebooting" forblev i
-    BUSY_CHROME_STEPS → isLiveStepBusy=true → banner og knap-lock hang
-    i ubestemt tid indtil klienten kom op igen og skrev et nyt step.
+  FIX #4: pendingLabel viser "liveChromeStatus · stepLabel" når begge har værdi,
+    så headeren altid viser baseline-status + aktiv handling-tekst kombineret.
 
   BUSY_CHROME_STEPS (låser knapper + viser banner — kun MENS handling kører):
     clear_cookies            — rydder cookies
@@ -84,9 +78,6 @@ import { useAuth } from "../../auth/authcontext";
     system_shutting_down   ← FIX #3: Chrome kører ikke under/efter shutdown
 */
 
-// FIX #3: system_rebooting og system_shutting_down er FJERNET.
-// Banneret under reboot/shutdown vises via clientActionPending=true.
-// Når polling terminerer sættes clientActionPending=false og banneret forsvinder korrekt.
 const BUSY_CHROME_STEPS = new Set([
   "clear_cookies",
   "terminate_chrome",
@@ -95,14 +86,11 @@ const BUSY_CHROME_STEPS = new Set([
   "system_reboot_countdown",
 ]);
 
-// Steps der bekræfter Chrome kører
 const CHROME_RUNNING_STEPS = new Set([
   "start_chrome",
   "chrome_opened_manual",
 ]);
 
-// FIX #3: system_rebooting og system_shutting_down tilføjet her —
-// Chrome kører definitivt ikke når maskinen genstarter eller lukker ned.
 const CHROME_STOPPED_STEPS = new Set([
   "chrome_closed_programmatically",
   "chrome_closed_manual",
@@ -113,8 +101,9 @@ const CHROME_STOPPED_STEPS = new Set([
   "system_shutting_down",
 ]);
 
-// Oversæt faktiske chrome step-navne til læsbar dansk tekst
-function getStepLabel(step, liveChromeStatus) {
+// Oversæt faktiske chrome step-navne til læsbar dansk tekst.
+// liveChromeStatus bruges IKKE som fallback her — kombinationen bygges manuelt i pendingLabel.
+function getStepLabel(step) {
   if (!step) return null;
   const s = String(step).toLowerCase();
   if (s === "clear_cookies")                   return "Rydder cookies…";
@@ -131,7 +120,6 @@ function getStepLabel(step, liveChromeStatus) {
   if (s === "system_sleep")                    return "Klient i dvale";
   if (s === "system_wake")                     return "Klient vækket";
   if (s === "error")                           return "Der opstod en fejl";
-  if (liveChromeStatus)                        return liveChromeStatus;
   return null;
 }
 
@@ -297,11 +285,18 @@ export default function ClientDetailsActionsSection({
 
   // ---------------------------------------------------------------------------
   // Pending-banner tekst
+  // FIX #4: Kombinér liveChromeStatus og stepLabel når begge har værdi:
+  //   "Chrome kører · Tæller ned…"
+  // Hvis kun stepLabel → vis kun stepLabel.
+  // Hvis ingen step matcher → vis liveChromeStatus alene eller fallback-tekst.
   // ---------------------------------------------------------------------------
   const pendingLabel = (() => {
     if (!clientActionPending && !hasPendingAction && !isLiveStepBusy) return null;
-    const stepLabel = getStepLabel(liveStep, liveChromeStatus);
-    if (stepLabel) return stepLabel;
+    const stepLabel = getStepLabel(liveStep);
+    if (stepLabel) {
+      return liveChromeStatus ? `${liveChromeStatus} · ${stepLabel}` : stepLabel;
+    }
+    if (liveChromeStatus) return liveChromeStatus;
     const actionName = normalizedPendingAction !== "none"
       ? normalizedPendingAction
       : "handling";
