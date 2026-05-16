@@ -4,35 +4,17 @@ import { Box, CircularProgress, Typography, Button } from "@mui/material";
 import ClientDetailsPage from "./ClientDetailsPage";
 import { getClient, getMarkedDays, getCurrentSeason } from "../../api";
 
-/*
-  ClientDetailsPageWrapper.jsx
-
-  FIX (kritisk): Hvis id mangler/er undefined sættes loading = false
-    og en fejlbesked vises — i stedet for at returnere stille og lade
-    loading-spinneren køre for evigt.
-
-  FIX (kritisk): getMarkedDays blev kaldt som getMarkedDays(id, season)
-    men api.js signaturen er getMarkedDays(season, client_id, ...).
-    Rettet til: getMarkedDays(season, id).
-
-  FIX: isOnline bevares direkte fra server-svar — ingen lokal override.
-  FIX: showSnackbar defaulter til console.warn hvis parent ikke sender prop.
-  FIX: mountedRef guard på alle async operationer.
-*/
-
 export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarProp }) {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [client, setClient] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const [markedDays, setMarkedDays] = useState({});
+  const [client,          setClient]          = useState(null);
+  const [loading,         setLoading]         = useState(true);
+  const [error,           setError]           = useState(null);
+  const [refreshing,      setRefreshing]      = useState(false);
+  const [markedDays,      setMarkedDays]      = useState({});
   const [calendarLoading, setCalendarLoading] = useState(false);
-
-  const [streamKey, setStreamKey] = useState(0);
+  const [streamKey,       setStreamKey]       = useState(0);
 
   const mountedRef = useRef(true);
 
@@ -50,9 +32,11 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
     }
   }, [showSnackbarProp]);
 
+  // ---------------------------------------------------------------------------
   // Hent klient
+  // ---------------------------------------------------------------------------
   const fetchClient = useCallback(async (isRefresh = false) => {
-    // FIX: Sæt loading = false og vis fejl hvis id mangler,
+    // FIX: Sætter loading/refreshing = false og viser fejl hvis id mangler,
     // i stedet for at returnere stille og lade spinneren køre for evigt.
     if (!id) {
       setLoading(false);
@@ -80,9 +64,7 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
       } else if (err?.response?.status === 404 || err?.status === 404) {
         setError("Klienten blev ikke fundet.");
       } else {
-        setError(
-          "Kunne ikke hente klientdata: " + (err?.message || String(err))
-        );
+        setError("Kunne ikke hente klientdata: " + (err?.message || String(err)));
       }
     } finally {
       if (mountedRef.current) {
@@ -92,9 +74,11 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
     }
   }, [id]);
 
+  // ---------------------------------------------------------------------------
   // Hent kalendermarkinger
+  // ---------------------------------------------------------------------------
   const fetchMarkedDays = useCallback(async () => {
-    if (!id) return;
+    if (!id || !mountedRef.current) return;
     setCalendarLoading(true);
     try {
       const seasonData = await getCurrentSeason();
@@ -105,7 +89,6 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
       }
 
       // FIX: Korrekt parameter-rækkefølge: getMarkedDays(season, client_id)
-      // Tidligere forkert: getMarkedDays(id, season)
       const data = await getMarkedDays(season, id);
 
       if (!mountedRef.current) return;
@@ -115,51 +98,55 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
       );
     } catch (err) {
       if (!mountedRef.current) return;
-      console.warn(
-        "Kunne ikke hente kalendermarkinger:",
-        err?.message || err
-      );
+      console.warn("Kunne ikke hente kalendermarkinger:", err?.message || err);
       setMarkedDays({});
     } finally {
       if (mountedRef.current) setCalendarLoading(false);
     }
   }, [id]);
 
+  // ---------------------------------------------------------------------------
   // Initial load
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     mountedRef.current = true;
     fetchClient(false);
     fetchMarkedDays();
-    return () => {
-      mountedRef.current = false;
-    };
+    return () => { mountedRef.current = false; };
   }, [fetchClient, fetchMarkedDays]);
 
+  // ---------------------------------------------------------------------------
   // Refresh handler
+  // ---------------------------------------------------------------------------
   const handleRefresh = useCallback(async () => {
     await Promise.all([fetchClient(true), fetchMarkedDays()]);
     showSnackbar({ message: "Klient opdateret", severity: "success" });
   }, [fetchClient, fetchMarkedDays, showSnackbar]);
 
-  // Stream restart
+  // ---------------------------------------------------------------------------
+  // Stream restart — bruges til at force-reinitiere livestream fra parent
+  // FIX: handleRestartStream og onRestartStream-prop fjernet —
+  // ClientDetailsPage bruger dem ikke længere. streamKey sendes stadig
+  // direkte til livestream-sektionen som "hard reset"-mekanisme.
+  // ---------------------------------------------------------------------------
   const handleRestartStream = useCallback(() => {
     setStreamKey((prev) => prev + 1);
   }, []);
 
-  // --- Render ---
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: 200,
-          flexDirection: "column",
-          gap: 2,
-        }}
-      >
+      <Box sx={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        minHeight: 200,
+        flexDirection: "column",
+        gap: 2,
+      }}>
         <CircularProgress />
         <Typography variant="body2" color="text.secondary">
           Henter klientdata...
@@ -170,35 +157,23 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
 
   if (error) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: 200,
-          flexDirection: "column",
-          gap: 2,
-          px: 2,
-        }}
-      >
+      <Box sx={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        minHeight: 200,
+        flexDirection: "column",
+        gap: 2,
+        px: 2,
+      }}>
         <Typography variant="h6" color="error" align="center">
           {error}
         </Typography>
-        <Box
-          sx={{
-            display: "flex",
-            gap: 2,
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
+        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center" }}>
           <Button variant="outlined" onClick={() => fetchClient(false)}>
             Prøv igen
           </Button>
-          <Button
-            variant="outlined"
-            onClick={() => navigate("/clients")}
-          >
+          <Button variant="outlined" onClick={() => navigate("/clients")}>
             Tilbage til klientoversigt
           </Button>
         </Box>
@@ -208,23 +183,18 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
 
   if (!client) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: 200,
-          flexDirection: "column",
-          gap: 2,
-        }}
-      >
+      <Box sx={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        minHeight: 200,
+        flexDirection: "column",
+        gap: 2,
+      }}>
         <Typography variant="body1" color="text.secondary">
           Ingen klientdata tilgængelig.
         </Typography>
-        <Button
-          variant="outlined"
-          onClick={() => navigate("/clients")}
-        >
+        <Button variant="outlined" onClick={() => navigate("/clients")}>
           Tilbage til klientoversigt
         </Button>
       </Box>
@@ -239,7 +209,8 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
       markedDays={markedDays}
       calendarLoading={calendarLoading}
       streamKey={streamKey}
-      onRestartStream={handleRestartStream}
+      // FIX: onRestartStream fjernet — ClientDetailsPage bruger den ikke længere.
+      // Livestream-sektionen håndterer sin egen genstart internt.
       showSnackbar={showSnackbar}
     />
   );
