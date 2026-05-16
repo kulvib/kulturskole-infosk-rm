@@ -35,21 +35,19 @@ import { useAuth } from "../../auth/authcontext";
   - Viser handlingsknapper og håndterer klik.
   - Al polling og lock-logik ligger i ClientDetailsPage (undgår blinking).
   - clientActionPending (prop) låser alle knapper mens en handling afventer klient.
-  - liveStep + liveChromeStatus viser aktuel chrome-status i pending-banneret
-    — samme datakilde som ClientDetailsHeaderSection (hvert 1s).
+  - liveStep bruges nu til BÅDE banner-tekst OG knap-lock — banneret følger
+    headeren 1:1 og forsvinder præcis når headeren viser en rolig tilstand.
   - Ingen intern polling overhovedet.
 */
 
-// FIX: Udvidet med alle transiente steps som klientkoden skriver.
-// Skal matche BUSY_CHROME_STEPS i ClientDetailsPage.jsx.
+// Skal matche BUSY_CHROME_STEPS i ClientDetailsPage.jsx
 const BUSY_CHROME_STEPS = new Set([
   "countdown",
   "clear_cookies",
   "system_reboot_countdown",
-  "chrome_starting",   // FIX: skrives under scenario_system_start
-  "chrome_stopping",   // FIX: skrives under scenario_manual_shutdown
-  "system_sleep",      // FIX: skrives under sleep-flow
-  "system_wake",       // FIX: skrives under wake-flow
+  "chrome_starting",
+  "chrome_stopping",
+  "system_wake",
 ]);
 
 // Oversæt chrome step-navn til læsbar dansk tekst til banner
@@ -133,11 +131,8 @@ export default function ClientDetailsActionsSection({
   refreshing,
   showSnackbar: showSnackbarProp,
   clientOnline = true,
-  // Fra ClientDetailsPage — true mens handling afventer klient-bekræftelse
   clientActionPending = false,
-  // Fra ClientDetailsPage — seneste chrome step navn (opdateres hvert 1s)
   liveStep = null,
-  // Fra ClientDetailsPage — seneste chrome status tekst (opdateres hvert 1s)
   liveChromeStatus = null,
 }) {
   const theme    = useTheme();
@@ -157,12 +152,16 @@ export default function ClientDetailsActionsSection({
   const normalizedClientState   = String(clientState || "").trim().toLowerCase();
   const isSleeping              = normalizedClientState.startsWith("sleep");
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
-  const hasPendingAction        =
-    !!normalizedPendingAction && normalizedPendingAction !== "none";
+  const hasPendingAction        = !!normalizedPendingAction && normalizedPendingAction !== "none";
+
+  // Låser knapper + viser banner hvis liveStep er et aktivt busy-step
+  const isLiveStepBusy = BUSY_CHROME_STEPS.has(String(liveStep ?? "").toLowerCase());
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
-  // Lås alle knapper hvis: loading, refreshing, handling afventer klient, eller pending action
-  const anyBusy = anyLoading || !!refreshing || clientActionPending || hasPendingAction;
+
+  // Lås alle knapper hvis: loading, refreshing, handling afventer klient,
+  // pending action i backend, ELLER liveStep er et busy-step
+  const anyBusy = anyLoading || !!refreshing || clientActionPending || hasPendingAction || isLiveStepBusy;
 
   // ---------------------------------------------------------------------------
   // Snackbar
@@ -224,10 +223,11 @@ export default function ClientDetailsActionsSection({
 
   // ---------------------------------------------------------------------------
   // Pending-banner tekst
-  // Prioritet: chrome step label → liveChromeStatus → pending action navn
+  // Vises så længe clientActionPending, hasPendingAction ELLER isLiveStepBusy
+  // — banneret følger headeren 1:1
   // ---------------------------------------------------------------------------
   const pendingLabel = (() => {
-    if (!clientActionPending && !hasPendingAction) return null;
+    if (!clientActionPending && !hasPendingAction && !isLiveStepBusy) return null;
 
     // Brug chrome step label hvis tilgængeligt (samme kilde som header)
     const stepLabel = getStepLabel(liveStep, liveChromeStatus);
@@ -346,7 +346,7 @@ export default function ClientDetailsActionsSection({
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2, ...cardStyle }}>
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
 
-        {/* Pending / waiting indicator */}
+        {/* Pending / waiting indicator — følger headeren 1:1 */}
         {pendingLabel && (
           <Alert
             severity="info"
