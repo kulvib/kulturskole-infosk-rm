@@ -27,27 +27,16 @@ import TerminalIcon from "@mui/icons-material/Terminal";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
-import { getClient, apiUrl } from "../../api";
 
 /*
   DetailsActionsSection.jsx
 
-  Fix: pollUntilConfirmed checker nu BÅDE pending_chrome_action OG chrome-status
-  for at forhindre at låsen frigives mens klienten stadig er i countdown/startup-flow.
+  Ansvar:
+  - Viser handlingsknapper og håndterer klik.
+  - Al polling og lock-logik ligger i ClientDetailsPage (undgår blinking).
+  - clientActionPending (prop) låser alle knapper mens en handling afventer klient.
+  - Ingen intern pollUntilConfirmed — ClientDetailsPage ejer den logik.
 */
-
-const POLL_INTERVAL_MS = 1500;
-const POLL_MAX_WAIT_MS = 60_000;
-
-// Trin der indikerer at klienten er optaget — lås skal holdes
-const BUSY_CHROME_STEPS = new Set([
-  "countdown",
-  "clear_cookies",
-  "system_reboot_countdown",
-]);
-
-const ACTIONS_NEEDING_CONFIRMATION = new Set(["shutdown"]);
-const ACTIONS_NEEDING_POLLING = new Set(["start", "stop", "sleep", "wakeup", "reboot"]);
 
 const actionBtnStyle = {
   minWidth: 0,
@@ -68,7 +57,7 @@ const actionBtnStyle = {
 };
 
 function ActionButton({ btn, isMobile, anyBusy }) {
-  const isActive = !!btn.loading || !!btn.waiting;
+  const isActive = !!btn.loading;
   const isDisabled = isActive || anyBusy || !!btn.disabled;
 
   const button = (
@@ -82,11 +71,7 @@ function ActionButton({ btn, isMobile, anyBusy }) {
         sx={actionBtnStyle}
         fullWidth
       >
-        {btn.waiting
-          ? "Venter på klient…"
-          : btn.loading
-          ? "Arbejder..."
-          : btn.label}
+        {btn.loading ? "Arbejder..." : btn.label}
       </Button>
     </span>
   );
@@ -99,11 +84,6 @@ function ActionButton({ btn, isMobile, anyBusy }) {
   );
 }
 
-function getAuthHeaders() {
-  const token = localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export default function ClientDetailsActionsSection({
   clientId,
   clientState,
@@ -114,6 +94,8 @@ export default function ClientDetailsActionsSection({
   refreshing,
   showSnackbar: showSnackbarProp,
   clientOnline = true,
+  // Prop fra ClientDetailsPage — true mens handling afventer klient-bekræftelse
+  clientActionPending = false,
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -122,8 +104,6 @@ export default function ClientDetailsActionsSection({
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
   const [actionLoading, setActionLoading] = useState({});
-  const [waitingAction, setWaitingAction] = useState(null);
-  const [waitingLabel, setWaitingLabel] = useState("");
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
   const [localSnackbar, setLocalSnackbar] = useState({
     open: false,
@@ -133,13 +113,14 @@ export default function ClientDetailsActionsSection({
 
   const normalizedClientState = String(clientState || "").trim().toLowerCase();
   const isSleeping = normalizedClientState.startsWith("sleep");
+
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
   const hasPendingAction =
     !!normalizedPendingAction && normalizedPendingAction !== "none";
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
-  const anyWaiting = waitingAction !== null;
-  const anyBusy = anyLoading || anyWaiting || !!refreshing;
+  // Lås alle knapper hvis: loading, refreshing, handling afventer klient, eller pending action
+  const anyBusy = anyLoading || !!refreshing || clientActionPending || hasPendingAction;
 
   // ---------------------------------------------------------------------------
   // Snackbar
@@ -160,85 +141,12 @@ export default function ClientDetailsActionsSection({
   );
 
   // ---------------------------------------------------------------------------
-  // Hent chrome-status og tjek om klienten stadig er i et aktivt trin
-  // ---------------------------------------------------------------------------
-  const isChromeStatusBusy = useCallback(async () => {
-    if (!clientId) return false;
-    try {
-      const resp = await fetch(
-        `${apiUrl}/api/clients/${clientId}/chrome-status`,
-        { headers: getAuthHeaders(), signal: AbortSignal.timeout(4000) }
-      );
-      if (!resp.ok) return false;
-      const data = await resp.json();
-      const stepName = data?.step?.step ?? "";
-      return BUSY_CHROME_STEPS.has(String(stepName).toLowerCase());
-    } catch {
-      return false;
-    }
-  }, [clientId]);
-
-  // ---------------------------------------------------------------------------
-  // Poll backend indtil:
-  //   1) pending_chrome_action === "none"  OG
-  //   2) chrome-status ikke er i et aktivt trin (countdown osv.)
-  // ---------------------------------------------------------------------------
-  const pollUntilConfirmed = useCallback(
-    async (action) => {
-      if (!ACTIONS_NEEDING_POLLING.has(action)) return;
-      if (!clientId) return;
-
-      setWaitingAction(action);
-      setWaitingLabel("Venter på klient…");
-      const start = Date.now();
-
-      try {
-        while (Date.now() - start < POLL_MAX_WAIT_MS) {
-          await new Promise((res) => setTimeout(res, POLL_INTERVAL_MS));
-
-          // Trin 1: pending_chrome_action skal være "none"
-          let pcaClear = false;
-          try {
-            const data = await getClient(clientId);
-            const pca = String(data?.pending_chrome_action || "").toLowerCase();
-            pcaClear = !pca || pca === "none";
-          } catch {
-            // ignorer poll-fejl
-          }
-
-          if (!pcaClear) {
-            setWaitingLabel("Afventer klient…");
-            continue;
-          }
-
-          // Trin 2: chrome-status må ikke vise et aktivt trin (fx countdown)
-          const stillBusy = await isChromeStatusBusy();
-          if (stillBusy) {
-            setWaitingLabel("Starter browser…");
-            continue;
-          }
-
-          // Alt OK — frigiv låsen
-          return;
-        }
-      } finally {
-        setWaitingAction(null);
-        setWaitingLabel("");
-      }
-    },
-    [clientId, isChromeStatusBusy]
-  );
-
-  // ---------------------------------------------------------------------------
-  // Kør handling
+  // Kør handling — ingen intern polling (ClientDetailsPage håndterer det)
   // ---------------------------------------------------------------------------
   const doAction = useCallback(
     async (action) => {
       if (clientOnline === false) {
-        notify({
-          message: "Klienten er offline — handling afvist",
-          severity: "warning",
-        });
+        notify({ message: "Klienten er offline — handling afvist", severity: "warning" });
         return;
       }
 
@@ -250,14 +158,11 @@ export default function ClientDetailsActionsSection({
           message: "Fejl: " + (err?.message || "Kunne ikke udføre handling"),
           severity: "error",
         });
-        return;
       } finally {
         setActionLoading((prev) => ({ ...prev, [action]: false }));
       }
-
-      await pollUntilConfirmed(action);
     },
-    [clientOnline, handleClientAction, notify, pollUntilConfirmed]
+    [clientOnline, handleClientAction, notify]
   );
 
   // ---------------------------------------------------------------------------
@@ -266,12 +171,20 @@ export default function ClientDetailsActionsSection({
   const isDisabledByState = useCallback(
     (key) => {
       if (clientOnline === false) return true;
-      if (hasPendingAction) return true;
       if (isSleeping) return key !== "wakeup";
       return key === "wakeup";
     },
-    [clientOnline, hasPendingAction, isSleeping]
+    [clientOnline, isSleeping]
   );
+
+  // ---------------------------------------------------------------------------
+  // Pending-label til info-banner
+  // ---------------------------------------------------------------------------
+  const pendingLabel = clientActionPending
+    ? `Afventer klient: ${normalizedPendingAction !== "none" ? normalizedPendingAction : "handling"}`
+    : hasPendingAction
+    ? `Afventer klient: ${normalizedPendingAction}`
+    : null;
 
   // ---------------------------------------------------------------------------
   // Knap-definitioner — Række 1 (alle brugere)
@@ -285,7 +198,6 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: () => doAction("start"),
       loading: !!actionLoading["start"],
-      waiting: waitingAction === "start",
       disabled: isDisabledByState("start"),
       tooltip: "Start kiosk browser",
     },
@@ -297,7 +209,6 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: () => doAction("stop"),
       loading: !!actionLoading["stop"],
-      waiting: waitingAction === "stop",
       disabled: isDisabledByState("stop"),
       tooltip: "Stop kiosk browser",
     },
@@ -309,7 +220,6 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: () => doAction("sleep"),
       loading: !!actionLoading["sleep"],
-      waiting: waitingAction === "sleep",
       disabled: isDisabledByState("sleep"),
       tooltip: "Sæt klient i dvale",
     },
@@ -321,7 +231,6 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: () => doAction("wakeup"),
       loading: !!actionLoading["wakeup"],
-      waiting: waitingAction === "wakeup",
       disabled: isDisabledByState("wakeup"),
       tooltip: "Væk klient fra dvale",
     },
@@ -339,7 +248,6 @@ export default function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => doAction("reboot"),
       loading: !!actionLoading["reboot"],
-      waiting: waitingAction === "reboot",
       disabled: clientOnline === false,
       tooltip: "Genstart klient",
     },
@@ -351,7 +259,6 @@ export default function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => setShutdownDialogOpen(true),
       loading: !!actionLoading["shutdown"],
-      waiting: false,
       disabled: clientOnline === false,
       tooltip: "Sluk klient — kræver fysisk tænding bagefter",
     },
@@ -363,7 +270,6 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: handleOpenTerminal,
       loading: false,
-      waiting: false,
       disabled: clientOnline === false,
       tooltip: "Åbn terminal",
     },
@@ -375,7 +281,6 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: handleOpenRemoteDesktop,
       loading: false,
-      waiting: false,
       disabled: clientOnline === false,
       tooltip: "Åbn fjernskrivebord",
     },
@@ -388,11 +293,9 @@ export default function ClientDetailsActionsSection({
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
 
         {/* Pending / waiting indicator */}
-        {(hasPendingAction || anyWaiting) && (
-          <Alert severity="info" sx={{ mb: 1.5 }}>
-            {anyWaiting
-              ? waitingLabel || `Venter på bekræftelse fra klient: ${waitingAction}`
-              : `Afventer klient: ${normalizedPendingAction}`}
+        {pendingLabel && (
+          <Alert severity="info" sx={{ mb: 1.5 }} icon={<CircularProgress size={16} />}>
+            {pendingLabel}
           </Alert>
         )}
 
