@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   Box,
   Card,
@@ -31,16 +31,24 @@ import { useAuth } from "../../auth/authcontext";
 /*
   DetailsActionsSection.jsx
 
-  LØSNING 2: ALLE ændringer registreres og sendes til backend med korrekt source.
+  Ansvar:
+  - Viser handlingsknapper og håndterer klik.
+  - Al polling og lock-logik ligger i ClientDetailsPage (undgår blinking).
+  - clientActionPending (prop) låser alle knapper mens en handling afventer klient.
+  - isLiveStepBusy låser knapper + viser banner hvis liveStep er et aktivt
+    busy-step — banneret følger headeren 1:1.
+  - Ingen intern polling overhovedet.
 
-  Alle handlinger sendes via /api/clients/{id}/chrome-command med
-  source="actionbutton" — dette sikrer at klienten (clientflow_service.py)
-  kender den korrekte trigger-kilde og skriver korrekt status
-  (fx "Kiosk browser startet fra backend" i stedet for "fra GUI").
-
-  Tidligere sendte komponenten handleClientAction(action) uden source,
-  hvilket betød at klienten ikke kunne skelne backend-knapper fra GUI-knapper.
-  Nu sendes source eksplicit med hver handling.
+  FIX #1: "shutdown_chrome" er fjernet fra BUSY_CHROME_STEPS.
+  FIX #2: isDisabledByState bruger chromeIsRunning (udledt fra liveStep).
+  FIX #3: "system_rebooting" og "system_shutting_down" er fjernet fra
+    BUSY_CHROME_STEPS og flyttet til CHROME_STOPPED_STEPS.
+  FIX #4: pendingLabel viser "liveChromeStatus · stepLabel" når begge har værdi,
+    så headeren altid viser baseline-status + aktiv handling-tekst kombineret.
+  FIX #5: Optimistisk låsning ved reboot/shutdown — knapper deaktiveres STRAKS
+    ved klik uden at vente på næste poll-cyklus. localBlockAll sættes true ved
+    reboot/shutdown og ryddes automatisk når liveStep bekræfter terminal-tilstand
+    ELLER efter MAX_OPTIMISTIC_BLOCK_MS millisekunder (sikkerhedsventil).
 
   BUSY_CHROME_STEPS (låser knapper + viser banner — kun MENS handling kører):
     clear_cookies            — rydder cookies
@@ -56,8 +64,8 @@ import { useAuth } from "../../auth/authcontext";
     chrome_closed_manual           — Chrome lukket manuelt
     system_sleep                   — sleep-handling færdig
     system_wake                    — wake-handling færdig
-    system_rebooting               — reboot igangsat
-    system_shutting_down           — shutdown igangsat
+    system_rebooting               — reboot igangsat (terminal for reboot-action)
+    system_shutting_down           — shutdown igangsat (terminal for shutdown-action)
     error                          — scenario fejlede
 
   CHROME_RUNNING_STEPS (Chrome er oppe):
@@ -70,9 +78,13 @@ import { useAuth } from "../../auth/authcontext";
     shutdown_chrome
     kill_chrome
     system_sleep
-    system_rebooting
-    system_shutting_down
+    system_rebooting       ← FIX #3: Chrome kører ikke under/efter reboot
+    system_shutting_down   ← FIX #3: Chrome kører ikke under/efter shutdown
 */
+
+// Maksimal tid (ms) localBlockAll forbliver aktiv som sikkerhedsventil.
+// Hvis backend/klient ikke svarer inden for dette tidsrum, fjernes låsen automatisk.
+const MAX_OPTIMISTIC_BLOCK_MS = 30_000;
 
 const BUSY_CHROME_STEPS = new Set([
   "clear_cookies",
@@ -97,6 +109,14 @@ const CHROME_STOPPED_STEPS = new Set([
   "system_shutting_down",
 ]);
 
+// Terminal steps der bekræfter at reboot/shutdown er igangsat
+// — bruges til at rydde localBlockAll automatisk
+const REBOOT_SHUTDOWN_TERMINAL_STEPS = new Set([
+  "system_rebooting",
+  "system_shutting_down",
+]);
+
+// Oversæt faktiske chrome step-navne til læsbar dansk tekst.
 function getStepLabel(step) {
   if (!step) return null;
   const s = String(step).toLowerCase();
@@ -198,9 +218,33 @@ export default function ClientDetailsActionsSection({
     severity: "success",
   });
 
-  // ---------------------------------------------------------------------------
-  // Afledte tilstande
-  // ---------------------------------------------------------------------------
+  // FIX #5: Optimistisk låsning — sættes true ved reboot/shutdown-klik,
+  // ryddes automatisk når terminal-step bekræftes eller timeout udløber.
+  const [localBlockAll, setLocalBlockAll] = useState(false);
+  const localBlockTimerRef = useRef(null);
+
+  // Ryd localBlockAll automatisk ved terminal-step fra liveStep
+  useEffect(() => {
+    if (!localBlockAll) return;
+    const liveStepNormalized = String(liveStep ?? "").toLowerCase();
+    if (REBOOT_SHUTDOWN_TERMINAL_STEPS.has(liveStepNormalized)) {
+      setLocalBlockAll(false);
+      if (localBlockTimerRef.current) {
+        clearTimeout(localBlockTimerRef.current);
+        localBlockTimerRef.current = null;
+      }
+    }
+  }, [liveStep, localBlockAll]);
+
+  // Ryd timer ved unmount
+  useEffect(() => {
+    return () => {
+      if (localBlockTimerRef.current) {
+        clearTimeout(localBlockTimerRef.current);
+      }
+    };
+  }, []);
+
   const normalizedClientState   = String(clientState || "").trim().toLowerCase();
   const isSleeping              = normalizedClientState.startsWith("sleep");
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
@@ -216,7 +260,9 @@ export default function ClientDetailsActionsSection({
     : null;
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
-  const anyBusy    = anyLoading || !!refreshing || clientActionPending || hasPendingAction || isLiveStepBusy;
+
+  // FIX #5: localBlockAll medtages i anyBusy
+  const anyBusy = anyLoading || !!refreshing || clientActionPending || hasPendingAction || isLiveStepBusy || localBlockAll;
 
   // ---------------------------------------------------------------------------
   // Snackbar
@@ -237,19 +283,12 @@ export default function ClientDetailsActionsSection({
   );
 
   // ---------------------------------------------------------------------------
-  // LØSNING 2: Kør handling med source="actionbutton"
-  //
-  // handleClientAction(action, { source }) kaldes nu med source eksplicit.
-  // Dette propageres til /api/clients/{id}/chrome-command med source="actionbutton"
-  // i forælderkomponenten (ClientDetailsPage), så klienten kan udlede
-  // trigger="actionbutton_backend_sleep_wakeup" → normaliseret til "backend"
-  // via TRIGGER_ALIASES i status_map.py.
-  //
-  // Uden dette sendes ingen source, og klienten kan ikke skelne
-  // "backend-knap klikket" fra "GUI-knap på klient klikket".
+  // Kør handling
+  // FIX #5: Ved reboot/shutdown sættes localBlockAll=true STRAKS (optimistisk
+  // låsning) så knapperne deaktiveres med det samme — uden at vente på poll.
   // ---------------------------------------------------------------------------
   const doAction = useCallback(
-    async (action, extraOpts = {}) => {
+    async (action) => {
       if (clientOnline === false) {
         notify({
           message: "Klienten er offline — handling afvist",
@@ -258,29 +297,33 @@ export default function ClientDetailsActionsSection({
         return;
       }
 
+      // FIX #5: Optimistisk låsning ved reboot og shutdown
+      const isRebootOrShutdown = action === "reboot" || action === "shutdown";
+      if (isRebootOrShutdown) {
+        setLocalBlockAll(true);
+        // Sikkerhedsventil: ryd låsen efter MAX_OPTIMISTIC_BLOCK_MS
+        // hvis klienten ikke svarer (fx offline/fejl)
+        if (localBlockTimerRef.current) {
+          clearTimeout(localBlockTimerRef.current);
+        }
+        localBlockTimerRef.current = setTimeout(() => {
+          setLocalBlockAll(false);
+          localBlockTimerRef.current = null;
+        }, MAX_OPTIMISTIC_BLOCK_MS);
+      }
+
       setActionLoading((prev) => ({ ...prev, [action]: true }));
       try {
-        // LØSNING 2: send source med alle handlinger fra denne komponent.
-        // Forælderkomponenten (ClientDetailsPage / handleClientAction) skal
-        // videresende source til POST /api/clients/{id}/chrome-command som
-        //   { action, source: "actionbutton" }
-        // Klienten (clientflow_service.py) bruger source til at sætte
-        // trigger korrekt i _map_source_to_trigger().
-        await handleClientAction(action, { source: "actionbutton", ...extraOpts });
-
-        // Giv bruger feedback ved succesfuld handling
-        const labels = {
-          start:   "Start-kommando sendt til klient",
-          stop:    "Stop-kommando sendt til klient",
-          sleep:   "Dvale-kommando sendt til klient",
-          wakeup:  "Væk-kommando sendt til klient",
-          reboot:  "Genstart-kommando sendt til klient",
-          shutdown:"Slukning-kommando sendt til klient",
-        };
-        if (labels[action]) {
-          notify({ message: labels[action], severity: "success" });
-        }
+        await handleClientAction(action);
       } catch (err) {
+        // Ryd optimistisk lås ved fejl så bruger kan prøve igen
+        if (isRebootOrShutdown) {
+          setLocalBlockAll(false);
+          if (localBlockTimerRef.current) {
+            clearTimeout(localBlockTimerRef.current);
+            localBlockTimerRef.current = null;
+          }
+        }
         notify({
           message: "Fejl: " + (err?.message || "Kunne ikke udføre handling"),
           severity: "error",
@@ -300,8 +343,8 @@ export default function ClientDetailsActionsSection({
       if (clientOnline === false) return true;
       if (isSleeping) return key !== "wakeup";
       if (key === "wakeup") return true;
-      if (key === "start" && chromeIsRunning === true)  return true;
-      if (key === "stop"  && chromeIsRunning === false) return true;
+      if (key === "start" && chromeIsRunning === true) return true;
+      if (key === "stop" && chromeIsRunning === false) return true;
       return false;
     },
     [clientOnline, isSleeping, chromeIsRunning]
@@ -309,8 +352,22 @@ export default function ClientDetailsActionsSection({
 
   // ---------------------------------------------------------------------------
   // Pending-banner tekst
+  // FIX #4: Kombinér liveChromeStatus og stepLabel når begge har værdi.
+  // FIX #5: Vis specifik tekst ved localBlockAll (reboot/shutdown igangsat).
   // ---------------------------------------------------------------------------
   const pendingLabel = (() => {
+    // Vis straks når localBlockAll er sat (optimistisk)
+    if (localBlockAll) {
+      const liveStepNorm2 = String(liveStep ?? "").toLowerCase();
+      if (REBOOT_SHUTDOWN_TERMINAL_STEPS.has(liveStepNorm2)) {
+        return getStepLabel(liveStep) || "Handling igangsat…";
+      }
+      // Endnu ikke bekræftet — vis generisk tekst
+      return liveChromeStatus
+        ? `${liveChromeStatus} · Sender kommando til klient…`
+        : "Sender kommando til klient…";
+    }
+
     if (!clientActionPending && !hasPendingAction && !isLiveStepBusy) return null;
     const stepLabel = getStepLabel(liveStep);
     if (stepLabel) {
@@ -486,7 +543,6 @@ export default function ClientDetailsActionsSection({
 
       </CardContent>
 
-      {/* Bekræftelsesdialog for slukning */}
       <Dialog
         open={shutdownDialogOpen}
         onClose={() => setShutdownDialogOpen(false)}
