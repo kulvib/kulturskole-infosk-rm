@@ -177,6 +177,7 @@ export default function ClientDetailsActionsSection({
   const { user } = useAuth();
 
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+  const isSuperadmin = user?.role === "superadmin";
 
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
@@ -394,6 +395,9 @@ export default function ClientDetailsActionsSection({
       disabled: clientOnline === false,
       tooltip: "Sluk klient — kræver fysisk tænding bagefter",
     },
+  ];
+
+  const row2Superadmin = [
     {
       key: "terminal",
       label: "Terminal",
@@ -446,6 +450,12 @@ export default function ClientDetailsActionsSection({
             <Box sx={{ height: 12 }} />
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {row2Admin.map((btn) => (
+                <Grid item xs={12} sm={6} md={isSuperadmin ? 3 : 6} key={btn.key}>
+                  <ActionButton btn={btn} isMobile={isMobile} anyBusy={anyBusy} />
+                </Grid>
+              ))}
+
+              {isSuperadmin && row2Superadmin.map((btn) => (
                 <Grid item xs={12} sm={6} md={3} key={btn.key}>
                   <ActionButton btn={btn} isMobile={isMobile} anyBusy={anyBusy} />
                 </Grid>
