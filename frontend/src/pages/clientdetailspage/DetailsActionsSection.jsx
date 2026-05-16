@@ -12,15 +12,18 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogContentText,
   DialogActions,
+  DialogContentText,
+  Alert,
+  Snackbar,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import HotelIcon from "@mui/icons-material/Hotel";
+import NightlightIcon from "@mui/icons-material/Nightlight";
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
-import OpenInBrowserIcon from "@mui/icons-material/OpenInBrowser";
-import CloseIcon from "@mui/icons-material/Close";
+import ChromeReaderModeIcon from "@mui/icons-material/ChromeReaderMode";
+import StopIcon from "@mui/icons-material/Stop";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import { useTheme } from "@mui/material/styles";
@@ -30,122 +33,66 @@ import { getClient } from "../../api";
 /*
   DetailsActionsSection.jsx
 
-  - Viser handlingsknapper for en klient: start/stop browser, sleep/wake, reboot, shutdown.
-  - Kun admin/superadmin ser reboot, shutdown, terminal og remote desktop.
-  - "Genstart browser" knap er fjernet.
-  - FIX: Efter en handling polles backend hvert sekund indtil pending_chrome_action === "none".
-    Under polling vises "Venter på bekræftelse fra klient…" på knappen.
-  - FIX: Alle knapper er disabled mens en handling kører (actionLoading guard).
-  - FIX: Shutdown-bekræftelsesdialog er robust mod manglende showSnackbar prop.
-  - FIX: clientOnline bruges til at disable knapper når klienten er offline.
+  Layout: 2 rækker af 4 knapper (admin), 1 række af 4 (bruger).
+  Logik:
+    - Efter en handling polles backend hvert sekund indtil
+      pending_chrome_action === "none" (max 30s).
+    - Alle knapper er disabled under polling og API-kald.
+    - "Afventer klient: <action>" vises som Alert mens vi poller.
+    - Genstart browser er fjernet.
+    - Sluk klient kræver bekræftelsesdialog.
 */
 
 const POLL_INTERVAL_MS = 1000;
 const POLL_MAX_WAIT_MS = 30_000;
 
-// Handlinger der skal vente på pending_chrome_action === "none"
-const ACTIONS_NEEDING_CONFIRMATION = new Set(["start", "stop"]);
+const ACTIONS_NEEDING_CONFIRMATION = new Set(["shutdown"]);
+const ACTIONS_NEEDING_POLLING = new Set(["start", "stop"]);
 
-const ACTION_LABELS = {
-  start: "Start browser",
-  stop: "Stop browser",
-  sleep: "Sæt i dvale",
-  wakeup: "Væk klient",
-  reboot: "Genstart maskine",
-  shutdown: "Sluk maskine",
+const actionBtnStyle = {
+  minWidth: 0,
+  width: "100%",
+  height: 38,
+  fontSize: "0.95rem",
+  textTransform: "none",
+  fontWeight: 500,
+  lineHeight: 1.18,
+  py: 0.75,
+  px: 1.25,
+  m: 0,
+  whiteSpace: "nowrap",
+  display: "inline-flex",
+  justifyContent: "center",
+  borderRadius: 2.8,
+  boxShadow: 1,
 };
 
-const ACTION_ICONS = {
-  start: <OpenInBrowserIcon fontSize="small" />,
-  stop: <CloseIcon fontSize="small" />,
-  sleep: <HotelIcon fontSize="small" />,
-  wakeup: <WbSunnyIcon fontSize="small" />,
-  reboot: <RestartAltIcon fontSize="small" />,
-  shutdown: <PowerSettingsNewIcon fontSize="small" />,
-};
+function ActionButton({ btn, isMobile, anyBusy }) {
+  const isActive = !!btn.loading || !!btn.waiting;
+  const isDisabled = isActive || anyBusy || !!btn.disabled;
 
-const ACTION_COLORS = {
-  start: "success",
-  stop: "error",
-  sleep: "primary",
-  wakeup: "warning",
-  reboot: "warning",
-  shutdown: "error",
-};
-
-// Knapper der kræver admin
-const ADMIN_ONLY_ACTIONS = new Set(["reboot", "shutdown"]);
-
-// Knapper der kræver bekræftelse
-const CONFIRM_ACTIONS = new Set(["shutdown", "reboot"]);
-
-const CONFIRM_TEXTS = {
-  shutdown: {
-    title: "Bekræft nedlukning",
-    body: "Er du sikker på at du vil slukke maskinen? Den skal tændes fysisk igen efterfølgende.",
-  },
-  reboot: {
-    title: "Bekræft genstart",
-    body: "Er du sikker på at du vil genstarte maskinen?",
-  },
-};
-
-function ActionButton({
-  action,
-  onClick,
-  loading,
-  waiting,
-  disabled,
-  isMobile,
-  isAdmin,
-}) {
-  if (ADMIN_ONLY_ACTIONS.has(action) && !isAdmin) return null;
-
-  const label = ACTION_LABELS[action] ?? action;
-  const icon = ACTION_ICONS[action] ?? null;
-  const color = ACTION_COLORS[action] ?? "primary";
-
-  let buttonLabel;
-  if (waiting) {
-    buttonLabel = "Venter på bekræftelse fra klient…";
-  } else if (loading) {
-    buttonLabel = "Arbejder...";
-  } else {
-    buttonLabel = label;
-  }
-
-  const isActive = loading || waiting;
-
-  return (
-    <Tooltip title={disabled && !isActive ? "Ikke tilgængelig" : label} arrow>
-      <span style={{ width: "100%" }}>
-        <Button
-          variant="outlined"
-          color={color}
-          size={isMobile ? "small" : "medium"}
-          startIcon={
-            isActive
-              ? <CircularProgress size={isMobile ? 13 : 16} color="inherit" />
-              : icon
-          }
-          onClick={onClick}
-          disabled={disabled || isActive}
-          fullWidth
-          sx={{
-            textTransform: "none",
-            fontWeight: 500,
-            fontSize: isMobile ? "0.82rem" : "0.9rem",
-            justifyContent: "flex-start",
-            px: isMobile ? 1 : 1.5,
-            py: isMobile ? 0.5 : 0.75,
-            minHeight: isMobile ? 34 : 40,
-          }}
-        >
-          {buttonLabel}
-        </Button>
-      </span>
-    </Tooltip>
+  const button = (
+    <span style={{ width: "100%" }}>
+      <Button
+        variant={btn.variant}
+        color={btn.color}
+        startIcon={isActive ? <CircularProgress size={16} color="inherit" /> : btn.icon}
+        disabled={isDisabled}
+        onClick={btn.onClick}
+        sx={actionBtnStyle}
+        fullWidth
+      >
+        {btn.waiting
+          ? "Venter på klient…"
+          : btn.loading
+          ? "Arbejder..."
+          : btn.label}
+      </Button>
+    </span>
   );
+
+  if (isMobile) return button;
+  return <Tooltip title={isDisabled && !isActive ? "Ikke tilgængelig" : btn.tooltip} arrow>{button}</Tooltip>;
 }
 
 export default function ClientDetailsActionsSection({
@@ -156,8 +103,8 @@ export default function ClientDetailsActionsSection({
   handleOpenTerminal,
   handleOpenRemoteDesktop,
   refreshing,
-  showSnackbar,
-  clientOnline,
+  showSnackbar: showSnackbarProp,
+  clientOnline = true,
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -165,33 +112,36 @@ export default function ClientDetailsActionsSection({
 
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
-  // actionLoading: true mens API-kaldet er i gang
   const [actionLoading, setActionLoading] = useState({});
-  // waitingAction: hvilken action vi venter på bekræftelse for (polling)
   const [waitingAction, setWaitingAction] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, action: null });
+  const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
+  const [localSnackbar, setLocalSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  const isSleeping = typeof clientState === "string" &&
-    clientState.toLowerCase().startsWith("sleep");
+  const normalizedClientState = String(clientState || "").trim().toLowerCase();
+  const isSleeping = normalizedClientState.startsWith("sleep");
+  const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
+  const hasPendingAction = !!normalizedPendingAction && normalizedPendingAction !== "none";
 
-  const isOffline = clientOnline === false;
-
-  // Alle knapper disabled mens én handling kører eller vi venter på bekræftelse
   const anyLoading = Object.values(actionLoading).some(Boolean);
   const anyWaiting = waitingAction !== null;
-  const anyBusy = anyLoading || anyWaiting;
+  const anyBusy = anyLoading || anyWaiting || !!refreshing;
 
-  const safeShowSnackbar = useCallback((opts) => {
-    if (typeof showSnackbar === "function") {
-      showSnackbar(opts);
+  // ---------------------------------------------------------------------------
+  // Snackbar
+  // ---------------------------------------------------------------------------
+  const notify = useCallback((opts) => {
+    if (typeof showSnackbarProp === "function") {
+      showSnackbarProp(opts);
     } else {
-      console.warn("[snackbar]", opts?.message);
+      setLocalSnackbar({ open: true, message: opts?.message ?? "", severity: opts?.severity ?? "success" });
     }
-  }, [showSnackbar]);
+  }, [showSnackbarProp]);
 
-  // Poll backend hvert sekund indtil pending_chrome_action === "none" (eller timeout)
+  // ---------------------------------------------------------------------------
+  // Poll backend hvert sekund indtil pending_chrome_action === "none"
+  // ---------------------------------------------------------------------------
   const pollUntilConfirmed = useCallback(async (action) => {
-    if (!ACTIONS_NEEDING_CONFIRMATION.has(action)) return;
+    if (!ACTIONS_NEEDING_POLLING.has(action)) return;
     if (!clientId) return;
 
     setWaitingAction(action);
@@ -202,27 +152,23 @@ export default function ClientDetailsActionsSection({
         await new Promise(res => setTimeout(res, POLL_INTERVAL_MS));
         try {
           const data = await getClient(clientId);
-          const pca = data?.pending_chrome_action;
-          if (!pca || pca === "none") {
-            return;
-          }
+          const pca = String(data?.pending_chrome_action || "").toLowerCase();
+          if (!pca || pca === "none") return;
         } catch {
-          // Ignorer poll-fejl — prøv igen ved næste interval
+          // Ignorer poll-fejl — prøv igen
         }
       }
-      // Timeout — vi stopper polling uden fejl
-      console.warn("[DetailsActionsSection] pollUntilConfirmed: timeout");
     } finally {
       setWaitingAction(null);
     }
   }, [clientId]);
 
-  const onAction = useCallback(async (action) => {
-    if (!clientId) return;
-
-    // Bekræftelsesdialog for farlige handlinger
-    if (CONFIRM_ACTIONS.has(action)) {
-      setConfirmDialog({ open: true, action });
+  // ---------------------------------------------------------------------------
+  // Kør handling
+  // ---------------------------------------------------------------------------
+  const doAction = useCallback(async (action) => {
+    if (clientOnline === false) {
+      notify({ message: "Klienten er offline — handling afvist", severity: "warning" });
       return;
     }
 
@@ -230,224 +176,216 @@ export default function ClientDetailsActionsSection({
     try {
       await handleClientAction(action);
     } catch (err) {
-      safeShowSnackbar({
-        message: "Fejl ved handling: " + (err?.message || String(err)),
-        severity: "error",
-      });
-      return;
-    } finally {
-      setActionLoading(prev => ({ ...prev, [action]: false }));
-    }
-
-    // Poll indtil bekræftet
-    await pollUntilConfirmed(action);
-  }, [clientId, handleClientAction, safeShowSnackbar, pollUntilConfirmed]);
-
-  const onConfirmAction = useCallback(async () => {
-    const action = confirmDialog.action;
-    setConfirmDialog({ open: false, action: null });
-    if (!action) return;
-
-    setActionLoading(prev => ({ ...prev, [action]: true }));
-    try {
-      await handleClientAction(action);
-    } catch (err) {
-      safeShowSnackbar({
-        message: "Fejl ved handling: " + (err?.message || String(err)),
-        severity: "error",
-      });
+      notify({ message: "Fejl: " + (err?.message || "Kunne ikke udføre handling"), severity: "error" });
       return;
     } finally {
       setActionLoading(prev => ({ ...prev, [action]: false }));
     }
 
     await pollUntilConfirmed(action);
-  }, [confirmDialog.action, handleClientAction, safeShowSnackbar, pollUntilConfirmed]);
+  }, [clientOnline, handleClientAction, notify, pollUntilConfirmed]);
 
-  const onCancelConfirm = useCallback(() => {
-    setConfirmDialog({ open: false, action: null });
-  }, []);
+  // ---------------------------------------------------------------------------
+  // disabled-logik per knap
+  // ---------------------------------------------------------------------------
+  const isDisabledByState = useCallback((key) => {
+    if (clientOnline === false) return true;
+    if (hasPendingAction) return true;
+    if (isSleeping) return key !== "wakeup";
+    return key === "wakeup";
+  }, [clientOnline, hasPendingAction, isSleeping]);
 
-  // Beregn hvilke knapper der er disabled
-  const isDisabled = useCallback((action) => {
-    if (anyBusy) return true;
-    if (refreshing) return true;
+  // ---------------------------------------------------------------------------
+  // Knap-definitioner — 2 rækker á 4
+  // ---------------------------------------------------------------------------
+  const row1 = [
+    {
+      key: "start",
+      label: "Start kiosk browser",
+      icon: <ChromeReaderModeIcon />,
+      color: "primary",
+      variant: "outlined",
+      onClick: () => doAction("start"),
+      loading: !!actionLoading["start"],
+      waiting: waitingAction === "start",
+      disabled: isDisabledByState("start"),
+      tooltip: "Start kiosk browser",
+    },
+    {
+      key: "stop",
+      label: "Stop kiosk browser",
+      icon: <StopIcon />,
+      color: "secondary",
+      variant: "outlined",
+      onClick: () => doAction("stop"),
+      loading: !!actionLoading["stop"],
+      waiting: waitingAction === "stop",
+      disabled: isDisabledByState("stop"),
+      tooltip: "Stop kiosk browser",
+    },
+    {
+      key: "sleep",
+      label: "Sæt i dvale",
+      icon: <NightlightIcon />,
+      color: "info",
+      variant: "outlined",
+      onClick: () => doAction("sleep"),
+      loading: !!actionLoading["sleep"],
+      waiting: waitingAction === "sleep",
+      disabled: isDisabledByState("sleep"),
+      tooltip: "Sæt klient i dvale",
+    },
+    {
+      key: "wakeup",
+      label: "Væk fra dvale",
+      icon: <WbSunnyIcon />,
+      color: "success",
+      variant: "outlined",
+      onClick: () => doAction("wakeup"),
+      loading: !!actionLoading["wakeup"],
+      waiting: waitingAction === "wakeup",
+      disabled: isDisabledByState("wakeup"),
+      tooltip: "Væk klient fra dvale",
+    },
+  ];
 
-    // Sleep/wake afhænger ikke af online-status
-    if (action === "sleep") return isSleeping;
-    if (action === "wakeup") return !isSleeping;
+  const row2Admin = [
+    {
+      key: "reboot",
+      label: "Genstart klient",
+      icon: <RestartAltIcon />,
+      color: "warning",
+      variant: "contained",
+      onClick: () => doAction("reboot"),
+      loading: !!actionLoading["reboot"],
+      waiting: waitingAction === "reboot",
+      disabled: clientOnline === false,
+      tooltip: "Genstart klient",
+    },
+    {
+      key: "shutdown",
+      label: "Sluk klient",
+      icon: <PowerSettingsNewIcon />,
+      color: "error",
+      variant: "contained",
+      onClick: () => setShutdownDialogOpen(true),
+      loading: !!actionLoading["shutdown"],
+      waiting: false,
+      disabled: clientOnline === false,
+      tooltip: "Sluk klient — kræver fysisk tænding bagefter",
+    },
+    {
+      key: "terminal",
+      label: "Terminal",
+      icon: <TerminalIcon />,
+      color: "inherit",
+      variant: "outlined",
+      onClick: handleOpenTerminal,
+      loading: false,
+      waiting: false,
+      disabled: clientOnline === false,
+      tooltip: "Åbn terminal",
+    },
+    {
+      key: "remote",
+      label: "Fjernskrivebord",
+      icon: <DesktopWindowsIcon />,
+      color: "inherit",
+      variant: "outlined",
+      onClick: handleOpenRemoteDesktop,
+      loading: false,
+      waiting: false,
+      disabled: clientOnline === false,
+      tooltip: "Åbn fjernskrivebord",
+    },
+  ];
 
-    // Reboot og shutdown kræver ikke nødvendigvis online
-    if (action === "reboot" || action === "shutdown") return false;
-
-    // Resten kræver online
-    if (isOffline) return true;
-
-    return false;
-  }, [anyBusy, refreshing, isSleeping, isOffline]);
-
-  // Bruger-synlige handlinger — "restart" er fjernet
-  const userActions = ["start", "stop", "sleep", "wakeup"];
-  const adminActions = ["reboot", "shutdown"];
-
-  const confirmInfo = confirmDialog.action
-    ? (CONFIRM_TEXTS[confirmDialog.action] ?? { title: "Bekræft", body: "Er du sikker?" })
-    : { title: "", body: "" };
+  const cardStyle = clientOnline === false ? { opacity: 0.85 } : {};
 
   return (
-    <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2 }}>
-      <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
-        <Typography
-          variant="h6"
-          sx={{ fontWeight: 700, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? 16 : undefined }}
-        >
-          Handlinger
-        </Typography>
+    <Card elevation={2} sx={{ borderRadius: 2, mb: 2, ...cardStyle }}>
+      <CardContent sx={{ px: isMobile ? 1 : 2 }}>
 
-        {/* Bruger-handlinger */}
-        <Grid container spacing={isMobile ? 0.5 : 1} sx={{ mb: isMobile ? 0.5 : 1 }}>
-          {userActions.map(action => (
-            <Grid item xs={6} sm={4} md={3} key={action}>
-              <ActionButton
-                action={action}
-                onClick={() => onAction(action)}
-                loading={!!actionLoading[action]}
-                waiting={waitingAction === action}
-                disabled={isDisabled(action)}
-                isMobile={isMobile}
-                isAdmin={isAdmin}
-              />
+        {/* Pending action indicator */}
+        {(hasPendingAction || anyWaiting) && (
+          <Alert severity="info" sx={{ mb: 1.5 }}>
+            {anyWaiting
+              ? `Venter på bekræftelse fra klient: ${waitingAction}`
+              : `Afventer klient: ${normalizedPendingAction}`}
+          </Alert>
+        )}
+
+        {/* Række 1 — alle brugere */}
+        <Grid container spacing={2} alignItems="center" justifyContent="center">
+          {row1.map(btn => (
+            <Grid item xs={12} sm={6} md={3} key={btn.key}>
+              <ActionButton btn={btn} isMobile={isMobile} anyBusy={anyBusy} />
             </Grid>
           ))}
         </Grid>
 
-        {/* Admin-handlinger */}
+        {/* Række 2 — kun admin */}
         {isAdmin && (
-          <Grid container spacing={isMobile ? 0.5 : 1} sx={{ mb: isMobile ? 0.5 : 1 }}>
-            {adminActions.map(action => (
-              <Grid item xs={6} sm={4} md={3} key={action}>
-                <ActionButton
-                  action={action}
-                  onClick={() => onAction(action)}
-                  loading={!!actionLoading[action]}
-                  waiting={waitingAction === action}
-                  disabled={isDisabled(action)}
-                  isMobile={isMobile}
-                  isAdmin={isAdmin}
-                />
-              </Grid>
-            ))}
-
-            {/* Terminal */}
-            <Grid item xs={6} sm={4} md={3}>
-              <Tooltip title="Åbn terminal" arrow>
-                <span style={{ width: "100%" }}>
-                  <Button
-                    variant="outlined"
-                    color="inherit"
-                    size={isMobile ? "small" : "medium"}
-                    startIcon={<TerminalIcon fontSize="small" />}
-                    onClick={handleOpenTerminal}
-                    disabled={isOffline || anyBusy}
-                    fullWidth
-                    sx={{
-                      textTransform: "none",
-                      fontWeight: 500,
-                      fontSize: isMobile ? "0.82rem" : "0.9rem",
-                      justifyContent: "flex-start",
-                      px: isMobile ? 1 : 1.5,
-                      py: isMobile ? 0.5 : 0.75,
-                      minHeight: isMobile ? 34 : 40,
-                    }}
-                  >
-                    Terminal
-                  </Button>
-                </span>
-              </Tooltip>
+          <>
+            <Box sx={{ height: 12 }} />
+            <Grid container spacing={2} alignItems="center" justifyContent="center">
+              {row2Admin.map(btn => (
+                <Grid item xs={12} sm={6} md={3} key={btn.key}>
+                  <ActionButton btn={btn} isMobile={isMobile} anyBusy={anyBusy} />
+                </Grid>
+              ))}
             </Grid>
-
-            {/* Remote Desktop */}
-            <Grid item xs={6} sm={4} md={3}>
-              <Tooltip title="Åbn fjernskrivebord" arrow>
-                <span style={{ width: "100%" }}>
-                  <Button
-                    variant="outlined"
-                    color="inherit"
-                    size={isMobile ? "small" : "medium"}
-                    startIcon={<DesktopWindowsIcon fontSize="small" />}
-                    onClick={handleOpenRemoteDesktop}
-                    disabled={isOffline || anyBusy}
-                    fullWidth
-                    sx={{
-                      textTransform: "none",
-                      fontWeight: 500,
-                      fontSize: isMobile ? "0.82rem" : "0.9rem",
-                      justifyContent: "flex-start",
-                      px: isMobile ? 1 : 1.5,
-                      py: isMobile ? 0.5 : 0.75,
-                      minHeight: isMobile ? 34 : 40,
-                    }}
-                  >
-                    Fjernskrivebord
-                  </Button>
-                </span>
-              </Tooltip>
-            </Grid>
-          </Grid>
+          </>
         )}
 
         {/* Offline-besked */}
-        {isOffline && (
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}
-          >
-            Klienten er offline — nogle handlinger er ikke tilgængelige.
+        {clientOnline === false && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, fontSize: isMobile ? 11 : 13 }}>
+            Klienten er offline — handlinger er ikke tilgængelige.
           </Typography>
         )}
 
         {/* Dvale-besked */}
-        {isSleeping && !isOffline && (
-          <Typography
-            variant="body2"
-            color="primary"
-            sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}
-          >
-            Klienten er i dvale — brug "Væk klient" for at aktivere den.
+        {isSleeping && clientOnline !== false && (
+          <Typography variant="body2" color="primary" sx={{ mt: 1.5, fontSize: isMobile ? 11 : 13 }}>
+            Klienten er i dvale — brug "Væk fra dvale" for at aktivere den.
           </Typography>
         )}
       </CardContent>
 
-      {/* Bekræftelsesdialog */}
-      <Dialog
-        open={confirmDialog.open}
-        onClose={onCancelConfirm}
-        aria-labelledby="confirm-dialog-title"
-        aria-describedby="confirm-dialog-description"
-      >
-        <DialogTitle id="confirm-dialog-title">
-          {confirmInfo.title}
-        </DialogTitle>
+      {/* Bekræftelsesdialog — sluk */}
+      <Dialog open={shutdownDialogOpen} onClose={() => setShutdownDialogOpen(false)}>
+        <DialogTitle>Bekræft slukning af klient</DialogTitle>
         <DialogContent>
-          <DialogContentText id="confirm-dialog-description">
-            {confirmInfo.body}
+          <DialogContentText>
+            <strong>Ved dette valg skal klienten startes manuelt lokalt.</strong>
+            <br />
+            Er du sikker på, at du vil slukke klienten?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onCancelConfirm} color="inherit">
+          <Button onClick={() => setShutdownDialogOpen(false)} color="primary">
             Annuller
           </Button>
           <Button
-            onClick={onConfirmAction}
+            onClick={async () => {
+              setShutdownDialogOpen(false);
+              await doAction("shutdown");
+            }}
             color="error"
             variant="contained"
-            autoFocus
+            disabled={clientOnline === false || anyBusy}
           >
-            Bekræft
+            Ja, sluk klienten
           </Button>
         </DialogActions>
       </Dialog>
-    </Card>
-  );
-}
+
+      {/* Lokal snackbar fallback */}
+      <Snackbar
+        open={localSnackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setLocalSnackbar(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        *
