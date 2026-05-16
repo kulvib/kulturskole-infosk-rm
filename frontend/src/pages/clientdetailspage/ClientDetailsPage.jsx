@@ -7,7 +7,7 @@ import ClientDetailsInfoSection from "./ClientDetailsInfoSection";
 import ClientDetailsActionsSection from "./DetailsActionsSection";
 import ClientDetailsLivestreamSection from "./ClientDetailsLivestreamSection";
 import ClientCalendarDialog from "../calendarpage/ClientCalendarDialog";
-import ClientTerminalDialog from "./ClientTerminalDialog";
+import ClientTerminalDialog from "../terminal/ClientTerminalDialog";
 
 import {
   getChromeStatus,
