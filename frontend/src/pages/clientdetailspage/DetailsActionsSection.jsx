@@ -51,13 +51,10 @@ import { useAuth } from "../../auth/authcontext";
     system_rebooting         — maskinen er ved at genstarte
     system_shutting_down     — maskinen er ved at lukke ned
 
-  TERMINAL_CHROME_STEPS (låser IKKE — processen er færdig):
-    start_chrome                   — start-handling færdig
-    chrome_closed_programmatically — stop/sleep-handling færdig (watchdog)
-    chrome_closed_manual           — Chrome lukket manuelt (watchdog)
-    system_sleep                   — sleep-handling færdig
-    system_wake                    — wake-handling færdig (reboot følger)
-    error                          — scenario fejlede → processen stoppet
+  NB: system_rebooting og system_shutting_down er i BUSY_CHROME_STEPS
+  så banneret vises korrekt under reboot/shutdown. I ClientDetailsPage
+  tjekkes terminal FØR busy i polling-loopen, så disse steps stadig kan
+  terminere polling for reboot/shutdown-actions korrekt.
 */
 
 // Skal matche BUSY_CHROME_STEPS i ClientDetailsPage.jsx
@@ -183,7 +180,9 @@ export default function ClientDetailsActionsSection({
   const hasPendingAction        = !!normalizedPendingAction && normalizedPendingAction !== "none";
 
   // Låser knapper + viser banner hvis liveStep er et aktivt busy-step.
-  // Banneret følger headeren 1:1 — samme datakilde (getChromeStatus, 1s interval).
+  // system_rebooting og system_shutting_down er i BUSY_CHROME_STEPS så
+  // banneret vises korrekt — polling i ClientDetailsPage håndterer
+  // terminal-tjekket separat (terminal før busy).
   const isLiveStepBusy = BUSY_CHROME_STEPS.has(String(liveStep ?? "").toLowerCase());
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
@@ -472,13 +471,4 @@ export default function ClientDetailsActionsSection({
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setLocalSnackbar((s) => ({ ...s, open: false }))}
-          severity={localSnackbar.severity}
-          sx={{ width: "100%" }}
-        >
-          {localSnackbar.message}
-        </Alert>
-      </Snackbar>
-    </Card>
-  );
-}
+          onClose={() => setLocalSnackbar((*
