@@ -29,22 +29,10 @@ import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
 import { getClient } from "../../api";
 
-/*
-  DetailsActionsSection.jsx
+const POLL_INTERVAL_MS = 1500;
+const POLL_MAX_WAIT_MS = 45_000;
 
-  Layout: 2 rækker af 4 knapper (admin), 1 række af 4 (bruger).
-  Logik:
-    - Efter en handling (start/stop) polles backend hvert sekund indtil
-      pending_chrome_action === "none" (max 30s).
-    - Alle knapper er disabled under polling og API-kald.
-    - "Afventer klient: <action>" vises som Alert mens vi poller.
-    - Sluk klient kræver bekræftelsesdialog.
-*/
-
-const POLL_INTERVAL_MS = 1000;
-const POLL_MAX_WAIT_MS = 30_000;
-
-const ACTIONS_NEEDING_POLLING = new Set(["start", "stop"]);
+const ACTIONS_NEEDING_POLLING = new Set(["start", "stop", "sleep", "wakeup", "reboot", "shutdown"]);
 
 const actionBtnStyle = {
   minWidth: 0,
@@ -130,7 +118,8 @@ export default function ClientDetailsActionsSection({
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
   const anyWaiting = waitingAction !== null;
-  const anyBusy = anyLoading || anyWaiting || !!refreshing;
+  // anyBusy: alle knapper låses hvis ÉN handling er i gang
+  const anyBusy = anyLoading || anyWaiting || !!refreshing || hasPendingAction;
 
   // ---------------------------------------------------------------------------
   // Snackbar
@@ -151,7 +140,7 @@ export default function ClientDetailsActionsSection({
   );
 
   // ---------------------------------------------------------------------------
-  // Poll backend hvert sekund indtil pending_chrome_action === "none"
+  // Poll backend indtil pending_chrome_action === "none"
   // ---------------------------------------------------------------------------
   const pollUntilConfirmed = useCallback(
     async (action) => {
@@ -169,7 +158,7 @@ export default function ClientDetailsActionsSection({
             const pca = String(data?.pending_chrome_action || "").toLowerCase();
             if (!pca || pca === "none") return;
           } catch {
-            // Ignorer poll-fejl — prøv igen
+            // Ignorer poll-fejl
           }
         }
       } finally {
@@ -180,10 +169,18 @@ export default function ClientDetailsActionsSection({
   );
 
   // ---------------------------------------------------------------------------
-  // Kør handling
+  // Udfør handling — med guard mod dobbelt-klik
   // ---------------------------------------------------------------------------
   const doAction = useCallback(
     async (action) => {
+      // Afvis straks hvis der allerede kører noget
+      if (anyBusy) {
+        notify({
+          message: "En anden handling er allerede i gang — vent venligst",
+          severity: "warning",
+        });
+        return;
+      }
       if (clientOnline === false) {
         notify({
           message: "Klienten er offline — handling afvist",
@@ -196,10 +193,19 @@ export default function ClientDetailsActionsSection({
       try {
         await handleClientAction(action);
       } catch (err) {
-        notify({
-          message: "Fejl: " + (err?.message || "Kunne ikke udføre handling"),
-          severity: "error",
-        });
+        const msg = err?.message || "";
+        // 409 = backend afviste fordi pending action allerede eksisterer
+        if (msg.includes("409") || msg.includes("ventende")) {
+          notify({
+            message: "En handling er allerede i gang på klienten — vent venligst",
+            severity: "warning",
+          });
+        } else {
+          notify({
+            message: "Fejl: " + (msg || "Kunne ikke udføre handling"),
+            severity: "error",
+          });
+        }
         return;
       } finally {
         setActionLoading((prev) => ({ ...prev, [action]: false }));
@@ -207,7 +213,7 @@ export default function ClientDetailsActionsSection({
 
       await pollUntilConfirmed(action);
     },
-    [clientOnline, handleClientAction, notify, pollUntilConfirmed]
+    [anyBusy, clientOnline, handleClientAction, notify, pollUntilConfirmed]
   );
 
   // ---------------------------------------------------------------------------
@@ -216,15 +222,14 @@ export default function ClientDetailsActionsSection({
   const isDisabledByState = useCallback(
     (key) => {
       if (clientOnline === false) return true;
-      if (hasPendingAction) return true;
       if (isSleeping) return key !== "wakeup";
       return key === "wakeup";
     },
-    [clientOnline, hasPendingAction, isSleeping]
+    [clientOnline, isSleeping]
   );
 
   // ---------------------------------------------------------------------------
-  // Knap-definitioner — 2 rækker á 4
+  // Knap-definitioner
   // ---------------------------------------------------------------------------
   const row1 = [
     {
@@ -328,12 +333,12 @@ export default function ClientDetailsActionsSection({
     },
   ];
 
-  const cardStyle = clientOnline === false ? { opacity: 0.85 } : {};
-
   return (
-    <Card elevation={2} sx={{ borderRadius: 2, mb: 2, ...cardStyle }}>
+    <Card
+      elevation={2}
+      sx={{ borderRadius: 2, mb: 2, opacity: clientOnline === false ? 0.85 : 1 }}
+    >
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
-
         {/* Pending action indicator */}
         {(hasPendingAction || anyWaiting) && (
           <Alert severity="info" sx={{ mb: 1.5 }}>
@@ -343,7 +348,7 @@ export default function ClientDetailsActionsSection({
           </Alert>
         )}
 
-        {/* Række 1 — alle brugere */}
+        {/* Række 1 */}
         <Grid container spacing={2} alignItems="center" justifyContent="center">
           {row1.map((btn) => (
             <Grid item xs={12} sm={6} md={3} key={btn.key}>
@@ -366,7 +371,6 @@ export default function ClientDetailsActionsSection({
           </>
         )}
 
-        {/* Offline-besked */}
         {clientOnline === false && (
           <Typography
             variant="body2"
@@ -377,7 +381,6 @@ export default function ClientDetailsActionsSection({
           </Typography>
         )}
 
-        {/* Dvale-besked */}
         {isSleeping && clientOnline !== false && (
           <Typography
             variant="body2"
@@ -390,10 +393,7 @@ export default function ClientDetailsActionsSection({
       </CardContent>
 
       {/* Bekræftelsesdialog — sluk */}
-      <Dialog
-        open={shutdownDialogOpen}
-        onClose={() => setShutdownDialogOpen(false)}
-      >
+      <Dialog open={shutdownDialogOpen} onClose={() => setShutdownDialogOpen(false)}>
         <DialogTitle>Bekræft slukning af klient</DialogTitle>
         <DialogContent>
           <DialogContentText>
@@ -423,7 +423,7 @@ export default function ClientDetailsActionsSection({
       {/* Lokal snackbar fallback */}
       <Snackbar
         open={localSnackbar.open}
-        autoHideDuration={3000}
+        autoHideDuration={4000}
         onClose={() => setLocalSnackbar((s) => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
