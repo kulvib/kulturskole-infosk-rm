@@ -13,6 +13,15 @@ import AdminPage from "./pages/adminpages/AdminPage";
 import RemoteDesktop from "./components/RemoteDesktop";
 import ChangePassword from "./pages/ChangePassword";
 
+/*
+  App.jsx
+
+  FIX (kritisk): Route param hed ":clientId" men ClientDetailsPageWrapper
+    destructurerer useParams() som { id } — det betød at id altid var
+    undefined og getClient(undefined) blev kaldt.
+    Rettet til ":id" så det matcher useParams() i wrapperen.
+*/
+
 export default function App() {
   return (
     <Routes>
@@ -27,7 +36,10 @@ export default function App() {
       >
         <Route index element={<HomePage />} />
         <Route path="clients" element={<ClientInfoPage />} />
-        <Route path="clients/:clientId" element={<ClientDetailsPageWrapper />} />
+
+        {/* FIX: ":clientId" → ":id" så useParams() i ClientDetailsPageWrapper matcher */}
+        <Route path="clients/:id" element={<ClientDetailsPageWrapper />} />
+
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="skift-adgangskode" element={<ChangePassword />} />
         <Route
@@ -38,7 +50,6 @@ export default function App() {
             </AdminRoute>
           }
         />
-        {/* <Route path="livestream-test" element={<LivestreamTest />} /> FJERNET */}
       </Route>
       <Route path="/remote-desktop/:clientId" element={<RemoteDesktop />} />
       <Route path="*" element={<NotFound />} />
