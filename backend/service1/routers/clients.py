@@ -31,7 +31,7 @@ def is_online(client: Client) -> bool:
     if client.last_seen is None:
         return False
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    return (now - client.last_seen) < timedelta(seconds=25)
+    return (now - client.last_seen) < timedelta(seconds=15)
 
 
 @router.get("/clients/public")
