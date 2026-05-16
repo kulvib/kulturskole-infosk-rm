@@ -173,7 +173,7 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
 
       <DialogContent>
         <Alert severity="warning" sx={{ mb: 1.5 }}>
-          Remote terminal giver shell-adgang til klienten. Bruges kun af superadmin.
+          Remote terminal shell adgang
         </Alert>
 
         <Typography variant="body2" sx={{ mb: 1, color: "text.secondary" }}>
