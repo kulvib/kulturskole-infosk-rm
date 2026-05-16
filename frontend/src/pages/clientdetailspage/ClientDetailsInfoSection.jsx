@@ -15,6 +15,11 @@ import {
   Box,
   IconButton,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
   useMediaQuery,
 } from "@mui/material";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
@@ -188,14 +193,15 @@ function getUbuntuUpdateColor(client) {
   const count = getUbuntuUpdateCount(client);
 
   if (client?.pending_os_update || client?.state === "updating") {
-    return "warning.main";
+    return "error.main";
   }
 
   if (count === null) {
     return "text.secondary";
   }
 
-  return count > 0 ? "warning.main" : "success.main";
+  // Grøn når der ikke er opdateringer, rød når der er opdateringer.
+  return count > 0 ? "error.main" : "success.main";
 }
 
 function formatDateTime(dateStr, withSeconds = false) {
@@ -414,6 +420,7 @@ function SystemInfoTable({
 
   const [updateStarting, setUpdateStarting] = React.useState(false);
   const [localMessage, setLocalMessage] = React.useState("");
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
 
   const updateCount = getUbuntuUpdateCount(client);
   const isUpdating = !!client?.pending_os_update || client?.state === "updating";
@@ -428,20 +435,20 @@ function SystemInfoTable({
     !isUpdating &&
     !updateStarting;
 
-  const handleUbuntuUpdate = React.useCallback(async () => {
+  const closeConfirmDialog = React.useCallback(() => {
+    if (!updateStarting) {
+      setConfirmOpen(false);
+    }
+  }, [updateStarting]);
+
+  const openConfirmDialog = React.useCallback(() => {
     if (!canRequestUbuntuUpdate) return;
+    setLocalMessage("");
+    setConfirmOpen(true);
+  }, [canRequestUbuntuUpdate]);
 
-    const countText =
-      updateCount !== null
-        ? `${updateCount} pakke(r)`
-        : "Ubuntu-opdateringer";
-
-    const ok = window.confirm(
-      `Vil du starte Ubuntu-opdatering på klienten?\n\n` +
-      `${countText} installeres, og klienten kan genstarte bagefter.`
-    );
-
-    if (!ok) return;
+  const handleConfirmUbuntuUpdate = React.useCallback(async () => {
+    if (!canRequestUbuntuUpdate) return;
 
     setUpdateStarting(true);
     setLocalMessage("");
@@ -450,6 +457,8 @@ function SystemInfoTable({
       await requestUbuntuUpdate(client.id);
 
       setLocalMessage("Ubuntu-opdatering bestilt");
+      setConfirmOpen(false);
+
       if (typeof showSnackbar === "function") {
         showSnackbar("Ubuntu-opdatering bestilt", "success");
       }
@@ -468,7 +477,6 @@ function SystemInfoTable({
   }, [
     canRequestUbuntuUpdate,
     client?.id,
-    updateCount,
     showSnackbar,
     onUbuntuUpdateStarted,
   ]);
@@ -480,21 +488,26 @@ function SystemInfoTable({
     return (
       <Box
         sx={{
-          display: "flex",
+          display: "inline-flex",
           alignItems: "center",
           gap: 1,
           flexWrap: "wrap",
           lineHeight: isMobile ? "22px" : "30px",
+          fontSize: isMobile ? 12 : 14,
+          fontFamily: "inherit",
+          fontWeight: 400,
         }}
       >
-        <Box component="span">{text}</Box>
+        <Box component="span" sx={{ fontFamily: "inherit", fontWeight: 400 }}>
+          {text}
+        </Box>
 
         {showButton && (
           <Button
             size="small"
             variant="outlined"
-            color={updateCount > 0 ? "warning" : "primary"}
-            onClick={handleUbuntuUpdate}
+            color={updateCount > 0 ? "error" : "primary"}
+            onClick={openConfirmDialog}
             disabled={!canRequestUbuntuUpdate}
             sx={{
               minHeight: isMobile ? 22 : 26,
@@ -503,6 +516,8 @@ function SystemInfoTable({
               fontSize: isMobile ? 11 : 12,
               textTransform: "none",
               whiteSpace: "nowrap",
+              fontFamily: "inherit",
+              fontWeight: 400,
             }}
           >
             {updateStarting ? (
@@ -526,7 +541,8 @@ function SystemInfoTable({
               color: localMessage.toLowerCase().includes("fejl") || localMessage.toLowerCase().includes("kunne ikke")
                 ? "error.main"
                 : "success.main",
-              fontWeight: 600,
+              fontWeight: 400,
+              fontFamily: "inherit",
             }}
           >
             {localMessage}
@@ -539,11 +555,18 @@ function SystemInfoTable({
     updateCount,
     isUpdating,
     isMobile,
-    handleUbuntuUpdate,
+    openConfirmDialog,
     canRequestUbuntuUpdate,
     updateStarting,
     localMessage,
   ]);
+
+  const confirmPackageText =
+    updateCount === null
+      ? "Ubuntu-opdateringer"
+      : updateCount === 1
+        ? "1 pakke"
+        : `${updateCount} pakker`;
 
   // useMemo — rows + dyre format-kald genskabes ikke ved hver render
   const rows = React.useMemo(() => [
@@ -568,30 +591,99 @@ function SystemInfoTable({
   ]);
 
   return (
-    <TableContainer>
-      <Table size="small" aria-label="systeminfo">
-        <TableBody>
-          {rows.map(({ label, value, color }) => (
-            <TableRow key={label} sx={{ height: isMobile ? 22 : 30 }}>
-              <TableCell sx={cellStyle}>{label}</TableCell>
-              <TableCell sx={valueCellStyle}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    lineHeight: isMobile ? "22px" : "30px",
-                    color: color || "inherit",
-                    fontWeight: color ? 600 : 400,
-                  }}
-                >
-                  {value}
-                </Box>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+    <>
+      <TableContainer>
+        <Table size="small" aria-label="systeminfo">
+          <TableBody>
+            {rows.map(({ label, value, color }) => (
+              <TableRow key={label} sx={{ height: isMobile ? 22 : 30 }}>
+                <TableCell sx={cellStyle}>{label}</TableCell>
+                <TableCell sx={valueCellStyle}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      lineHeight: isMobile ? "22px" : "30px",
+                      color: color || "inherit",
+                      fontWeight: 400,
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {value}
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Dialog
+        open={confirmOpen}
+        onClose={closeConfirmDialog}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          Start Ubuntu-opdatering?
+        </DialogTitle>
+
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1.5 }}>
+            Du er ved at starte Ubuntu-opdatering på denne klient.
+          </Typography>
+
+          <Alert severity={updateCount > 0 ? "warning" : "info"} sx={{ mb: 1.5 }}>
+            {updateCount > 0
+              ? `${confirmPackageText} installeres. Klienten kan genstarte automatisk bagefter.`
+              : "Der er aktuelt ingen registrerede opdateringer, men klienten tjekker igen, når handlingen startes."}
+          </Alert>
+
+          <Typography variant="body2" color="text.secondary">
+            Klient: {client?.name || client?.id || "ukendt"}
+          </Typography>
+
+          {localMessage && (
+            <Typography
+              variant="body2"
+              sx={{
+                mt: 1.5,
+                color: localMessage.toLowerCase().includes("fejl") || localMessage.toLowerCase().includes("kunne ikke")
+                  ? "error.main"
+                  : "success.main",
+              }}
+            >
+              {localMessage}
+            </Typography>
+          )}
+        </DialogContent>
+
+        <DialogActions>
+          <Button
+            onClick={closeConfirmDialog}
+            color="inherit"
+            disabled={updateStarting}
+          >
+            Annullér
+          </Button>
+          <Button
+            onClick={handleConfirmUbuntuUpdate}
+            color="error"
+            variant="contained"
+            disabled={!canRequestUbuntuUpdate}
+          >
+            {updateStarting ? (
+              <>
+                <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} />
+                Starter...
+              </>
+            ) : (
+              "Start opdatering"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }
 
