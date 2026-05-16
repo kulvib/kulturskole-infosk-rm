@@ -83,9 +83,12 @@ class Client(ClientBase, table=True):
     created_at: Optional[datetime] = Field(default_factory=utcnow, nullable=False)
     chrome_status: Optional[str] = "unknown"
     chrome_last_updated: Optional[datetime] = None
+    chrome_color: Optional[str] = None
+    # chrome_step gemmer det seneste step-navn (fx "countdown", "start_chrome")
+    # så frontend kan bruge det til lock-logik uden at læse lokal fil.
+    chrome_step: Optional[str] = Field(default=None)
     pending_reboot: Optional[bool] = False
     pending_shutdown: Optional[bool] = False
-    chrome_color: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = Field(default=ChromeAction.NONE)
     pending_chrome_action_source: Optional[str] = None
     school_id: Optional[int] = Field(default=None, foreign_key="school.id")
@@ -108,6 +111,7 @@ class ClientCreate(ClientBase):
     lan_mac_address: Optional[str] = None
     chrome_status: Optional[str] = None
     chrome_color: Optional[str] = None
+    chrome_step: Optional[str] = None
     pending_chrome_action: Optional[ChromeAction] = ChromeAction.NONE
     pending_chrome_action_source: Optional[str] = None
     school_id: Optional[int] = None
@@ -131,6 +135,7 @@ class ClientUpdate(SQLModel):
     chrome_status: Optional[str] = None
     chrome_last_updated: Optional[datetime] = None
     chrome_color: Optional[str] = None
+    chrome_step: Optional[str] = None
     last_seen: Optional[datetime] = None
     created_at: Optional[datetime] = None
     pending_chrome_action: Optional[ChromeAction] = None
