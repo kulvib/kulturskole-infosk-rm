@@ -20,6 +20,7 @@ import {
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useTheme } from "@mui/material/styles";
+import { apiUrl } from "../../api";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -28,6 +29,40 @@ import { useTheme } from "@mui/material/styles";
 const UKEDAGE = [
   "Søndag","Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag",
 ];
+
+function getAuthHeaders(extra = {}) {
+  const token = localStorage.getItem("token");
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    accept: "application/json",
+    ...extra,
+  };
+}
+
+async function requestUbuntuUpdate(clientId) {
+  if (!clientId) throw new Error("Mangler klient-id");
+
+  const res = await fetch(`${apiUrl}/api/clients/${encodeURIComponent(clientId)}/os-update`, {
+    method: "POST",
+    credentials: "include",
+    headers: getAuthHeaders({
+      "Content-Type": "application/json",
+    }),
+  });
+
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    // Backend kan i sjældne tilfælde returnere tom body.
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.detail || data?.message || `Ubuntu-opdatering fejlede (${res.status})`);
+  }
+
+  return data;
+}
 
 function formatDateShort(dt) {
   const dayName = UKEDAGE[dt.getDay()];
@@ -143,15 +178,20 @@ function formatUbuntuUpdates(client) {
   return `${count} pakke(r) klar`;
 }
 
-function getUbuntuUpdateColor(client) {
+function getUbuntuUpdateCount(client) {
   const raw = client?.ubuntu_updates_available;
   const count = Number.parseInt(String(raw ?? ""), 10);
+  return Number.isFinite(count) && count >= 0 ? count : null;
+}
+
+function getUbuntuUpdateColor(client) {
+  const count = getUbuntuUpdateCount(client);
 
   if (client?.pending_os_update || client?.state === "updating") {
     return "warning.main";
   }
 
-  if (!Number.isFinite(count) || count < 0) {
+  if (count === null) {
     return "text.secondary";
   }
 
@@ -360,16 +400,157 @@ function CopyField({ value, isMobile = false }) {
   );
 }
 
-function SystemInfoTable({ client, uptime, lastSeen, isMobile = false }) {
+function SystemInfoTable({
+  client,
+  uptime,
+  lastSeen,
+  isMobile = false,
+  clientOnline,
+  showSnackbar,
+  onUbuntuUpdateStarted,
+}) {
   const cellStyle      = React.useMemo(() => makeCellStyle(isMobile),      [isMobile]);
   const valueCellStyle = React.useMemo(() => makeValueCellStyle(isMobile), [isMobile]);
+
+  const [updateStarting, setUpdateStarting] = React.useState(false);
+  const [localMessage, setLocalMessage] = React.useState("");
+
+  const updateCount = getUbuntuUpdateCount(client);
+  const isUpdating = !!client?.pending_os_update || client?.state === "updating";
+  const isOffline =
+    typeof clientOnline !== "undefined"
+      ? clientOnline === false
+      : client?.isOnline === false;
+
+  const canRequestUbuntuUpdate =
+    !!client?.id &&
+    !isOffline &&
+    !isUpdating &&
+    !updateStarting;
+
+  const handleUbuntuUpdate = React.useCallback(async () => {
+    if (!canRequestUbuntuUpdate) return;
+
+    const countText =
+      updateCount !== null
+        ? `${updateCount} pakke(r)`
+        : "Ubuntu-opdateringer";
+
+    const ok = window.confirm(
+      `Vil du starte Ubuntu-opdatering på klienten?\n\n` +
+      `${countText} installeres, og klienten kan genstarte bagefter.`
+    );
+
+    if (!ok) return;
+
+    setUpdateStarting(true);
+    setLocalMessage("");
+
+    try {
+      await requestUbuntuUpdate(client.id);
+
+      setLocalMessage("Ubuntu-opdatering bestilt");
+      if (typeof showSnackbar === "function") {
+        showSnackbar("Ubuntu-opdatering bestilt", "success");
+      }
+      if (typeof onUbuntuUpdateStarted === "function") {
+        onUbuntuUpdateStarted();
+      }
+    } catch (err) {
+      const message = err?.message || "Kunne ikke starte Ubuntu-opdatering";
+      setLocalMessage(message);
+      if (typeof showSnackbar === "function") {
+        showSnackbar(message, "error");
+      }
+    } finally {
+      setUpdateStarting(false);
+    }
+  }, [
+    canRequestUbuntuUpdate,
+    client?.id,
+    updateCount,
+    showSnackbar,
+    onUbuntuUpdateStarted,
+  ]);
+
+  const ubuntuUpdateValue = React.useMemo(() => {
+    const text = formatUbuntuUpdates(client);
+    const showButton = updateCount === null || updateCount > 0 || isUpdating;
+
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          flexWrap: "wrap",
+          lineHeight: isMobile ? "22px" : "30px",
+        }}
+      >
+        <Box component="span">{text}</Box>
+
+        {showButton && (
+          <Button
+            size="small"
+            variant="outlined"
+            color={updateCount > 0 ? "warning" : "primary"}
+            onClick={handleUbuntuUpdate}
+            disabled={!canRequestUbuntuUpdate}
+            sx={{
+              minHeight: isMobile ? 22 : 26,
+              py: 0,
+              px: 1,
+              fontSize: isMobile ? 11 : 12,
+              textTransform: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {updateStarting ? (
+              <>
+                <CircularProgress size={12} sx={{ mr: 0.75 }} />
+                Starter...
+              </>
+            ) : isUpdating ? (
+              "Opdaterer..."
+            ) : (
+              "Opdater Ubuntu"
+            )}
+          </Button>
+        )}
+
+        {localMessage && (
+          <Typography
+            component="span"
+            variant="caption"
+            sx={{
+              color: localMessage.toLowerCase().includes("fejl") || localMessage.toLowerCase().includes("kunne ikke")
+                ? "error.main"
+                : "success.main",
+              fontWeight: 600,
+            }}
+          >
+            {localMessage}
+          </Typography>
+        )}
+      </Box>
+    );
+  }, [
+    client,
+    updateCount,
+    isUpdating,
+    isMobile,
+    handleUbuntuUpdate,
+    canRequestUbuntuUpdate,
+    updateStarting,
+    localMessage,
+  ]);
 
   // useMemo — rows + dyre format-kald genskabes ikke ved hver render
   const rows = React.useMemo(() => [
     { label: "Ubuntu version:", value: client?.ubuntu_version || "ukendt" },
     {
       label: "Ubuntu opdateringer:",
-      value: formatUbuntuUpdates(client),
+      value: ubuntuUpdateValue,
       color: getUbuntuUpdateColor(client),
     },
     { label: "Oppetid:",        value: formatUptime(uptime) },
@@ -381,6 +562,7 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile = false }) {
     client?.pending_os_update,
     client?.state,
     client?.created_at,
+    ubuntuUpdateValue,
     uptime,
     lastSeen,
   ]);
@@ -447,6 +629,8 @@ export default function ClientDetailsInfoSection({
   setCalendarDialogOpen,
   clientOnline,
   calendarLoading = false,
+  showSnackbar,
+  onUbuntuUpdateStarted,
 }) {
   const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -537,6 +721,9 @@ export default function ClientDetailsInfoSection({
               uptime={uptime}
               lastSeen={lastSeen}
               isMobile={isMobile}
+              clientOnline={clientOnline}
+              showSnackbar={showSnackbar}
+              onUbuntuUpdateStarted={onUbuntuUpdateStarted}
             />
           </CardContent>
         </Card>
