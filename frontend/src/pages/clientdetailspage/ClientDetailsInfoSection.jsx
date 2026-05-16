@@ -14,6 +14,7 @@ import {
   TableRow,
   Box,
   IconButton,
+  CircularProgress,
   useMediaQuery,
 } from "@mui/material";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
@@ -59,7 +60,7 @@ function getStatusAndTimesFromRaw(markedDays, dt) {
     return { status: "off", powerOn: "", powerOff: "" };
   }
   return {
-    status: "on",
+    status:   "on",
     powerOn:  data.onTime  || "",
     powerOff: data.offTime || "",
   };
@@ -125,7 +126,7 @@ function formatDateTime(dateStr, withSeconds = false) {
   } else {
     d = new Date(dateStr + "Z");
   }
-  // FIX: Guard mod Invalid Date — vises som "ukendt" i stedet for at crashe
+  // Guard mod Invalid Date
   if (isNaN(d.getTime())) return "ukendt";
 
   const formatter = new Intl.DateTimeFormat("da-DK", {
@@ -152,9 +153,7 @@ function formatDateTime(dateStr, withSeconds = false) {
 }
 
 // ---------------------------------------------------------------------------
-// Delte tabel-styles — defineret udenfor komponenter så de ikke genskabes
-// FIX: cellStyle og valueCellStyle var identisk duplikeret i SystemInfoTable
-// og NetworkInfoTable — nu delt som factory-funktioner
+// Delte tabel-styles — factory-funktioner så de ikke duplikeres
 // ---------------------------------------------------------------------------
 
 function makeCellStyle(isMobile) {
@@ -182,6 +181,17 @@ function makeValueCellStyle(isMobile) {
 }
 
 // ---------------------------------------------------------------------------
+// Konstanter udenfor komponenter
+// ---------------------------------------------------------------------------
+
+const NETWORK_ROWS = [
+  { label: "IP-adresse WLAN:",  key: "wifi_ip_address" },
+  { label: "MAC-adresse WLAN:", key: "wifi_mac_address" },
+  { label: "IP-adresse LAN:",   key: "lan_ip_address" },
+  { label: "MAC-adresse LAN:",  key: "lan_mac_address" },
+];
+
+// ---------------------------------------------------------------------------
 // Sub-komponenter
 // ---------------------------------------------------------------------------
 
@@ -202,7 +212,7 @@ function StatusText({ status, isMobile = false }) {
 }
 
 function ClientPowerShortTable({ markedDays, isMobile = false }) {
-  // FIX: useMemo — days-array genskabes ikke ved hver render
+  // useMemo — days-array genskabes ikke ved hver render
   const days = React.useMemo(() => {
     const now = new Date();
     return Array.from({ length: 3 }, (_, i) => {
@@ -212,7 +222,7 @@ function ClientPowerShortTable({ markedDays, isMobile = false }) {
     });
   }, []);
 
-  // FIX: useMemo — cellStyle genskabes ikke ved hver render
+  // useMemo — cellStyle genskabes ikke ved hver render
   const cellStyle = React.useMemo(() => ({
     whiteSpace: "nowrap",
     py: 0,
@@ -245,7 +255,7 @@ function ClientPowerShortTable({ markedDays, isMobile = false }) {
                   <StatusText status={status} isMobile={isMobile} />
                 </TableCell>
                 <TableCell sx={cellStyle}>
-                  {status === "on" && powerOn ? powerOn : ""}
+                  {status === "on" && powerOn  ? powerOn  : ""}
                 </TableCell>
                 <TableCell sx={cellStyle}>
                   {status === "on" && powerOff ? powerOff : ""}
@@ -311,12 +321,10 @@ function CopyField({ value, isMobile = false }) {
 }
 
 function SystemInfoTable({ client, uptime, lastSeen, isMobile = false }) {
-  // FIX: Delte style-factories i stedet for duplikeret kode
   const cellStyle      = React.useMemo(() => makeCellStyle(isMobile),      [isMobile]);
   const valueCellStyle = React.useMemo(() => makeValueCellStyle(isMobile), [isMobile]);
 
-  // FIX: useMemo — rows + dyre format-kald genskabes ikke ved hver render
-  // FIX: copy-feltet er fjernet — det blev defineret men aldrig brugt
+  // useMemo — rows + dyre format-kald genskabes ikke ved hver render
   const rows = React.useMemo(() => [
     { label: "Ubuntu version:", value: client?.ubuntu_version || "ukendt" },
     { label: "Oppetid:",        value: formatUptime(uptime) },
@@ -345,23 +353,14 @@ function SystemInfoTable({ client, uptime, lastSeen, isMobile = false }) {
 }
 
 function NetworkInfoTable({ client, isMobile = false }) {
-  // FIX: Delte style-factories i stedet for duplikeret kode
   const cellStyle      = React.useMemo(() => makeCellStyle(isMobile),      [isMobile]);
   const valueCellStyle = React.useMemo(() => makeValueCellStyle(isMobile), [isMobile]);
-
-  // Konstant — defineres udenfor ville være endnu bedre, men rows afhænger ikke af props/state
-  const rows = [
-    { label: "IP-adresse WLAN:",  key: "wifi_ip_address" },
-    { label: "MAC-adresse WLAN:", key: "wifi_mac_address" },
-    { label: "IP-adresse LAN:",   key: "lan_ip_address" },
-    { label: "MAC-adresse LAN:",  key: "lan_mac_address" },
-  ];
 
   return (
     <TableContainer>
       <Table size="small" aria-label="netværksinfo">
         <TableBody>
-          {rows.map(({ label, key }) => (
+          {NETWORK_ROWS.map(({ label, key }) => (
             <TableRow key={key} sx={{ height: isMobile ? 22 : 30 }}>
               <TableCell sx={cellStyle}>{label}</TableCell>
               <TableCell sx={valueCellStyle}>
@@ -375,14 +374,6 @@ function NetworkInfoTable({ client, isMobile = false }) {
   );
 }
 
-// Konstant — rows i NetworkInfoTable afhænger ikke af props → helt ud af komponenten
-const NETWORK_ROWS = [
-  { label: "IP-adresse WLAN:",  key: "wifi_ip_address" },
-  { label: "MAC-adresse WLAN:", key: "wifi_mac_address" },
-  { label: "IP-adresse LAN:",   key: "lan_ip_address" },
-  { label: "MAC-adresse LAN:",  key: "lan_mac_address" },
-];
-
 // ---------------------------------------------------------------------------
 // Hoved-komponent
 // ---------------------------------------------------------------------------
@@ -392,10 +383,9 @@ export default function ClientDetailsInfoSection({
   markedDays,
   uptime,
   lastSeen,
-  // FIX: calendarDialogOpen fjernet — prop'en blev modtaget men aldrig brugt i JSX.
-  // Dialog-tilstand styres udelukkende af parent via setCalendarDialogOpen.
   setCalendarDialogOpen,
   clientOnline,
+  calendarLoading = false,
 }) {
   const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -405,7 +395,6 @@ export default function ClientDetailsInfoSection({
       ? clientOnline === false
       : client?.isOnline === false;
 
-  // FIX: useMemo — genskabes ikke ved hver render
   const disabledOverlay = React.useMemo(() =>
     isOffline
       ? { opacity: 0.65, filter: "grayscale(20%)", bgcolor: "#fafafa" }
@@ -432,6 +421,7 @@ export default function ClientDetailsInfoSection({
 
   return (
     <Grid container spacing={isMobile ? 0.5 : 1}>
+
       {/* Kalender */}
       <Grid item xs={12} md={4}>
         <Card elevation={2} sx={cardSx}>
@@ -440,6 +430,10 @@ export default function ClientDetailsInfoSection({
               <Typography variant="h6" sx={headingSx}>
                 Kalender
               </Typography>
+              {/* Viser spinner mens kalenderdata hentes fra backend */}
+              {calendarLoading && (
+                <CircularProgress size={14} sx={{ ml: 1 }} />
+              )}
               <Tooltip title="Vis kalender for periode">
                 <span>
                   <Button
@@ -500,6 +494,7 @@ export default function ClientDetailsInfoSection({
           </CardContent>
         </Card>
       </Grid>
+
     </Grid>
   );
 }
