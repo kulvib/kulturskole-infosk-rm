@@ -13,7 +13,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import TerminalIcon from "@mui/icons-material/Terminal";
-import { getTerminalBrowserWsUrl } from "../../api";
+import { getTerminalBrowserWsUrl } from "../../../api";
 
 function nowTime() {
   return new Date().toLocaleTimeString("da-DK", { hour12: false });
