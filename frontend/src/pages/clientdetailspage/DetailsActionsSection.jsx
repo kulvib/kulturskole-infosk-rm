@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Box,
   Card,
@@ -38,6 +38,8 @@ import { useAuth } from "../../auth/authcontext";
       primary, secondary, success, error, warning, info, inherit
   - Det forhindrer render-crash og gør at sektionen kan opdatere korrekt.
 */
+
+const PENDING_BANNER_AUTO_HIDE_MS = 10_000;
 
 const BUSY_CHROME_STEPS = new Set([
   "clear_cookies",
@@ -175,30 +177,27 @@ export default function ClientDetailsActionsSection({
     message: "",
     severity: "success",
   });
+  const [pendingBannerHidden, setPendingBannerHidden] = useState(false);
 
   const normalizedClientState = String(clientState || "").trim().toLowerCase();
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
   const hasPendingAction = !!normalizedPendingAction && normalizedPendingAction !== "none";
-  const isOffline = clientOnline === false;
 
   const liveStepNorm = String(liveStep ?? "").trim().toLowerCase();
 
   // System-level handlinger må låse hele knap-panelet.
   // pending_reboot/pending_shutdown cleares hurtigt på klienten, så frontend
   // skal bruge liveStep som sandhed under selve reboot/shutdown-flowet.
-  const stateLooksSystemLocked =
-    normalizedClientState.startsWith("reboot") ||
-    normalizedClientState.startsWith("shut");
-
   const isSystemLocked =
     SYSTEM_LOCK_STEPS.has(liveStepNorm) ||
-    ((clientActionPending || hasPendingAction) && stateLooksSystemLocked);
+    normalizedClientState.startsWith("reboot") ||
+    normalizedClientState.startsWith("shut");
 
   // Dvale skal ikke låse hele panelet; den skal kun efterlade "Væk fra dvale" aktiv.
   const isSleeping =
     normalizedClientState.startsWith("sleep") || SYSTEM_SLEEP_STEPS.has(liveStepNorm);
 
-  const isLiveStepBusy = !isOffline && (BUSY_CHROME_STEPS.has(liveStepNorm) || isSystemLocked);
+  const isLiveStepBusy = BUSY_CHROME_STEPS.has(liveStepNorm) || isSystemLocked;
 
   const chromeIsRunning = CHROME_RUNNING_STEPS.has(liveStepNorm)
     ? true
@@ -208,12 +207,11 @@ export default function ClientDetailsActionsSection({
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
   const anyBusy =
-    !isOffline &&
-    (anyLoading ||
-      !!refreshing ||
-      clientActionPending ||
-      hasPendingAction ||
-      isLiveStepBusy);
+    anyLoading ||
+    !!refreshing ||
+    clientActionPending ||
+    hasPendingAction ||
+    isLiveStepBusy;
 
   const notify = useCallback(
     (opts) => {
@@ -232,7 +230,7 @@ export default function ClientDetailsActionsSection({
 
   const doAction = useCallback(
     async (action) => {
-      if (isOffline) {
+      if (clientOnline === false) {
         notify({
           message: "Klienten er offline — handling afvist",
           severity: "warning",
@@ -252,12 +250,12 @@ export default function ClientDetailsActionsSection({
         setActionLoading((prev) => ({ ...prev, [action]: false }));
       }
     },
-    [isOffline, handleClientAction, notify]
+    [clientOnline, handleClientAction, notify]
   );
 
   const isDisabledByState = useCallback(
     (key) => {
-      if (isOffline) return true;
+      if (clientOnline === false) return true;
       if (isSystemLocked) return true;
       if (isSleeping) return key !== "wakeup";
       if (key === "wakeup") return true;
@@ -265,13 +263,10 @@ export default function ClientDetailsActionsSection({
       if (key === "stop" && chromeIsRunning === false) return true;
       return false;
     },
-    [isOffline, isSystemLocked, isSleeping, chromeIsRunning]
+    [clientOnline, isSystemLocked, isSleeping, chromeIsRunning]
   );
 
   const pendingLabel = (() => {
-    // Når klienten er offline under reboot/shutdown, skal den blå
-    // “Klient genstarter…”-tekst ikke blive hængende oven på offline-visningen.
-    if (isOffline) return null;
     if (!clientActionPending && !hasPendingAction && !isLiveStepBusy) return null;
     const stepLabel = getStepLabel(liveStep);
     if (stepLabel) {
@@ -282,6 +277,29 @@ export default function ClientDetailsActionsSection({
       normalizedPendingAction !== "none" ? normalizedPendingAction : "handling";
     return `Afventer klient: ${actionName}`;
   })();
+
+  // Skjuler kun infoboksen efter 10 sekunder.
+  // Selve busy-/låse-logikken bevares via anyBusy og isDisabledByState.
+  const hasPendingLabel = !!pendingLabel;
+  const pendingBannerKey = `${normalizedPendingAction}|${liveStepNorm}|${
+    clientActionPending ? "pending" : "idle"
+  }|${hasPendingAction ? "has-pca" : "no-pca"}`;
+
+  useEffect(() => {
+    if (!hasPendingLabel) {
+      setPendingBannerHidden(false);
+      return undefined;
+    }
+
+    setPendingBannerHidden(false);
+    const timer = window.setTimeout(() => {
+      setPendingBannerHidden(true);
+    }, PENDING_BANNER_AUTO_HIDE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [pendingBannerKey, hasPendingLabel]);
+
+  const visiblePendingLabel = pendingBannerHidden ? null : pendingLabel;
 
   const row1 = [
     {
@@ -345,7 +363,7 @@ export default function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => doAction("reboot"),
       loading: !!actionLoading["reboot"],
-      disabled: isOffline,
+      disabled: clientOnline === false,
       tooltip: "Genstart klient",
     },
     {
@@ -356,7 +374,7 @@ export default function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => setShutdownDialogOpen(true),
       loading: !!actionLoading["shutdown"],
-      disabled: isOffline,
+      disabled: clientOnline === false,
       tooltip: "Sluk klient — kræver fysisk tænding bagefter",
     },
     {
@@ -367,7 +385,7 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: handleOpenTerminal,
       loading: false,
-      disabled: isOffline,
+      disabled: clientOnline === false,
       tooltip: "Åbn terminal",
     },
     {
@@ -378,23 +396,23 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: handleOpenRemoteDesktop,
       loading: false,
-      disabled: isOffline,
+      disabled: clientOnline === false,
       tooltip: "Åbn fjernskrivebord",
     },
   ];
 
-  const cardStyle = isOffline ? { opacity: 0.85 } : {};
+  const cardStyle = clientOnline === false ? { opacity: 0.85 } : {};
 
   return (
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2, ...cardStyle }}>
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
-        {pendingLabel && (
+        {visiblePendingLabel && (
           <Alert
             severity="info"
             sx={{ mb: 1.5 }}
             icon={<CircularProgress size={16} />}
           >
-            {pendingLabel}
+            {visiblePendingLabel}
           </Alert>
         )}
 
@@ -419,7 +437,7 @@ export default function ClientDetailsActionsSection({
           </>
         )}
 
-        {isOffline && (
+        {clientOnline === false && (
           <Typography
             variant="body2"
             color="text.secondary"
@@ -429,7 +447,7 @@ export default function ClientDetailsActionsSection({
           </Typography>
         )}
 
-        {isSleeping && !isOffline && (
+        {isSleeping && clientOnline !== false && (
           <Typography
             variant="body2"
             color="primary"
@@ -463,7 +481,7 @@ export default function ClientDetailsActionsSection({
             }}
             color="error"
             variant="contained"
-            disabled={isOffline || anyBusy}
+            disabled={clientOnline === false || anyBusy}
           >
             Ja, sluk klienten
           </Button>
