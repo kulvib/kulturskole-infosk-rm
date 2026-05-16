@@ -24,9 +24,11 @@ import {
     uden full re-render. Step sendes til DetailsActionsSection som liveStep.
   - pending_chrome_action polles via getClient direkte under action-flow →
     opdaterer kun localPendingAction + localClientState, IKKE hele client-objektet.
-  - Lock holdes indtil BÅDE:
+  - Lock holdes indtil ALLE betingelser er opfyldt:
       1) pending_chrome_action === "none"
       2) chrome step er ikke i BUSY_CHROME_STEPS
+      3) Mindst ACTION_MIN_LOCK_MS er gået siden action-start
+         (klienten rydder PCA øjeblikkeligt — vi venter på første chrome-step)
   - Korrekt unlock-rækkefølge: silentRefresh() FØRST → unlock bagefter.
   - handleRefresh (full re-render) bruges KUN ved manuel klik på "Opdater".
   - cancelActionPoll eksponeres via prop-callback så Wrapper kan stoppe
@@ -36,11 +38,17 @@ import {
 const CHROME_STATUS_POLL_MS = 1000;
 const ACTION_POLL_MS        = 1500;
 const ACTION_POLL_MAX_MS    = 60_000;
+const ACTION_MIN_LOCK_MS    = 5000; // FIX: klienten rydder PCA straks — vent mindst 5s på første chrome-step
 
+// FIX: Udvidet med alle transiente steps som klientkoden skriver
 const BUSY_CHROME_STEPS = new Set([
   "countdown",
   "clear_cookies",
   "system_reboot_countdown",
+  "chrome_starting",   // FIX: skrives under scenario_system_start
+  "chrome_stopping",   // FIX: skrives under scenario_manual_shutdown
+  "system_sleep",      // FIX: skrives under sleep-flow
+  "system_wake",       // FIX: skrives under wake-flow
 ]);
 
 export default function ClientDetailsPage({
@@ -224,7 +232,6 @@ export default function ClientDetailsPage({
 
     async function pollForConfirmation() {
       while (!actionPollStopRef.current && mountedRef.current) {
-        // Timeout-tjek øverst i løkken — ikke efter break
         if (Date.now() - startTime > ACTION_POLL_MAX_MS) break;
 
         await new Promise((res) => setTimeout(res, ACTION_POLL_MS));
@@ -247,11 +254,17 @@ export default function ClientDetailsPage({
 
         if (!pcaClear) continue;
 
-        // Tjek 2: chrome step må ikke være i BUSY_CHROME_STEPS
-        const currentStep = String(liveStepRef.current ?? "").toLowerCase();
-        if (BUSY_CHROME_STEPS.has(currentStep)) continue;
+        // FIX: Håndhæv minimumsventetid — klienten rydder PCA øjeblikkeligt
+        // ved modtagelse, men handlingen er endnu ikke startet.
+        // Vent mindst ACTION_MIN_LOCK_MS så klienten når at sende første chrome-step.
+        if (Date.now() - startTime < ACTION_MIN_LOCK_MS) continue;
 
-        // Begge betingelser opfyldt — afslut polling
+        // FIX: null/tom step = vi ved ikke hvad klienten laver → fortsæt polling
+        // Tidligere brød dette straks ud og låste knapper op for tidligt.
+        const currentStep = String(liveStepRef.current ?? "").toLowerCase();
+        if (!currentStep || BUSY_CHROME_STEPS.has(currentStep)) continue;
+
+        // Alle betingelser opfyldt — afslut polling
         break;
       }
 
