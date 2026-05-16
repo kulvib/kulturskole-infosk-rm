@@ -55,7 +55,7 @@ export default function App() {
         path="/remote-desktop/:clientId"
         element={
           <ProtectedRoute>
-            <AdminRoute>
+            <AdminRoute requireSuperadmin>
               <RemoteDesktop />
             </AdminRoute>
           </ProtectedRoute>
