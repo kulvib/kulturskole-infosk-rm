@@ -82,7 +82,7 @@ import { useAuth } from "../../auth/authcontext";
 */
 
 // Hvor længe knapper forbliver låst efter system_rebooting/system_shutting_down (ms)
-const REBOOT_LOCK_DURATION_MS = 75_000; // 75 sekunder
+const REBOOT_LOCK_DURATION_MS = 45_000; // 45 sekunder
 
 const BUSY_CHROME_STEPS = new Set([
   "clear_cookies",
