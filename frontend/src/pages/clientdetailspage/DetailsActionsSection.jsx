@@ -40,11 +40,16 @@ import { useAuth } from "../../auth/authcontext";
   - Ingen intern polling overhovedet.
 */
 
-// Steps der indikerer klienten stadig er aktivt i gang
+// FIX: Udvidet med alle transiente steps som klientkoden skriver.
+// Skal matche BUSY_CHROME_STEPS i ClientDetailsPage.jsx.
 const BUSY_CHROME_STEPS = new Set([
   "countdown",
   "clear_cookies",
   "system_reboot_countdown",
+  "chrome_starting",   // FIX: skrives under scenario_system_start
+  "chrome_stopping",   // FIX: skrives under scenario_manual_shutdown
+  "system_sleep",      // FIX: skrives under sleep-flow
+  "system_wake",       // FIX: skrives under wake-flow
 ]);
 
 // Oversæt chrome step-navn til læsbar dansk tekst til banner
@@ -141,9 +146,9 @@ export default function ClientDetailsActionsSection({
 
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
-  const [actionLoading, setActionLoading]         = useState({});
+  const [actionLoading, setActionLoading]           = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
-  const [localSnackbar, setLocalSnackbar]         = useState({
+  const [localSnackbar, setLocalSnackbar]           = useState({
     open: false,
     message: "",
     severity: "success",
