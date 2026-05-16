@@ -23,30 +23,14 @@ import NightlightIcon from "@mui/icons-material/Nightlight";
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
 import ChromeReaderModeIcon from "@mui/icons-material/ChromeReaderMode";
 import StopIcon from "@mui/icons-material/Stop";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
 import { getClient } from "../../api";
 
-/*
-  DetailsActionsSection.jsx
-
-  Layout: 2 rækker af 4 knapper (admin), 1 række af 4 (bruger).
-  Logik:
-    - Efter en handling polles backend hvert sekund indtil
-      pending_chrome_action === "none" (max 30s).
-    - Alle knapper er disabled under polling og API-kald.
-    - "Afventer klient: <action>" vises som Alert mens vi poller.
-    - Genstart browser er fjernet.
-    - Sluk klient kræver bekræftelsesdialog.
-*/
-
 const POLL_INTERVAL_MS = 1000;
 const POLL_MAX_WAIT_MS = 30_000;
-
-const ACTIONS_NEEDING_CONFIRMATION = new Set(["shutdown"]);
 const ACTIONS_NEEDING_POLLING = new Set(["start", "stop"]);
 
 const actionBtnStyle = {
@@ -92,7 +76,11 @@ function ActionButton({ btn, isMobile, anyBusy }) {
   );
 
   if (isMobile) return button;
-  return <Tooltip title={isDisabled && !isActive ? "Ikke tilgængelig" : btn.tooltip} arrow>{button}</Tooltip>;
+  return (
+    <Tooltip title={isDisabled && !isActive ? "Ikke tilgængelig" : btn.tooltip} arrow>
+      {button}
+    </Tooltip>
+  );
 }
 
 export default function ClientDetailsActionsSection({
@@ -126,9 +114,6 @@ export default function ClientDetailsActionsSection({
   const anyWaiting = waitingAction !== null;
   const anyBusy = anyLoading || anyWaiting || !!refreshing;
 
-  // ---------------------------------------------------------------------------
-  // Snackbar
-  // ---------------------------------------------------------------------------
   const notify = useCallback((opts) => {
     if (typeof showSnackbarProp === "function") {
       showSnackbarProp(opts);
@@ -137,9 +122,6 @@ export default function ClientDetailsActionsSection({
     }
   }, [showSnackbarProp]);
 
-  // ---------------------------------------------------------------------------
-  // Poll backend hvert sekund indtil pending_chrome_action === "none"
-  // ---------------------------------------------------------------------------
   const pollUntilConfirmed = useCallback(async (action) => {
     if (!ACTIONS_NEEDING_POLLING.has(action)) return;
     if (!clientId) return;
@@ -163,9 +145,6 @@ export default function ClientDetailsActionsSection({
     }
   }, [clientId]);
 
-  // ---------------------------------------------------------------------------
-  // Kør handling
-  // ---------------------------------------------------------------------------
   const doAction = useCallback(async (action) => {
     if (clientOnline === false) {
       notify({ message: "Klienten er offline — handling afvist", severity: "warning" });
@@ -185,9 +164,6 @@ export default function ClientDetailsActionsSection({
     await pollUntilConfirmed(action);
   }, [clientOnline, handleClientAction, notify, pollUntilConfirmed]);
 
-  // ---------------------------------------------------------------------------
-  // disabled-logik per knap
-  // ---------------------------------------------------------------------------
   const isDisabledByState = useCallback((key) => {
     if (clientOnline === false) return true;
     if (hasPendingAction) return true;
@@ -195,9 +171,6 @@ export default function ClientDetailsActionsSection({
     return key === "wakeup";
   }, [clientOnline, hasPendingAction, isSleeping]);
 
-  // ---------------------------------------------------------------------------
-  // Knap-definitioner — 2 rækker á 4
-  // ---------------------------------------------------------------------------
   const row1 = [
     {
       key: "start",
@@ -306,7 +279,7 @@ export default function ClientDetailsActionsSection({
     <Card elevation={2} sx={{ borderRadius: 2, mb: 2, ...cardStyle }}>
       <CardContent sx={{ px: isMobile ? 1 : 2 }}>
 
-        {/* Pending action indicator */}
+        {/* Pending action / polling indicator */}
         {(hasPendingAction || anyWaiting) && (
           <Alert severity="info" sx={{ mb: 1.5 }}>
             {anyWaiting
@@ -388,4 +361,14 @@ export default function ClientDetailsActionsSection({
         onClose={() => setLocalSnackbar(s => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        *
+        <Alert
+          onClose={() => setLocalSnackbar(s => ({ ...s, open: false }))}
+          severity={localSnackbar.severity}
+          sx={{ width: "100%" }}
+        >
+          {localSnackbar.message}
+        </Alert>
+      </Snackbar>
+    </Card>
+  );
+}
