@@ -35,8 +35,33 @@ import { useAuth } from "../../auth/authcontext";
   - Viser handlingsknapper og håndterer klik.
   - Al polling og lock-logik ligger i ClientDetailsPage (undgår blinking).
   - clientActionPending (prop) låser alle knapper mens en handling afventer klient.
-  - Ingen intern pollUntilConfirmed — ClientDetailsPage ejer den logik.
+  - liveStep + liveChromeStatus (props fra ClientDetailsPage) bruges til at vise
+    aktuel chrome-status i pending-banneret — samme kilde som ClientDetailsHeaderSection.
+  - Ingen intern polling — ClientDetailsPage ejer al polling-logik.
 */
+
+// Steps der indikerer klienten er aktivt i gang
+const BUSY_CHROME_STEPS = new Set([
+  "countdown",
+  "clear_cookies",
+  "system_reboot_countdown",
+]);
+
+// Læsbare labels til banner baseret på chrome step
+function getStepLabel(step, liveChromeStatus) {
+  if (!step) return null;
+  const s = String(step).toLowerCase();
+  if (s === "countdown")               return "Tæller ned…";
+  if (s === "clear_cookies")           return "Rydder cookies…";
+  if (s === "system_reboot_countdown") return "Genstarter…";
+  if (s === "chrome_starting")         return "Starter browser…";
+  if (s === "chrome_stopping")         return "Stopper browser…";
+  if (s === "system_sleep")            return "Sætter i dvale…";
+  if (s === "system_wake")             return "Vågner op…";
+  // Fallback: brug liveChromeStatus hvis tilgængelig
+  if (liveChromeStatus)                return liveChromeStatus;
+  return null;
+}
 
 const actionBtnStyle = {
   minWidth: 0,
@@ -57,7 +82,7 @@ const actionBtnStyle = {
 };
 
 function ActionButton({ btn, isMobile, anyBusy }) {
-  const isActive = !!btn.loading;
+  const isActive   = !!btn.loading;
   const isDisabled = isActive || anyBusy || !!btn.disabled;
 
   const button = (
@@ -65,7 +90,11 @@ function ActionButton({ btn, isMobile, anyBusy }) {
       <Button
         variant={btn.variant}
         color={btn.color}
-        startIcon={isActive ? <CircularProgress size={16} color="inherit" /> : btn.icon}
+        startIcon={
+          isActive
+            ? <CircularProgress size={16} color="inherit" />
+            : btn.icon
+        }
         disabled={isDisabled}
         onClick={btn.onClick}
         sx={actionBtnStyle}
@@ -78,7 +107,10 @@ function ActionButton({ btn, isMobile, anyBusy }) {
 
   if (isMobile) return button;
   return (
-    <Tooltip title={isDisabled && !isActive ? "Ikke tilgængelig" : btn.tooltip} arrow>
+    <Tooltip
+      title={isDisabled && !isActive ? "Ikke tilgængelig" : btn.tooltip}
+      arrow
+    >
       {button}
     </Tooltip>
   );
@@ -94,30 +126,35 @@ export default function ClientDetailsActionsSection({
   refreshing,
   showSnackbar: showSnackbarProp,
   clientOnline = true,
+  // Fra ClientDetailsPage — true mens handling afventer klient-bekræftelse
   clientActionPending = false,
+  // Fra ClientDetailsPage — seneste chrome step (opdateres hvert 1s)
+  liveStep = null,
+  // Fra ClientDetailsPage — seneste chrome status tekst (opdateres hvert 1s)
+  liveChromeStatus = null,
 }) {
-  const theme = useTheme();
+  const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
-  const [actionLoading, setActionLoading] = useState({});
+  const [actionLoading, setActionLoading]   = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
-  const [localSnackbar, setLocalSnackbar] = useState({
+  const [localSnackbar, setLocalSnackbar]   = useState({
     open: false,
     message: "",
     severity: "success",
   });
 
-  const normalizedClientState = String(clientState || "").trim().toLowerCase();
-  const isSleeping = normalizedClientState.startsWith("sleep");
-
+  const normalizedClientState  = String(clientState || "").trim().toLowerCase();
+  const isSleeping             = normalizedClientState.startsWith("sleep");
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
-  const hasPendingAction =
+  const hasPendingAction       =
     !!normalizedPendingAction && normalizedPendingAction !== "none";
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
+  // Lås alle knapper hvis: loading, refreshing, handling afventer klient, eller pending action
   const anyBusy = anyLoading || !!refreshing || clientActionPending || hasPendingAction;
 
   // ---------------------------------------------------------------------------
@@ -139,12 +176,15 @@ export default function ClientDetailsActionsSection({
   );
 
   // ---------------------------------------------------------------------------
-  // Kør handling
+  // Kør handling — ingen intern polling (ClientDetailsPage håndterer det)
   // ---------------------------------------------------------------------------
   const doAction = useCallback(
     async (action) => {
       if (clientOnline === false) {
-        notify({ message: "Klienten er offline — handling afvist", severity: "warning" });
+        notify({
+          message: "Klienten er offline — handling afvist",
+          severity: "warning",
+        });
         return;
       }
 
@@ -176,13 +216,23 @@ export default function ClientDetailsActionsSection({
   );
 
   // ---------------------------------------------------------------------------
-  // Pending-label til info-banner
+  // Pending-banner tekst
+  // Viser aktuel chrome step (samme kilde som ClientDetailsHeaderSection)
   // ---------------------------------------------------------------------------
-  const pendingLabel = clientActionPending
-    ? `Afventer klient: ${normalizedPendingAction !== "none" ? normalizedPendingAction : "handling"}`
-    : hasPendingAction
-    ? `Afventer klient: ${normalizedPendingAction}`
-    : null;
+  const stepLabel = getStepLabel(liveStep, liveChromeStatus);
+
+  const pendingLabel = (() => {
+    if (!clientActionPending && !hasPendingAction) return null;
+
+    // Hvis vi har et aktivt chrome step — vis det
+    if (stepLabel) return stepLabel;
+
+    // Ellers vis pending action navn
+    const actionName = normalizedPendingAction !== "none"
+      ? normalizedPendingAction
+      : "handling";
+    return `Afventer klient: ${actionName}`;
+  })();
 
   // ---------------------------------------------------------------------------
   // Knap-definitioner — Række 1 (alle brugere)
@@ -348,7 +398,10 @@ export default function ClientDetailsActionsSection({
       </CardContent>
 
       {/* Bekræftelsesdialog — sluk */}
-      <Dialog open={shutdownDialogOpen} onClose={() => setShutdownDialogOpen(false)}>
+      <Dialog
+        open={shutdownDialogOpen}
+        onClose={() => setShutdownDialogOpen(false)}
+      >
         <DialogTitle>Bekræft slukning af klient</DialogTitle>
         <DialogContent>
           <DialogContentText>
