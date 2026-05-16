@@ -35,36 +35,44 @@ import { useAuth } from "../../auth/authcontext";
   - Viser handlingsknapper og håndterer klik.
   - Al polling og lock-logik ligger i ClientDetailsPage (undgår blinking).
   - clientActionPending (prop) låser alle knapper mens en handling afventer klient.
-  - liveStep bruges nu til BÅDE banner-tekst OG knap-lock — banneret følger
-    headeren 1:1 og forsvinder præcis når headeren viser en rolig tilstand.
+  - isLiveStepBusy låser knapper + viser banner hvis liveStep er et aktivt
+    busy-step — banneret følger headeren 1:1.
   - Ingen intern polling overhovedet.
+
+  Faktiske step-navne fra chrome_kiosk.py:
+    BUSY:     clear_cookies, terminate_chrome, shutdown_chrome, countdown,
+              system_reboot_countdown, system_wake
+    TERMINAL: start_chrome, chrome_closed_programmatically,
+              chrome_closed_manual, system_sleep
 */
 
 // Skal matche BUSY_CHROME_STEPS i ClientDetailsPage.jsx
+// Faktiske transiente steps fra chrome_kiosk.py
 const BUSY_CHROME_STEPS = new Set([
-  "countdown",
   "clear_cookies",
+  "terminate_chrome",
+  "shutdown_chrome",
+  "countdown",
   "system_reboot_countdown",
-  "chrome_starting",
-  "chrome_stopping",
   "system_wake",
 ]);
 
-// Oversæt chrome step-navn til læsbar dansk tekst til banner
+// Oversæt faktiske chrome step-navne til læsbar dansk tekst
 function getStepLabel(step, liveChromeStatus) {
   if (!step) return null;
   const s = String(step).toLowerCase();
-  if (s === "countdown")               return "Tæller ned…";
-  if (s === "clear_cookies")           return "Rydder cookies…";
-  if (s === "system_reboot_countdown") return "Genstarter…";
-  if (s === "chrome_starting")         return "Starter browser…";
-  if (s === "chrome_stopping")         return "Stopper browser…";
-  if (s === "system_sleep")            return "Sætter i dvale…";
-  if (s === "system_wake")             return "Vågner op…";
-  if (s === "chrome_running")          return "Browser kører";
-  if (s === "chrome_stopped")          return "Browser stoppet";
+  if (s === "clear_cookies")                   return "Rydder cookies…";
+  if (s === "terminate_chrome")                return "Lukker browser…";
+  if (s === "shutdown_chrome")                 return "Lukker browser…";
+  if (s === "countdown")                       return "Tæller ned…";
+  if (s === "system_reboot_countdown")         return "Genstarter…";
+  if (s === "system_wake")                     return "Vågner op…";
+  if (s === "start_chrome")                    return "Browser startet";
+  if (s === "chrome_closed_programmatically")  return "Browser lukket";
+  if (s === "chrome_closed_manual")            return "Browser lukket manuelt";
+  if (s === "system_sleep")                    return "Klient i dvale";
   // Fallback: brug liveChromeStatus tekst hvis tilgængelig
-  if (liveChromeStatus)                return liveChromeStatus;
+  if (liveChromeStatus)                        return liveChromeStatus;
   return null;
 }
 
@@ -154,7 +162,8 @@ export default function ClientDetailsActionsSection({
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
   const hasPendingAction        = !!normalizedPendingAction && normalizedPendingAction !== "none";
 
-  // Låser knapper + viser banner hvis liveStep er et aktivt busy-step
+  // Låser knapper + viser banner hvis liveStep er et aktivt busy-step.
+  // Banneret følger headeren 1:1 — samme datakilde (getChromeStatus, 1s interval).
   const isLiveStepBusy = BUSY_CHROME_STEPS.has(String(liveStep ?? "").toLowerCase());
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
@@ -223,8 +232,8 @@ export default function ClientDetailsActionsSection({
 
   // ---------------------------------------------------------------------------
   // Pending-banner tekst
-  // Vises så længe clientActionPending, hasPendingAction ELLER isLiveStepBusy
-  // — banneret følger headeren 1:1
+  // Vises så længe clientActionPending, hasPendingAction ELLER isLiveStepBusy.
+  // Banneret følger headeren 1:1 — forsvinder præcis når processen er færdig.
   // ---------------------------------------------------------------------------
   const pendingLabel = (() => {
     if (!clientActionPending && !hasPendingAction && !isLiveStepBusy) return null;
