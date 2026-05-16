@@ -39,34 +39,73 @@ import { useAuth } from "../../auth/authcontext";
     busy-step — banneret følger headeren 1:1.
   - Ingen intern polling overhovedet.
 
+  FIX #1: "shutdown_chrome" er fjernet fra BUSY_CHROME_STEPS.
+    shutdown_chrome er et termination-step (klienten er FÆRDIG med at lukke
+    Chrome) — ikke et busy-step. Det forårsagede at banneret aldrig forsvandt,
+    fordi polling-løkken i ClientDetailsPage sad fast på "continue" indtil
+    watchdogen skrev chrome_closed_programmatically (5–7s forsinkelse).
+
+  FIX #2: isDisabledByState bruger nu chromeIsRunning (udledt fra liveStep)
+    til at deaktivere "Start" når Chrome kører, og "Stop" når Chrome er stoppet.
+    Tidligere var der ingen logik der tjekkede Chrome-tilstand — kun dvale.
+
   Faktiske step-navne fra chrome_kiosk.py / kiosk_sleep.py / kiosk_wake.py:
 
   BUSY_CHROME_STEPS (låser knapper + viser banner):
     clear_cookies            — rydder cookies (start/stop/sleep)
     terminate_chrome         — SIGTERM til Chrome
     kill_chrome              — SIGKILL til Chrome (efter failed SIGTERM)
-    shutdown_chrome          — chrome shutdown bekræftet
     countdown                — nedtælling før start eller sleep
     system_reboot_countdown  — nedtælling før reboot efter wake
     system_rebooting         — maskinen er ved at genstarte
     system_shutting_down     — maskinen er ved at lukke ned
 
-  NB: system_rebooting og system_shutting_down er i BUSY_CHROME_STEPS
-  så banneret vises korrekt under reboot/shutdown. I ClientDetailsPage
-  tjekkes terminal FØR busy i polling-loopen, så disse steps stadig kan
-  terminere polling for reboot/shutdown-actions korrekt.
+  TERMINAL_CHROME_STEPS (låser IKKE — processen er færdig):
+    shutdown_chrome                — chrome shutdown bekræftet (FIX: flyttet hertil)
+    start_chrome                   — start-handling færdig
+    chrome_closed_programmatically — stop/sleep-handling færdig (watchdog)
+    chrome_closed_manual           — Chrome lukket manuelt (watchdog)
+    system_sleep                   — sleep-handling færdig
+    system_wake                    — wake-handling færdig (reboot følger)
+    error                          — scenario fejlede → processen stoppet
+
+  CHROME_RUNNING_STEPS (Chrome er oppe):
+    start_chrome
+    chrome_opened_manual
+
+  CHROME_STOPPED_STEPS (Chrome er nede):
+    chrome_closed_programmatically
+    chrome_closed_manual
+    shutdown_chrome
+    kill_chrome
+    system_sleep
 */
 
-// Skal matche BUSY_CHROME_STEPS i ClientDetailsPage.jsx
+// FIX #1: shutdown_chrome er FJERNET — det er et terminal-step, ikke busy.
+// Skal matche BUSY_CHROME_STEPS i ClientDetailsPage.jsx (som også skal opdateres).
 const BUSY_CHROME_STEPS = new Set([
   "clear_cookies",
   "terminate_chrome",
   "kill_chrome",
-  "shutdown_chrome",
   "countdown",
   "system_reboot_countdown",
   "system_rebooting",
   "system_shutting_down",
+]);
+
+// FIX #2: Steps der bekræfter Chrome kører
+const CHROME_RUNNING_STEPS = new Set([
+  "start_chrome",
+  "chrome_opened_manual",
+]);
+
+// FIX #2: Steps der bekræfter Chrome er stoppet
+const CHROME_STOPPED_STEPS = new Set([
+  "chrome_closed_programmatically",
+  "chrome_closed_manual",
+  "shutdown_chrome",
+  "kill_chrome",
+  "system_sleep",
 ]);
 
 // Oversæt faktiske chrome step-navne til læsbar dansk tekst
@@ -76,7 +115,7 @@ function getStepLabel(step, liveChromeStatus) {
   if (s === "clear_cookies")                   return "Rydder cookies…";
   if (s === "terminate_chrome")                return "Lukker browser…";
   if (s === "kill_chrome")                     return "Tvangslukker browser…";
-  if (s === "shutdown_chrome")                 return "Lukker browser…";
+  if (s === "shutdown_chrome")                 return "Browser lukket";
   if (s === "countdown")                       return "Tæller ned…";
   if (s === "system_reboot_countdown")         return "Genstarter om lidt…";
   if (s === "system_rebooting")                return "Genstarter maskinen…";
@@ -179,8 +218,20 @@ export default function ClientDetailsActionsSection({
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
   const hasPendingAction        = !!normalizedPendingAction && normalizedPendingAction !== "none";
 
-  // Låser knapper + viser banner hvis liveStep er et aktivt busy-step.
+  // FIX #1: shutdown_chrome er ikke længere i BUSY_CHROME_STEPS, så
+  // isLiveStepBusy bliver false når Chrome er lukket — banneret forsvinder.
   const isLiveStepBusy = BUSY_CHROME_STEPS.has(String(liveStep ?? "").toLowerCase());
+
+  // FIX #2: Udled Chrome-tilstand fra liveStep.
+  // true  = Chrome kører bekræftet
+  // false = Chrome er stoppet bekræftet
+  // null  = ukendt (endnu ingen step, eller step fortæller os ikke noget)
+  const liveStepNorm = String(liveStep ?? "").toLowerCase();
+  const chromeIsRunning = CHROME_RUNNING_STEPS.has(liveStepNorm)
+    ? true
+    : CHROME_STOPPED_STEPS.has(liveStepNorm)
+    ? false
+    : null;
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
 
@@ -235,20 +286,33 @@ export default function ClientDetailsActionsSection({
   );
 
   // ---------------------------------------------------------------------------
-  // Disabled-logik per knap
+  // FIX #2: Disabled-logik per knap — bruger nu chromeIsRunning
   // ---------------------------------------------------------------------------
   const isDisabledByState = useCallback(
     (key) => {
       if (clientOnline === false) return true;
+
+      // Dvale-tilstand: kun "Væk fra dvale" er tilgængelig
       if (isSleeping) return key !== "wakeup";
-      return key === "wakeup";
+
+      // Ingen dvale: "Væk fra dvale" er aldrig tilgængelig
+      if (key === "wakeup") return true;
+
+      // "Start" deaktiveres når Chrome bekræftet kører
+      if (key === "start" && chromeIsRunning === true) return true;
+
+      // "Stop" deaktiveres når Chrome bekræftet er stoppet
+      if (key === "stop" && chromeIsRunning === false) return true;
+
+      return false;
     },
-    [clientOnline, isSleeping]
+    [clientOnline, isSleeping, chromeIsRunning]
   );
 
   // ---------------------------------------------------------------------------
   // Pending-banner tekst
   // Vises så længe clientActionPending, hasPendingAction ELLER isLiveStepBusy.
+  // Banneret følger headeren 1:1 — forsvinder præcis når processen er færdig.
   // ---------------------------------------------------------------------------
   const pendingLabel = (() => {
     if (!clientActionPending && !hasPendingAction && !isLiveStepBusy) return null;
@@ -277,7 +341,9 @@ export default function ClientDetailsActionsSection({
       onClick: () => doAction("start"),
       loading: !!actionLoading["start"],
       disabled: isDisabledByState("start"),
-      tooltip: "Start kiosk browser",
+      tooltip: chromeIsRunning === true
+        ? "Kiosk browser kører allerede"
+        : "Start kiosk browser",
     },
     {
       key: "stop",
@@ -288,7 +354,9 @@ export default function ClientDetailsActionsSection({
       onClick: () => doAction("stop"),
       loading: !!actionLoading["stop"],
       disabled: isDisabledByState("stop"),
-      tooltip: "Stop kiosk browser",
+      tooltip: chromeIsRunning === false
+        ? "Kiosk browser er allerede stoppet"
+        : "Stop kiosk browser",
     },
     {
       key: "sleep",
