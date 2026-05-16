@@ -319,11 +319,11 @@ export function openTerminal(id) {
 }
 
 export function openRemoteDesktop(id) {
-  window.open(
-    `${apiUrl}/api/clients/${id}/remote-desktop`,
-    "_blank",
-    "noopener"
-  );
+  // Åbn frontend-siden for fjernskrivebord.
+  // Backend-placeholderen /api/clients/{id}/remote-desktop bruges ikke til
+  // Remote Desktop v2, da den rigtige forbindelse kører via WebSocket
+  // fra frontend-routen /remote-desktop/:clientId.
+  window.open(`/remote-desktop/${id}`, "_blank", "noopener");
 }
 
 export function getClientStream(id) {
