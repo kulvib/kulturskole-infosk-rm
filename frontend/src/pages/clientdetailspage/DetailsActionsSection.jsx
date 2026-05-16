@@ -7,13 +7,13 @@ import {
   Button,
   CircularProgress,
   Tooltip,
+  Grid,
   useMediaQuery,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogContentText,
   DialogActions,
-  Divider,
 } from "@mui/material";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -29,48 +29,50 @@ import { useAuth } from "../../auth/authcontext";
 /*
   DetailsActionsSection.jsx
 
-  Layout: To rækker med gruppeoverskrifter
-    Række 1 — Browser:  Start browser | Stop browser | Genstart browser
-    Række 1 — Dvale:    Sæt i dvale   | Væk klient
-    Række 2 — Maskine:  Genstart maskine | Sluk maskine        (kun admin)
-    Række 2 — Værktøjer: Terminal | Fjernskrivebord            (kun admin)
+  FIX (kritisk): pca === "start" || pca === "none" === false
+    evaluerede til pca !== "none" pga. operator-precedens.
+    Rettet til: pca === "start"
 
-  FIX: Alle knapper er disabled når pendingChromeAction IKKE er "none"/"null"
-  — forhindrer at flere processer køres parallelt på klienten.
+  FIX: handleClientAction i ClientDetailsPage awaiter nu hele refresh-cyklussen
+    før den returnerer, så actionLoading forbliver true under API-kald + refresh.
+    Knapperne forbliver disabled i hele perioden.
+
+  FIX: Bekræftelsesdialog for reboot/shutdown.
+  FIX: safeShowSnackbar guard mod manglende prop.
 */
 
 const ACTION_LABELS = {
-  start:    "Start browser",
-  stop:     "Stop browser",
-  restart:  "Genstart browser",
-  sleep:    "Sæt i dvale",
-  wakeup:   "Væk klient",
-  reboot:   "Genstart maskine",
+  start: "Start browser",
+  stop: "Stop browser",
+  sleep: "Sæt i dvale",
+  wakeup: "Væk klient",
+  restart: "Genstart browser",
+  reboot: "Genstart maskine",
   shutdown: "Sluk maskine",
 };
 
 const ACTION_ICONS = {
-  start:    <OpenInBrowserIcon fontSize="small" />,
-  stop:     <CloseIcon fontSize="small" />,
-  restart:  <RestartAltIcon fontSize="small" />,
-  sleep:    <HotelIcon fontSize="small" />,
-  wakeup:   <WbSunnyIcon fontSize="small" />,
-  reboot:   <RestartAltIcon fontSize="small" />,
+  start: <OpenInBrowserIcon fontSize="small" />,
+  stop: <CloseIcon fontSize="small" />,
+  sleep: <HotelIcon fontSize="small" />,
+  wakeup: <WbSunnyIcon fontSize="small" />,
+  restart: <RestartAltIcon fontSize="small" />,
+  reboot: <RestartAltIcon fontSize="small" />,
   shutdown: <PowerSettingsNewIcon fontSize="small" />,
 };
 
 const ACTION_COLORS = {
-  start:    "success",
-  stop:     "error",
-  restart:  "secondary",
-  sleep:    "primary",
-  wakeup:   "warning",
-  reboot:   "warning",
+  start: "success",
+  stop: "error",
+  sleep: "primary",
+  wakeup: "warning",
+  restart: "secondary",
+  reboot: "warning",
   shutdown: "error",
 };
 
 const ADMIN_ONLY_ACTIONS = new Set(["reboot", "shutdown"]);
-const CONFIRM_ACTIONS    = new Set(["shutdown", "reboot"]);
+const CONFIRM_ACTIONS = new Set(["shutdown", "reboot"]);
 
 const CONFIRM_TEXTS = {
   shutdown: {
@@ -83,65 +85,42 @@ const CONFIRM_TEXTS = {
   },
 };
 
-// Er der en aktiv pending action på klienten (sendt fra backend)?
-function hasPendingAction(pendingChromeAction) {
-  if (!pendingChromeAction) return false;
-  const pca = String(pendingChromeAction).toLowerCase().trim();
-  return pca !== "" && pca !== "none";
-}
-
-function ActionButton({ action, onClick, loading, disabled, isMobile, isAdmin, variant = "outlined" }) {
+function ActionButton({ action, onClick, loading, disabled, isMobile, isAdmin }) {
   if (ADMIN_ONLY_ACTIONS.has(action) && !isAdmin) return null;
 
   const label = ACTION_LABELS[action] ?? action;
-  const icon  = ACTION_ICONS[action]  ?? null;
+  const icon = ACTION_ICONS[action] ?? null;
   const color = ACTION_COLORS[action] ?? "primary";
 
   return (
     <Tooltip title={disabled && !loading ? "Ikke tilgængelig" : label} arrow>
-      <span>
+      <span style={{ width: "100%" }}>
         <Button
-          variant={variant}
+          variant="outlined"
           color={color}
           size={isMobile ? "small" : "medium"}
-          startIcon={loading
-            ? <CircularProgress size={isMobile ? 13 : 16} color="inherit" />
-            : icon}
+          startIcon={
+            loading
+              ? <CircularProgress size={isMobile ? 13 : 16} color="inherit" />
+              : icon
+          }
           onClick={onClick}
           disabled={disabled || loading}
+          fullWidth
           sx={{
             textTransform: "none",
             fontWeight: 500,
-            fontSize: isMobile ? "0.80rem" : "0.88rem",
+            fontSize: isMobile ? "0.82rem" : "0.9rem",
+            justifyContent: "flex-start",
             px: isMobile ? 1 : 1.5,
-            py: isMobile ? 0.4 : 0.65,
-            minHeight: isMobile ? 32 : 38,
-            whiteSpace: "nowrap",
+            py: isMobile ? 0.5 : 0.75,
+            minHeight: isMobile ? 34 : 40,
           }}
         >
           {loading ? "Arbejder..." : label}
         </Button>
       </span>
     </Tooltip>
-  );
-}
-
-function GroupLabel({ label, isMobile }) {
-  return (
-    <Typography
-      variant="caption"
-      sx={{
-        fontWeight: 700,
-        color: "text.secondary",
-        textTransform: "uppercase",
-        letterSpacing: "0.06em",
-        fontSize: isMobile ? 10 : 11,
-        mb: 0.5,
-        display: "block",
-      }}
-    >
-      {label}
-    </Typography>
   );
 }
 
@@ -156,28 +135,22 @@ export default function ClientDetailsActionsSection({
   showSnackbar,
   clientOnline,
 }) {
-  const theme    = useTheme();
+  const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
-  const [actionLoading, setActionLoading]   = useState({});
-  const [confirmDialog, setConfirmDialog]   = useState({ open: false, action: null });
+  const [actionLoading, setActionLoading] = useState({});
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, action: null });
 
-  const isSleeping = typeof clientState === "string" &&
-    clientState.toLowerCase().startsWith("sleep");
+  const isSleeping =
+    typeof clientState === "string" && clientState.toLowerCase().startsWith("sleep");
 
   const isOffline = clientOnline === false;
 
-  // FIX: Alle knapper disabled mens én lokal handling kører
-  const anyLocalLoading = Object.values(actionLoading).some(Boolean);
-
-  // FIX: Alle knapper disabled når klienten allerede har en igangværende pending action
-  const clientBusy = hasPendingAction(pendingChromeAction);
-
-  // Samlet blokering: lokalt loading, refresh, eller klient er optaget
-  const globalBlocked = anyLocalLoading || refreshing || clientBusy;
+  // Alle knapper disabled mens én handling kører
+  const anyLoading = Object.values(actionLoading).some(Boolean);
 
   const safeShowSnackbar = useCallback((opts) => {
     if (typeof showSnackbar === "function") showSnackbar(opts);
@@ -192,6 +165,8 @@ export default function ClientDetailsActionsSection({
     }
     setActionLoading(prev => ({ ...prev, [action]: true }));
     try {
+      // handleClientAction i ClientDetailsPage awaiter nu refresh synkront —
+      // actionLoading forbliver true i hele perioden (API-kald + 600ms + refresh)
       await handleClientAction(action);
     } catch (err) {
       safeShowSnackbar({
@@ -224,225 +199,163 @@ export default function ClientDetailsActionsSection({
     setConfirmDialog({ open: false, action: null });
   }, []);
 
-  // Disabled-logik pr. action
+  // FIX: isDisabled — rettet pca-logikken
   const isDisabled = useCallback((action) => {
-    // Global blokering: lokal process, refresh, eller klient har pending action
-    if (globalBlocked) return true;
+    // Altid disabled hvis en anden handling kører eller refreshing
+    if (anyLoading) return true;
+    if (refreshing) return true;
 
-    if (action === "sleep")   return isSleeping;
-    if (action === "wakeup")  return !isSleeping;
+    // Sleep/wake: afhænger af klientens dvale-tilstand
+    if (action === "sleep") return isSleeping;
+    if (action === "wakeup") return !isSleeping;
 
-    // Reboot/shutdown kræver ikke nødvendigvis online
+    // Reboot/shutdown: kræver ikke online
     if (action === "reboot" || action === "shutdown") return false;
 
-    // Alt andet kræver online
+    // Resten kræver at klienten er online
     if (isOffline) return true;
 
+    if (action === "start") {
+      // FIX: var fejlagtigt: pca === "start" || pca === "none" === false
+      // Det evaluerede til pca !== "none" pga. operator-precedens.
+      // Korrekt: disabled KUN hvis der allerede er en start-handling i gang
+      const pca = typeof pendingChromeAction === "string"
+        ? pendingChromeAction.toLowerCase()
+        : "";
+      return pca === "start";
+    }
+
+    if (action === "stop") return false;
+    if (action === "restart") return false;
+
     return false;
-  }, [globalBlocked, isSleeping, isOffline]);
+  }, [anyLoading, refreshing, isSleeping, isOffline, pendingChromeAction]);
+
+  const userActions = ["start", "stop", "restart", "sleep", "wakeup"];
+  const adminActions = ["reboot", "shutdown"];
 
   const confirmInfo = confirmDialog.action
     ? (CONFIRM_TEXTS[confirmDialog.action] ?? { title: "Bekræft", body: "Er du sikker?" })
     : { title: "", body: "" };
-
-  const rowGap = isMobile ? 0.5 : 1;
 
   return (
     <Card elevation={2} sx={{ borderRadius: isMobile ? 1 : 2 }}>
       <CardContent sx={{ px: isMobile ? 1 : 2, py: isMobile ? 1 : 2 }}>
         <Typography
           variant="h6"
-          sx={{ fontWeight: 700, mb: isMobile ? 0.75 : 1.25, fontSize: isMobile ? 16 : undefined }}
+          sx={{ fontWeight: 700, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? 16 : undefined }}
         >
           Handlinger
         </Typography>
 
-        {/* ── Række 1: Browser + Dvale ── */}
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            gap: isMobile ? 1 : 2,
-            mb: isMobile ? 1 : 1.5,
-            alignItems: isMobile ? "stretch" : "flex-start",
-          }}
-        >
-          {/* Gruppe: Browser */}
-          <Box>
-            <GroupLabel label="Browser" isMobile={isMobile} />
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: rowGap }}>
-              {["start", "stop", "restart"].map(action => (
-                <ActionButton
-                  key={action}
-                  action={action}
-                  onClick={() => onAction(action)}
-                  loading={!!actionLoading[action]}
-                  disabled={isDisabled(action)}
-                  isMobile={isMobile}
-                  isAdmin={isAdmin}
-                />
-              ))}
-            </Box>
-          </Box>
+        {/* Bruger-handlinger */}
+        <Grid container spacing={isMobile ? 0.5 : 1} sx={{ mb: isMobile ? 0.5 : 1 }}>
+          {userActions.map(action => (
+            <Grid item xs={6} sm={4} md={2} key={action}>
+              <ActionButton
+                action={action}
+                onClick={() => onAction(action)}
+                loading={!!actionLoading[action]}
+                disabled={isDisabled(action)}
+                isMobile={isMobile}
+                isAdmin={isAdmin}
+              />
+            </Grid>
+          ))}
+        </Grid>
 
-          {!isMobile && (
-            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-          )}
-
-          {/* Gruppe: Dvale */}
-          <Box>
-            <GroupLabel label="Dvale" isMobile={isMobile} />
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: rowGap }}>
-              {["sleep", "wakeup"].map(action => (
-                <ActionButton
-                  key={action}
-                  action={action}
-                  onClick={() => onAction(action)}
-                  loading={!!actionLoading[action]}
-                  disabled={isDisabled(action)}
-                  isMobile={isMobile}
-                  isAdmin={isAdmin}
-                />
-              ))}
-            </Box>
-          </Box>
-        </Box>
-
-        {/* ── Række 2: Maskine + Værktøjer (kun admin) ── */}
+        {/* Admin-handlinger */}
         {isAdmin && (
-          <>
-            <Divider sx={{ mb: isMobile ? 1 : 1.25 }} />
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: isMobile ? "column" : "row",
-                gap: isMobile ? 1 : 2,
-                alignItems: isMobile ? "stretch" : "flex-start",
-              }}
-            >
-              {/* Gruppe: Maskine */}
-              <Box>
-                <GroupLabel label="Maskine" isMobile={isMobile} />
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: rowGap }}>
-                  {["reboot", "shutdown"].map(action => (
-                    <ActionButton
-                      key={action}
-                      action={action}
-                      onClick={() => onAction(action)}
-                      loading={!!actionLoading[action]}
-                      disabled={isDisabled(action)}
-                      isMobile={isMobile}
-                      isAdmin={isAdmin}
-                    />
-                  ))}
-                </Box>
-              </Box>
+          <Grid container spacing={isMobile ? 0.5 : 1} sx={{ mb: isMobile ? 0.5 : 1 }}>
+            {adminActions.map(action => (
+              <Grid item xs={6} sm={4} md={2} key={action}>
+                <ActionButton
+                  action={action}
+                  onClick={() => onAction(action)}
+                  loading={!!actionLoading[action]}
+                  disabled={isDisabled(action)}
+                  isMobile={isMobile}
+                  isAdmin={isAdmin}
+                />
+              </Grid>
+            ))}
 
-              {!isMobile && (
-                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-              )}
+            {/* Terminal */}
+            <Grid item xs={6} sm={4} md={2}>
+              <Tooltip title="Åbn terminal" arrow>
+                <span style={{ width: "100%" }}>
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    size={isMobile ? "small" : "medium"}
+                    startIcon={<TerminalIcon fontSize="small" />}
+                    onClick={handleOpenTerminal}
+                    disabled={isOffline || anyLoading}
+                    fullWidth
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 500,
+                      fontSize: isMobile ? "0.82rem" : "0.9rem",
+                      justifyContent: "flex-start",
+                      px: isMobile ? 1 : 1.5,
+                      py: isMobile ? 0.5 : 0.75,
+                      minHeight: isMobile ? 34 : 40,
+                    }}
+                  >
+                    Terminal
+                  </Button>
+                </span>
+              </Tooltip>
+            </Grid>
 
-              {/* Gruppe: Værktøjer */}
-              <Box>
-                <GroupLabel label="Værktøjer" isMobile={isMobile} />
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: rowGap }}>
-                  <Tooltip title="Åbn terminal" arrow>
-                    <span>
-                      <Button
-                        variant="outlined"
-                        color="inherit"
-                        size={isMobile ? "small" : "medium"}
-                        startIcon={<TerminalIcon fontSize="small" />}
-                        onClick={handleOpenTerminal}
-                        disabled={isOffline || globalBlocked}
-                        sx={{
-                          textTransform: "none",
-                          fontWeight: 500,
-                          fontSize: isMobile ? "0.80rem" : "0.88rem",
-                          px: isMobile ? 1 : 1.5,
-                          py: isMobile ? 0.4 : 0.65,
-                          minHeight: isMobile ? 32 : 38,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        Terminal
-                      </Button>
-                    </span>
-                  </Tooltip>
-
-                  <Tooltip title="Åbn fjernskrivebord" arrow>
-                    <span>
-                      <Button
-                        variant="outlined"
-                        color="inherit"
-                        size={isMobile ? "small" : "medium"}
-                        startIcon={<DesktopWindowsIcon fontSize="small" />}
-                        onClick={handleOpenRemoteDesktop}
-                        disabled={isOffline || globalBlocked}
-                        sx={{
-                          textTransform: "none",
-                          fontWeight: 500,
-                          fontSize: isMobile ? "0.80rem" : "0.88rem",
-                          px: isMobile ? 1 : 1.5,
-                          py: isMobile ? 0.4 : 0.65,
-                          minHeight: isMobile ? 32 : 38,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        Fjernskrivebord
-                      </Button>
-                    </span>
-                  </Tooltip>
-                </Box>
-              </Box>
-            </Box>
-          </>
-        )}
-
-        {/* Status-beskeder */}
-        {clientBusy && !anyLocalLoading && (
-          <Typography
-            variant="body2"
-            color="warning.main"
-            sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}
-          >
-            Klienten har en igangværende handling ({pendingChromeAction}) — vent til den er færdig.
-          </Typography>
+            {/* Remote Desktop */}
+            <Grid item xs={6} sm={4} md={2}>
+              <Tooltip title="Åbn fjernskrivebord" arrow>
+                <span style={{ width: "100%" }}>
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    size={isMobile ? "small" : "medium"}
+                    startIcon={<DesktopWindowsIcon fontSize="small" />}
+                    onClick={handleOpenRemoteDesktop}
+                    disabled={isOffline || anyLoading}
+                    fullWidth
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 500,
+                      fontSize: isMobile ? "0.82rem" : "0.9rem",
+                      justifyContent: "flex-start",
+                      px: isMobile ? 1 : 1.5,
+                      py: isMobile ? 0.5 : 0.75,
+                      minHeight: isMobile ? 34 : 40,
+                    }}
+                  >
+                    Fjernskrivebord
+                  </Button>
+                </span>
+              </Tooltip>
+            </Grid>
+          </Grid>
         )}
 
         {isOffline && (
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}
-          >
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}>
             Klienten er offline — nogle handlinger er ikke tilgængelige.
           </Typography>
         )}
 
         {isSleeping && !isOffline && (
-          <Typography
-            variant="body2"
-            color="primary"
-            sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}
-          >
+          <Typography variant="body2" color="primary" sx={{ mt: 1, fontSize: isMobile ? 11 : 13 }}>
             Klienten er i dvale — brug "Væk klient" for at aktivere den.
           </Typography>
         )}
       </CardContent>
 
       {/* Bekræftelsesdialog */}
-      <Dialog
-        open={confirmDialog.open}
-        onClose={onCancelConfirm}
-        aria-labelledby="confirm-dialog-title"
-        aria-describedby="confirm-dialog-description"
-      >
+      <Dialog open={confirmDialog.open} onClose={onCancelConfirm} aria-labelledby="confirm-dialog-title">
         <DialogTitle id="confirm-dialog-title">{confirmInfo.title}</DialogTitle>
         <DialogContent>
-          <DialogContentText id="confirm-dialog-description">
-            {confirmInfo.body}
-          </DialogContentText>
+          <DialogContentText>{confirmInfo.body}</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={onCancelConfirm} color="inherit">Annuller</Button>
