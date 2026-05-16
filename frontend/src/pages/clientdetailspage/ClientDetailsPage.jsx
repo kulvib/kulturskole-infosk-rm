@@ -19,40 +19,44 @@ import {
 /*
   ClientDetailsPage.jsx
 
-  Arkitektur for at undgå blinking OG sikre korrekt lock:
-  - getChromeStatus polles hvert 1s → liveChromeStatus/Color/Step opdateres
-    uden full re-render. Step sendes til DetailsActionsSection som liveStep.
-  - pending_chrome_action polles via getClient direkte under action-flow →
-    opdaterer kun localPendingAction + localClientState, IKKE hele client-objektet.
-  - Lock holdes indtil betingelser er opfyldt — tre tidszoner:
-      0–2s:  Altid låst (minimum — klienten når ikke at reagere endnu)
-      2–8s:  Låst hvis step er null ELLER et busy-step
-             (null = vi ved endnu ikke hvad klienten laver)
-      8s+:   Kun låst hvis step er eksplicit busy
-             (null efter 8s = PCA clear + ingen aktiv proces → unlock)
-  - Kendte busy-steps blokerer uden tidsbegrænsning — de er eksplicitte
-    signaler fra klienten om at processen stadig kører.
-  - Korrekt unlock-rækkefølge: silentRefresh() FØRST → unlock bagefter.
-  - handleRefresh (full re-render) bruges KUN ved manuel klik på "Opdater".
-  - cancelActionPoll eksponeres via prop-callback så Wrapper kan stoppe
-    action-polling ved manuel refresh.
+  Lock-logik — tre lag:
+
+  1. PCA skal være "none" i backend (klienten har modtaget handlingen)
+
+  2. Chrome-step afgør unlock:
+       BUSY-step     → altid låst (klienten er aktivt i gang)
+       TERMINAL-step → unlock øjeblikkeligt (klienten er færdig)
+       null/ukendt   → 0–2s: altid låst
+                       2–8s: låst (step ikke ankommet endnu)
+                       8s+:  unlock (PCA clear + ingen aktiv proces)
+
+  BUSY_CHROME_STEPS     = transiente steps (proces i gang)
+  TERMINAL_CHROME_STEPS = endelige steps (proces færdig)
+
+  Korrekt unlock-rækkefølge: silentRefresh() FØRST → unlock BAGEFTER.
 */
 
-const CHROME_STATUS_POLL_MS  = 1000;
-const ACTION_POLL_MS         = 1500;
-const ACTION_POLL_MAX_MS     = 60_000;
-const ACTION_MIN_LOCK_MS     = 2000; // 0–2s: altid låst
-const ACTION_NULL_STEP_MS    = 8000; // 2–8s: null-step = låst; 8s+: null-step = unlock
+const CHROME_STATUS_POLL_MS = 1000;
+const ACTION_POLL_MS        = 1500;
+const ACTION_POLL_MAX_MS    = 60_000;
+const ACTION_MIN_LOCK_MS    = 2000; // 0–2s: altid låst
+const ACTION_NULL_STEP_MS   = 8000; // null-step låst indtil 8s, derefter unlock
 
-// Busy-steps blokerer uden tidsbegrænsning — eksplicitte signaler fra klienten
+// Transiente steps — processen er stadig i gang
 const BUSY_CHROME_STEPS = new Set([
   "countdown",
   "clear_cookies",
   "system_reboot_countdown",
-  "chrome_starting",
-  "chrome_stopping",
-  "system_sleep",
-  "system_wake",
+  "chrome_starting",   // under scenario_system_start
+  "chrome_stopping",   // under scenario_manual_shutdown
+  "system_wake",       // under wake-flow (klient genstarter bagefter)
+]);
+
+// Terminale steps — processen er fuldt færdig
+const TERMINAL_CHROME_STEPS = new Set([
+  "chrome_running",  // start færdig / wake færdig (efter reboot + chrome-start)
+  "chrome_stopped",  // stop færdig
+  "system_sleep",    // sleep færdig
 ]);
 
 export default function ClientDetailsPage({
@@ -241,7 +245,7 @@ export default function ClientDetailsPage({
         await new Promise((res) => setTimeout(res, ACTION_POLL_MS));
         if (actionPollStopRef.current || !mountedRef.current) break;
 
-        // Tjek 1: pending_chrome_action
+        // Betingelse 1: pending_chrome_action skal være "none"
         let pcaClear = false;
         try {
           const data = await getClient(client.id);
@@ -260,21 +264,22 @@ export default function ClientDetailsPage({
 
         const elapsed = Date.now() - startTime;
 
-        // Zone 1 — 0–2s: altid låst
-        // Klienten når ikke at reagere på PCA inden for 2s
+        // Zone 0–2s: altid låst — klienten når ikke at reagere endnu
         if (elapsed < ACTION_MIN_LOCK_MS) continue;
 
         const currentStep = String(liveStepRef.current ?? "").toLowerCase();
 
-        // Busy-step blokerer altid — uanset tid
-        // Det er et eksplicit signal fra klienten om at processen kører
+        // BUSY-step: processen er stadig i gang — altid låst
         if (BUSY_CHROME_STEPS.has(currentStep)) continue;
 
-        // Zone 2 — 2–8s: null/tom step = vi ved ikke hvad klienten laver → vent
-        // Zone 3 — 8s+:  null/tom step = ingen aktiv proces → unlock
-        if (!currentStep && elapsed < ACTION_NULL_STEP_MS) continue;
+        // TERMINAL-step: processen er fuldt færdig — unlock øjeblikkeligt
+        if (TERMINAL_CHROME_STEPS.has(currentStep)) break;
 
-        // Alle betingelser opfyldt — afslut polling
+        // null/ukendt step:
+        // 2–8s: step er måske ikke ankommet endnu — vent
+        // 8s+:  PCA clear + ingen aktiv proces → unlock
+        if (elapsed < ACTION_NULL_STEP_MS) continue;
+
         break;
       }
 
@@ -356,15 +361,15 @@ export default function ClientDetailsPage({
           clientOnline={clientOnline}
         />
 
-        {/* 3 */}
+        {/* 3 — FIX: calendarLoading sendes nu korrekt videre */}
         <ClientDetailsInfoSection
           client={client}
           markedDays={markedDays}
           uptime={displayUptime}
           lastSeen={lastSeen ?? client?.last_seen}
-          calendarDialogOpen={calendarDialogOpen}
           setCalendarDialogOpen={setCalendarDialogOpen}
           clientOnline={clientOnline}
+          calendarLoading={calendarLoading}
         />
 
         {/* 4 */}
