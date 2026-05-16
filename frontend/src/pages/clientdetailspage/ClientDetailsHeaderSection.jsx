@@ -142,7 +142,9 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
 function OnlineStatusBadge({ isOnline, isMobile = false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
-  return <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />;
+
+  // Offline bør ikke pulsere. Puls antyder aktiv/live forbindelse.
+  return <StatusBadge color={color} text={text} animate={!!isOnline} isMobile={isMobile} />;
 }
 
 function StateBadge({ state, isMobile = false }) {
@@ -190,11 +192,11 @@ function StateBadge({ state, isMobile = false }) {
   );
 }
 
-function ChromeStatusBadge({ status, color, isMobile = false }) {
+function ChromeStatusBadge({ status, color, isMobile = false, animate = true }) {
   const text = status || "ukendt";
   return (
-    <Box sx={{ display: "inline-flex", alignItems: "center" }}>
-      <StatusBadge color={color} text={text} animate={true} isMobile={isMobile} />
+    <Box sx={{ display: "inline-flex", alignItems: "center", minWidth: 0 }}>
+      <StatusBadge color={color} text={text} animate={animate} isMobile={isMobile} />
     </Box>
   );
 }
@@ -203,13 +205,14 @@ function CopyIconButton({ value, disabled, iconSize = 16, isMobile = false }) {
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = async () => {
-    if (!value) return;
+    if (disabled || value === null || value === undefined || value === "") return;
+    const text = String(value);
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(value);
+        await navigator.clipboard.writeText(text);
       } else {
         const textarea = document.createElement("textarea");
-        textarea.value = value;
+        textarea.value = text;
         textarea.style.position = "fixed";
         textarea.style.left = "-9999px";
         document.body.appendChild(textarea);
@@ -401,6 +404,16 @@ function ClientDetailsHeaderSection({
   const resolvedIsOnline = clientOnline !== undefined
     ? clientOnline === true
     : client?.isOnline === true;
+
+  // Når klienten er offline, kan liveChromeStatus være stale fra sidste backend-step.
+  // Vis derfor en neutral offline-status i headeren i stedet for fx "Kiosk browser startet".
+  const resolvedChromeStatus = isOffline
+    ? "Klienten offline"
+    : (liveChromeStatus || "ukendt");
+
+  const resolvedChromeColor = isOffline
+    ? "#9e9e9e"
+    : (liveChromeColor || "grey.400");
 
   // FIX: useMemo på disabled-style — genskabes ikke ved hver render
   const rightPaperDisabledStyle = React.useMemo(
@@ -1028,8 +1041,9 @@ function ClientDetailsHeaderSection({
                         }}
                       >
                         <ChromeStatusBadge
-                          status={liveChromeStatus}
-                          color={liveChromeColor}
+                          status={resolvedChromeStatus}
+                          color={resolvedChromeColor}
+                          animate={!isOffline}
                           isMobile={isMobile}
                         />
                       </TableCell>
