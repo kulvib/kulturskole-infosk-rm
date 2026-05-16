@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Box, CircularProgress, Typography, Button } from "@mui/material";
+import { Box, CircularProgress, Typography, Button, Snackbar, Alert } from "@mui/material";
 import ClientDetailsPage from "./ClientDetailsPage";
 import { getClient, getMarkedDays, getCurrentSeason } from "../../api";
 
@@ -26,6 +26,12 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const [localSnackbar, setLocalSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
   const [markedDays, setMarkedDays] = useState({});
   const [calendarLoading, setCalendarLoading] = useState(false);
 
@@ -37,14 +43,25 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
   const cancelActionPollRef = useRef(null);
 
   const showSnackbar = useCallback((opts) => {
+    const message = opts?.message ?? "";
+    const severity = opts?.severity ?? "success";
+
     if (typeof showSnackbarProp === "function") {
-      showSnackbarProp(opts);
-    } else {
-      const { message, severity } = opts || {};
-      if (severity === "error") console.warn("[snackbar error]", message);
-      else console.info("[snackbar]", message);
+      showSnackbarProp({ message, severity });
+      return;
     }
+
+    setLocalSnackbar({
+      open: true,
+      message,
+      severity,
+    });
   }, [showSnackbarProp]);
+
+  const handleCloseSnackbar = useCallback((_event, reason) => {
+    if (reason === "clickaway") return;
+    setLocalSnackbar((prev) => ({ ...prev, open: false }));
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Hent klient
@@ -172,17 +189,35 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
   }
 
   return (
-    <ClientDetailsPage
-      client={client}
-      refreshing={refreshing}
-      handleRefresh={handleRefresh}
-      silentRefresh={silentRefresh}
-      onCancelActionPollRef={cancelActionPollRef}
-      markedDays={markedDays}
-      calendarLoading={calendarLoading}
-      streamKey={streamKey}
-      onRestartStream={handleRestartStream}
-      showSnackbar={showSnackbar}
-    />
+    <>
+      <ClientDetailsPage
+        client={client}
+        refreshing={refreshing}
+        handleRefresh={handleRefresh}
+        silentRefresh={silentRefresh}
+        onCancelActionPollRef={cancelActionPollRef}
+        markedDays={markedDays}
+        calendarLoading={calendarLoading}
+        streamKey={streamKey}
+        onRestartStream={handleRestartStream}
+        showSnackbar={showSnackbar}
+      />
+
+      <Snackbar
+        open={localSnackbar.open}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={localSnackbar.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {localSnackbar.message}
+        </Alert>
+      </Snackbar>
+    </>
   );
 }
