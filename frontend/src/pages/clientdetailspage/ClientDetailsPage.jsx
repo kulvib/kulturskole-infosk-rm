@@ -141,7 +141,7 @@ const DEFAULT_TERMINAL_STEPS = new Set([
   "error",
 ]);
 
-const ONLINE_LAST_SEEN_MAX_AGE_MS = 45_000;
+const ONLINE_LAST_SEEN_MAX_AGE_MS = 20_000;
 const PREVIOUS_BOOT_STEP_GRACE_MS = 5_000;
 
 function parseTimestampMs(value) {
