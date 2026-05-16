@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import Hls from "hls.js";
 import {
   Box, Card, Typography, CircularProgress, Alert, IconButton,
@@ -9,6 +9,10 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import { useTheme, alpha } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
 import { apiUrl } from "../../api";
+
+const HEALTH_POLL_MS = 2000;
+const LAST_SEGMENT_POLL_MS = 2000;
+const AUTO_RECONNECT_DELAY_MS = 3000;
 
 function getAuthHeaders() {
   const token = localStorage.getItem("token");
@@ -99,9 +103,75 @@ export default function ClientDetailsLivestreamSection({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
 
+  /*
+    VIGTIGT:
+    Tidligere brugte komponenten ENTEN parent streamKey ELLER localRefreshKey.
+    Hvis parent altid sender streamKey, havde lokal refresh og automatisk HLS-retry
+    ingen effekt, fordi effectiveRefreshKey ikke ændrede sig.
+
+    Nu kombineres begge, så både parent-refresh, manuel refresh og auto-reconnect
+    tvinger HLS/health-effekterne til at starte forfra.
+  */
   const effectiveRefreshKey = useMemo(() => {
-    return (streamKey !== null && streamKey !== undefined) ? streamKey : localRefreshKey;
+    const parentKey = streamKey ?? "none";
+    return `${parentKey}:${localRefreshKey}`;
   }, [streamKey, localRefreshKey]);
+
+  const resetStreamState = useCallback(() => {
+    if (hlsRef.current) {
+      try { hlsRef.current.destroy(); } catch {}
+      hlsRef.current = null;
+    }
+
+    const video = videoRef.current;
+    if (video) {
+      try {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      } catch {}
+    }
+
+    setServerReady(false);
+    setManifestReady(false);
+    setError("");
+    setBuffering(false);
+    setCurrentSegNum(null);
+    setFragDuration(8);
+    setLastSegNum(null);
+    setLastSegmentLag(null);
+    setLastSegmentTimestamp(null);
+    setLastFetched(null);
+    setStreamStale(false);
+  }, []);
+
+  const wasOnlineRef = useRef(clientOnline !== false);
+
+  /*
+    Når klienten går offline, skal gammel HLS-instans og gamle segment-data ryddes.
+    Når klienten kommer online igen efter shutdown/reboot, skal streamen starte helt
+    forfra automatisk uden at brugeren trykker refresh.
+  */
+  useEffect(() => {
+    const isOnline = clientOnline !== false;
+    const wasOnline = wasOnlineRef.current;
+    wasOnlineRef.current = isOnline;
+
+    if (!isOnline) {
+      resetStreamState();
+      return undefined;
+    }
+
+    if (!wasOnline && isOnline) {
+      resetStreamState();
+      setRefreshing(true);
+      setLocalRefreshKey((k) => k + 1);
+      const t = window.setTimeout(() => setRefreshing(false), 800);
+      return () => window.clearTimeout(t);
+    }
+
+    return undefined;
+  }, [clientOnline, resetStreamState]);
 
   // -------------------------------------------------------------------------
   // Poll /health
@@ -127,7 +197,7 @@ export default function ClientDetailsLivestreamSection({
             if (!stop) setStreamStale(data.has_segments && data.is_stale);
           }
         } catch {}
-        if (!stop) await new Promise(res => setTimeout(res, 2000));
+        if (!stop) await new Promise(res => setTimeout(res, HEALTH_POLL_MS));
       }
     }
 
@@ -148,10 +218,13 @@ export default function ClientDetailsLivestreamSection({
     const video = videoRef.current;
     if (!video) return;
 
-    const token  = localStorage.getItem("token");
-    const hlsUrl = token
-      ? `${apiUrl}/hls/${clientId}/index.m3u8?token=${encodeURIComponent(token)}`
-      : `${apiUrl}/hls/${clientId}/index.m3u8`;
+    const token = localStorage.getItem("token");
+    const hlsParams = new URLSearchParams();
+    hlsParams.set("_kiosk_refresh", String(effectiveRefreshKey));
+    hlsParams.set("_ts", String(Date.now()));
+    if (token) hlsParams.set("token", token);
+
+    const hlsUrl = `${apiUrl}/hls/${clientId}/index.m3u8?${hlsParams.toString()}`;
 
     let fatalErrorTimeout = null;
     let playTimeout       = null;
@@ -195,7 +268,7 @@ export default function ClientDetailsLivestreamSection({
           try { video.pause(); video.removeAttribute("src"); video.load(); } catch {}
           setManifestReady(false); setServerReady(false);
           if (fatalErrorTimeout) clearTimeout(fatalErrorTimeout);
-          fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), 3000);
+          fatalErrorTimeout = setTimeout(() => setLocalRefreshKey(k => k + 1), AUTO_RECONNECT_DELAY_MS);
         } else {
           if (data.details === "bufferStalledError") return;
           console.warn("[HLS Error]", data.details);
@@ -268,7 +341,7 @@ export default function ClientDetailsLivestreamSection({
           setLastSegmentTimestamp(null);
           setLastSegmentLag(null);
         }
-        await new Promise(res => setTimeout(res, 2000));
+        await new Promise(res => setTimeout(res, LAST_SEGMENT_POLL_MS));
       }
     }
 
@@ -295,37 +368,20 @@ export default function ClientDetailsLivestreamSection({
   // Handlers
   // -------------------------------------------------------------------------
   const handleRefreshClick = () => {
-    if (!clientOnline) return;
+    if (clientOnline === false) return;
 
-    // 1. Destruer HLS.js øjeblikkeligt — ikke via useEffect
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
+    resetStreamState();
 
-    // 2. Ryd video-elementet øjeblikkeligt
-    const video = videoRef.current;
-    if (video) {
-      try { video.pause(); video.removeAttribute("src"); video.load(); } catch {}
-    }
-
-    // 3. Nulstil AL state på én gang — som en hard refresh af sektionen
-    setManifestReady(false);
-    setServerReady(false);
-    setStreamStale(false);
-    setError("");
-    setBuffering(false);
-    setCurrentSegNum(null);
-    setLastSegNum(null);
-    setLastSegmentLag(null);
-    setLastSegmentTimestamp(null);
-    setLastFetched(null);
-    setFragDuration(8);
-
-    // 4. Trigger fuld geninitialisering
+    // Trigger fuld geninitialisering.
+    // effectiveRefreshKey kombinerer parent streamKey + localRefreshKey,
+    // så dette virker også når parent har sendt streamKey.
     setRefreshing(true);
     setLocalRefreshKey(k => k + 1);
-    setTimeout(() => setRefreshing(false), 800);
+    window.setTimeout(() => setRefreshing(false), 800);
+
+    if (typeof onRestartStream === "function") {
+      try { onRestartStream(); } catch {}
+    }
   };
 
   const handleFullscreen = () => {
