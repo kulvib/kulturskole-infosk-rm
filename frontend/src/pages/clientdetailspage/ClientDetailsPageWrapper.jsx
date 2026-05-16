@@ -9,11 +9,12 @@ import { getClient, getMarkedDays, getCurrentSeason } from "../../api";
 
   Ansvar:
   - Initial load + manuel refresh af client-data.
-  - silentRefresh: opdaterer client-data UDEN snackbar og UDEN refreshing=true.
-    Bruges af ClientDetailsPage efter en action er bekræftet — ingen blinking.
+  - silentRefresh: opdaterer client state UDEN snackbar og UDEN refreshing=true.
+    Bruges af ClientDetailsPage efter action er bekræftet — ingen blinking.
   - handleRefresh: fuld refresh MED snackbar — kun ved manuel klik på "Opdater".
-  - Den hurtige poll-loop (hvert 2s ved aktiv PCA) er FJERNET —
-    ClientDetailsPage ejer den logik via lokal state (undgår blinking).
+    Kalder cancelActionPoll via onCancelActionPollRef FØR refresh så evt.
+    kørende action-polling stoppes rent og knapper låses op korrekt.
+  - Ingen hurtig poll-loop — ClientDetailsPage ejer al action-polling via lokal state.
 */
 
 export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarProp }) {
@@ -32,6 +33,9 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
 
   const mountedRef = useRef(true);
 
+  // Ref til cancelActionPoll — sættes af ClientDetailsPage via onCancelActionPollRef
+  const cancelActionPollRef = useRef(null);
+
   const showSnackbar = useCallback((opts) => {
     if (typeof showSnackbarProp === "function") {
       showSnackbarProp(opts);
@@ -43,7 +47,7 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
   }, [showSnackbarProp]);
 
   // ---------------------------------------------------------------------------
-  // Hent klient — isRefresh=true viser spinner, isRefresh=false er initial load
+  // Hent klient
   // ---------------------------------------------------------------------------
   const fetchClient = useCallback(async (isRefresh = false) => {
     if (!id) return;
@@ -119,9 +123,13 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
 
   // ---------------------------------------------------------------------------
   // Manuel refresh — MED snackbar, MED refreshing=true (spinner i header)
-  // Kaldes KUN ved klik på "Opdater"-knappen
+  // Stopper evt. kørende action-polling FØR refresh via cancelActionPollRef
   // ---------------------------------------------------------------------------
   const handleRefresh = useCallback(async () => {
+    // Stop evt. kørende action-poll rent så knapper ikke forbliver låste
+    if (typeof cancelActionPollRef.current === "function") {
+      cancelActionPollRef.current();
+    }
     await Promise.all([fetchClient(true), fetchMarkedDays()]);
     showSnackbar({ message: "Klient opdateret", severity: "success" });
   }, [fetchClient, fetchMarkedDays, showSnackbar]);
@@ -169,6 +177,7 @@ export default function ClientDetailsPageWrapper({ showSnackbar: showSnackbarPro
       refreshing={refreshing}
       handleRefresh={handleRefresh}
       silentRefresh={silentRefresh}
+      onCancelActionPollRef={cancelActionPollRef}
       markedDays={markedDays}
       calendarLoading={calendarLoading}
       streamKey={streamKey}
