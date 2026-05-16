@@ -34,16 +34,16 @@ import {
   PROBLEMS DER LØSES:
 
   A) "start" — chrome_closed_programmatically må ikke være terminal:
-       clear_cookies (BUSY) → shutdown_chrome (BUSY)
+       clear_cookies (BUSY) → shutdown_chrome (terminal, ikke busy)
        → watchdog: chrome_closed_programmatically   ← MÅ IKKE UNLOCK
        → countdown (BUSY) → start_chrome (TERMINAL ✓)
 
   B) "sleep" — chrome_closed_programmatically må ikke være terminal:
-       shutdown_chrome_compat() → watchdog: chrome_closed_programmatically ← MÅ IKKE UNLOCK
+       shutdown_chrome → watchdog: chrome_closed_programmatically ← MÅ IKKE UNLOCK
        → countdown (BUSY) → system_sleep (TERMINAL ✓)
 
   C) "reboot"/"shutdown" — terminal skal tjekkes FØR busy:
-       shutdown_chrome (BUSY ✓) → system_rebooting  ← BUSY i sættet men TERMINAL for action
+       shutdown_chrome → system_rebooting  ← BUSY i sættet men TERMINAL for action
        Uden fix: polling venter 60s timeout fordi BUSY altid vinder.
        Med fix: terminal tjekkes først → unlock korrekt.
 
@@ -53,11 +53,15 @@ import {
     clear_cookies            — rydder cookies
     terminate_chrome         — SIGTERM til Chrome
     kill_chrome              — SIGKILL til Chrome
-    shutdown_chrome          — chrome shutdown bekræftet
     countdown                — nedtælling før start eller sleep
     system_reboot_countdown  — nedtælling før reboot efter wake
     system_rebooting         — maskinen genstarter (også terminal for reboot-action)
     system_shutting_down     — maskinen lukker ned (også terminal for shutdown-action)
+
+  FIX: shutdown_chrome er FJERNET fra BUSY_CHROME_STEPS — det er et
+  terminal-step (Chrome er færdig med at lukke), ikke et busy-step.
+  Tidligere sad polling-løkken fast på "continue" ved shutdown_chrome
+  fordi BUSY altid vandt over terminal-tjekket.
 
   TERMINAL_STEPS_BY_ACTION:
     start    → start_chrome, error
@@ -74,11 +78,12 @@ const ACTION_POLL_MAX_MS    = 60_000;
 const ACTION_MIN_LOCK_MS    = 2000;
 const ACTION_NULL_STEP_MS   = 8000;
 
+// FIX: shutdown_chrome er fjernet — det er terminal, ikke busy.
+// Skal matche BUSY_CHROME_STEPS i DetailsActionsSection.jsx.
 const BUSY_CHROME_STEPS = new Set([
   "clear_cookies",
   "terminate_chrome",
   "kill_chrome",
-  "shutdown_chrome",
   "countdown",
   "system_reboot_countdown",
   "system_rebooting",
@@ -102,7 +107,7 @@ const BUSY_CHROME_STEPS = new Set([
     Venter KUN på system_sleep.
     chrome_closed_programmatically skrives af watchdog FØR countdown i
     sleep-sekvensen — må ikke terminere polling:
-      shutdown_chrome_compat() → watchdog: chrome_closed_programmatically
+      shutdown_chrome → watchdog: chrome_closed_programmatically
       → countdown (BUSY) → system_sleep (TERMINAL)
 
   wakeup:
@@ -118,7 +123,7 @@ const BUSY_CHROME_STEPS = new Set([
 */
 const TERMINAL_STEPS_BY_ACTION = {
   start:    new Set(["start_chrome", "error"]),
-  stop:     new Set(["chrome_closed_programmatically", "chrome_closed_manual", "error"]),
+  stop:     new Set(["chrome_closed_programmatically", "chrome_closed_manual", "shutdown_chrome", "error"]),
   sleep:    new Set(["system_sleep", "error"]),
   wakeup:   new Set(["system_wake", "error"]),
   reboot:   new Set(["system_rebooting", "error"]),
@@ -130,6 +135,7 @@ const DEFAULT_TERMINAL_STEPS = new Set([
   "start_chrome",
   "chrome_closed_programmatically",
   "chrome_closed_manual",
+  "shutdown_chrome",
   "system_sleep",
   "system_wake",
   "error",
@@ -390,7 +396,7 @@ export default function ClientDetailsPage({
       if (!client?.id) return;
       await clientAction(client.id, action);
       setLocalPendingAction(action);
-      startActionConfirmationPolling(action); // ← action sendes med
+      startActionConfirmationPolling(action);
     },
     [client?.id, startActionConfirmationPolling]
   );
