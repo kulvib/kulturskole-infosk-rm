@@ -22,6 +22,7 @@ from routers import schools
 from routers import users
 from routers import livestream
 from routers import holidays
+from routers import terminal
 from routers.livestream import HLS_DIR
 
 print("### main.py: livestream importeret ###")
@@ -194,6 +195,7 @@ app.include_router(meta.router,       prefix="/api")
 app.include_router(users.router,      prefix="/api")
 app.include_router(livestream.router, prefix="/api")
 app.include_router(holidays.router,   prefix="/api")
+app.include_router(terminal.router,    prefix="/api")
 
 
 @app.get("/health")
