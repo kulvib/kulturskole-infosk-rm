@@ -14,6 +14,11 @@ router = APIRouter()
 
 HLS_BASE_DIR = os.getenv("HLS_BASE_DIR", "/opt/render/project/src/backend/service1/hls")
 
+# Brug samme timeout alle steder i backend. 15 sek. kan give meget hurtige
+# offline/online-skift, især omkring reboot. Sæt env til 15 hvis du vil bevare
+# den gamle adfærd.
+ONLINE_TIMEOUT_SECONDS = int(os.getenv("CLIENTFLOW_ONLINE_TIMEOUT_SECONDS", "30"))
+
 VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error", "updating"}
 VALID_PENDING_CHROME_ACTION_SOURCES = {"actionbutton", "calendar"}
 
@@ -27,11 +32,65 @@ def normalize_client_state(value: str) -> str:
     return normalized
 
 
+def _as_naive_utc(dt):
+    """
+    DB-feltet last_seen/chrome_last_updated kan være naive UTC eller timezone-aware.
+    Sammenlign altid som naive UTC, så is_online ikke fejler eller giver forkert resultat.
+    """
+    if dt is None:
+        return None
+    if getattr(dt, "tzinfo", None) is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+def _chrome_action_value(value):
+    """Returnerer Enum.value når feltet er ChromeAction, ellers string/None."""
+    if value is None:
+        return None
+    return getattr(value, "value", value)
+
+
 def is_online(client: Client) -> bool:
-    if client.last_seen is None:
+    last_seen = _as_naive_utc(client.last_seen)
+    if last_seen is None:
         return False
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    return (now - client.last_seen) < timedelta(seconds=15)
+    return (now - last_seen) < timedelta(seconds=ONLINE_TIMEOUT_SECONDS)
+
+
+SYSTEM_TERMINAL_STEPS = {
+    "system_reboot_countdown",
+    "system_rebooting",
+    "system_shutting_down",
+}
+
+
+def is_step_from_previous_boot(client: Client) -> bool:
+    """
+    Efter reboot kan DB stadig indeholde chrome_step='system_rebooting'.
+    Hvis klienten igen sender uptime, kan vi beregne nuværende boot-tidspunkt.
+    Ligger chrome_last_updated før boot-tidspunktet, er step'et fra før reboot
+    og bør ikke bruges til banner/lås i frontend.
+    """
+    step = str(client.chrome_step or "").lower()
+    if step not in SYSTEM_TERMINAL_STEPS:
+        return False
+
+    if client.uptime in (None, "") or client.chrome_last_updated is None:
+        return False
+
+    try:
+        uptime_seconds = int(float(str(client.uptime)))
+    except Exception:
+        return False
+
+    # Undgå at små clock-skævheder rydder et helt nyt step.
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    current_boot_time = now - timedelta(seconds=uptime_seconds)
+    step_time = _as_naive_utc(client.chrome_last_updated)
+
+    return step_time is not None and step_time < (current_boot_time - timedelta(seconds=2))
 
 
 @router.get("/clients/public")
@@ -83,15 +142,22 @@ def get_chrome_status(id: int, session=Depends(get_session), user=Depends(get_cu
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
-    # FIX: Læser nu chrome_step fra database i stedet for at åbne
-    # chrome_status.json som kun findes på klient-maskinen (ikke på Render).
-    # Klienten pusher chrome_step via /update eller /chrome-status PUT.
+    online = is_online(client)
+
+    # FIX: Læser chrome_step fra database, men filtrerer gamle system-steps fra
+    # forrige boot. Ellers kan frontend blive ved med at vise
+    # "Klient genstarter..." efter klienten er kommet online igen.
     step_obj = None
-    if client.chrome_step:
+    if client.chrome_step and not is_step_from_previous_boot(client):
         step_obj = {
             "step": client.chrome_step,
-            "timestamp": client.chrome_last_updated.isoformat() + "Z" if client.chrome_last_updated else None,
+            "timestamp": (
+                _as_naive_utc(client.chrome_last_updated).isoformat() + "Z"
+                if client.chrome_last_updated else None
+            ),
         }
+
+    pending_action = _chrome_action_value(client.pending_chrome_action) or "none"
 
     return {
         "client_id": client.id,
@@ -101,8 +167,21 @@ def get_chrome_status(id: int, session=Depends(get_session), user=Depends(get_cu
         "step": step_obj,
         "last_seen": client.last_seen,
         "uptime": client.uptime,
-    }
 
+        # Vigtigt for ClientDetailsPage: den poller dette endpoint hvert sekund.
+        # Uden isOnline her bliver siden ved med at bruge den gamle client.isOnline
+        # fra initial getClient/silentRefresh.
+        "isOnline": online,
+        "is_online": online,
+
+        # Gør frontend i stand til at slippe låse/banner uden at vente på fuldt
+        # /clients/{id}/ refresh.
+        "state": client.state,
+        "pending_chrome_action": pending_action,
+        "pending_chrome_action_source": getattr(client, "pending_chrome_action_source", None),
+        "pending_reboot": client.pending_reboot,
+        "pending_shutdown": client.pending_shutdown,
+    }
 
 @router.put("/clients/{id}/chrome-status")
 def update_chrome_status(
@@ -122,6 +201,8 @@ def update_chrome_status(
     if data.get("chrome_step") is not None:
         client.chrome_step = data.get("chrome_step")
     client.chrome_last_updated = utcnow()
+    # Et chrome-status push er også et livstegn fra klienten.
+    client.last_seen = utcnow()
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -498,6 +579,7 @@ def client_heartbeat(id: int, session=Depends(get_session), user=Depends(get_cur
     session.add(client)
     session.commit()
     session.refresh(client)
+    client.isOnline = True
     return client
 
 
