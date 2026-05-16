@@ -44,7 +44,18 @@ const BUSY_CHROME_STEPS = new Set([
   "terminate_chrome",
   "kill_chrome",
   "countdown",
+]);
+
+const SYSTEM_LOCK_STEPS = new Set([
   "system_reboot_countdown",
+  "system_rebooting",
+  "system_shutting_down",
+  "system_wake",
+]);
+
+const SYSTEM_SLEEP_STEPS = new Set([
+  "system_sleep",
+  "system_sleep_complete",
 ]);
 
 const CHROME_RUNNING_STEPS = new Set([
@@ -58,6 +69,7 @@ const CHROME_STOPPED_STEPS = new Set([
   "shutdown_chrome",
   "kill_chrome",
   "system_sleep",
+  "system_sleep_complete",
   "system_rebooting",
   "system_shutting_down",
 ]);
@@ -77,7 +89,9 @@ function getStepLabel(step) {
   if (s === "chrome_closed_programmatically") return "Browser lukket";
   if (s === "chrome_closed_manual") return "Browser lukket manuelt";
   if (s === "system_sleep") return "Klient i dvale";
-  if (s === "system_wake") return "Klient vækket";
+  if (s === "system_sleep_complete") return "Klient sat i dvale";
+  if (s === "system_wake") return "Klient vækkes…";
+  if (s === "system_wake_complete") return "Klient vækket";
   if (s === "error") return "Der opstod en fejl";
   return null;
 }
@@ -163,12 +177,24 @@ export default function ClientDetailsActionsSection({
   });
 
   const normalizedClientState = String(clientState || "").trim().toLowerCase();
-  const isSleeping = normalizedClientState.startsWith("sleep");
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
   const hasPendingAction = !!normalizedPendingAction && normalizedPendingAction !== "none";
 
-  const liveStepNorm = String(liveStep ?? "").toLowerCase();
-  const isLiveStepBusy = BUSY_CHROME_STEPS.has(liveStepNorm);
+  const liveStepNorm = String(liveStep ?? "").trim().toLowerCase();
+
+  // System-level handlinger må låse hele knap-panelet.
+  // pending_reboot/pending_shutdown cleares hurtigt på klienten, så frontend
+  // skal bruge liveStep som sandhed under selve reboot/shutdown-flowet.
+  const isSystemLocked =
+    SYSTEM_LOCK_STEPS.has(liveStepNorm) ||
+    normalizedClientState.startsWith("reboot") ||
+    normalizedClientState.startsWith("shut");
+
+  // Dvale skal ikke låse hele panelet; den skal kun efterlade "Væk fra dvale" aktiv.
+  const isSleeping =
+    normalizedClientState.startsWith("sleep") || SYSTEM_SLEEP_STEPS.has(liveStepNorm);
+
+  const isLiveStepBusy = BUSY_CHROME_STEPS.has(liveStepNorm) || isSystemLocked;
 
   const chromeIsRunning = CHROME_RUNNING_STEPS.has(liveStepNorm)
     ? true
@@ -227,13 +253,14 @@ export default function ClientDetailsActionsSection({
   const isDisabledByState = useCallback(
     (key) => {
       if (clientOnline === false) return true;
+      if (isSystemLocked) return true;
       if (isSleeping) return key !== "wakeup";
       if (key === "wakeup") return true;
       if (key === "start" && chromeIsRunning === true) return true;
       if (key === "stop" && chromeIsRunning === false) return true;
       return false;
     },
-    [clientOnline, isSleeping, chromeIsRunning]
+    [clientOnline, isSystemLocked, isSleeping, chromeIsRunning]
   );
 
   const pendingLabel = (() => {
