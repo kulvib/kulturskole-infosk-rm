@@ -571,11 +571,43 @@ async def approve_client(
 
 
 @router.post("/clients/{id}/heartbeat", response_model=Client)
-def client_heartbeat(id: int, session=Depends(get_session), user=Depends(get_current_user)):
+def client_heartbeat(
+    id: int,
+    data: dict = Body(default=None),
+    session=Depends(get_session),
+    user=Depends(get_current_user),
+):
+    """
+    Heartbeat er klientens hurtige livstegn.
+
+    Vigtigt:
+    Webfrontend viser uptime fra backend. Den lokale klient-GUI viser uptime
+    direkte fra clientflow_config.json, som opdateres fra /proc/uptime.
+    Derfor skal heartbeat også opdatere backend.uptime, ellers kan webvisningen
+    være bagud i forhold til den lokale GUI.
+    """
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+
     client.last_seen = utcnow()
+
+    if isinstance(data, dict):
+        if data.get("uptime") is not None:
+            client.uptime = str(data.get("uptime"))
+        if data.get("ubuntu_version") is not None:
+            client.ubuntu_version = data.get("ubuntu_version")
+
+        # Valgfrit, men nyttigt hvis heartbeat senere bruges til netværksdata.
+        for field in (
+            "wifi_ip_address",
+            "wifi_mac_address",
+            "lan_ip_address",
+            "lan_mac_address",
+        ):
+            if data.get(field) is not None:
+                setattr(client, field, data.get(field))
+
     session.add(client)
     session.commit()
     session.refresh(client)
