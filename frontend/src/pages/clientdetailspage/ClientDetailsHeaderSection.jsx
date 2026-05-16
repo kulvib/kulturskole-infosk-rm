@@ -139,6 +139,25 @@ function StatusBadge({ color, text, animate = false, isMobile = false }) {
   );
 }
 
+function isOsUpdateStatusMessage(status) {
+  const text = String(status || "").trim().toLowerCase();
+
+  if (!text) return false;
+
+  return (
+    text.startsWith("ubuntu:") ||
+    text.includes("ubuntu-opdatering") ||
+    text.includes("ingen opdateringer") ||
+    text.includes("opdatering gennemført") ||
+    text.includes("installerer opdateringer") ||
+    text.includes("henter pakkeliste") ||
+    text.includes("rydder op efter opdatering") ||
+    text.includes("os_update") ||
+    text.includes("os_upgrading") ||
+    text.includes("os_cleanup")
+  );
+}
+
 function OnlineStatusBadge({ isOnline, isMobile = false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
@@ -407,13 +426,24 @@ function ClientDetailsHeaderSection({
 
   // Når klienten er offline, kan liveChromeStatus være stale fra sidste backend-step.
   // Vis derfor en neutral offline-status i headeren i stedet for fx "Kiosk browser startet".
+  //
+  // Vigtigt:
+  // Ubuntu/OS-update steps skrives også til chrome_status.json, så backend kan logge dem.
+  // Men de skal IKKE vises i feltet "Kiosk browser status", da det felt kun skal
+  // handle om Chrome/kiosk-browseren.
+  const latestStatusIsOsUpdate = isOsUpdateStatusMessage(liveChromeStatus);
+
   const resolvedChromeStatus = isOffline
     ? "Klienten offline"
-    : (liveChromeStatus || "ukendt");
+    : latestStatusIsOsUpdate
+      ? "Ingen aktiv browserstatus"
+      : (liveChromeStatus || "ukendt");
 
   const resolvedChromeColor = isOffline
     ? "#9e9e9e"
-    : (liveChromeColor || "grey.400");
+    : latestStatusIsOsUpdate
+      ? "#9e9e9e"
+      : (liveChromeColor || "grey.400");
 
   // FIX: useMemo på disabled-style — genskabes ikke ved hver render
   const rightPaperDisabledStyle = React.useMemo(
@@ -1043,7 +1073,7 @@ function ClientDetailsHeaderSection({
                         <ChromeStatusBadge
                           status={resolvedChromeStatus}
                           color={resolvedChromeColor}
-                          animate={!isOffline}
+                          animate={!isOffline && !latestStatusIsOsUpdate}
                           isMobile={isMobile}
                         />
                       </TableCell>
