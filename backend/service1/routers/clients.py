@@ -13,6 +13,10 @@ import json
 router = APIRouter()
 
 HLS_BASE_DIR = os.getenv("HLS_BASE_DIR", "/opt/render/project/src/backend/service1/hls")
+
+# NB: CHROME_STATUS_PATH læses kun som fallback — backend på Render har ikke
+# adgang til klientens lokale fil. chrome_step/chrome_status synkroniseres
+# i stedet via clientflow_service.py → PUT /update og PUT /chrome-status.
 CHROME_STATUS_PATH = os.getenv("CHROME_STATUS_PATH", "/home/kulturskolenviborg/api/chrome_status.json")
 
 VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error", "updating"}
@@ -33,6 +37,16 @@ def is_online(client: Client) -> bool:
         return False
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     return (now - client.last_seen) < timedelta(minutes=2)
+
+
+def _format_dt_utc(dt) -> str | None:
+    """Formatér datetime til ISO 8601 med Z-suffix (UTC). Returnerer None hvis dt er None."""
+    if dt is None:
+        return None
+    try:
+        return dt.strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
+    except Exception:
+        return str(dt)
 
 
 @router.get("/clients/public")
@@ -83,6 +97,8 @@ def get_chrome_status(id: int, session=Depends(get_session), user=Depends(get_cu
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+
+    # Forsøg at læse fra lokal fil (virker kun hvis backend kører på samme maskine som klient)
     last_step = None
     try:
         with open(CHROME_STATUS_PATH, "r", encoding="utf-8") as f:
@@ -91,21 +107,41 @@ def get_chrome_status(id: int, session=Depends(get_session), user=Depends(get_cu
                 last_step = data["steps"][-1]
     except Exception:
         last_step = None
+
     if last_step:
         return {
             "client_id": client.id,
             "chrome_status": last_step.get("message", "unknown"),
             "chrome_last_updated": last_step.get("timestamp", None),
             "chrome_color": last_step.get("color", None),
+            "chrome_step": last_step.get("step", None),
             "step": last_step,
             "last_seen": client.last_seen,
             "uptime": client.uptime,
         }
+
+    # Fallback: brug DB-værdier som klienten har pushet via PUT /update og PUT /chrome-status.
+    # chrome_step indeholder det seneste step-navn (fx "countdown", "start_chrome").
+    # Konstruér et step-objekt så frontend får den samme struktur som ved lokal fil.
+    chrome_step_val = getattr(client, "chrome_step", None)
+    chrome_last_updated_val = getattr(client, "chrome_last_updated", None)
+
+    step_obj = None
+    if chrome_step_val:
+        step_obj = {
+            "step": chrome_step_val,
+            "message": getattr(client, "chrome_status", None),
+            "color": getattr(client, "chrome_color", None),
+            "timestamp": _format_dt_utc(chrome_last_updated_val),
+        }
+
     return {
         "client_id": client.id,
         "chrome_status": getattr(client, "chrome_status", "unknown"),
-        "chrome_last_updated": getattr(client, "chrome_last_updated", None),
+        "chrome_last_updated": chrome_last_updated_val,
         "chrome_color": getattr(client, "chrome_color", None),
+        "chrome_step": chrome_step_val,
+        "step": step_obj,
         "last_seen": client.last_seen,
         "uptime": client.uptime,
     }
@@ -120,6 +156,9 @@ def update_chrome_status(id: int, data: dict = Body(...), session=Depends(get_se
     client.chrome_last_updated = utcnow()
     if data.get("chrome_color") is not None:
         client.chrome_color = data.get("chrome_color")
+    # Gem step-navn så get_chrome_status kan returnere det til frontend
+    if data.get("chrome_step") is not None:
+        client.chrome_step = data.get("chrome_step")
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -294,6 +333,7 @@ async def create_client(client_in: ClientCreate, session=Depends(get_session), u
         chrome_status=getattr(client_in, "chrome_status", "unknown"),
         chrome_last_updated=None,
         chrome_color=getattr(client_in, "chrome_color", None),
+        chrome_step=getattr(client_in, "chrome_step", None),
         pending_reboot=False,
         pending_shutdown=False,
         pending_chrome_action=getattr(client_in, "pending_chrome_action", ChromeAction.NONE),
@@ -334,6 +374,7 @@ async def update_client(
     if "lan_mac_address" in fields: client.lan_mac_address = client_update.lan_mac_address
     if "chrome_status" in fields: client.chrome_status = client_update.chrome_status
     if "chrome_color" in fields: client.chrome_color = client_update.chrome_color
+    if "chrome_step" in fields: client.chrome_step = client_update.chrome_step
     if "chrome_last_updated" in fields:
         client.chrome_last_updated = client_update.chrome_last_updated
     elif "chrome_status" in fields:
