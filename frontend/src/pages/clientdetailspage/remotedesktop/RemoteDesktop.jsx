@@ -19,7 +19,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import KeyboardIcon from "@mui/icons-material/Keyboard";
 import MouseIcon from "@mui/icons-material/Mouse";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
-import { apiUrl } from "../api";
+import { apiUrl } from "../../../api";
 
 function getAuthToken() {
   return localStorage.getItem("token") || "";
