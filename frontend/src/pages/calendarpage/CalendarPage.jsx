@@ -84,11 +84,31 @@ function getSchoolName(schools, client) {
   return schools.find(s => String(s.id) === String(schoolId))?.name || "Ukendt skole";
 }
 
-// Dagens dato til fremhævning
-const TODAY = new Date();
-const TODAY_STR = formatDate(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
-const CURRENT_MONTH = TODAY.getMonth();
-const CURRENT_YEAR = TODAY.getFullYear();
+function getTodayInfo() {
+  const today = new Date();
+  return {
+    todayStr: formatDate(today.getFullYear(), today.getMonth(), today.getDate()),
+    currentMonth: today.getMonth(),
+    currentYear: today.getFullYear(),
+  };
+}
+
+function useTodayInfo() {
+  const [todayInfo, setTodayInfo] = useState(() => getTodayInfo());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const next = getTodayInfo();
+      setTodayInfo(prev => (
+        prev.todayStr === next.todayStr ? prev : next
+      ));
+    }, 60_000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return todayInfo;
+}
 
 const ClientSelectorInline = React.memo(function ClientSelectorInline({
   clients, selected, onChange, schools, disabled, selectedSchool
@@ -210,6 +230,7 @@ export default function CalendarPage() {
   const isAdmin = user?.role === "admin";
 
   const currentSeason = getCurrentSeasonString();
+  const todayInfo = useTodayInfo();
 
   const [selectedSeason, setSelectedSeason] = useState(currentSeason);
   const [schools, setSchools] = useState([]);
@@ -267,7 +288,7 @@ export default function CalendarPage() {
       setSelectedClients([]);
       setActiveClient(null);
     }
-  }, [selectedSeason, seasonSummary]);
+  }, [selectedSeason, seasonSummary, selectedSchool, isSuperadmin, isAdmin]);
 
   const [fadeIn, setFadeIn] = useState(true);
   useEffect(() => {
@@ -328,13 +349,24 @@ export default function CalendarPage() {
     let isCurrent = true;
     getMarkedDays(selectedSeason, activeClient)
       .then(data => {
-        if (isCurrent) dispatchMarkedDays({
-          type: "set", clientId: activeClient, days: mapRawDays(data.markedDays || {})
-        });
+        if (!isCurrent) return;
+        const mapped = mapRawDays(data.markedDays || {});
+        dispatchMarkedDays({ type: "set", clientId: activeClient, days: mapped });
+
+        // Baseline skal sættes ved load. Ellers kan autosave-effekten opfatte
+        // nyindlæste backend-data som lokale ændringer og gemme unødigt igen.
+        lastDialogSavedMarkedDays.current = {
+          ...lastDialogSavedMarkedDays.current,
+          [activeClient]: mapped,
+        };
       })
       .catch(() => {
         if (isCurrent) {
           dispatchMarkedDays({ type: "set", clientId: activeClient, days: {} });
+          lastDialogSavedMarkedDays.current = {
+            ...lastDialogSavedMarkedDays.current,
+            [activeClient]: {},
+          };
           setSnackbar({ open: true, message: "Kunne ikke hente kalender.", severity: "error" });
         }
       });
@@ -343,14 +375,31 @@ export default function CalendarPage() {
 
   useEffect(() => {
     if (editDialogOpen || !activeClient) return;
+
+    const currentMarkedDays = markedDays[activeClient];
+    if (currentMarkedDays === undefined) return;
+
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    const changedSinceDialog = !deepEqual(
-      markedDays[activeClient],
-      lastDialogSavedMarkedDays.current[activeClient]
-    );
+
+    const baseline = lastDialogSavedMarkedDays.current[activeClient];
+    if (baseline === undefined) {
+      lastDialogSavedMarkedDays.current = {
+        ...lastDialogSavedMarkedDays.current,
+        [activeClient]: currentMarkedDays,
+      };
+      return;
+    }
+
+    const changedSinceDialog = !deepEqual(currentMarkedDays, baseline);
     if (!changedSinceDialog) return;
-    autoSaveTimer.current = setTimeout(() => { handleSaveSingleClient(activeClient); }, 1000);
-    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+
+    autoSaveTimer.current = setTimeout(() => {
+      handleSaveSingleClient(activeClient);
+    }, 1000);
+
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
   }, [markedDays[activeClient], activeClient, editDialogOpen]);
 
   function getDefaultTimes(dateStr, clientId) {
@@ -406,7 +455,8 @@ export default function CalendarPage() {
     try {
       await saveMarkedDays({ clients: [clientId], markedDays: payloadMarkedDays, season: selectedSeason });
       lastDialogSavedMarkedDays.current = {
-        ...lastDialogSavedMarkedDays.current, [clientId]: markedDays[clientId]
+        ...lastDialogSavedMarkedDays.current,
+        [clientId]: markedDays[clientId] || {},
       };
       lastDialogSavedTimestamp.current = Date.now();
     } catch (e) {
@@ -512,8 +562,15 @@ export default function CalendarPage() {
           dispatchMarkedDays({ type: "set", clientId: activeClient, days: {} });
         }
       }
-    } catch { }
-    setSavingCalendar(false);
+    } catch (e) {
+      setSnackbar({
+        open: true,
+        message: e?.message || "Kunne ikke gemme kalender.",
+        severity: "error",
+      });
+    } finally {
+      setSavingCalendar(false);
+    }
   }, [selectedClients, activeClient, markedDays, schoolYearMonths, selectedSeason, filteredClients, allSchoolTimes]);
 
   useEffect(() => {
@@ -784,6 +841,9 @@ export default function CalendarPage() {
             clientId={activeClient} markedDays={markedDays} markMode={markMode}
             onDayClick={handleDayClick} onDateShiftLeftClick={handleDateShiftLeftClick}
             loadingDialogDate={loadingDialogDate} loadingDialogClient={loadingDialogClient}
+            todayStr={todayInfo.todayStr}
+            currentMonth={todayInfo.currentMonth}
+            currentYear={todayInfo.currentYear}
           />
         ))}
         {activeClient && loadingMarkedDays && (
@@ -812,7 +872,8 @@ export default function CalendarPage() {
 
 const MonthCalendar = React.memo(function MonthCalendar({
   name, month, year, clientId, markedDays, markMode,
-  onDayClick, onDateShiftLeftClick, loadingDialogDate, loadingDialogClient
+  onDayClick, onDateShiftLeftClick, loadingDialogDate, loadingDialogClient,
+  todayStr, currentMonth, currentYear
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const draggedDates = useRef(new Set());
@@ -825,7 +886,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const isCurrentMonth = month === CURRENT_MONTH && year === CURRENT_YEAR;
+  const isCurrentMonth = month === currentMonth && year === currentYear;
 
   const weekRows = useMemo(() => {
     const rows = [];
@@ -925,7 +986,7 @@ const MonthCalendar = React.memo(function MonthCalendar({
               {row.weekDays.map((day, idx) => {
                 if (!day) return <Box key={idx + "-empty"} />;
                 const dateString = formatDate(year, month, day);
-                const isToday = dateString === TODAY_STR;
+                const isToday = dateString === todayStr;
                 const cellStatus = markedDays?.[clientId]?.[dateString]?.status || "off";
                 let bg = "#fff";
                 if (cellStatus === "on") bg = "#b4eeb4";
