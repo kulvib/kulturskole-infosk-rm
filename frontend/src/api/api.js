@@ -677,3 +677,42 @@ export async function revokeEnrollmentToken(id) {
     throw new Error(await extractError(res, "Kunne ikke tilbagekalde installationskode"));
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Client-secret administration for existing clients
+// ---------------------------------------------------------------------------
+
+export async function getClientSecretStatus(clientId) {
+  const res = await fetch(`${apiUrl}/api/clients/${encodeURIComponent(clientId)}/client-secret/status`, {
+    headers: authHeaders(),
+    credentials: "include",
+  });
+  if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
+  if (!res.ok)
+    throw new Error(await extractError(res, "Kunne ikke hente client-secret status"));
+  return res.json();
+}
+
+export async function rotateClientSecret(clientId) {
+  const res = await fetch(`${apiUrl}/api/clients/${encodeURIComponent(clientId)}/client-secret/rotate`, {
+    method: "POST",
+    headers: authHeaders(),
+    credentials: "include",
+  });
+  if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
+  if (!res.ok)
+    throw new Error(await extractError(res, "Kunne ikke generere client-secret"));
+  return res.json();
+}
+
+export async function revokeClientSecret(clientId) {
+  const res = await fetch(`${apiUrl}/api/clients/${encodeURIComponent(clientId)}/client-secret/revoke`, {
+    method: "POST",
+    headers: authHeaders(),
+    credentials: "include",
+  });
+  if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
+  if (!res.ok)
+    throw new Error(await extractError(res, "Kunne ikke tilbagekalde client-secret"));
+  return res.json();
+}
