@@ -79,6 +79,21 @@ RATE_LIMIT_MAX = 10
 RATE_LIMIT_WINDOW = 60  # sekunder
 
 
+def _get_client_ip(request: Request) -> str:
+    """Returnér bedste klient-IP bag proxy/load balancer.
+
+    Render/proxyer kan sætte request.client.host til en proxy-IP, hvilket ellers
+    får alle brugere til at dele samme login-rate-limit. Stol kun på første
+    X-Forwarded-For hop når headeren findes.
+    """
+    xff = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
+    if xff:
+        first = xff.split(",")[0].strip()
+        if first:
+            return first
+    return request.client.host if request.client else "unknown"
+
+
 def _check_rate_limit(ip: str):
     now = time.time()
     with _rate_lock:
@@ -164,7 +179,7 @@ def login_for_access_token(
     )
 
     # Rate limiting baseret på klientens IP
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _get_client_ip(request)
     _check_rate_limit(client_ip)
 
     user = authenticate_user(form_data.username, form_data.password, session)
