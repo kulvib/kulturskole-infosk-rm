@@ -103,11 +103,11 @@ function getLagStatus(lag) {
     return { text: "Live", color: "#43a047" };
   }
 
-  if (lag < 10) {
-    return { text: `Næsten live · ${rounded} sek. forsinket`, color: "#43a047" };
+  if (lag < 20) {
+    return { text: `Stream er ${rounded} sekunder forsinket`, color: "#43a047" };
   }
 
-  if (lag < 20) {
+  if (lag < 30) {
     return { text: `Stream er ${rounded} sekunder forsinket`, color: "#f90" };
   }
 
