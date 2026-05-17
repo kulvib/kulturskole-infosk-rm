@@ -63,21 +63,6 @@ def migrate_legacy_user_roles():
             print("Rollemigration: ingen forældede roller fundet")
 
 
-def migrate_add_chrome_step():
-    """
-    Tilføj chrome_step kolonne til client-tabellen hvis den ikke allerede eksisterer.
-    chrome_step gemmer det seneste step-navn fra klienten (fx "countdown", "start_chrome")
-    så frontend kan bruge det til lock-logik uden at læse klientens lokale fil.
-    """
-    with Session(engine) as session:
-        try:
-            session.exec(text("ALTER TABLE client ADD COLUMN chrome_step VARCHAR"))
-            session.commit()
-            print("Migration: chrome_step kolonne tilføjet til client-tabel")
-        except Exception:
-            # Kolonnen eksisterer allerede — det er forventet ved genstart
-            pass
-
 
 def ensure_admin_user():
     with Session(engine) as session:
@@ -111,7 +96,6 @@ def ensure_admin_user():
 async def lifespan(app: FastAPI):
     create_db_and_tables()
     migrate_legacy_user_roles()
-    migrate_add_chrome_step()
     ensure_admin_user()
     yield
 
