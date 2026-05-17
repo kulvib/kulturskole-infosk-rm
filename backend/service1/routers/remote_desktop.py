@@ -264,6 +264,7 @@ async def remote_desktop_browser_ws(websocket: WebSocket, client_id: int):
                 "mouse",
                 "key",
                 "text",
+                "shout",
                 "request_frame",
             }:
                 await _send_json(websocket, {"type": "error", "message": f"Ukendt type: {msg_type}"})
@@ -271,6 +272,13 @@ async def remote_desktop_browser_ws(websocket: WebSocket, client_id: int):
 
             msg["session_id"] = session_id
             msg["username"] = user.username
+
+            if msg_type == "shout":
+                print(
+                    f"REMOTE_DESKTOP_SHOUT_BROWSER client_id={client_id} "
+                    f"session_id={session_id} user={user.username} text_len={len(str(msg.get('text') or ''))}",
+                    flush=True,
+                )
 
             async with LOCK:
                 agent = AGENTS.get(client_id)
@@ -283,6 +291,12 @@ async def remote_desktop_browser_ws(websocket: WebSocket, client_id: int):
                 continue
 
             await _send_json(agent.websocket, msg)
+
+            if msg_type == "shout":
+                print(
+                    f"REMOTE_DESKTOP_SHOUT_FORWARDED client_id={client_id} session_id={session_id}",
+                    flush=True,
+                )
 
     except WebSocketDisconnect:
         pass
