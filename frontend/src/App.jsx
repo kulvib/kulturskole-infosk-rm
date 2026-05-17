@@ -10,16 +10,16 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import AdminRoute from "./auth/AdminRoute";
 import CalendarPage from "./pages/calendarpage/CalendarPage";
 import AdminPage from "./pages/adminpages/AdminPage";
+import EnrollmentTokensPage from "./pages/adminpages/EnrollmentTokensPage";
 import RemoteDesktop from "./pages/clientdetailspage/remotedesktop/RemoteDesktop";
 import ChangePassword from "./pages/ChangePassword";
 
 /*
   App.jsx
 
-  FIX (kritisk): Route param hed ":clientId" men ClientDetailsPageWrapper
-    destructurerer useParams() som { id } — det betød at id altid var
-    undefined og getClient(undefined) blev kaldt.
-    Rettet til ":id" så det matcher useParams() i wrapperen.
+  Route til installationskoder:
+  - /installationskoder
+  - Kun superadmin
 */
 
 export default function App() {
@@ -36,8 +36,6 @@ export default function App() {
       >
         <Route index element={<HomePage />} />
         <Route path="clients" element={<ClientInfoPage />} />
-
-        {/* FIX: ":clientId" → ":id" så useParams() i ClientDetailsPageWrapper matcher */}
         <Route path="clients/:id" element={<ClientDetailsPageWrapper />} />
 
         <Route path="calendar" element={<CalendarPage />} />
@@ -47,6 +45,14 @@ export default function App() {
           element={
             <AdminRoute>
               <AdminPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="installationskoder"
+          element={
+            <AdminRoute requireSuperadmin>
+              <EnrollmentTokensPage />
             </AdminRoute>
           }
         />
