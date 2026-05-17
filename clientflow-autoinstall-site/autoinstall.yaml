@@ -1,0 +1,151 @@
+autoinstall:
+  version: 1
+
+  # Interactive install:
+  # Ubuntu spørger stadig om sprog, tastatur, netværk, disk,
+  # hostname, brugernavn og password.
+  interactive-sections:
+    - "*"
+
+  refresh-installer:
+    update: false
+
+  locale: da_DK.UTF-8
+  keyboard:
+    layout: dk
+    variant: ""
+  timezone: Europe/Copenhagen
+
+  # Syntaktisk default. Med interactive-sections="*" ændrer du dette i UI.
+  identity:
+    hostname: clientflow-client
+    username: clientflow
+    password: "$6$xS196rmCEobFN.t8$trgA3lqwjZtQ.mek0l.235qv7.zgQBS9Eu.w734cIr8u6m7iUA/wB6HCFOKV.JaCnL6hA5oTDcHnL6JzfbiTK/"
+
+  apt:
+    geoip: false
+
+  ssh:
+    install-server: true
+    allow-pw: true
+
+  late-commands:
+    - |
+      cat > /target/usr/local/sbin/clientflow-firstboot-install.sh <<'SH'
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      LOG="/var/log/clientflow-firstboot-install.log"
+      exec > >(tee -a "$LOG") 2>&1
+
+      # RET DENNE LINJE, hvis Render giver et andet site-navn/URL:
+      RENDER_BASE_URL="https://clientflow-autoinstall-site.onrender.com"
+
+      CLIENTFLOW_BASE_URL="https://kulturskole-infosk-rm.onrender.com"
+      DONE="/var/lib/clientflow-firstboot-install.done"
+      WORK="/opt/clientflow-installer"
+      ZIP_NAME="clientflow_clean_ubuntu_installer_v2.zip"
+      ZIP_URL="${RENDER_BASE_URL}/${ZIP_NAME}"
+
+      echo "=== ClientFlow firstboot install ==="
+      date -Is
+      echo "Render URL: $RENDER_BASE_URL"
+      echo "Installer ZIP URL: $ZIP_URL"
+
+      if [[ -f "$DONE" ]]; then
+        echo "Allerede kørt: $DONE"
+        exit 0
+      fi
+
+      CLIENTFLOW_USER="$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $1 != "nobody" { print $1; exit }')"
+
+      if [[ -z "${CLIENTFLOW_USER:-}" ]]; then
+        echo "FEJL: Kunne ikke finde almindelig Ubuntu-bruger med UID >= 1000."
+        exit 1
+      fi
+
+      echo "Fundet Ubuntu-bruger: $CLIENTFLOW_USER"
+      echo "Backend URL: $CLIENTFLOW_BASE_URL"
+
+      echo "== Sætter GDM til X11 + autologin for $CLIENTFLOW_USER =="
+      mkdir -p /etc/gdm3
+      cat > /etc/gdm3/custom.conf <<EOF
+      [daemon]
+      WaylandEnable=false
+      AutomaticLoginEnable=True
+      AutomaticLogin=$CLIENTFLOW_USER
+      EOF
+
+      echo "== Venter på netværk/DNS =="
+      host="$(echo "$CLIENTFLOW_BASE_URL" | sed -E 's#^https?://([^/]+).*#\1#')"
+      for i in $(seq 1 90); do
+        if getent hosts "$host" >/dev/null 2>&1; then
+          echo "Netværk/DNS OK"
+          break
+        fi
+        sleep 3
+      done
+
+      export DEBIAN_FRONTEND=noninteractive
+
+      echo "== Sikrer curl/unzip/ca-certificates =="
+      apt-get update || true
+      apt-get install -y curl unzip ca-certificates || true
+
+      mkdir -p "$WORK"
+      ZIP_PATH="$WORK/$ZIP_NAME"
+
+      echo "== Downloader ClientFlow installer =="
+      if ! curl -fL "$ZIP_URL" -o "$ZIP_PATH"; then
+        echo "FEJL: Kunne ikke downloade $ZIP_URL"
+        echo "Kontroller at Render Static Site er public, og at filen findes:"
+        echo "  $ZIP_URL"
+        exit 1
+      fi
+
+      echo "Installer zip: $ZIP_PATH"
+      rm -rf "$WORK/unpacked"
+      mkdir -p "$WORK/unpacked"
+      unzip -o "$ZIP_PATH" -d "$WORK/unpacked"
+
+      cd "$WORK/unpacked"
+      if [[ ! -f scripts/install_clientflow_clean_ubuntu.sh ]]; then
+        echo "FEJL: scripts/install_clientflow_clean_ubuntu.sh findes ikke efter unzip"
+        find "$WORK/unpacked" -maxdepth 3 -type f | sort | sed -n '1,160p'
+        exit 1
+      fi
+
+      echo "== Kører ClientFlow clean installer =="
+      bash scripts/install_clientflow_clean_ubuntu.sh "$CLIENTFLOW_USER" "$CLIENTFLOW_BASE_URL"
+
+      mkdir -p /var/lib
+      touch "$DONE"
+
+      systemctl disable clientflow-firstboot-install.service || true
+
+      echo "== ClientFlow firstboot install færdig =="
+      date -Is
+      SH
+
+      chmod +x /target/usr/local/sbin/clientflow-firstboot-install.sh
+
+    - |
+      cat > /target/etc/systemd/system/clientflow-firstboot-install.service <<'EOF'
+      [Unit]
+      Description=ClientFlow first boot installer
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/clientflow-firstboot-install.sh
+      RemainAfterExit=yes
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+      EOF
+
+    - curtin in-target --target=/target -- systemctl enable clientflow-firstboot-install.service
+    - curtin in-target --target=/target -- systemctl enable ssh || true
