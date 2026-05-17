@@ -73,6 +73,13 @@ class ClientBase(SQLModel):
 
 class Client(ClientBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    # Client-secret bruges af nye klienter installeret via enrollment-token.
+    # Eksisterende klienter med admin-login virker fortsat bagudkompatibelt.
+    client_secret_hash: Optional[str] = Field(default=None)
+    client_secret_created_at: Optional[datetime] = None
+    client_secret_revoked_at: Optional[datetime] = None
+    enrollment_token_id: Optional[int] = Field(default=None, foreign_key="enrollmenttoken.id")
+    machine_id: Optional[str] = Field(default=None, index=True)
     status: Optional[str] = "pending"
     isOnline: Optional[bool] = False
     last_seen: Optional[datetime] = None
@@ -101,6 +108,7 @@ class Client(ClientBase, table=True):
 
 
 class ClientCreate(ClientBase):
+    machine_id: Optional[str] = None
     sort_order: Optional[int] = None
     kiosk_url: Optional[str] = None
     ubuntu_version: Optional[str] = None
@@ -121,6 +129,7 @@ class ClientCreate(ClientBase):
 
 
 class ClientUpdate(SQLModel):
+    machine_id: Optional[str] = None
     locality: Optional[str] = None
     sort_order: Optional[int] = None
     kiosk_url: Optional[str] = None
@@ -148,6 +157,34 @@ class ClientUpdate(SQLModel):
     livestream_last_error: Optional[str] = None
     ubuntu_updates_available: Optional[int] = None
     pending_os_update: Optional[bool] = None
+
+
+class EnrollmentToken(SQLModel, table=True):
+    """
+    Engangs installationskode til nye Ubuntu-klienter.
+
+    Selve koden gemmes aldrig i klartekst. Kun hash gemmes.
+    Koden vises kun én gang ved oprettelse i admin-UI.
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code_hash: str
+    code_preview: Optional[str] = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=utcnow, nullable=False)
+    expires_at: datetime
+    used_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
+    created_by_user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    used_by_client_id: Optional[int] = Field(default=None, foreign_key="client.id")
+    school_id: Optional[int] = Field(default=None, foreign_key="school.id")
+    note: Optional[str] = None
+
+    @property
+    def is_used(self) -> bool:
+        return self.used_at is not None
+
+    @property
+    def is_revoked(self) -> bool:
+        return self.revoked_at is not None
 
 
 class CalendarMarking(SQLModel, table=True):
