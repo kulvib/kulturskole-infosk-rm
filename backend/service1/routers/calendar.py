@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, date
 import ipaddress
 import requests
-from auth import get_current_user
+from auth import get_current_user, get_current_user_or_client, require_client_self_or_user
 
 router = APIRouter()
 
@@ -109,9 +109,12 @@ def get_marked_days(
     start_date: Optional[str] = Query(None, description="Filtrer fra dato (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="Filtrer til dato (YYYY-MM-DD)"),
     session=Depends(get_session),
-    user=Depends(get_current_user)
+    principal=Depends(get_current_user_or_client)
 ):
     _validate_season(season)
+    # Browser/admin-brugere må hente alle klienters kalenderdata.
+    # Installerede Ubuntu-klienter med client-token må kun hente egen kalender.
+    require_client_self_or_user(principal, client_id)
     existing = session.exec(
         select(CalendarMarking).where(
             CalendarMarking.season == season,
@@ -136,7 +139,7 @@ def get_marked_days(
 
 
 @router.get("/calendar/seasons")
-def get_seasons_list(user=Depends(get_current_user)):
+def get_seasons_list(principal=Depends(get_current_user_or_client)):
     """Returnerer nuværende sæson + 2 fremtidige sæsoner."""
     today = date.today()
     current_start = today.year if today.month >= 8 else today.year - 1
@@ -153,7 +156,7 @@ def get_seasons_list(user=Depends(get_current_user)):
 
 
 @router.get("/calendar/season")
-def get_current_season(user=Depends(get_current_user)):
+def get_current_season(principal=Depends(get_current_user_or_client)):
     today = date.today()
     if today.month >= 8:
         season_start, season_end = today.year, today.year + 1
