@@ -111,16 +111,56 @@ def create_db_and_tables():
         except Exception:
             client_columns = set()
 
-        if "state" not in client_columns:
-            conn.execute(text("ALTER TABLE client ADD COLUMN state TEXT DEFAULT 'normal'"))
-        if "pending_chrome_action_source" not in client_columns:
-            conn.execute(text("ALTER TABLE client ADD COLUMN pending_chrome_action_source TEXT"))
-        if "livestream_status" not in client_columns:
-            conn.execute(text("ALTER TABLE client ADD COLUMN livestream_status TEXT DEFAULT 'idle'"))
-        if "livestream_last_segment" not in client_columns:
-            conn.execute(text("ALTER TABLE client ADD COLUMN livestream_last_segment TIMESTAMP"))
-        if "livestream_last_error" not in client_columns:
-            conn.execute(text("ALTER TABLE client ADD COLUMN livestream_last_error TEXT"))
+        def _add_client_column_if_missing(name: str, ddl: str) -> None:
+            """Idempotent letvægtsmigration for eksisterende Render/SQLite databaser.
+
+            SQLModel.create_all() opretter kun nye tabeller; den tilføjer ikke
+            nye kolonner til en eksisterende tabel. Klientkoden forventer alle
+            felterne nedenfor, så manglende kolonner kan få /api/clients/... til
+            at fejle med "no such column".
+            """
+            nonlocal client_columns
+            if name in client_columns:
+                return
+            try:
+                conn.execute(text(f"ALTER TABLE client ADD COLUMN {name} {ddl}"))
+                client_columns.add(name)
+                print(f"[DB] Tilføjede client.{name}")
+            except Exception as e:
+                print(f"[DB] Migration info for client.{name}: {e}")
+
+        bool_default_false = "BOOLEAN NOT NULL DEFAULT FALSE" if engine.dialect.name == "postgresql" else "BOOLEAN NOT NULL DEFAULT 0"
+        bool_nullable_false = "BOOLEAN DEFAULT FALSE" if engine.dialect.name == "postgresql" else "BOOLEAN DEFAULT 0"
+
+        # Hold denne liste synkroniseret med models.Client.
+        _add_client_column_if_missing("locality", "TEXT")
+        _add_client_column_if_missing("wifi_ip_address", "TEXT")
+        _add_client_column_if_missing("wifi_mac_address", "TEXT")
+        _add_client_column_if_missing("lan_ip_address", "TEXT")
+        _add_client_column_if_missing("lan_mac_address", "TEXT")
+        _add_client_column_if_missing("status", "TEXT DEFAULT 'pending'")
+        _add_client_column_if_missing("isOnline", bool_nullable_false)
+        _add_client_column_if_missing("last_seen", "TIMESTAMP")
+        _add_client_column_if_missing("sort_order", "INTEGER")
+        _add_client_column_if_missing("kiosk_url", "TEXT")
+        _add_client_column_if_missing("ubuntu_version", "TEXT")
+        _add_client_column_if_missing("uptime", "TEXT")
+        _add_client_column_if_missing("created_at", "TIMESTAMP")
+        _add_client_column_if_missing("chrome_status", "TEXT DEFAULT 'unknown'")
+        _add_client_column_if_missing("chrome_last_updated", "TIMESTAMP")
+        _add_client_column_if_missing("pending_reboot", bool_nullable_false)
+        _add_client_column_if_missing("pending_shutdown", bool_nullable_false)
+        _add_client_column_if_missing("chrome_color", "TEXT")
+        _add_client_column_if_missing("chrome_step", "TEXT")
+        _add_client_column_if_missing("pending_chrome_action", "TEXT DEFAULT 'none'")
+        _add_client_column_if_missing("pending_chrome_action_source", "TEXT")
+        _add_client_column_if_missing("school_id", "INTEGER")
+        _add_client_column_if_missing("state", "TEXT DEFAULT 'normal'")
+        _add_client_column_if_missing("livestream_status", "TEXT DEFAULT 'idle'")
+        _add_client_column_if_missing("livestream_last_segment", "TIMESTAMP")
+        _add_client_column_if_missing("livestream_last_error", "TEXT")
+        _add_client_column_if_missing("ubuntu_updates_available", "INTEGER DEFAULT 0")
+        _add_client_column_if_missing("pending_os_update", bool_default_false)
 
         # --- Migrér season int → string ---
         _migrate_seasons_to_string(conn)
