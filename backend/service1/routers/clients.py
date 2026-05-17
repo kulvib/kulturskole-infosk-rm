@@ -4,7 +4,7 @@ from typing import List
 from datetime import datetime, timedelta, date, timezone
 from db import get_session
 from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction, School, SchoolSeasonTimes
-from auth import get_current_user, get_current_admin_user
+from auth import get_current_user, get_current_admin_user, get_current_user_or_client, require_client_self_or_user, principal_is_client
 from models import utcnow
 import os
 import glob
@@ -23,6 +23,33 @@ VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error", "upd
 VALID_PENDING_CHROME_ACTION_SOURCES = {"actionbutton", "calendar"}
 
 BLOCKING_ACTIONS = {"start", "stop", "sleep", "wakeup", "reboot", "shutdown"}
+
+# Felter som en klient med client-token selv må opdatere på /clients/{id}/update.
+# Admin/frontend kan fortsat opdatere alle de eksisterende ClientUpdate-felter.
+CLIENT_SELF_UPDATE_FIELDS = {
+    "machine_id",
+    "ubuntu_version",
+    "uptime",
+    "wifi_ip_address",
+    "wifi_mac_address",
+    "lan_ip_address",
+    "lan_mac_address",
+    "chrome_status",
+    "chrome_last_updated",
+    "chrome_color",
+    "chrome_step",
+    "last_seen",
+    "pending_reboot",
+    "pending_shutdown",
+    "pending_chrome_action",
+    "pending_chrome_action_source",
+    "state",
+    "livestream_status",
+    "livestream_last_segment",
+    "livestream_last_error",
+    "ubuntu_updates_available",
+    "pending_os_update",
+}
 
 
 def normalize_client_state(value: str) -> str:
@@ -122,11 +149,14 @@ def get_clients(session=Depends(get_session), user=Depends(get_current_user)):
 
 
 @router.get("/clients/{id}/", response_model=Client)
-def get_client(id: int, session=Depends(get_session), user=Depends(get_current_user)):
+def get_client(id: int, session=Depends(get_session), user=Depends(get_current_user_or_client)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     client.isOnline = is_online(client)
+    if principal_is_client(user):
+        require_client_self_or_user(user, id)
+        return client
     if getattr(user, "is_admin", False):
         return client
     if getattr(user, "role", None) == "bruger":
@@ -137,7 +167,8 @@ def get_client(id: int, session=Depends(get_session), user=Depends(get_current_u
 
 
 @router.get("/clients/{id}/chrome-status")
-def get_chrome_status(id: int, session=Depends(get_session), user=Depends(get_current_user)):
+def get_chrome_status(id: int, session=Depends(get_session), user=Depends(get_current_user_or_client)):
+    require_client_self_or_user(user, id)
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -188,8 +219,9 @@ def update_chrome_status(
     id: int,
     data: dict = Body(...),
     session=Depends(get_session),
-    user=Depends(get_current_admin_user),
+    user=Depends(get_current_user_or_client),
 ):
+    require_client_self_or_user(user, id)
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -210,7 +242,8 @@ def update_chrome_status(
 
 
 @router.put("/clients/{id}/state")
-def update_client_state(id: int, data: dict = Body(...), session=Depends(get_session), user=Depends(get_current_admin_user)):
+def update_client_state(id: int, data: dict = Body(...), session=Depends(get_session), user=Depends(get_current_user_or_client)):
+    require_client_self_or_user(user, id)
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -228,7 +261,8 @@ def update_client_state(id: int, data: dict = Body(...), session=Depends(get_ses
 
 
 @router.get("/clients/{id}/state")
-def get_client_state(id: int, session=Depends(get_session), user=Depends(get_current_user)):
+def get_client_state(id: int, session=Depends(get_session), user=Depends(get_current_user_or_client)):
+    require_client_self_or_user(user, id)
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -240,8 +274,9 @@ def set_chrome_command(
     id: int,
     data: dict = Body(...),
     session=Depends(get_session),
-    user=Depends(get_current_admin_user),
+    user=Depends(get_current_user_or_client),
 ):
+    require_client_self_or_user(user, id)
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -307,7 +342,8 @@ def set_chrome_command(
 
 
 @router.get("/clients/{id}/chrome-command")
-def get_chrome_command(id: int, session=Depends(get_session), user=Depends(get_current_user)):
+def get_chrome_command(id: int, session=Depends(get_session), user=Depends(get_current_user_or_client)):
+    require_client_self_or_user(user, id)
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -346,7 +382,8 @@ async def trigger_os_update(
 
 
 @router.get("/clients/{id}/ubuntu-updates")
-def get_ubuntu_updates(id: int, session=Depends(get_session), user=Depends(get_current_user)):
+def get_ubuntu_updates(id: int, session=Depends(get_session), user=Depends(get_current_user_or_client)):
+    require_client_self_or_user(user, id)
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -359,7 +396,7 @@ def get_ubuntu_updates(id: int, session=Depends(get_session), user=Depends(get_c
 
 
 @router.post("/clients/", response_model=Client)
-async def create_client(client_in: ClientCreate, session=Depends(get_session), user=Depends(get_current_admin_user)):
+async def create_client(client_in: ClientCreate, session=Depends(get_session), user=Depends(get_current_user)):
     client = Client(
         name=client_in.name,
         locality=client_in.locality,
@@ -401,12 +438,21 @@ async def update_client(
     id: int,
     client_update: ClientUpdate,
     session=Depends(get_session),
-    user=Depends(get_current_admin_user),
+    user=Depends(get_current_user_or_client),
 ):
+    require_client_self_or_user(user, id)
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     fields = client_update.model_fields_set
+    if principal_is_client(user):
+        forbidden = sorted(set(fields) - CLIENT_SELF_UPDATE_FIELDS)
+        if forbidden:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Klient-token må ikke opdatere disse felter: {forbidden}",
+            )
+    if "machine_id" in fields: client.machine_id = client_update.machine_id
     if "locality" in fields: client.locality = client_update.locality
     if "sort_order" in fields: client.sort_order = client_update.sort_order
     if "kiosk_url" in fields: client.kiosk_url = client_update.kiosk_url
@@ -466,7 +512,7 @@ async def update_kiosk_url(
     id: int,
     data: dict = Body(...),
     session=Depends(get_session),
-    user=Depends(get_current_admin_user),
+    user=Depends(get_current_user),
 ):
     client = session.get(Client, id)
     if not client:
@@ -575,7 +621,7 @@ def client_heartbeat(
     id: int,
     data: dict = Body(default=None),
     session=Depends(get_session),
-    user=Depends(get_current_admin_user),
+    user=Depends(get_current_user_or_client),
 ):
     """
     Heartbeat er klientens hurtige livstegn.
@@ -586,6 +632,7 @@ def client_heartbeat(
     Derfor skal heartbeat også opdatere backend.uptime, ellers kan webvisningen
     være bagud i forhold til den lokale GUI.
     """
+    require_client_self_or_user(user, id)
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
