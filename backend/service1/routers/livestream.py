@@ -11,7 +11,7 @@ from fastapi import (
     UploadFile, File, HTTPException, Form, Response, Depends, Query
 )
 from pydantic import BaseModel
-from auth import get_current_user, verify_ws_token
+from auth import get_current_user_or_client, verify_ws_token, principal_is_client, require_client_self_or_user
 from models import utcnow
 from sqlmodel import Session
 
@@ -52,6 +52,16 @@ def safe_client_dir(client_id: str) -> str:
     if not path.startswith(os.path.abspath(HLS_DIR)):
         raise HTTPException(status_code=400, detail="Ugyldigt client_id")
     return path
+
+def require_hls_access(principal, client_id: str) -> None:
+    """Admin/user-token må se HLS. Client-token må kun tilgå egen client_id."""
+    if principal_is_client(principal):
+        try:
+            cid = int(client_id)
+        except Exception:
+            raise HTTPException(status_code=403, detail="Klient-token kræver numerisk client_id")
+        require_client_self_or_user(principal, cid)
+
 
 
 def extract_num(filename: str, prefix: str = "segment_") -> int:
@@ -277,8 +287,9 @@ async def upload_hls_file(
     client_id: str = Form(...),
     segment_duration: int = Form(2),
     captured_at: Optional[str] = Form(default=None),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user_or_client)
 ):
+    require_hls_access(user, client_id)
     allowed_exts = [".ts", ".mp4"]
     if not any(file.filename.endswith(ext) for ext in allowed_exts):
         raise HTTPException(status_code=400, detail="Kun .ts eller .mp4 segmenter understøttes")
@@ -322,9 +333,10 @@ async def upload_hls_file(
 async def cleanup_hls_files(
     payload: HlsCleanupRequest,
     keep_n: int = KEEP_N,
-    user=Depends(get_current_user)
+    user=Depends(get_current_user_or_client)
 ):
     client_id        = payload.client_id
+    require_hls_access(user, client_id)
     keep_files       = payload.keep_files
     segment_duration = _normalize_segment_duration(payload.segment_duration, default=2)
     client_dir       = safe_client_dir(client_id)
@@ -379,8 +391,9 @@ async def cleanup_hls_files(
 def get_last_segment_info(
     client_id: str,
     response: Response,
-    user=Depends(get_current_user)
+    user=Depends(get_current_user_or_client)
 ):
+    require_hls_access(user, client_id)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"]        = "no-cache"
     response.headers["Expires"]       = "0"
@@ -440,8 +453,9 @@ def _guess_target_duration_from_manifest(lines: List[str]) -> Optional[int]:
 def health_check(
     client_id: str,
     response: Response,
-    user=Depends(get_current_user)
+    user=Depends(get_current_user_or_client)
 ):
+    require_hls_access(user, client_id)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"]        = "no-cache"
     response.headers["Expires"]       = "0"
@@ -501,7 +515,8 @@ def health_check(
 # Reset
 # ---------------------------------------------------------------------------
 @router.post("/hls/{client_id}/reset")
-def reset_hls(client_id: str, response: Response, user=Depends(get_current_user)):
+def reset_hls(client_id: str, response: Response, user=Depends(get_current_user_or_client)):
+    require_hls_access(user, client_id)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     client_dir = safe_client_dir(client_id)
 
