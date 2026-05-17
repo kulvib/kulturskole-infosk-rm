@@ -15,7 +15,7 @@ Dette er ikke VNC/RDP. Det er en kontrolleret MVP:
 
 Sikkerhed:
 - browser-adgang er superadmin-only
-- agent-adgang kræver admin/superadmin-token
+- agent-adgang kræver admin/superadmin-token eller matchende client-token
 """
 
 from __future__ import annotations
@@ -83,7 +83,7 @@ def _extract_token(websocket: WebSocket) -> Optional[str]:
     return None
 
 
-def _get_ws_user(websocket: WebSocket) -> Optional[User]:
+def _get_ws_user(websocket: WebSocket) -> Optional[User | Client]:
     token = _extract_token(websocket)
     if not token:
         return None
@@ -91,15 +91,21 @@ def _get_ws_user(websocket: WebSocket) -> Optional[User]:
         return verify_ws_token(token, session)
 
 
-def _client_exists_and_accessible(client_id: int, user: User) -> bool:
+def _client_exists_and_accessible(client_id: int, principal: User | Client) -> bool:
     with Session(engine) as session:
         client = session.get(Client, client_id)
         if not client:
             return False
-        if getattr(user, "is_admin", False):
+
+        # Installeret klient-agent med client-token må kun tilgå sig selv
+        # og kun hvis klienten er godkendt.
+        if isinstance(principal, Client):
+            return principal.id == client_id and client.status == "approved"
+
+        if getattr(principal, "is_admin", False):
             return True
-        if getattr(user, "role", None) == "bruger":
-            return client.status == "approved" and client.school_id == user.school_id
+        if getattr(principal, "role", None) == "bruger":
+            return client.status == "approved" and client.school_id == principal.school_id
         return False
 
 
@@ -117,13 +123,23 @@ async def remote_desktop_agent_ws(websocket: WebSocket, client_id: int):
     """
     await websocket.accept()
 
-    user = _get_ws_user(websocket)
-    if not user or not getattr(user, "is_admin", False):
-        await _close_with_reason(websocket, 4403, "Kun admin/superadmin må forbinde remote desktop-agent")
+    principal = _get_ws_user(websocket)
+    if not principal:
+        await _close_with_reason(websocket, 4401, "Ikke logget ind")
         return
 
-    if not _client_exists_and_accessible(client_id, user):
-        await _close_with_reason(websocket, 4404, "Klient ikke fundet eller ingen adgang")
+    # Efter migrering til client-secret må Ubuntu-agenten forbinde med et
+    # matchende client-token. Browser-ruten er stadig superadmin-only.
+    if isinstance(principal, Client):
+        if principal.id != client_id:
+            await _close_with_reason(websocket, 4403, "Client-token matcher ikke klient-id")
+            return
+    elif not getattr(principal, "is_admin", False):
+        await _close_with_reason(websocket, 4403, "Kun admin/superadmin eller matchende client-token må forbinde remote desktop-agent")
+        return
+
+    if not _client_exists_and_accessible(client_id, principal):
+        await _close_with_reason(websocket, 4404, "Klient ikke fundet, ikke godkendt eller ingen adgang")
         return
 
     async with LOCK:
@@ -136,7 +152,7 @@ async def remote_desktop_agent_ws(websocket: WebSocket, client_id: int):
         AGENTS[client_id] = AgentConnection(
             client_id=client_id,
             websocket=websocket,
-            user_id=user.id,
+            user_id=None if isinstance(principal, Client) else principal.id,
         )
 
     await _send_json(websocket, {"type": "hello", "role": "agent", "client_id": client_id})
