@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import json
 import traceback
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -15,8 +16,16 @@ from models import utcnow
 from sqlmodel import Session
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-HLS_DIR  = os.path.abspath(os.path.join(BASE_DIR, "..", "hls"))
+
+# HLS_DIR bruges af både upload-endpoints og main.py static mount.
+# VIGTIGT på Render: sæt HLS_BASE_DIR til samme path, evt. på en persistent disk.
+# Fallback matcher den eksisterende repo-struktur: backend/service1/hls.
+HLS_DIR = os.path.abspath(
+    os.getenv("HLS_BASE_DIR")
+    or os.path.join(BASE_DIR, "..", "hls")
+)
 os.makedirs(HLS_DIR, exist_ok=True)
+print(f"[HLS] HLS_DIR={HLS_DIR}")
 
 router = APIRouter()
 
@@ -63,7 +72,10 @@ def _parse_captured_at(captured_at_str: Optional[str]) -> Optional[datetime]:
         return None
     try:
         s = captured_at_str.strip().replace("Z", "+00:00")
-        return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
     except Exception:
         return None
 
@@ -125,23 +137,105 @@ def _write_manifest(
             m3u.write(f"{seg}\n")
 
 
-# In-memory map: segment_filename → captured_at datetime
+# In-memory map: segment_filename → captured_at datetime.
+# Derudover skrives samme map til disk pr. klient, så det virker på tværs af
+# Render workers/restarts og ikke kun i den worker der modtog uploadet.
 _captured_at_store: Dict[str, Dict[str, datetime]] = {}
+CAPTURED_AT_FILENAME = "_captured_at.json"
+MAX_CAPTURED_AT_ENTRIES = 120
+
+
+def _captured_at_path(client_id: str) -> str:
+    return os.path.join(safe_client_dir(client_id), CAPTURED_AT_FILENAME)
+
+
+def _dt_to_iso(dt: datetime) -> str:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _load_captured_at_from_disk(client_id: str) -> Dict[str, datetime]:
+    path = _captured_at_path(client_id)
+    if not os.path.exists(path):
+        return {}
+    try:
+        raw = json.loads(open(path, "r", encoding="utf-8").read())
+        if not isinstance(raw, dict):
+            return {}
+        out: Dict[str, datetime] = {}
+        for seg, value in raw.items():
+            if not isinstance(seg, str):
+                continue
+            dt = _parse_captured_at(str(value))
+            if dt is not None:
+                out[seg] = dt
+        return out
+    except Exception as e:
+        print(f"[HLS] Kunne ikke læse {path}: {e}")
+        return {}
+
+
+def _write_captured_at_to_disk(client_id: str, store: Dict[str, datetime]) -> None:
+    try:
+        client_dir = safe_client_dir(client_id)
+        os.makedirs(client_dir, exist_ok=True)
+        # Begræns filen til de nyeste segment-numre.
+        items = sorted(store.items(), key=lambda kv: extract_num(kv[0], "segment_"))[-MAX_CAPTURED_AT_ENTRIES:]
+        data = {name: _dt_to_iso(dt) for name, dt in items}
+        path = os.path.join(client_dir, CAPTURED_AT_FILENAME)
+        tmp = f"{path}.tmp.{os.getpid()}"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, path)
+    except Exception as e:
+        print(f"[HLS] Kunne ikke skrive captured_at sidecar for client={client_id}: {e}")
 
 
 def _store_captured_at(client_id: str, seg_name: str, dt: datetime) -> None:
-    if client_id not in _captured_at_store:
-        _captured_at_store[client_id] = {}
-    _captured_at_store[client_id][seg_name] = dt
-    store = _captured_at_store[client_id]
-    if len(store) > 50:
-        oldest_keys = sorted(store.keys())[:-50]
-        for k in oldest_keys:
-            del store[k]
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    dt = dt.astimezone(timezone.utc)
+
+    disk_store = _load_captured_at_from_disk(client_id)
+    mem_store = _captured_at_store.get(client_id, {})
+    merged = {**disk_store, **mem_store}
+    merged[seg_name] = dt
+
+    if len(merged) > MAX_CAPTURED_AT_ENTRIES:
+        keep = sorted(merged.items(), key=lambda kv: extract_num(kv[0], "segment_"))[-MAX_CAPTURED_AT_ENTRIES:]
+        merged = dict(keep)
+
+    _captured_at_store[client_id] = merged
+    _write_captured_at_to_disk(client_id, merged)
 
 
 def _get_captured_at_map(client_id: str) -> Dict[str, datetime]:
-    return _captured_at_store.get(client_id, {})
+    disk_store = _load_captured_at_from_disk(client_id)
+    mem_store = _captured_at_store.get(client_id, {})
+    merged = {**disk_store, **mem_store}
+    if merged:
+        _captured_at_store[client_id] = merged
+    return merged
+
+
+def _read_manifest_program_dates(manifest_path: str) -> Dict[str, datetime]:
+    """Fallback: læs EXT-X-PROGRAM-DATE-TIME direkte fra manifestet."""
+    out: Dict[str, datetime] = {}
+    try:
+        last_dt: Optional[datetime] = None
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if line.startswith("#EXT-X-PROGRAM-DATE-TIME:"):
+                    last_dt = _parse_captured_at(line.split(":", 1)[1])
+                elif line.startswith("segment_"):
+                    if last_dt is not None:
+                        out[line] = last_dt
+                    last_dt = None
+    except Exception:
+        pass
+    return out
 
 
 def update_manifest(client_dir: str, client_id: str, keep_n: int = KEEP_N, segment_duration: int = 6) -> None:
@@ -249,6 +343,16 @@ async def cleanup_hls_files(
         except Exception as e:
             print(f"[CLEANUP] Kunne ikke slette {seg}: {e}")
 
+    # Hold captured_at sidecar i sync med segmenter der stadig findes.
+    try:
+        cap_map = _get_captured_at_map(client_id)
+        existing = {f for f in os.listdir(client_dir) if f.startswith("segment_")}
+        cap_map = {k: v for k, v in cap_map.items() if k in existing}
+        _captured_at_store[client_id] = cap_map
+        _write_captured_at_to_disk(client_id, cap_map)
+    except Exception as e:
+        print(f"[CLEANUP] Kunne ikke opdatere captured_at sidecar: {e}")
+
     kept_sorted = sorted(
         [f for f in keep_files if os.path.exists(os.path.join(client_dir, f))],
         key=lambda f: extract_num(f, "segment_")
@@ -299,9 +403,10 @@ def get_last_segment_info(
         return {"error": "segment missing", "is_healthy": False}
 
     captured_at_map = _get_captured_at_map(client_id)
-    dt = captured_at_map.get(last_segment)
+    manifest_dates = _read_manifest_program_dates(manifest_path)
+    dt = captured_at_map.get(last_segment) or manifest_dates.get(last_segment)
     if dt is not None:
-        timestamp_iso = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        timestamp_iso = _dt_to_iso(dt)
         epoch         = dt.timestamp()
     else:
         mtime         = os.path.getmtime(seg_path)
