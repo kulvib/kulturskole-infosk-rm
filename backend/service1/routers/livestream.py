@@ -29,8 +29,8 @@ print(f"[HLS] HLS_DIR={HLS_DIR}")
 
 router = APIRouter()
 
-MANIFEST_STALE_SECONDS = 30
-KEEP_N = 15
+MANIFEST_STALE_SECONDS = int(os.getenv("HLS_STALE_SECONDS", "12"))
+KEEP_N = int(os.getenv("HLS_MANIFEST_KEEP_N", "8"))
 
 
 # ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ KEEP_N = 15
 class HlsCleanupRequest(BaseModel):
     client_id: str
     keep_files: List[str]
-    segment_duration: int = 6
+    segment_duration: int = 2
 
 
 # ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ def extract_num(filename: str, prefix: str = "segment_") -> int:
     return int(m.group(1)) if m else -1
 
 
-def _normalize_segment_duration(value, default: int = 6, min_v: int = 1, max_v: int = 60) -> int:
+def _normalize_segment_duration(value, default: int = 2, min_v: int = 1, max_v: int = 10) -> int:
     try:
         n = int(value)
         return max(min_v, min(max_v, n))
@@ -238,8 +238,8 @@ def _read_manifest_program_dates(manifest_path: str) -> Dict[str, datetime]:
     return out
 
 
-def update_manifest(client_dir: str, client_id: str, keep_n: int = KEEP_N, segment_duration: int = 6) -> None:
-    segment_duration = _normalize_segment_duration(segment_duration, default=6)
+def update_manifest(client_dir: str, client_id: str, keep_n: int = KEEP_N, segment_duration: int = 2) -> None:
+    segment_duration = _normalize_segment_duration(segment_duration, default=2)
 
     for ext in [".ts", ".mp4"]:
         segs = sorted(
@@ -275,7 +275,7 @@ def update_manifest(client_dir: str, client_id: str, keep_n: int = KEEP_N, segme
 async def upload_hls_file(
     file: UploadFile = File(...),
     client_id: str = Form(...),
-    segment_duration: int = Form(6),
+    segment_duration: int = Form(2),
     captured_at: Optional[str] = Form(default=None),
     user=Depends(get_current_user)
 ):
@@ -285,7 +285,7 @@ async def upload_hls_file(
     if not re.match(r"^[a-zA-Z0-9_.-]+$", file.filename):
         raise HTTPException(status_code=400, detail="Ugyldigt filnavn")
 
-    segment_duration = _normalize_segment_duration(segment_duration, default=6)
+    segment_duration = _normalize_segment_duration(segment_duration, default=2)
     client_dir       = safe_client_dir(client_id)
     os.makedirs(client_dir, exist_ok=True)
 
@@ -326,7 +326,7 @@ async def cleanup_hls_files(
 ):
     client_id        = payload.client_id
     keep_files       = payload.keep_files
-    segment_duration = _normalize_segment_duration(payload.segment_duration, default=6)
+    segment_duration = _normalize_segment_duration(payload.segment_duration, default=2)
     client_dir       = safe_client_dir(client_id)
 
     if not os.path.exists(client_dir):
@@ -423,6 +423,16 @@ def get_last_segment_info(
     }
 
 
+
+def _guess_target_duration_from_manifest(lines: List[str]) -> Optional[int]:
+    for line in lines:
+        if line.startswith("#EXT-X-TARGETDURATION:"):
+            try:
+                return int(line.split(":", 1)[1])
+            except Exception:
+                return None
+    return None
+
 # ---------------------------------------------------------------------------
 # Health check
 # ---------------------------------------------------------------------------
@@ -442,22 +452,47 @@ def health_check(
         return {"online": False, "has_segments": False, "is_stale": False, "last_update": None, "message": "Manifest ikke fundet"}
 
     try:
-        files        = os.listdir(client_dir)
-        has_segments = any(
-            f.startswith("segment_") and (f.endswith(".ts") or f.endswith(".mp4"))
-            for f in files
-        )
-        if has_segments:
-            mtime       = os.path.getmtime(manifest_path)
+        with open(manifest_path, "r", encoding="utf-8") as m3u:
+            manifest_lines = [line.strip() for line in m3u if line.strip()]
+
+        manifest_segments = [line for line in manifest_lines if line.startswith("segment_")]
+        existing_manifest_segments = [
+            seg for seg in manifest_segments
+            if os.path.exists(os.path.join(client_dir, seg))
+            and os.path.getsize(os.path.join(client_dir, seg)) > 1000
+        ]
+
+        if existing_manifest_segments:
+            last_seg = existing_manifest_segments[-1]
+            seg_path = os.path.join(client_dir, last_seg)
+            mtime = os.path.getmtime(seg_path)
             last_update = datetime.fromtimestamp(mtime, tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
             age_seconds = time.time() - mtime
-            is_stale    = age_seconds > MANIFEST_STALE_SECONDS
+            is_stale = age_seconds > MANIFEST_STALE_SECONDS
             return {
-                "online": True, "has_segments": True, "is_stale": is_stale,
+                "online": True,
+                "has_segments": True,
+                "is_stale": is_stale,
                 "last_update": last_update,
-                "message": "Stream er forældet — klienten svarer ikke" if is_stale else "Stream er aktiv"
+                "age_seconds": round(age_seconds, 2),
+                "segment_count": len(existing_manifest_segments),
+                "manifest_segment_count": len(manifest_segments),
+                "latest_segment": last_seg,
+                "target_duration": _guess_target_duration_from_manifest(manifest_lines),
+                "message": "Stream er forældet — klienten svarer ikke" if is_stale else "Stream er aktiv",
             }
-        return {"online": True, "has_segments": False, "is_stale": False, "last_update": None, "message": "Ingen segmenter endnu"}
+
+        # Manifest findes, men peger ikke på eksisterende segmenter.
+        # Det er typisk et cleanup/path-problem, og bør ikke ligne aktiv stream.
+        return {
+            "online": True,
+            "has_segments": False,
+            "is_stale": False,
+            "last_update": None,
+            "segment_count": 0,
+            "manifest_segment_count": len(manifest_segments),
+            "message": "Manifest findes, men segmentfiler mangler",
+        }
     except Exception as e:
         return {"online": False, "has_segments": False, "is_stale": False, "last_update": None, "message": f"Fejl: {str(e)}"}
 
