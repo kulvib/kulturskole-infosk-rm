@@ -49,6 +49,8 @@ export default function RemoteDesktop() {
   const wsRef = useRef(null);
   const imgRef = useRef(null);
   const containerRef = useRef(null);
+  const mouseDownRef = useRef(false);
+  const lastMouseMoveSentRef = useRef(0);
 
   const [connected, setConnected] = useState(false);
   const [agentConnected, setAgentConnected] = useState(false);
@@ -59,6 +61,7 @@ export default function RemoteDesktop() {
   const [screenSize, setScreenSize] = useState({ width: null, height: null });
   const [lastFrameTs, setLastFrameTs] = useState(null);
   const [textToType, setTextToType] = useState("");
+  const [keyboardEnabled, setKeyboardEnabled] = useState(false);
 
   const canControl = connected && agentConnected && sessionId;
 
@@ -218,47 +221,91 @@ export default function RemoteDesktop() {
     };
   }, [screenSize]);
 
-  const handleClick = useCallback((event) => {
+  const focusRemoteDesktop = useCallback(() => {
+    try {
+      containerRef.current?.focus();
+    } catch {}
+  }, []);
+
+  const sendMouseEvent = useCallback((event, action, extra = {}) => {
     if (!canControl) return;
     const pos = getRemoteCoordinates(event);
     if (!pos) return;
 
     send({
       type: "mouse",
-      action: event.detail >= 2 ? "double_click" : "click",
+      action,
       ...pos,
+      ...extra,
     });
   }, [canControl, getRemoteCoordinates, send]);
+
+  const handleMouseDown = useCallback((event) => {
+    if (!canControl) return;
+    event.preventDefault();
+    event.stopPropagation();
+    focusRemoteDesktop();
+
+    const button = event.button === 2 ? 3 : 1;
+    mouseDownRef.current = button === 1;
+
+    sendMouseEvent(event, "down", { button });
+  }, [canControl, focusRemoteDesktop, sendMouseEvent]);
+
+  const handleMouseUp = useCallback((event) => {
+    if (!canControl) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const button = event.button === 2 ? 3 : 1;
+    sendMouseEvent(event, "up", { button });
+
+    if (button === 1) {
+      mouseDownRef.current = false;
+    }
+  }, [canControl, sendMouseEvent]);
+
+  const handleDoubleClick = useCallback((event) => {
+    if (!canControl) return;
+    event.preventDefault();
+    event.stopPropagation();
+    sendMouseEvent(event, "double_click");
+  }, [canControl, sendMouseEvent]);
 
   const handleContextMenu = useCallback((event) => {
     event.preventDefault();
     if (!canControl) return;
-    const pos = getRemoteCoordinates(event);
-    if (!pos) return;
-
-    send({
-      type: "mouse",
-      action: "right_click",
-      ...pos,
-    });
-  }, [canControl, getRemoteCoordinates, send]);
+    event.stopPropagation();
+    sendMouseEvent(event, "right_click");
+  }, [canControl, sendMouseEvent]);
 
   const handleMouseMove = useCallback((event) => {
     if (!canControl) return;
     const pos = getRemoteCoordinates(event);
     if (!pos) return;
-    // Throttle simpelt via timestamp på elementet.
+
     const now = Date.now();
-    const last = Number(imgRef.current?.dataset?.lastMove || "0");
-    if (now - last < 80) return;
-    if (imgRef.current) imgRef.current.dataset.lastMove = String(now);
+    const throttleMs = mouseDownRef.current ? 25 : 80;
+    if (now - lastMouseMoveSentRef.current < throttleMs) return;
+    lastMouseMoveSentRef.current = now;
 
     send({
       type: "mouse",
       action: "move",
       ...pos,
+      dragging: mouseDownRef.current,
     });
   }, [canControl, getRemoteCoordinates, send]);
+
+  const handleMouseLeave = useCallback((event) => {
+    if (!canControl) return;
+    if (!mouseDownRef.current) return;
+
+    // Hvis musen forlader billedet mens venstre knap er nede, slipper vi den
+    // på klienten, så et vindue ikke bliver ved med at hænge fast.
+    sendMouseEvent(event, "up", { button: 1 });
+    mouseDownRef.current = false;
+  }, [canControl, sendMouseEvent]);
 
   const handleWheel = useCallback((event) => {
     if (!canControl) return;
@@ -284,6 +331,61 @@ export default function RemoteDesktop() {
     const el = containerRef.current;
     if (el?.requestFullscreen) el.requestFullscreen();
   }, []);
+
+  const mapBrowserKeyToXdotool = useCallback((key) => {
+    const keyMap = {
+      Enter: "Return",
+      Escape: "Escape",
+      Backspace: "BackSpace",
+      Delete: "Delete",
+      Tab: "Tab",
+      ArrowUp: "Up",
+      ArrowDown: "Down",
+      ArrowLeft: "Left",
+      ArrowRight: "Right",
+      Home: "Home",
+      End: "End",
+      PageUp: "Page_Up",
+      PageDown: "Page_Down",
+      Insert: "Insert",
+      " ": "space",
+    };
+
+    if (keyMap[key]) return keyMap[key];
+    if (/^F\d{1,2}$/.test(key)) return key;
+    if (key.length === 1) return key.toLowerCase();
+    return key;
+  }, []);
+
+  const handleRemoteKeyDown = useCallback((event) => {
+    if (!keyboardEnabled || !canControl) return;
+
+    const targetTag = String(event.target?.tagName || "").toLowerCase();
+    if (["input", "textarea", "select"].includes(targetTag)) return;
+
+    // Undgå at browseren selv scroller/navigerer, når tastaturet bruges til klienten.
+    event.preventDefault();
+    event.stopPropagation();
+
+    const hasModifier = event.ctrlKey || event.altKey || event.metaKey;
+
+    // Almindelig tekst sendes som tekst, så æ/ø/å og tegn fungerer bedre.
+    if (!hasModifier && event.key && event.key.length === 1) {
+      send({ type: "text", text: event.key });
+      return;
+    }
+
+    let key = mapBrowserKeyToXdotool(event.key);
+
+    const parts = [];
+    if (event.ctrlKey) parts.push("ctrl");
+    if (event.altKey) parts.push("alt");
+    if (event.shiftKey && (hasModifier || key.length > 1)) parts.push("shift");
+    if (event.metaKey) parts.push("super");
+    parts.push(key);
+
+    send({ type: "key", key: parts.join("+") });
+  }, [keyboardEnabled, canControl, send, mapBrowserKeyToXdotool]);
 
   return (
     <Container maxWidth="xl" sx={{ py: 2 }}>
@@ -312,10 +414,23 @@ export default function RemoteDesktop() {
           <Button onClick={requestFullscreen} startIcon={<FullscreenIcon />} variant="outlined">
             Fuld skærm
           </Button>
+          <Button
+            disabled={!canControl}
+            onClick={() => {
+              setKeyboardEnabled((prev) => !prev);
+              setTimeout(focusRemoteDesktop, 50);
+            }}
+            startIcon={<KeyboardIcon />}
+            variant={keyboardEnabled ? "contained" : "outlined"}
+            color={keyboardEnabled ? "success" : "inherit"}
+          >
+            Tastatur {keyboardEnabled ? "til" : "fra"}
+          </Button>
         </Stack>
 
         <Alert severity="warning">
           Remote desktop - Klient ID: {clientId || "Ukendt"} - Lokation: {client?.locality || "Ikke angivet"}
+          {keyboardEnabled ? " · Tastatur aktivt" : " · Klik “Tastatur fra” for at aktivere tastatur"}
         </Alert>
 
         {error && (
@@ -327,12 +442,17 @@ export default function RemoteDesktop() {
         <Paper
           ref={containerRef}
           elevation={3}
+          tabIndex={0}
+          onKeyDown={handleRemoteKeyDown}
+          onClick={focusRemoteDesktop}
           sx={{
             bgcolor: "#111",
             p: 1,
             borderRadius: 2,
             overflow: "auto",
             minHeight: 360,
+            outline: keyboardEnabled ? "2px solid" : "none",
+            outlineColor: keyboardEnabled ? "primary.main" : "transparent",
           }}
         >
           {!frameSrc ? (
@@ -357,9 +477,12 @@ export default function RemoteDesktop() {
                   ref={imgRef}
                   src={frameSrc}
                   alt="Remote desktop"
-                  onClick={handleClick}
+                  onMouseDown={handleMouseDown}
+                  onMouseUp={handleMouseUp}
+                  onDoubleClick={handleDoubleClick}
                   onContextMenu={handleContextMenu}
                   onMouseMove={handleMouseMove}
+                  onMouseLeave={handleMouseLeave}
                   onWheel={handleWheel}
                   sx={{
                     maxWidth: "100%",
@@ -367,6 +490,7 @@ export default function RemoteDesktop() {
                     cursor: canControl ? "crosshair" : "not-allowed",
                     borderRadius: 1,
                     userSelect: "none",
+                    touchAction: "none",
                   }}
                   draggable={false}
                 />
@@ -401,6 +525,12 @@ export default function RemoteDesktop() {
               </Typography>
             </Stack>
 
+            <Alert severity={keyboardEnabled ? "success" : "info"}>
+              {keyboardEnabled
+                ? "Dit tastatur sendes nu til klienten, når remote desktop-billedet har fokus."
+                : "Aktivér “Tastatur fra”-knappen øverst, og klik derefter på skærmbilledet for at bruge dit eget tastatur."}
+            </Alert>
+
             <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
               <Button disabled={!canControl} variant="outlined" onClick={() => sendKey("F5")}>F5</Button>
               <Button disabled={!canControl} variant="outlined" onClick={() => sendKey("ctrl+r")}>Ctrl+R</Button>
@@ -419,6 +549,7 @@ export default function RemoteDesktop() {
                 fullWidth
                 disabled={!canControl}
                 onKeyDown={(e) => {
+                  e.stopPropagation();
                   if (e.key === "Enter") {
                     e.preventDefault();
                     sendText();
@@ -433,7 +564,7 @@ export default function RemoteDesktop() {
             <Stack direction="row" spacing={1} alignItems="center">
               <MouseIcon fontSize="small" />
               <Typography variant="caption" color="text.secondary">
-                Mus: venstreklik, dobbeltklik, højreklik og scroll på skærmbilledet.
+                Mus: venstreklik, dobbeltklik, højreklik, scroll og træk vinduer rundt med hold-og-slip.
               </Typography>
             </Stack>
           </Stack>
