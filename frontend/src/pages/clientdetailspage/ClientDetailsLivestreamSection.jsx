@@ -10,9 +10,14 @@ import { useTheme, alpha } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
 import { apiUrl } from "../../api";
 
-const HEALTH_POLL_MS = 2000;
-const LAST_SEGMENT_POLL_MS = 2000;
-const AUTO_RECONNECT_DELAY_MS = 3000;
+const HEALTH_POLL_MS = 1000;
+const LAST_SEGMENT_POLL_MS = 1000;
+const AUTO_RECONNECT_DELAY_MS = 2000;
+
+// Low-latency regular HLS target. Med 2s segmenter giver det typisk 5-10s end-to-end.
+const HLS_LIVE_SYNC_SECONDS = 3;
+const HLS_MAX_LATENCY_SECONDS = 8;
+const HLS_CATCH_UP_SEEK_SECONDS = 10;
 
 function getAuthHeaders() {
   const token = localStorage.getItem("token");
@@ -121,7 +126,7 @@ export default function ClientDetailsLivestreamSection({
   const [error, setError]                       = useState("");
   const [buffering, setBuffering]               = useState(false);
   const [currentSegNum, setCurrentSegNum]       = useState(null);
-  const [fragDuration, setFragDuration]         = useState(8);
+  const [fragDuration, setFragDuration]         = useState(2);
   const [lastSegNum, setLastSegNum]             = useState(null);
   const [lastSegmentLag, setLastSegmentLag]     = useState(null);
   const [lastSegmentTimestamp, setLastSegmentTimestamp] = useState(null);
@@ -174,7 +179,7 @@ export default function ClientDetailsLivestreamSection({
     setError("");
     setBuffering(false);
     setCurrentSegNum(null);
-    setFragDuration(8);
+    setFragDuration(2);
     setLastSegNum(null);
     setLastSegmentLag(null);
     setLastSegmentTimestamp(null);
@@ -318,16 +323,24 @@ export default function ClientDetailsLivestreamSection({
 
     if (Hls.isSupported()) {
       const hls = new Hls({
-        liveSyncDurationCount:        3,
-        liveMaxLatencyDurationCount:  5,
-        initialLiveManifestSize:      3,
-        maxBufferLength:              20,
-        maxMaxBufferLength:           30,
-        liveBackBufferLength:         8,
+        // Vi bruger almindelig HLS med korte segmenter, ikke LL-HLS.
+        // liveSyncDuration holder browseren tættere på live edge end den gamle 3x8s-buffer.
+        liveSyncDuration:             HLS_LIVE_SYNC_SECONDS,
+        liveMaxLatencyDuration:       HLS_MAX_LATENCY_SECONDS,
+        initialLiveManifestSize:      1,
+        maxBufferLength:              6,
+        maxMaxBufferLength:           10,
+        backBufferLength:             0,
+        liveBackBufferLength:         0,
+        maxLiveSyncPlaybackRate:      1.25,
         enableWorker:                 true,
         startLevel:                   -1,
         lowLatencyMode:               false,
         forceKeyFrameOnDiscontinuity: false,
+        manifestLoadingTimeOut:       5000,
+        manifestLoadingMaxRetry:      4,
+        fragLoadingTimeOut:           10000,
+        fragLoadingMaxRetry:          4,
       });
 
       hlsRef.current = hls;
@@ -346,6 +359,20 @@ export default function ClientDetailsLivestreamSection({
         setManifestReady(true);
         setError("");
         playTimeout = setTimeout(() => video.play().catch(() => {}), 100);
+      });
+
+      hls.on(Hls.Events.LEVEL_LOADED, () => {
+        // Hvis browseren driver for langt bagud, spring tættere på live edge.
+        // Det holder forsinkelsen nede efter netværkshak uden at genstarte hele HLS-instansen.
+        try {
+          const livePos = hls.liveSyncPosition;
+          if (Number.isFinite(livePos) && Number.isFinite(video.currentTime)) {
+            const behind = livePos - video.currentTime;
+            if (behind > HLS_CATCH_UP_SEEK_SECONDS) {
+              video.currentTime = Math.max(0, livePos - 0.25);
+            }
+          }
+        } catch {}
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
@@ -370,6 +397,15 @@ export default function ClientDetailsLivestreamSection({
           if (data.frag.duration > 0) setFragDuration(data.frag.duration);
           setError("");
         }
+        try {
+          const livePos = hls.liveSyncPosition;
+          if (Number.isFinite(livePos) && Number.isFinite(video.currentTime)) {
+            const behind = livePos - video.currentTime;
+            if (behind > HLS_CATCH_UP_SEEK_SECONDS) {
+              video.currentTime = Math.max(0, livePos - 0.25);
+            }
+          }
+        } catch {}
       });
 
       return () => {
