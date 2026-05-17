@@ -536,11 +536,6 @@ export default function RemoteDesktop() {
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
               Shout out
             </Typography>
-
-            <Alert severity="info">
-              Send en stor besked direkte på klientens skærm. Den forsvinder automatisk efter få sekunder.
-            </Alert>
-
             <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
               <TextField
                 label="Shout out besked"
