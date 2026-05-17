@@ -8,6 +8,7 @@ import ClientDetailsActionsSection from "./DetailsActionsSection";
 import ClientDetailsLivestreamSection from "./ClientDetailsLivestreamSection";
 import ClientCalendarDialog from "../calendarpage/ClientCalendarDialog";
 import ClientTerminalDialog from "./terminal/ClientTerminalDialog";
+import ClientSecretAdminSection from "./ClientSecretAdminSection";
 
 import {
   getChromeStatus,
@@ -466,6 +467,13 @@ export default function ClientDetailsPage({
         />
 
         {/* 4 */}
+        <ClientSecretAdminSection
+          clientId={client?.id}
+          clientName={client?.name}
+          showSnackbar={showSnackbar}
+        />
+
+        {/* 5 */}
         <ClientDetailsActionsSection
           clientId={client?.id}
           clientState={effectiveClientState}
