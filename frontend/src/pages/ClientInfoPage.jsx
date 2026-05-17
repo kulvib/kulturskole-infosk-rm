@@ -23,6 +23,7 @@ import {
   DialogContent,
   DialogActions,
   Chip,
+  TextField,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -312,6 +313,7 @@ export default function ClientInfoPage() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmClientId, setConfirmClientId] = useState(null);
+  const [confirmDeleteText, setConfirmDeleteText] = useState("");
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -428,6 +430,7 @@ export default function ClientInfoPage() {
 
   const openRemoveDialog = useCallback((clientId) => {
     setConfirmClientId(clientId);
+    setConfirmDeleteText("");
     setConfirmOpen(true);
   }, []);
 
@@ -435,6 +438,7 @@ export default function ClientInfoPage() {
     if (removingClientId) return;
     setConfirmOpen(false);
     setConfirmClientId(null);
+    setConfirmDeleteText("");
   }, [removingClientId]);
 
   const handleRemoveClient = useCallback(
@@ -455,6 +459,7 @@ export default function ClientInfoPage() {
         showSnackbar("Klient fjernet!", "success");
         setConfirmOpen(false);
         setConfirmClientId(null);
+        setConfirmDeleteText("");
 
         // Hent endelig sandhed fra backend.
         await fetchClients(true, false);
@@ -652,6 +657,22 @@ export default function ClientInfoPage() {
     [isAdmin, getSchoolName, openRemoveDialog, removingClientId]
   );
 
+  const removalRequiresTypedId =
+    !!selectedClientForRemoval &&
+    (
+      selectedClientForRemoval.status === "approved" ||
+      selectedClientForRemoval.isOnline
+    );
+
+  const removalTypedIdMatches =
+    !removalRequiresTypedId ||
+    String(confirmDeleteText).trim() === String(selectedClientForRemoval?.id ?? "");
+
+  const canConfirmRemoval =
+    !!selectedClientForRemoval &&
+    !removingClientId &&
+    removalTypedIdMatches;
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -690,10 +711,12 @@ export default function ClientInfoPage() {
       <Dialog open={confirmOpen} onClose={closeRemoveDialog} maxWidth="sm" fullWidth>
         <DialogTitle>Fjern klient?</DialogTitle>
         <DialogContent>
-          <Stack spacing={1}>
-            <Typography>
-              Vil du virkelig fjerne denne klient? Dette kan ikke fortrydes.
-            </Typography>
+          <Stack spacing={1.5}>
+            <MuiAlert severity="warning">
+              Dette sletter kun klienten i backend. Den fysiske Ubuntu-maskine
+              bliver ikke nulstillet, og hvis den skal bruges igen, skal den
+              enrolles/installationsregistreres på ny.
+            </MuiAlert>
 
             {selectedClientForRemoval && (
               <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "rgba(0,0,0,0.02)" }}>
@@ -704,16 +727,43 @@ export default function ClientInfoPage() {
                   Status: {selectedClientForRemoval.status || "ukendt"}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
+                  Online: {selectedClientForRemoval.isOnline ? "Ja" : "Nej"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
                   Lokation: {getClientLocality(selectedClientForRemoval) || "ikke angivet"}
                 </Typography>
               </Paper>
             )}
 
             {selectedClientForRemoval?.isOnline && (
-              <MuiAlert severity="warning">
-                Klienten ser ud til at være online. Hvis agenten stadig kører,
-                kan den muligvis registrere sig igen senere.
+              <MuiAlert severity="error">
+                Klienten ser ud til at være online. Slet kun en online klient,
+                hvis du er sikker på, at den skal fjernes fra driften.
               </MuiAlert>
+            )}
+
+            {selectedClientForRemoval?.status === "approved" && (
+              <MuiAlert severity="info">
+                Klienten er godkendt. Hvis den slettes ved en fejl, skal den
+                oprettes igen med en ny installationskode og godkendes på ny.
+              </MuiAlert>
+            )}
+
+            {removalRequiresTypedId && selectedClientForRemoval && (
+              <TextField
+                size="small"
+                fullWidth
+                label={`Skriv klient-ID ${selectedClientForRemoval.id} for at bekræfte`}
+                value={confirmDeleteText}
+                onChange={(e) => setConfirmDeleteText(e.target.value)}
+                disabled={!!removingClientId}
+                error={!!confirmDeleteText && !removalTypedIdMatches}
+                helperText={
+                  removalTypedIdMatches
+                    ? " "
+                    : "Klient-ID matcher ikke."
+                }
+              />
             )}
           </Stack>
         </DialogContent>
@@ -725,7 +775,7 @@ export default function ClientInfoPage() {
             onClick={confirmRemoveClient}
             color="error"
             variant="contained"
-            disabled={!!removingClientId}
+            disabled={!canConfirmRemoval}
             startIcon={
               removingClientId ? (
                 <CircularProgress size={18} color="inherit" />
@@ -734,7 +784,7 @@ export default function ClientInfoPage() {
               )
             }
           >
-            {removingClientId ? "Fjerner..." : "Fjern"}
+            {removingClientId ? "Fjerner..." : "Fjern klient"}
           </Button>
         </DialogActions>
       </Dialog>
