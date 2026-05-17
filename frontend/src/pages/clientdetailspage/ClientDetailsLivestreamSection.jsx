@@ -93,11 +93,25 @@ function formatDateTimeWithDay(date) {
 }
 
 function getLagStatus(lag) {
-  if (lag == null) return { text: "Beregner forsinkelse …", color: "#888" };
-  if (lag < 8)   return { text: "Live",                                             color: "#43a047" };
-  if (lag < 35)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#43a047" };
-  if (lag < 70)  return { text: `Stream er ${Math.round(lag)} sekunder forsinket`, color: "#f90"    };
-  return           { text: `Stream er ${Math.round(lag)} sekunder forsinket`,       color: "#e53935" };
+  if (lag == null) {
+    return { text: "Beregner forsinkelse …", color: "#888" };
+  }
+
+  const rounded = Math.round(lag);
+
+  if (lag < 3) {
+    return { text: "Live", color: "#43a047" };
+  }
+
+  if (lag < 10) {
+    return { text: `Næsten live · ${rounded} sek. forsinket`, color: "#43a047" };
+  }
+
+  if (lag < 20) {
+    return { text: `Stream er ${rounded} sekunder forsinket`, color: "#f90" };
+  }
+
+  return { text: `Stream er ${rounded} sekunder forsinket`, color: "#e53935" };
 }
 
 function formatLagValue(val) {
