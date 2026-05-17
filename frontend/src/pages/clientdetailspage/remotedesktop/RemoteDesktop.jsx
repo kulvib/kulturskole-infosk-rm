@@ -60,8 +60,8 @@ export default function RemoteDesktop() {
   const [frameSrc, setFrameSrc] = useState("");
   const [screenSize, setScreenSize] = useState({ width: null, height: null });
   const [lastFrameTs, setLastFrameTs] = useState(null);
-  const [textToType, setTextToType] = useState("");
   const [keyboardEnabled, setKeyboardEnabled] = useState(false);
+  const [shoutText, setShoutText] = useState("");
 
   const canControl = connected && agentConnected && sessionId;
 
@@ -321,11 +321,18 @@ export default function RemoteDesktop() {
     send({ type: "key", key });
   }, [send]);
 
-  const sendText = useCallback(() => {
-    if (!textToType) return;
-    send({ type: "text", text: textToType });
-    setTextToType("");
-  }, [send, textToType]);
+  const sendShout = useCallback(() => {
+    const message = shoutText.trim();
+    if (!message) return;
+
+    send({
+      type: "shout",
+      text: message,
+      duration: 8,
+    });
+
+    setShoutText("");
+  }, [send, shoutText]);
 
   const requestFullscreen = useCallback(() => {
     const el = containerRef.current;
@@ -430,7 +437,9 @@ export default function RemoteDesktop() {
 
         <Alert severity="warning">
           Remote desktop - Klient ID: {clientId || "Ukendt"} - Lokation: {client?.locality || "Ikke angivet"}
-          {keyboardEnabled ? " · Tastatur aktivt" : " · Klik “Tastatur fra” for at aktivere tastatur"}
+          {keyboardEnabled
+            ? " · Tastatur aktivt"
+            : " · Aktiver “Tastatur fra”-knappen og klik derefter på skærmbilledet for at bruge dit eget tastatur."}
         </Alert>
 
         {error && (
@@ -518,54 +527,39 @@ export default function RemoteDesktop() {
 
         <Paper elevation={1} sx={{ p: 2 }}>
           <Stack spacing={1.5}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <KeyboardIcon />
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                Tastatur
-              </Typography>
-            </Stack>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+              Shout out
+            </Typography>
 
-            <Alert severity={keyboardEnabled ? "success" : "info"}>
-              {keyboardEnabled
-                ? "Dit tastatur sendes nu til klienten, når remote desktop-billedet har fokus."
-                : "Aktivér “Tastatur fra”-knappen øverst, og klik derefter på skærmbilledet for at bruge dit eget tastatur."}
+            <Alert severity="info">
+              Send en stor besked direkte på klientens skærm. Den forsvinder automatisk efter få sekunder.
             </Alert>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-              <Button disabled={!canControl} variant="outlined" onClick={() => sendKey("F5")}>F5</Button>
-              <Button disabled={!canControl} variant="outlined" onClick={() => sendKey("ctrl+r")}>Ctrl+R</Button>
-              <Button disabled={!canControl} variant="outlined" onClick={() => sendKey("Escape")}>Escape</Button>
-              <Button disabled={!canControl} variant="outlined" onClick={() => sendKey("Return")}>Enter</Button>
-              <Button disabled={!canControl} variant="outlined" onClick={() => sendKey("BackSpace")}>Backspace</Button>
-              <Button disabled={!canControl} variant="outlined" color="warning" onClick={() => sendKey("alt+F4")}>Alt+F4</Button>
-            </Stack>
-
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
               <TextField
-                label="Skriv tekst på klient"
-                value={textToType}
-                onChange={(e) => setTextToType(e.target.value)}
+                label="Shout out besked"
+                value={shoutText}
+                onChange={(e) => setShoutText(e.target.value)}
                 size="small"
                 fullWidth
                 disabled={!canControl}
+                inputProps={{ maxLength: 120 }}
                 onKeyDown={(e) => {
                   e.stopPropagation();
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    sendText();
+                    sendShout();
                   }
                 }}
               />
-              <Button disabled={!canControl || !textToType} variant="contained" onClick={sendText} startIcon={<KeyboardIcon />}>
-                Send tekst
+              <Button
+                disabled={!canControl || !shoutText.trim()}
+                variant="contained"
+                color="warning"
+                onClick={sendShout}
+              >
+                Send shout out
               </Button>
-            </Stack>
-
-            <Stack direction="row" spacing={1} alignItems="center">
-              <MouseIcon fontSize="small" />
-              <Typography variant="caption" color="text.secondary">
-                Mus: venstreklik, dobbeltklik, højreklik, scroll og træk vinduer rundt med hold-og-slip.
-              </Typography>
             </Stack>
           </Stack>
         </Paper>
