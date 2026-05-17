@@ -15,6 +15,9 @@ services:
     healthCheckPath: /health
 
     envVars:
+      - key: ENVIRONMENT
+        value: "production"
+
       - key: SECRET_KEY
         sync: false
 
@@ -49,6 +52,20 @@ services:
       # Hvis du senere bruger Render Disk, så mount disken på samme path.
       - key: HLS_BASE_DIR
         value: "/opt/render/project/src/backend/service1/hls"
+
+      # Low-latency HLS:
+      # Manifestet skal være kort, så browseren ikke ligger langt bag live edge.
+      - key: HLS_MANIFEST_KEEP_N
+        value: "8"
+
+      # Hvor hurtigt backend markerer streamen som stale, hvis der ikke kommer nye segmenter.
+      # Med 2s segmenter er 12s et godt udgangspunkt.
+      - key: HLS_STALE_SECONDS
+        value: "12"
+
+      # Bagudkompatibel alias, hvis noget backend-kode bruger HLS_KEEP_N.
+      - key: HLS_KEEP_N
+        value: "8"
 
       # Sætter Python til ikke at buffe stdout/stderr, så logs vises hurtigt.
       - key: PYTHONUNBUFFERED
