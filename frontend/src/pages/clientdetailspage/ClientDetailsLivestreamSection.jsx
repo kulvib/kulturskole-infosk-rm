@@ -41,6 +41,38 @@ async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
   throw lastError || new Error("All retry attempts failed");
 }
 
+async function sendLivestreamCommand(clientId, action) {
+  if (!clientId) throw new Error("Mangler klient-id");
+
+  const resp = await fetch(
+    `${apiUrl}/api/clients/${encodeURIComponent(clientId)}/chrome-command`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({ action, source: "actionbutton" }),
+      signal: AbortSignal.timeout(8000),
+    }
+  );
+
+  let data = null;
+  try {
+    data = await resp.json();
+  } catch {
+    // ignore empty/non-json response
+  }
+
+  if (!resp.ok) {
+    throw new Error(data?.detail || data?.message || `Kunne ikke sende ${action} (${resp.status})`);
+  }
+
+  return data;
+}
+
 function formatDateTimeWithDay(date) {
   if (!date) return "";
   const ukedage = ["Søndag","Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag"];
@@ -98,6 +130,11 @@ export default function ClientDetailsLivestreamSection({
   const [localRefreshKey, setLocalRefreshKey]   = useState(0);
   const [refreshing, setRefreshing]             = useState(false);
   const [streamStale, setStreamStale]           = useState(false);
+  const [autoStartStatus, setAutoStartStatus]   = useState("");
+  const [autoStartError, setAutoStartError]     = useState("");
+
+  const autoStartRequestedRef = useRef(false);
+  const autoStartInFlightRef  = useRef(false);
 
   const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -143,7 +180,40 @@ export default function ClientDetailsLivestreamSection({
     setLastSegmentTimestamp(null);
     setLastFetched(null);
     setStreamStale(false);
+    setAutoStartError("");
   }, []);
+
+
+  const ensureStreamStarted = useCallback(async (reason = "auto", { force = false } = {}) => {
+    if (!clientId || clientOnline === false) return false;
+    if (!force && autoStartRequestedRef.current) return false;
+    if (autoStartInFlightRef.current) return false;
+
+    autoStartRequestedRef.current = true;
+    autoStartInFlightRef.current = true;
+    setAutoStartError("");
+    setAutoStartStatus(reason === "manual_refresh" ? "Genstarter livestream …" : "Starter livestream …");
+
+    try {
+      await sendLivestreamCommand(clientId, "livestream_start");
+      setAutoStartStatus("Livestream er bestilt — venter på segmenter …");
+      return true;
+    } catch (err) {
+      autoStartRequestedRef.current = false;
+      setAutoStartStatus("");
+      setAutoStartError(err?.message || "Kunne ikke starte livestream.");
+      return false;
+    } finally {
+      autoStartInFlightRef.current = false;
+    }
+  }, [clientId, clientOnline]);
+
+  useEffect(() => {
+    autoStartRequestedRef.current = false;
+    autoStartInFlightRef.current = false;
+    setAutoStartStatus("");
+    setAutoStartError("");
+  }, [clientId]);
 
   const wasOnlineRef = useRef(clientOnline !== false);
 
@@ -158,11 +228,13 @@ export default function ClientDetailsLivestreamSection({
     wasOnlineRef.current = isOnline;
 
     if (!isOnline) {
+      autoStartRequestedRef.current = false;
       resetStreamState();
       return undefined;
     }
 
     if (!wasOnline && isOnline) {
+      autoStartRequestedRef.current = false;
       resetStreamState();
       setRefreshing(true);
       setLocalRefreshKey((k) => k + 1);
@@ -191,10 +263,25 @@ export default function ClientDetailsLivestreamSection({
           if (resp.ok) {
             const data = await resp.json();
             if (data.has_segments && !data.is_stale) {
-              if (!stop) { setServerReady(true); setStreamStale(false); }
+              if (!stop) {
+                setServerReady(true);
+                setStreamStale(false);
+                setAutoStartStatus("");
+                setAutoStartError("");
+              }
               return;
             }
-            if (!stop) setStreamStale(data.has_segments && data.is_stale);
+
+            if (!stop) {
+              setStreamStale(data.has_segments && data.is_stale);
+            }
+
+            // Denne komponent er ansvarlig for at starte livestreamen.
+            // Hvis der ikke findes aktive segmenter, bestil livestream_start én gang
+            // og fortsæt derefter health-polling indtil segmenterne dukker op.
+            if (!stop && clientOnline !== false && (!data.has_segments || data.is_stale)) {
+              await ensureStreamStarted(data.is_stale ? "stale_stream" : "missing_segments");
+            }
           }
         } catch {}
         if (!stop) await new Promise(res => setTimeout(res, HEALTH_POLL_MS));
@@ -203,7 +290,7 @@ export default function ClientDetailsLivestreamSection({
 
     pollUntilReady();
     return () => { stop = true; };
-  }, [clientId, effectiveRefreshKey, clientOnline]);
+  }, [clientId, effectiveRefreshKey, clientOnline, ensureStreamStarted]);
 
   // -------------------------------------------------------------------------
   // HLS.js lifecycle
@@ -367,12 +454,15 @@ export default function ClientDetailsLivestreamSection({
   // -------------------------------------------------------------------------
   // Handlers
   // -------------------------------------------------------------------------
-  const handleRefreshClick = () => {
+  const handleRefreshClick = async () => {
     if (clientOnline === false) return;
 
+    autoStartRequestedRef.current = false;
     resetStreamState();
 
-    // Trigger fuld geninitialisering.
+    // Bestil/refresh selve klient-streamen og trigger derefter fuld HLS-geninitialisering.
+    await ensureStreamStarted("manual_refresh", { force: true });
+
     // effectiveRefreshKey kombinerer parent streamKey + localRefreshKey,
     // så dette virker også når parent har sendt streamKey.
     setRefreshing(true);
@@ -405,10 +495,14 @@ export default function ClientDetailsLivestreamSection({
   const lagStatus       = getLagStatus(manifestReady ? computedLag : null);
   const disabledOverlay = clientOnline === false ? { opacity: 0.65 } : {};
 
-  const loadingText = streamStale
-    ? "Stream er gået ned — venter på genstart …"
-    : !serverReady ? "Venter på at stream starter …"
-    : "Forbinder til stream …";
+  const loadingText = autoStartError
+    ? autoStartError
+    : autoStartStatus
+      ? autoStartStatus
+      : streamStale
+        ? "Stream er gået ned — venter på genstart …"
+        : !serverReady ? "Venter på at stream starter …"
+        : "Forbinder til stream …";
 
   // -------------------------------------------------------------------------
   // Render
@@ -454,8 +548,10 @@ export default function ClientDetailsLivestreamSection({
                 : lagStatus.text}
             </Typography>
 
-            {error && clientOnline !== false && (
-              <Alert severity="error" sx={{ mb: 1, fontSize: isMobile ? 12 : undefined }}>{error}</Alert>
+            {(error || autoStartError) && clientOnline !== false && (
+              <Alert severity="error" sx={{ mb: 1, fontSize: isMobile ? 12 : undefined }}>
+                {error || autoStartError}
+              </Alert>
             )}
           </Stack>
         </Grid>
@@ -587,6 +683,7 @@ export default function ClientDetailsLivestreamSection({
                 }}>
                   serverReady=<b>{serverReady ? "ja" : "nej"}</b>,{" "}
                   isStale=<b>{streamStale ? "ja" : "nej"}</b>,{" "}
+                  autoStart=<b>{autoStartStatus ? "ja" : "nej"}</b>,{" "}
                   manifestReady=<b>{manifestReady ? "ja" : "nej"}</b>
                 </Typography>
                 <Typography variant="caption" sx={{
