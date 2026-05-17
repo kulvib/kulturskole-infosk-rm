@@ -26,6 +26,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
+import AppRegistrationIcon from "@mui/icons-material/AppRegistration";
 import { useAuth } from "./auth/authcontext";
 import { getSchools } from "./api";
 
@@ -43,7 +44,7 @@ export default function Dashboard() {
   const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logoutUser, isAdmin } = useAuth();
+  const { user, logoutUser, isAdmin, isSuperadmin } = useAuth();
   const [schoolName, setSchoolName] = useState("");
 
   const drawerWidth = isMobile ? 160 : isTablet ? 190 : 230;
@@ -55,6 +56,9 @@ export default function Dashboard() {
     { text: "Skift adgangskode", path: "/skift-adgangskode", match: "/skift-adgangskode", icon: <VpnKeyIcon /> },
     ...(isAdmin
       ? [{ text: "Administration", path: "/administration", match: "/administration", icon: <AdminPanelSettingsIcon /> }]
+      : []),
+    ...(isSuperadmin
+      ? [{ text: "Installationskoder", path: "/installationskoder", match: "/installationskoder", icon: <AppRegistrationIcon /> }]
       : []),
   ];
 
