@@ -3,7 +3,7 @@ from sqlmodel import select, delete
 from typing import List, Optional
 from datetime import datetime, timedelta, date, timezone
 from db import get_session
-from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction, School, SchoolSeasonTimes
+from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction, School, SchoolSeasonTimes, EnrollmentToken
 from auth import get_current_user, get_current_admin_user, get_current_superadmin_user, get_current_user_or_client, require_client_self_or_user, principal_is_client, get_password_hash
 from models import utcnow
 import os
@@ -759,13 +759,45 @@ def revoke_client_secret(
 
 @router.delete("/clients/{id}/remove")
 async def remove_client(id: int, session=Depends(get_session), user=Depends(get_current_admin_user)):
+    """
+    Fjern en klient robust.
+
+    Enrollment-klienter kan være refereret fra EnrollmentToken.used_by_client_id.
+    Hvis vi sletter Client-rækken uden først at fjerne den reference, kan PostgreSQL
+    returnere foreign-key-fejl, hvilket tidligere gav HTTP 500 i frontend.
+
+    Vi beholder enrollment-token rækken som historik, men nulstiller linket til den
+    slettede klient.
+    """
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    session.exec(delete(CalendarMarking).where(CalendarMarking.client_id == client.id))
-    session.delete(client)
-    session.commit()
-    return {"ok": True}
+
+    try:
+        # Fjern kalender-markeringer for klienten.
+        session.exec(delete(CalendarMarking).where(CalendarMarking.client_id == client.id))
+
+        # Behold installationskode-historik, men fjern FK til klienten før sletning.
+        enrollment_tokens = session.exec(
+            select(EnrollmentToken).where(EnrollmentToken.used_by_client_id == client.id)
+        ).all()
+        for token in enrollment_tokens:
+            token.used_by_client_id = None
+            session.add(token)
+
+        session.delete(client)
+        session.commit()
+        return {
+            "ok": True,
+            "removed_client_id": id,
+            "unlinked_enrollment_tokens": len(enrollment_tokens),
+        }
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Kunne ikke fjerne klient {id}: {type(e).__name__}",
+        )
 
 
 @router.get("/clients/{id}/stream")
