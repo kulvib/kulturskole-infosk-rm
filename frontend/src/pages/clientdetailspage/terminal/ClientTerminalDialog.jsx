@@ -11,8 +11,15 @@ import {
   Alert,
   Chip,
   CircularProgress,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Divider,
+  Stack,
 } from "@mui/material";
 import TerminalIcon from "@mui/icons-material/Terminal";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { getTerminalBrowserWsUrl } from "../../../api";
 
 function nowTime() {
@@ -22,6 +29,106 @@ function nowTime() {
 function appendLine(setLines, line) {
   setLines((prev) => [...prev, line].slice(-800));
 }
+
+const SUPPORT_COMMAND_GROUPS = [
+  {
+    title: "Service-status",
+    commands: [
+      {
+        label: "ClientFlow services",
+        command:
+          "systemctl --no-pager --full status clientflow_service.service clientflow_calendar.service client_terminal_agent.service client_remote_desktop_agent.service",
+      },
+      {
+        label: "Aktive ClientFlow units",
+        command:
+          "systemctl list-units --all --type=service | grep -iE 'clientflow|terminal|remote|stream'",
+      },
+      {
+        label: "ClientFlow env uden password",
+        command:
+          "systemctl show clientflow_service.service -p Environment --no-pager | sed -E 's/CLIENTFLOW_PASSWORD=[^ ]+/CLIENTFLOW_PASSWORD=***/g'",
+      },
+    ],
+  },
+  {
+    title: "Logs",
+    commands: [
+      {
+        label: "Backend sync log",
+        command:
+          "journalctl -u clientflow_service.service -n 200 --no-pager -l",
+      },
+      {
+        label: "Kalender log",
+        command:
+          "journalctl -u clientflow_calendar.service -n 150 --no-pager -l",
+      },
+      {
+        label: "Terminal-agent log",
+        command:
+          "journalctl -u client_terminal_agent.service -n 150 --no-pager -l",
+      },
+      {
+        label: "Remote desktop-agent log",
+        command:
+          "journalctl -u client_remote_desktop_agent.service -n 150 --no-pager -l",
+      },
+      {
+        label: "Livestream-linjer fra backend sync",
+        command:
+          "journalctl -u clientflow_service.service -n 300 --no-pager -l | grep -iE 'livestream|hls|ffmpeg|segment|upload|fejl|error'",
+      },
+    ],
+  },
+  {
+    title: "Livestream",
+    commands: [
+      {
+        label: "Livestream-processer",
+        command:
+          "pgrep -af 'livestream.py|ffmpeg' || echo 'Ingen livestream/ffmpeg kører'",
+      },
+      {
+        label: "Seneste lokale segmenter",
+        command:
+          "ls -lah \"$HOME/api/segments\" 2>/dev/null | tail -30 || echo 'Ingen segments-mappe fundet'",
+      },
+      {
+        label: "Tjek segment_time",
+        command:
+          "pgrep -af 'ffmpeg' | grep -o -- '-segment_time [0-9.]*' || echo 'Ingen ffmpeg segment_time fundet'",
+      },
+      {
+        label: "Stop hængende livestream lokalt",
+        command:
+          "pkill -f \"$HOME/api/livestream.py\"; pkill -f 'ffmpeg .*segment_'; pgrep -af 'livestream.py|ffmpeg' || echo 'OK: livestream stoppet'",
+      },
+    ],
+  },
+  {
+    title: "System og netværk",
+    commands: [
+      {
+        label: "Disk, RAM og oppetid",
+        command: "df -h; echo; free -h; echo; uptime",
+      },
+      {
+        label: "IP-adresser",
+        command: "ip -br addr",
+      },
+      {
+        label: "Netværksenheder",
+        command: "nmcli device status 2>/dev/null || ip link",
+      },
+      {
+        label: "Chrome-processer",
+        command:
+          "pgrep -af 'chrome|chromium' || echo 'Ingen Chrome/Chromium-processer fundet'",
+      },
+    ],
+  },
+];
 
 export default function ClientTerminalDialog({ open, onClose, client }) {
   const [lines, setLines] = React.useState([]);
@@ -69,14 +176,19 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
         setAgentConnected(!!msg.client_connected);
         appendLine(
           setLines,
-          `[${nowTime()}] Session ${msg.session_id || "?"}. Agent: ${msg.client_connected ? "forbundet" : "ikke forbundet"}.`
+          `[${nowTime()}] Session ${msg.session_id || "?"}. Agent: ${
+            msg.client_connected ? "forbundet" : "ikke forbundet"
+          }.`
         );
         return;
       }
 
       if (msg.type === "agent_status") {
         setAgentConnected(!!msg.client_connected);
-        appendLine(setLines, `[${nowTime()}] Agent: ${msg.client_connected ? "forbundet" : "afbrudt"}.`);
+        appendLine(
+          setLines,
+          `[${nowTime()}] Agent: ${msg.client_connected ? "forbundet" : "afbrudt"}.`
+        );
         return;
       }
 
@@ -120,7 +232,12 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
       setAgentConnected(false);
       setRunning(false);
       if (!closedByComponent) {
-        appendLine(setLines, `[${nowTime()}] Forbindelsen blev lukket (${event.code}${event.reason ? `: ${event.reason}` : ""}).`);
+        appendLine(
+          setLines,
+          `[${nowTime()}] Forbindelsen blev lukket (${event.code}${
+            event.reason ? `: ${event.reason}` : ""
+          }).`
+        );
       }
     };
 
@@ -130,7 +247,9 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
 
     return () => {
       closedByComponent = true;
-      try { ws.close(); } catch {}
+      try {
+        ws.close();
+      } catch {}
       wsRef.current = null;
     };
   }, [open, client?.id]);
@@ -146,6 +265,18 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
     wsRef.current.send(JSON.stringify({ type: "run", command: cmd }));
     setCommand("");
   }, [command, running]);
+
+  const insertCommand = React.useCallback((cmd) => {
+    setCommand(cmd);
+  }, []);
+
+  const copyCommand = React.useCallback(async (cmd) => {
+    try {
+      await navigator.clipboard.writeText(cmd);
+    } catch {
+      // Clipboard kan være blokeret i nogle browsere. Ignorer.
+    }
+  }, []);
 
   const handleKeyDown = (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -173,7 +304,7 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
 
       <DialogContent>
         <Alert severity="warning" sx={{ mb: 1.5 }}>
-          Remote terminal shell adgang
+          Remote terminal shell-adgang. Bruges kun til support/fejlfinding.
         </Alert>
 
         <Typography variant="body2" sx={{ mb: 1, color: "text.secondary" }}>
@@ -183,7 +314,7 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
         <Box
           ref={outputRef}
           sx={{
-            height: { xs: 360, md: 520 },
+            height: { xs: 320, md: 440 },
             overflowY: "auto",
             bgcolor: "#0b0f14",
             color: "#d7e1ea",
@@ -222,6 +353,80 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
             {running ? <CircularProgress size={18} color="inherit" /> : "Kør"}
           </Button>
         </Box>
+
+        <Accordion sx={{ mt: 2 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box>
+              <Typography fontWeight={700}>Supportkommandoer</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Indsætter kommandoen i terminalfeltet. Den køres først, når du trykker “Kør”.
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Alert severity="info" sx={{ mb: 1.5 }}>
+              Logvisning er fjernet fra den lokale offentlige GUI. Brug denne superadmin-terminal
+              til support. Kommandoerne nedenfor forsøger at undgå at vise adgangskoder.
+            </Alert>
+
+            <Stack spacing={1.5}>
+              {SUPPORT_COMMAND_GROUPS.map((group) => (
+                <Box key={group.title}>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
+                    {group.title}
+                  </Typography>
+                  <Stack spacing={0.75}>
+                    {group.commands.map((item) => (
+                      <Box
+                        key={item.label}
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: { xs: "1fr", md: "180px 1fr auto auto" },
+                          gap: 0.75,
+                          alignItems: "center",
+                          p: 1,
+                          borderRadius: 1,
+                          bgcolor: "rgba(0,0,0,0.03)",
+                        }}
+                      >
+                        <Typography variant="body2" fontWeight={600}>
+                          {item.label}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontFamily:
+                              "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {item.command}
+                        </Typography>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => insertCommand(item.command)}
+                          disabled={!connected || !agentConnected || running}
+                        >
+                          Indsæt
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="text"
+                          startIcon={<ContentCopyIcon />}
+                          onClick={() => copyCommand(item.command)}
+                        >
+                          Kopiér
+                        </Button>
+                      </Box>
+                    ))}
+                  </Stack>
+                  <Divider sx={{ mt: 1.5 }} />
+                </Box>
+              ))}
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
       </DialogContent>
 
       <DialogActions>
