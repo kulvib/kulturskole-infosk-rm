@@ -637,3 +637,43 @@ export async function stopLivestream(clientId) {
     throw new Error(await extractError(res, "Kunne ikke stoppe livestream"));
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Installationskoder / Enrollment tokens
+// ---------------------------------------------------------------------------
+
+export async function createEnrollmentToken({ expires_in_hours = 72, note = null } = {}) {
+  const res = await fetch(`${apiUrl}/api/admin/enrollment-tokens`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    credentials: "include",
+    body: JSON.stringify({ expires_in_hours, note }),
+  });
+  if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
+  if (!res.ok)
+    throw new Error(await extractError(res, "Kunne ikke oprette installationskode"));
+  return res.json();
+}
+
+export async function getEnrollmentTokens() {
+  const res = await fetch(`${apiUrl}/api/admin/enrollment-tokens`, {
+    headers: authHeaders(),
+    credentials: "include",
+  });
+  if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
+  if (!res.ok)
+    throw new Error(await extractError(res, "Kunne ikke hente installationskoder"));
+  return res.json();
+}
+
+export async function revokeEnrollmentToken(id) {
+  const res = await fetch(`${apiUrl}/api/admin/enrollment-tokens/${encodeURIComponent(id)}/revoke`, {
+    method: "POST",
+    headers: authHeaders(),
+    credentials: "include",
+  });
+  if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
+  if (!res.ok)
+    throw new Error(await extractError(res, "Kunne ikke tilbagekalde installationskode"));
+  return res.json();
+}
