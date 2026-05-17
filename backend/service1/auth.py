@@ -445,16 +445,39 @@ def require_superadmin(user: User):
     return user
 
 
-def verify_ws_token(token: str, session: Session) -> Optional[User]:
-    """Validerer en JWT-token til WebSocket-forbindelser. Returnerer User eller None."""
+def verify_ws_token(token: str, session: Session) -> Optional[Union[User, Client]]:
+    """
+    Validerer JWT-token til WebSocket-forbindelser.
+
+    Returnerer enten User eller Client:
+    - Browser/frontend bruger almindeligt bruger-token.
+    - Installerede Ubuntu-agenter bruger client-token fra /auth/client-token.
+
+    Det er op til den konkrete WebSocket-route at afgøre, om User eller Client
+    må forbinde til ruten.
+    """
     if not token:
         return None
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if not username:
-            return None
     except InvalidTokenError:
+        return None
+
+    if payload.get("principal") == "client":
+        client_id = payload.get("client_id")
+        if client_id is None:
+            return None
+        try:
+            client_id = int(client_id)
+        except (TypeError, ValueError):
+            return None
+        client = session.get(Client, client_id)
+        if not client or client.client_secret_revoked_at is not None:
+            return None
+        return client
+
+    username: str = payload.get("sub")
+    if not username:
         return None
     user = session.exec(select(User).where(User.username == username)).first()
     if not user or not user.is_active:
