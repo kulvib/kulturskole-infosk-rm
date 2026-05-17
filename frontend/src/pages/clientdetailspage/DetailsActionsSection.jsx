@@ -37,6 +37,14 @@ import { useAuth } from "../../auth/authcontext";
   - Alle button colors er nu ændret til gyldige MUI-farver:
       primary, secondary, success, error, warning, info, inherit
   - Det forhindrer render-crash og gør at sektionen kan opdatere korrekt.
+
+  KNAP-LOGIK:
+  - Kiosk/system-knapper låses under igangværende actions.
+  - Terminal og Fjernskrivebord låses ikke af almindelige kiosk-actions.
+    De er supportværktøjer og skal kunne bruges til fejlfinding, mens fx
+    "Start kiosk browser" eller "Stop kiosk browser" kører.
+  - Terminal og Fjernskrivebord låses stadig, hvis klienten er offline eller
+    i en systemkritisk overgang som reboot/shutdown.
 */
 
 const BUSY_CHROME_STEPS = new Set([
@@ -124,9 +132,15 @@ const actionBtnStyle = {
   boxShadow: 1,
 };
 
-function ActionButton({ btn, isMobile, anyBusy }) {
+function ActionButton({ btn, isMobile, busy }) {
   const isActive = !!btn.loading;
-  const isDisabled = isActive || anyBusy || !!btn.disabled;
+  const lockDuringBusy = btn.lockDuringBusy !== false;
+  const isDisabled = isActive || !!btn.disabled || (lockDuringBusy && !!busy);
+
+  const tooltipText =
+    isDisabled && !isActive
+      ? btn.disabledTooltip || btn.tooltip || "Ikke tilgængelig"
+      : btn.tooltip || "";
 
   const button = (
     <span style={{ width: "100%" }}>
@@ -149,10 +163,7 @@ function ActionButton({ btn, isMobile, anyBusy }) {
   if (isMobile) return button;
 
   return (
-    <Tooltip
-      title={isDisabled && !isActive ? "Ikke tilgængelig" : (btn.tooltip || "")}
-      arrow
-    >
+    <Tooltip title={tooltipText} arrow>
       {button}
     </Tooltip>
   );
@@ -217,12 +228,20 @@ export default function ClientDetailsActionsSection({
     : null;
 
   const anyLoading = Object.values(actionLoading).some(Boolean);
-  const anyBusy =
+
+  // Almindelige kiosk/system-handlinger må låse hinanden for at undgå
+  // kolliderende handlinger som start+stop, sleep+reboot osv.
+  const actionPanelBusy =
     anyLoading ||
     !!refreshing ||
     clientActionPending ||
     hasPendingAction ||
     isLiveStepBusy;
+
+  // Supportværktøjer må ikke låses af almindelige kiosk-handlinger.
+  // Terminal/fjernskrivebord er netop nyttige, når start/stop hænger.
+  // De låses kun, når klienten er offline eller i en systemkritisk overgang.
+  const supportToolsDisabled = clientOnline === false || isSystemLocked;
 
   const notify = useCallback(
     (opts) => {
@@ -329,6 +348,7 @@ export default function ClientDetailsActionsSection({
       onClick: () => doAction("start"),
       loading: !!actionLoading["start"],
       disabled: isDisabledByState("start"),
+      lockDuringBusy: true,
       tooltip:
         chromeIsRunning === true
           ? "Kiosk browser kører allerede"
@@ -343,6 +363,7 @@ export default function ClientDetailsActionsSection({
       onClick: () => doAction("stop"),
       loading: !!actionLoading["stop"],
       disabled: isDisabledByState("stop"),
+      lockDuringBusy: true,
       tooltip:
         chromeIsRunning === false
           ? "Kiosk browser er allerede stoppet"
@@ -357,6 +378,7 @@ export default function ClientDetailsActionsSection({
       onClick: () => doAction("sleep"),
       loading: !!actionLoading["sleep"],
       disabled: isDisabledByState("sleep"),
+      lockDuringBusy: true,
       tooltip: "Sæt klient i dvale",
     },
     {
@@ -368,6 +390,7 @@ export default function ClientDetailsActionsSection({
       onClick: () => doAction("wakeup"),
       loading: !!actionLoading["wakeup"],
       disabled: isDisabledByState("wakeup"),
+      lockDuringBusy: true,
       tooltip: "Væk klient fra dvale",
     },
   ];
@@ -381,7 +404,8 @@ export default function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => doAction("reboot"),
       loading: !!actionLoading["reboot"],
-      disabled: clientOnline === false,
+      disabled: clientOnline === false || isSystemLocked,
+      lockDuringBusy: true,
       tooltip: "Genstart klient",
     },
     {
@@ -392,7 +416,8 @@ export default function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => setShutdownDialogOpen(true),
       loading: !!actionLoading["shutdown"],
-      disabled: clientOnline === false,
+      disabled: clientOnline === false || isSystemLocked,
+      lockDuringBusy: true,
       tooltip: "Sluk klient — kræver fysisk tænding bagefter",
     },
   ];
@@ -406,7 +431,14 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: handleOpenTerminal,
       loading: false,
-      disabled: clientOnline === false,
+      disabled: supportToolsDisabled,
+      lockDuringBusy: false,
+      disabledTooltip:
+        clientOnline === false
+          ? "Klienten er offline"
+          : isSystemLocked
+          ? "Klienten genstarter eller lukker ned"
+          : "Ikke tilgængelig",
       tooltip: "Åbn terminal",
     },
     {
@@ -417,7 +449,14 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: handleOpenRemoteDesktop,
       loading: false,
-      disabled: clientOnline === false,
+      disabled: supportToolsDisabled,
+      lockDuringBusy: false,
+      disabledTooltip:
+        clientOnline === false
+          ? "Klienten er offline"
+          : isSystemLocked
+          ? "Klienten genstarter eller lukker ned"
+          : "Ikke tilgængelig",
       tooltip: "Åbn fjernskrivebord",
     },
   ];
@@ -440,7 +479,7 @@ export default function ClientDetailsActionsSection({
         <Grid container spacing={2} alignItems="center" justifyContent="center">
           {row1.map((btn) => (
             <Grid item xs={12} sm={6} md={3} key={btn.key}>
-              <ActionButton btn={btn} isMobile={isMobile} anyBusy={anyBusy} />
+              <ActionButton btn={btn} isMobile={isMobile} busy={actionPanelBusy} />
             </Grid>
           ))}
         </Grid>
@@ -451,13 +490,13 @@ export default function ClientDetailsActionsSection({
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {row2Admin.map((btn) => (
                 <Grid item xs={12} sm={6} md={isSuperadmin ? 3 : 6} key={btn.key}>
-                  <ActionButton btn={btn} isMobile={isMobile} anyBusy={anyBusy} />
+                  <ActionButton btn={btn} isMobile={isMobile} busy={actionPanelBusy} />
                 </Grid>
               ))}
 
               {isSuperadmin && row2Superadmin.map((btn) => (
                 <Grid item xs={12} sm={6} md={3} key={btn.key}>
-                  <ActionButton btn={btn} isMobile={isMobile} anyBusy={anyBusy} />
+                  <ActionButton btn={btn} isMobile={isMobile} busy={actionPanelBusy} />
                 </Grid>
               ))}
             </Grid>
@@ -508,7 +547,7 @@ export default function ClientDetailsActionsSection({
             }}
             color="error"
             variant="contained"
-            disabled={clientOnline === false || anyBusy}
+            disabled={clientOnline === false || actionPanelBusy}
           >
             Ja, sluk klienten
           </Button>
