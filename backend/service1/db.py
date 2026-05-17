@@ -122,6 +122,31 @@ def create_db_and_tables():
         if "livestream_last_error" not in client_columns:
             conn.execute(text("ALTER TABLE client ADD COLUMN livestream_last_error TEXT"))
 
+        # --- Enrollment/client-secret kolonner ---
+        # SQLModel.metadata.create_all() opretter nye tabeller, men den tilføjer
+        # ikke nye kolonner til eksisterende tabeller. Derfor skal eksisterende
+        # Render/PostgreSQL databaser migreres manuelt her.
+        if "client_secret_hash" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN client_secret_hash TEXT"))
+        if "client_secret_created_at" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN client_secret_created_at TIMESTAMP"))
+        if "client_secret_revoked_at" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN client_secret_revoked_at TIMESTAMP"))
+        if "enrollment_token_id" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN enrollment_token_id INTEGER"))
+        if "machine_id" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN machine_id TEXT"))
+
+        # Disse kolonner findes typisk allerede hos dig, men beholdes her så
+        # clean installs/ældre databaser ikke fejler ved enrollment claim.
+        if "ubuntu_updates_available" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN ubuntu_updates_available INTEGER DEFAULT 0"))
+        if "pending_os_update" not in client_columns:
+            if engine.dialect.name == "postgresql":
+                conn.execute(text("ALTER TABLE client ADD COLUMN pending_os_update BOOLEAN DEFAULT FALSE"))
+            else:
+                conn.execute(text("ALTER TABLE client ADD COLUMN pending_os_update BOOLEAN DEFAULT 0"))
+
         # --- Migrér season int → string ---
         _migrate_seasons_to_string(conn)
 
