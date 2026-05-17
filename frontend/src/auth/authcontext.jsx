@@ -14,6 +14,14 @@ import Typography from "@mui/material/Typography";
 
 const AuthContext = createContext();
 
+// Inaktivitetspolitik:
+// - Vis advarsel efter 25 minutter uden aktivitet.
+// - Log automatisk ud efter yderligere 5 minutter.
+// Det giver 30 minutter total inaktivitet og passer bedre til livestream,
+// terminal og klientovervågning end den tidligere 4+1 minutters timer.
+const WARNING_AFTER_MS = 25 * 60_000;
+const LOGOUT_AFTER_WARNING_MS = 5 * 60_000;
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
@@ -58,7 +66,7 @@ export function AuthProvider({ children }) {
     navigate("/login", { replace: true });
   }, [navigate]);
 
-  // Inaktivitets-timer: advarsel efter 4 min, logout efter yderligere 1 min
+  // Inaktivitets-timer: advarsel efter 25 min, logout efter yderligere 5 min
   const resetInactivityTimer = useCallback(() => {
     setShowWarning(false);
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
@@ -68,19 +76,19 @@ export function AuthProvider({ children }) {
       setShowWarning(true);
       inactivityTimer.current = setTimeout(() => {
         logoutUser();
-      }, 60_000);
-    }, 240_000);
+      }, LOGOUT_AFTER_WARNING_MS);
+    }, WARNING_AFTER_MS);
   }, [logoutUser]);
 
   useEffect(() => {
     if (!user) return;
 
     const events = ["mousemove", "keydown", "mousedown", "touchstart"];
-    events.forEach(evt => window.addEventListener(evt, resetInactivityTimer));
+    events.forEach((evt) => window.addEventListener(evt, resetInactivityTimer));
     resetInactivityTimer();
 
     return () => {
-      events.forEach(evt => window.removeEventListener(evt, resetInactivityTimer));
+      events.forEach((evt) => window.removeEventListener(evt, resetInactivityTimer));
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
       if (warningTimer.current) clearTimeout(warningTimer.current);
     };
@@ -100,8 +108,8 @@ export function AuthProvider({ children }) {
         <DialogTitle>Inaktivitet registreret</DialogTitle>
         <DialogContent>
           <Typography>
-            Du har været inaktiv i 4 minutter.<br />
-            Du bliver automatisk logget ud om 1 minut.<br />
+            Du har været inaktiv i 25 minutter.<br />
+            Du bliver automatisk logget ud om 5 minutter.<br />
             Klik "Fortsæt session" for at forblive logget ind.
           </Typography>
         </DialogContent>
