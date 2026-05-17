@@ -20,14 +20,23 @@ autoinstall:
   identity:
     hostname: clientflow-client
     username: clientflow
-    password: "$6$TdqK25QAwtVzWFsf$yxO3IWDimtwClED.e/UBPwRSDR0mUnHtnLm7VrDMIOVu.Y/DTYO7Bbt7Xd3Yd8R0HmS1ATs6JK/Gvv7Y8BTFu0"
+    password: "$6$Uj0EKNkpUAGkMJPB$WN.HVKieIS07HN4RYtLXLDZoeyOYYpviX9MMPLmB8tZV5J25SThZZmI5p13xr6ixDVnXQYbtorifRDl251J60/"
 
+  # APT fix:
+  # Undgå geoip/country-mirror og brug en fast Ubuntu mirror.
+  # Hvis mirror ikke kan bruges, fortsæt offline fra installationsmediet.
   apt:
+    preserve_sources_list: false
+    mirror-selection:
+      primary:
+        - uri: "http://archive.ubuntu.com/ubuntu"
+          arches: [amd64]
+    fallback: offline-install
     geoip: false
 
-  ssh:
-    install-server: true
-    allow-pw: true
+  # Ingen ssh/packages her. Det minimerer risiko for at Subiquity hænger
+  # under "configuring apt". ClientFlow installerer selv sine dependencies
+  # efter første boot.
 
   late-commands:
     - |
@@ -147,4 +156,3 @@ autoinstall:
       EOF
 
     - curtin in-target --target=/target -- systemctl enable clientflow-firstboot-install.service
-    - curtin in-target --target=/target -- systemctl enable ssh || true
