@@ -3,18 +3,19 @@ import re
 import time
 import threading
 from collections import defaultdict
-from fastapi import APIRouter, HTTPException, Depends, Request, Response, status
+from fastapi import APIRouter, HTTPException, Depends, Request, Response, status, Body
 from fastapi.security import OAuth2, OAuth2PasswordRequestForm
 from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
 from passlib.context import CryptContext
 from sqlmodel import Session, select
-from typing import Optional
+from typing import Optional, Union
 import jwt
 from jwt.exceptions import InvalidTokenError
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 from db import get_session
-from models import User
+from models import User, Client
 
 load_dotenv()
 
@@ -69,6 +70,12 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearerOrCookie(tokenUrl="auth/token")
 
 
+class ClientTokenRequest(BaseModel):
+    client_id: int
+    client_secret: str
+
+
+
 # ---------------------------------------------------------------------------
 # Simpel in-memory rate limiter til login-endpoint
 # Maks 10 forsøg per IP per 60 sekunder
@@ -77,21 +84,6 @@ _rate_lock = threading.Lock()
 _login_attempts: dict[str, list[float]] = defaultdict(list)
 RATE_LIMIT_MAX = 10
 RATE_LIMIT_WINDOW = 60  # sekunder
-
-
-def _get_client_ip(request: Request) -> str:
-    """Returnér bedste klient-IP bag proxy/load balancer.
-
-    Render/proxyer kan sætte request.client.host til en proxy-IP, hvilket ellers
-    får alle brugere til at dele samme login-rate-limit. Stol kun på første
-    X-Forwarded-For hop når headeren findes.
-    """
-    xff = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
-    if xff:
-        first = xff.split(",")[0].strip()
-        if first:
-            return first
-    return request.client.host if request.client else "unknown"
 
 
 def _check_rate_limit(ip: str):
@@ -179,7 +171,7 @@ def login_for_access_token(
     )
 
     # Rate limiting baseret på klientens IP
-    client_ip = _get_client_ip(request)
+    client_ip = request.client.host if request.client else "unknown"
     _check_rate_limit(client_ip)
 
     user = authenticate_user(form_data.username, form_data.password, session)
@@ -210,6 +202,47 @@ def login_for_access_token(
         "access_token": access_token,
         "token_type": "bearer",
         "user": user_data
+    }
+
+
+@router.post("/client-token")
+def login_for_client_token(
+    data: ClientTokenRequest = Body(...),
+    session: Session = Depends(get_session),
+):
+    """
+    Token-login for installerede Ubuntu-klienter.
+
+    Nye klienter får client_id/client_secret via /api/enrollment/claim.
+    De skal ikke bruge admin-brugernavn/adgangskode lokalt.
+    """
+    client = session.get(Client, data.client_id)
+    if (
+        not client
+        or not client.client_secret_hash
+        or client.client_secret_revoked_at is not None
+        or not verify_password(data.client_secret, client.client_secret_hash)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Ugyldig client_id eller client_secret",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token = create_access_token(data={
+        "sub": f"client:{client.id}",
+        "principal": "client",
+        "client_id": client.id,
+        "role": "client",
+    })
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "client": {
+            "id": client.id,
+            "name": client.name,
+            "status": client.status,
+        },
     }
 
 
@@ -256,6 +289,71 @@ def get_me(
         "school_id": user.school_id,
         "must_change_password": user.must_change_password,
     }
+
+
+def _decode_token_or_raise(token: str) -> dict:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Kunne ikke validere legitimationsoplysninger",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except InvalidTokenError:
+        raise credentials_exception
+
+
+def get_current_client(
+    token: str = Depends(oauth2_scheme),
+    session: Session = Depends(get_session),
+) -> Client:
+    payload = _decode_token_or_raise(token)
+    if payload.get("principal") != "client":
+        raise HTTPException(status_code=403, detail="Kræver klient-token")
+    client_id = payload.get("client_id")
+    if client_id is None:
+        raise HTTPException(status_code=401, detail="Ugyldigt klient-token")
+    client = session.get(Client, int(client_id))
+    if not client or client.client_secret_revoked_at is not None:
+        raise HTTPException(status_code=401, detail="Klienten er ukendt eller revoked")
+    return client
+
+
+def get_current_user_or_client(
+    token: str = Depends(oauth2_scheme),
+    session: Session = Depends(get_session),
+) -> Union[User, Client]:
+    payload = _decode_token_or_raise(token)
+    if payload.get("principal") == "client":
+        client_id = payload.get("client_id")
+        if client_id is None:
+            raise HTTPException(status_code=401, detail="Ugyldigt klient-token")
+        client = session.get(Client, int(client_id))
+        if not client or client.client_secret_revoked_at is not None:
+            raise HTTPException(status_code=401, detail="Klienten er ukendt eller revoked")
+        return client
+
+    username: str = payload.get("sub")
+    if username is None:
+        raise HTTPException(status_code=401, detail="Ugyldigt bruger-token")
+    user = session.exec(select(User).where(User.username == username)).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=403, detail="Inaktiv eller ukendt bruger")
+    return user
+
+
+def principal_is_client(principal) -> bool:
+    return isinstance(principal, Client)
+
+
+def require_client_self_or_user(principal, client_id: int):
+    if isinstance(principal, Client):
+        if principal.id != client_id:
+            raise HTTPException(status_code=403, detail="Klient-token må kun tilgå egen klient")
+        return
+    if isinstance(principal, User):
+        return
+    raise HTTPException(status_code=403, detail="Ugyldig principal")
 
 
 def get_current_admin_user(
