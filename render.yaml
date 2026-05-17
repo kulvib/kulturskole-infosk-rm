@@ -6,30 +6,51 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: "pip install --upgrade pip && pip install -r service1/requirements.txt"
-    startCommand: "uvicorn service1.main:app --host 0.0.0.0 --port $PORT --workers 4 --log-level info"
+
+    # VIGTIGT for HLS/livestream:
+    # Kør 1 worker, fordi livestream health/manifest/timestamp-state ellers kan
+    # ramme forskellige worker-processer. Terminal/remote desktop kan stadig virke.
+    startCommand: "uvicorn service1.main:app --host 0.0.0.0 --port $PORT --workers 1 --log-level info"
 
     healthCheckPath: /health
 
     envVars:
       - key: SECRET_KEY
-        generateValue: true
+        sync: false
 
       - key: DATABASE_URL
         sync: false
 
-      - key: FRONTEND_URL
+      - key: ADMIN_USERNAME
         sync: false
 
-      # Kræver minimum 32 tegn — generateValue producerer en lang nøgle så
-      # denne er kun relevant hvis du overskriver med en manuel værdi.
+      - key: ADMIN_PASSWORD
+        sync: false
+
+      - key: ADMIN_EMAIL
+        sync: false
+
+      - key: ALLOWED_ORIGINS
+        value: "https://infoskaerm-frontend.onrender.com"
+
+      - key: FRONTEND_URL
+        value: "https://infoskaerm-frontend.onrender.com"
+
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "60"
+
+      - key: CLIENTFLOW_ONLINE_TIMEOUT_SECONDS
+        value: "30"
 
       - key: BCRYPT_ROUNDS
         value: "12"
 
-      # Sætter Python til at ikke buffe stdout/stderr —
-      # sikrer at logs vises i realtid i Render-dashboardet.
+      # Skal matche den mappe som backend monterer som /hls.
+      # Hvis du senere bruger Render Disk, så mount disken på samme path.
+      - key: HLS_BASE_DIR
+        value: "/opt/render/project/src/backend/service1/hls"
+
+      # Sætter Python til ikke at buffe stdout/stderr, så logs vises hurtigt.
       - key: PYTHONUNBUFFERED
         value: "1"
 
@@ -45,25 +66,29 @@ services:
       - path: /*
         name: X-Frame-Options
         value: DENY
+
       # Slå MIME-type sniffing fra
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
+
       # Aktiver HTTPS-enforcing i browseren (1 år)
       - path: /*
         name: Strict-Transport-Security
         value: "max-age=31536000; includeSubDomains"
-      # Content Security Policy — begrænser hvorfra ressourcer må indlæses
-      # style-src tillader 'unsafe-inline' da MUI/Emotion injicerer inline-styles.
-      # connect-src tillader https: så API-kald til backend (*.onrender.com) virker.
-      # Opdater connect-src til den specifikke backend-URL for en strammere politik.
+
+      # Content Security Policy.
+      # HLS.js kræver blob: til MediaSource og ofte worker-src blob:.
+      # Terminal/remote desktop kræver wss: i connect-src.
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' https: blob:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+
       # Assets med hash i filnavnet kan caches aggressivt
       - path: /assets/*
         name: Cache-Control
         value: "public, max-age=31536000, immutable"
+
       # index.html og andre HTML-filer må aldrig caches
       - path: /*.html
         name: Cache-Control
@@ -76,4 +101,4 @@ services:
 
     envVars:
       - key: VITE_API_URL
-        sync: false
+        value: "https://kulturskole-infosk-rm.onrender.com"
