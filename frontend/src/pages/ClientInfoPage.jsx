@@ -22,6 +22,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Chip,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -30,6 +31,9 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import DevicesIcon from "@mui/icons-material/Devices";
+import PendingActionsIcon from "@mui/icons-material/PendingActions";
 import { Link } from "react-router-dom";
 import {
   getClients,
@@ -45,31 +49,19 @@ import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 /*
   ClientInfoPage.jsx
 
-  FIX 1: token fjernet som argument til alle api-kald.
-    api.js bruger authHeaders() internt via localStorage —
-    token som parameter blev ignoreret og er forvirrende.
+  Formål:
+  - Viser godkendte klienter.
+  - Viser nye/pending klienter fra enrollment/installationskode-flow.
+  - Godkender pending klienter med skolevalg.
+  - Fjerner klienter med robust loading/error-flow.
 
-  FIX 2: filteredClients fjernet — var blot en alias for clients
-    uden nogen filtrering. Bruges nu direkte.
-
-  FIX 3: polling stoppes midlertidigt under aktiv drag
-    via isDraggingRef så listen ikke resettes midt i en drag-operation.
-
-  FIX 4: isClientListEqual sammenligner kun felter, der faktisk bruges på
-    oversigten. Efter uptime-fixet ændres uptime/last_seen hvert heartbeat,
-    og de bør ikke tvinge hele listen til at re-rendere hvert 5. sekund.
-
-  FIX 5: token destruktureres ikke længere fra useAuth()
-    da authcontext ikke eksponerer den.
-
-  FIX 6: renderMobileRow er memoized via memo + useCallback
-    så den ikke genskabes ved hvert render.
-
-  FIX 7: Polling-fejl under baggrundsopdatering vises ikke som snackbar hvert
-    5. sekund. Fejl vises stadig ved initial load og manuel refresh.
-
-  FIX 8: Drag/sort holder polling pauset indtil sorteringen er gemt, så rækken
-    ikke hopper tilbage midt i save-processen.
+  Relevante forbedringer:
+  - Pending/enrollment-klienter viser nu lokalitet tydeligt.
+  - Pending-listen sorteres med nyeste klienter først.
+  - Slet/fjern har loading state og lukker kun dialog ved succes.
+  - Fjern opdaterer UI optimistisk og henter derefter listen igen.
+  - Baggrundspolling spammer ikke snackbar.
+  - Polling pauser under drag/sort.
 */
 
 // ---------------------------------------------------------------------------
@@ -108,8 +100,43 @@ function formatTimestamp(isoDate) {
   };
 }
 
+function getTimestampMs(value) {
+  if (!value) return 0;
+  const raw = String(value);
+  const d = new Date(
+    raw.endsWith("Z") || /[+\-]\d{2}:?\d{2}$/.test(raw) ? raw : raw + "Z"
+  );
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+}
+
 function getClientSchoolId(client) {
   return client?.school_id ?? client?.schoolId ?? "";
+}
+
+function getClientDisplayName(client) {
+  return client?.name || client?.hostname || `Klient #${client?.id ?? "?"}`;
+}
+
+function getClientLocality(client) {
+  return client?.locality || client?.location || "";
+}
+
+function getClientStatusChipProps(status) {
+  const value = String(status || "").toLowerCase();
+
+  if (value === "approved") {
+    return { label: "Godkendt", color: "success" };
+  }
+
+  if (value === "pending" || value === "awaiting_approval") {
+    return { label: "Afventer", color: "warning" };
+  }
+
+  if (value === "rejected" || value === "disabled") {
+    return { label: "Deaktiveret", color: "default" };
+  }
+
+  return { label: status || "Ukendt", color: "default" };
 }
 
 // Sammenlign kun felter, der bruges på denne oversigt.
@@ -124,17 +151,20 @@ function isClientListEqual(a = [], b = []) {
     if (
       ca.id !== cb.id ||
       ca.name !== cb.name ||
+      ca.hostname !== cb.hostname ||
       ca.locality !== cb.locality ||
+      ca.location !== cb.location ||
       ca.status !== cb.status ||
       ca.sort_order !== cb.sort_order ||
       ca.isOnline !== cb.isOnline ||
       String(getClientSchoolId(ca)) !== String(getClientSchoolId(cb)) ||
 
-      // Felter vist for ikke-godkendte klienter
+      // Felter vist for ikke-godkendte/enrollment klienter
       ca.wifi_ip_address !== cb.wifi_ip_address ||
       ca.lan_ip_address !== cb.lan_ip_address ||
       ca.wifi_mac_address !== cb.wifi_mac_address ||
       ca.lan_mac_address !== cb.lan_mac_address ||
+      ca.machine_id !== cb.machine_id ||
       ca.created_at !== cb.created_at
     ) {
       return false;
@@ -148,7 +178,6 @@ function isClientListEqual(a = [], b = []) {
 // Sub-komponenter
 // ---------------------------------------------------------------------------
 
-// FIX 6: Memoized CopyIconButton
 const CopyIconButton = memo(function CopyIconButton({
   value,
   disabled,
@@ -224,12 +253,45 @@ const ClientStatusCell = memo(function ClientStatusCell({ isOnline }) {
   );
 });
 
+const EnrollmentIdentityCell = memo(function EnrollmentIdentityCell({ client }) {
+  const locality = getClientLocality(client);
+  const machineId = client?.machine_id || "";
+
+  return (
+    <Stack spacing={0.35}>
+      <Stack direction="row" spacing={0.75} alignItems="center">
+        <DevicesIcon sx={{ fontSize: 17, color: "primary.main" }} />
+        <Typography sx={{ fontWeight: 700 }}>
+          {getClientDisplayName(client)}
+        </Typography>
+      </Stack>
+
+      <Stack direction="row" spacing={0.75} alignItems="center">
+        <LocationOnIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+        <Typography variant="body2" color={locality ? "text.primary" : "text.secondary"}>
+          {locality || "Ingen lokation angivet"}
+        </Typography>
+      </Stack>
+
+      {machineId && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ wordBreak: "break-all" }}
+        >
+          Machine ID: {machineId}
+          <CopyIconButton value={machineId} iconSize={13} />
+        </Typography>
+      )}
+    </Stack>
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Hoved-komponent
 // ---------------------------------------------------------------------------
 
 export default function ClientInfoPage() {
-  // FIX 5: token fjernet — eksponeres ikke af authcontext
   const { user } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -242,8 +304,10 @@ export default function ClientInfoPage() {
   const [dragClients, setDragClients] = useState([]);
   const [savingSort, setSavingSort] = useState(false);
 
+  const [removingClientId, setRemovingClientId] = useState(null);
+  const [approvingClientId, setApprovingClientId] = useState(null);
+
   const lastFetchedClients = useRef([]);
-  // FIX 3: stopper polling under aktiv drag
   const isDraggingRef = useRef(false);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -265,14 +329,15 @@ export default function ClientInfoPage() {
 
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
 
+  const selectedClientForRemoval =
+    clients.find((client) => client.id === confirmClientId) || null;
+
   // ---------------------------------------------------------------------------
   // Data-hentning
   // ---------------------------------------------------------------------------
 
-  // FIX 1: token fjernet som argument
   const fetchClients = useCallback(
     async (forceUpdate = false, showLoading = false) => {
-      // FIX 3: undgå polling under drag
       if (isDraggingRef.current) return;
 
       if (showLoading) setLoading(true);
@@ -309,7 +374,7 @@ export default function ClientInfoPage() {
     return () => clearInterval(timer);
   }, [fetchClients]);
 
-  // Hent skoler — FIX 1: token fjernet
+  // Hent skoler
   useEffect(() => {
     getSchools()
       .then(setSchools)
@@ -317,7 +382,6 @@ export default function ClientInfoPage() {
   }, []);
 
   // Opdater dragClients når clients ændres
-  // FIX 3: opdater ikke dragClients under aktiv drag
   useEffect(() => {
     if (isDraggingRef.current) return;
 
@@ -338,10 +402,15 @@ export default function ClientInfoPage() {
     setDragClients(approved);
   }, [clients]);
 
+  // Pending/enrollment-klienter: nyeste først.
   const unapprovedClients = clients
     .filter((c) => c.status !== "approved")
     .slice()
-    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    .sort((a, b) => {
+      const byCreated = getTimestampMs(b.created_at) - getTimestampMs(a.created_at);
+      if (byCreated !== 0) return byCreated;
+      return (b.id || 0) - (a.id || 0);
+    });
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -363,40 +432,54 @@ export default function ClientInfoPage() {
   }, []);
 
   const closeRemoveDialog = useCallback(() => {
+    if (removingClientId) return;
     setConfirmOpen(false);
     setConfirmClientId(null);
-  }, []);
+  }, [removingClientId]);
 
-  // FIX 1: token fjernet
   const handleRemoveClient = useCallback(
     async (clientId) => {
+      setRemovingClientId(clientId);
+
       try {
         await removeClient(clientId);
+
+        // Optimistisk fjern fra UI med det samme.
+        setClients((prev) => {
+          const next = prev.filter((client) => client.id !== clientId);
+          lastFetchedClients.current = next;
+          return next;
+        });
+        setDragClients((prev) => prev.filter((client) => client.id !== clientId));
+
         showSnackbar("Klient fjernet!", "success");
-        fetchClients(true, true);
+        setConfirmOpen(false);
+        setConfirmClientId(null);
+
+        // Hent endelig sandhed fra backend.
+        await fetchClients(true, false);
       } catch (err) {
         showSnackbar(
           "Kunne ikke fjerne klient: " + (err?.message || err),
           "error"
         );
+      } finally {
+        setRemovingClientId(null);
       }
     },
     [fetchClients, showSnackbar]
   );
 
   const confirmRemoveClient = useCallback(async () => {
-    if (confirmClientId) {
+    if (confirmClientId !== null && confirmClientId !== undefined) {
       await handleRemoveClient(confirmClientId);
-      closeRemoveDialog();
     }
-  }, [confirmClientId, handleRemoveClient, closeRemoveDialog]);
+  }, [confirmClientId, handleRemoveClient]);
 
-  // FIX 3: sæt isDraggingRef ved drag start/slut
   const onDragStart = useCallback(() => {
     isDraggingRef.current = true;
   }, []);
 
-  // FIX 1: token fjernet
   const onDragEnd = useCallback(
     async (result) => {
       if (!result.destination) {
@@ -426,7 +509,6 @@ export default function ClientInfoPage() {
 
         showSnackbar("Sortering opdateret!", "success");
 
-        // Slip polling igen før forced refresh.
         isDraggingRef.current = false;
         await fetchClients(true, false);
       } catch (err) {
@@ -449,23 +531,35 @@ export default function ClientInfoPage() {
     setSchoolSelections((prev) => ({ ...prev, [clientId]: schoolId }));
   }, []);
 
-  // FIX 1: token fjernet
   const handleApproveClient = useCallback(
     async (clientId) => {
       const school_id = schoolSelections[clientId];
+
       if (!school_id) {
         showSnackbar("Vælg en skole først!", "warning");
         return;
       }
+
+      setApprovingClientId(clientId);
+
       try {
         await approveClient(clientId, school_id);
         showSnackbar("Klient godkendt!", "success");
-        fetchClients(true, true);
+
+        setSchoolSelections((prev) => {
+          const next = { ...prev };
+          delete next[clientId];
+          return next;
+        });
+
+        await fetchClients(true, true);
       } catch (err) {
         showSnackbar(
           "Kunne ikke godkende klient: " + (err?.message || err),
           "error"
         );
+      } finally {
+        setApprovingClientId(null);
       }
     },
     [schoolSelections, fetchClients, showSnackbar]
@@ -484,10 +578,10 @@ export default function ClientInfoPage() {
   );
 
   // ---------------------------------------------------------------------------
-  // FIX 6: Memoized mobil-række renderer
+  // Mobil-række renderer
   // ---------------------------------------------------------------------------
   const renderMobileRow = useCallback(
-    (client, idx, provided, snapshot) => (
+    (client, _idx, provided, snapshot) => (
       <TableRow
         ref={provided?.innerRef}
         {...(provided ? provided.draggableProps : {})}
@@ -529,13 +623,20 @@ export default function ClientInfoPage() {
         {isAdmin && (
           <TableCell align="center">
             <Tooltip title="Fjern klient">
-              <IconButton
-                color="error"
-                onClick={() => openRemoveDialog(client.id)}
-                size="small"
-              >
-                <DeleteIcon />
-              </IconButton>
+              <span>
+                <IconButton
+                  color="error"
+                  onClick={() => openRemoveDialog(client.id)}
+                  size="small"
+                  disabled={removingClientId === client.id}
+                >
+                  {removingClientId === client.id ? (
+                    <CircularProgress size={18} />
+                  ) : (
+                    <DeleteIcon />
+                  )}
+                </IconButton>
+              </span>
             </Tooltip>
           </TableCell>
         )}
@@ -548,7 +649,7 @@ export default function ClientInfoPage() {
         </TableCell>
       </TableRow>
     ),
-    [isAdmin, getSchoolName, openRemoveDialog]
+    [isAdmin, getSchoolName, openRemoveDialog, removingClientId]
   );
 
   // ---------------------------------------------------------------------------
@@ -571,7 +672,7 @@ export default function ClientInfoPage() {
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={3400}
+        autoHideDuration={4200}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
@@ -586,21 +687,54 @@ export default function ClientInfoPage() {
       </Snackbar>
 
       {/* Bekræftelsesdialog */}
-      <Dialog open={confirmOpen} onClose={closeRemoveDialog}>
-        <DialogTitle>Er du sikker?</DialogTitle>
+      <Dialog open={confirmOpen} onClose={closeRemoveDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Fjern klient?</DialogTitle>
         <DialogContent>
-          <Typography>
-            Vil du virkelig fjerne denne klient? Dette kan ikke fortrydes.
-          </Typography>
+          <Stack spacing={1}>
+            <Typography>
+              Vil du virkelig fjerne denne klient? Dette kan ikke fortrydes.
+            </Typography>
+
+            {selectedClientForRemoval && (
+              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "rgba(0,0,0,0.02)" }}>
+                <Typography sx={{ fontWeight: 700 }}>
+                  #{selectedClientForRemoval.id} · {getClientDisplayName(selectedClientForRemoval)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Status: {selectedClientForRemoval.status || "ukendt"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Lokation: {getClientLocality(selectedClientForRemoval) || "ikke angivet"}
+                </Typography>
+              </Paper>
+            )}
+
+            {selectedClientForRemoval?.isOnline && (
+              <MuiAlert severity="warning">
+                Klienten ser ud til at være online. Hvis agenten stadig kører,
+                kan den muligvis registrere sig igen senere.
+              </MuiAlert>
+            )}
+          </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeRemoveDialog}>Annullér</Button>
+          <Button onClick={closeRemoveDialog} disabled={!!removingClientId}>
+            Annullér
+          </Button>
           <Button
             onClick={confirmRemoveClient}
             color="error"
             variant="contained"
+            disabled={!!removingClientId}
+            startIcon={
+              removingClientId ? (
+                <CircularProgress size={18} color="inherit" />
+              ) : (
+                <DeleteIcon />
+              )
+            }
           >
-            Fjern
+            {removingClientId ? "Fjerner..." : "Fjern"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -675,7 +809,6 @@ export default function ClientInfoPage() {
             </Box>
           )}
 
-          {/* FIX 3: onDragStart tilføjet */}
           <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
             <Droppable droppableId="clients-droppable">
               {(provided) => (
@@ -758,7 +891,7 @@ export default function ClientInfoPage() {
                           key={client.id}
                           draggableId={String(client.id)}
                           index={idx}
-                          isDragDisabled={savingSort}
+                          isDragDisabled={savingSort || !!removingClientId}
                         >
                           {(provided, snapshot) =>
                             isMobile
@@ -813,14 +946,21 @@ export default function ClientInfoPage() {
                                   {isAdmin && (
                                     <TableCell align="center">
                                       <Tooltip title="Fjern klient">
-                                        <IconButton
-                                          color="error"
-                                          onClick={() =>
-                                            openRemoveDialog(client.id)
-                                          }
-                                        >
-                                          <DeleteIcon />
-                                        </IconButton>
+                                        <span>
+                                          <IconButton
+                                            color="error"
+                                            onClick={() =>
+                                              openRemoveDialog(client.id)
+                                            }
+                                            disabled={removingClientId === client.id}
+                                          >
+                                            {removingClientId === client.id ? (
+                                              <CircularProgress size={20} />
+                                            ) : (
+                                              <DeleteIcon />
+                                            )}
+                                          </IconButton>
+                                        </span>
                                       </Tooltip>
                                     </TableCell>
                                   )}
@@ -849,16 +989,35 @@ export default function ClientInfoPage() {
       {/* Ikke-godkendte klienter — kun admin */}
       {isAdmin && (
         <>
-          <Typography
-            variant="h5"
-            sx={{
-              mb: 2,
-              fontWeight: 700,
-              fontSize: { xs: "1.1rem", sm: "1.4rem" },
-            }}
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            justifyContent="space-between"
+            sx={{ mb: 2, gap: 1 }}
           >
-            Ikke godkendte klienter
-          </Typography>
+            <Box>
+              <Typography
+                variant="h5"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: "1.1rem", sm: "1.4rem" },
+                }}
+              >
+                Ikke godkendte klienter
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Nye klienter fra installationskode vises her. Vælg skole og godkend, når du har identificeret skærmen.
+              </Typography>
+            </Box>
+
+            <Chip
+              icon={<PendingActionsIcon />}
+              label={`${unapprovedClients.length} afventer`}
+              color={unapprovedClients.length ? "warning" : "default"}
+              variant={unapprovedClients.length ? "filled" : "outlined"}
+            />
+          </Stack>
+
           <Paper sx={{ px: { xs: 0.5, sm: 0 } }}>
             <TableContainer>
               <Table
@@ -883,16 +1042,17 @@ export default function ClientInfoPage() {
                       },
                     }}
                   >
-                    <TableCell sx={{ width: "12.5%" }}>Klient ID</TableCell>
-                    <TableCell sx={{ width: "12.5%" }}>Klientnavn</TableCell>
-                    <TableCell sx={{ width: "12.5%" }}>IP-adresser</TableCell>
-                    <TableCell sx={{ width: "12.5%" }}>MAC-adresser</TableCell>
-                    <TableCell sx={{ width: "12.5%" }}>Tilføjet</TableCell>
-                    <TableCell sx={{ width: "12.5%" }}>Skole</TableCell>
-                    <TableCell sx={{ width: "12.5%", textAlign: "center" }}>
+                    <TableCell>Klient ID</TableCell>
+                    <TableCell>Installationsoplysninger</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>IP-adresser</TableCell>
+                    <TableCell>MAC-adresser</TableCell>
+                    <TableCell>Tilføjet</TableCell>
+                    <TableCell>Skole</TableCell>
+                    <TableCell sx={{ textAlign: "center" }}>
                       Godkend
                     </TableCell>
-                    <TableCell sx={{ width: "12.5%", textAlign: "center" }}>
+                    <TableCell sx={{ textAlign: "center" }}>
                       Fjern
                     </TableCell>
                   </TableRow>
@@ -900,154 +1060,196 @@ export default function ClientInfoPage() {
                 <TableBody>
                   {unapprovedClients.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
+                      <TableCell colSpan={9} align="center">
                         Ingen ikke-godkendte klienter.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    unapprovedClients.map((client) => (
-                      <TableRow key={client.id} hover>
-                        <TableCell>{client.id}</TableCell>
-                        <TableCell>
-                          {client.name || "Ukendt navn"}
-                        </TableCell>
-                        <TableCell>
-                          <Stack spacing={0.25}>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              <b>WiFi:</b>&nbsp;
-                              <span>
-                                {client.wifi_ip_address || "ukendt"}
-                              </span>
-                              <CopyIconButton
-                                value={client.wifi_ip_address || ""}
-                                disabled={!client.wifi_ip_address}
-                                iconSize={14}
-                              />
-                            </Box>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              <b>LAN:</b>&nbsp;
-                              <span>
-                                {client.lan_ip_address || "ukendt"}
-                              </span>
-                              <CopyIconButton
-                                value={client.lan_ip_address || ""}
-                                disabled={!client.lan_ip_address}
-                                iconSize={14}
-                              />
-                            </Box>
-                          </Stack>
-                        </TableCell>
-                        <TableCell>
-                          <Stack spacing={0.25}>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              <b>WiFi:</b>&nbsp;
-                              <span>
-                                {client.wifi_mac_address || "ukendt"}
-                              </span>
-                              <CopyIconButton
-                                value={client.wifi_mac_address || ""}
-                                disabled={!client.wifi_mac_address}
-                                iconSize={14}
-                              />
-                            </Box>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              <b>LAN:</b>&nbsp;
-                              <span>
-                                {client.lan_mac_address || "ukendt"}
-                              </span>
-                              <CopyIconButton
-                                value={client.lan_mac_address || ""}
-                                disabled={!client.lan_mac_address}
-                                iconSize={14}
-                              />
-                            </Box>
-                          </Stack>
-                        </TableCell>
-                        <TableCell>
-                          {(() => {
-                            const ts = formatTimestamp(client.created_at);
-                            return (
-                              <span style={{ whiteSpace: "pre-line" }}>
-                                {ts.date}
-                                {"\n"}
-                                {ts.time}
-                              </span>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            size="small"
-                            value={schoolSelections[client.id] || ""}
-                            displayEmpty
-                            onChange={(e) =>
-                              handleSchoolChange(client.id, e.target.value)
-                            }
-                            sx={{
-                              minWidth: { xs: 70, sm: 120 },
-                              fontSize: { xs: "0.97em", sm: "0.875rem" },
-                            }}
-                          >
-                            <MenuItem value="">Vælg skole</MenuItem>
-                            {schools.map((school) => (
-                              <MenuItem key={school.id} value={school.id}>
-                                {school.name}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Button
-                            variant="contained"
-                            color="success"
-                            size="small"
-                            startIcon={<AddIcon />}
-                            onClick={() => handleApproveClient(client.id)}
-                            sx={{
-                              minWidth: 44,
-                              fontSize: { xs: "0.97em", sm: "0.875rem" },
-                            }}
-                          >
-                            Godkend
-                          </Button>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Tooltip title="Fjern klient">
-                            <IconButton
-                              color="error"
-                              onClick={() => openRemoveDialog(client.id)}
+                    unapprovedClients.map((client) => {
+                      const statusChip = getClientStatusChipProps(client.status);
+                      const isApproving = approvingClientId === client.id;
+                      const isRemoving = removingClientId === client.id;
+
+                      return (
+                        <TableRow key={client.id} hover>
+                          <TableCell>
+                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                              <Typography sx={{ fontWeight: 700 }}>
+                                {client.id}
+                              </Typography>
+                              <CopyIconButton value={client.id} iconSize={14} />
+                            </Stack>
+                          </TableCell>
+
+                          <TableCell>
+                            <EnrollmentIdentityCell client={client} />
+                          </TableCell>
+
+                          <TableCell>
+                            <Chip
                               size="small"
+                              color={statusChip.color}
+                              label={statusChip.label}
+                            />
+                          </TableCell>
+
+                          <TableCell>
+                            <Stack spacing={0.25}>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <b>WiFi:</b>&nbsp;
+                                <span>
+                                  {client.wifi_ip_address || "ukendt"}
+                                </span>
+                                <CopyIconButton
+                                  value={client.wifi_ip_address || ""}
+                                  disabled={!client.wifi_ip_address}
+                                  iconSize={14}
+                                />
+                              </Box>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <b>LAN:</b>&nbsp;
+                                <span>
+                                  {client.lan_ip_address || "ukendt"}
+                                </span>
+                                <CopyIconButton
+                                  value={client.lan_ip_address || ""}
+                                  disabled={!client.lan_ip_address}
+                                  iconSize={14}
+                                />
+                              </Box>
+                            </Stack>
+                          </TableCell>
+
+                          <TableCell>
+                            <Stack spacing={0.25}>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <b>WiFi:</b>&nbsp;
+                                <span>
+                                  {client.wifi_mac_address || "ukendt"}
+                                </span>
+                                <CopyIconButton
+                                  value={client.wifi_mac_address || ""}
+                                  disabled={!client.wifi_mac_address}
+                                  iconSize={14}
+                                />
+                              </Box>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <b>LAN:</b>&nbsp;
+                                <span>
+                                  {client.lan_mac_address || "ukendt"}
+                                </span>
+                                <CopyIconButton
+                                  value={client.lan_mac_address || ""}
+                                  disabled={!client.lan_mac_address}
+                                  iconSize={14}
+                                />
+                              </Box>
+                            </Stack>
+                          </TableCell>
+
+                          <TableCell>
+                            {(() => {
+                              const ts = formatTimestamp(client.created_at);
+                              return (
+                                <span style={{ whiteSpace: "pre-line" }}>
+                                  {ts.date || "-"}
+                                  {ts.time ? `\n${ts.time}` : ""}
+                                </span>
+                              );
+                            })()}
+                          </TableCell>
+
+                          <TableCell>
+                            <Select
+                              size="small"
+                              value={schoolSelections[client.id] || ""}
+                              displayEmpty
+                              onChange={(e) =>
+                                handleSchoolChange(client.id, e.target.value)
+                              }
+                              disabled={isApproving || isRemoving}
+                              sx={{
+                                minWidth: { xs: 95, sm: 140 },
+                                fontSize: { xs: "0.97em", sm: "0.875rem" },
+                              }}
                             >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                              <MenuItem value="">Vælg skole</MenuItem>
+                              {schools.map((school) => (
+                                <MenuItem key={school.id} value={school.id}>
+                                  {school.name}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </TableCell>
+
+                          <TableCell align="center">
+                            <Button
+                              variant="contained"
+                              color="success"
+                              size="small"
+                              startIcon={
+                                isApproving ? (
+                                  <CircularProgress size={16} color="inherit" />
+                                ) : (
+                                  <AddIcon />
+                                )
+                              }
+                              onClick={() => handleApproveClient(client.id)}
+                              disabled={isApproving || isRemoving}
+                              sx={{
+                                minWidth: 44,
+                                fontSize: { xs: "0.97em", sm: "0.875rem" },
+                              }}
+                            >
+                              {isApproving ? "Godkender..." : "Godkend"}
+                            </Button>
+                          </TableCell>
+
+                          <TableCell align="center">
+                            <Tooltip title="Fjern klient">
+                              <span>
+                                <IconButton
+                                  color="error"
+                                  onClick={() => openRemoveDialog(client.id)}
+                                  size="small"
+                                  disabled={isApproving || isRemoving}
+                                >
+                                  {isRemoving ? (
+                                    <CircularProgress size={18} />
+                                  ) : (
+                                    <DeleteIcon />
+                                  )}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
