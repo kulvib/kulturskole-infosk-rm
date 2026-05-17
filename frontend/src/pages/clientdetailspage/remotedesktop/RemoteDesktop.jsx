@@ -325,12 +325,18 @@ export default function RemoteDesktop() {
     const message = shoutText.trim();
     if (!message) return;
 
-    send({
+    const ok = send({
       type: "shout",
       text: message,
       duration: 8,
     });
 
+    if (!ok) {
+      setError("Shout out kunne ikke sendes: WebSocket er ikke forbundet.");
+      return;
+    }
+
+    setStatus("Shout out sendt til klienten");
     setShoutText("");
   }, [send, shoutText]);
 
