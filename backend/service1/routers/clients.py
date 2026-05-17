@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import select, delete
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timedelta, date, timezone
 from db import get_session
 from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction, School, SchoolSeasonTimes
-from auth import get_current_user, get_current_admin_user, get_current_user_or_client, require_client_self_or_user, principal_is_client
+from auth import get_current_user, get_current_admin_user, get_current_superadmin_user, get_current_user_or_client, require_client_self_or_user, principal_is_client, get_password_hash
 from models import utcnow
 import os
 import glob
 import json
+import secrets
 
 router = APIRouter()
 
@@ -660,6 +661,100 @@ def client_heartbeat(
     session.refresh(client)
     client.isOnline = True
     return client
+
+
+def _generate_client_secret() -> str:
+    """
+    Genererer en klienthemmelighed til installerede Ubuntu-klienter.
+
+    Vises kun én gang ved rotate/generering og gemmes kun hashed i databasen.
+    """
+    return "cf_client_" + secrets.token_urlsafe(32)
+
+
+def _client_secret_status(client: Client) -> dict:
+    return {
+        "client_id": client.id,
+        "has_client_secret": bool(client.client_secret_hash) and client.client_secret_revoked_at is None,
+        "client_secret_created_at": client.client_secret_created_at,
+        "client_secret_revoked_at": client.client_secret_revoked_at,
+        "enrollment_token_id": client.enrollment_token_id,
+        "machine_id": client.machine_id,
+        "status": client.status,
+        "name": client.name,
+    }
+
+
+@router.get("/clients/{id}/client-secret/status")
+def get_client_secret_status(
+    id: int,
+    session=Depends(get_session),
+    user=Depends(get_current_superadmin_user),
+):
+    """
+    Superadmin: se om en eksisterende klient har aktiv client-secret.
+
+    Returnerer aldrig selve secret'en.
+    """
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return _client_secret_status(client)
+
+
+@router.post("/clients/{id}/client-secret/rotate")
+def rotate_client_secret(
+    id: int,
+    session=Depends(get_session),
+    user=Depends(get_current_superadmin_user),
+):
+    """
+    Superadmin: generér/rotér client-secret for en eksisterende klient.
+
+    Bruges til at migrere eksisterende klienter væk fra admin-login.
+    Secret'en returneres kun i dette response og kan ikke læses igen bagefter.
+    """
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    client_secret = _generate_client_secret()
+    client.client_secret_hash = get_password_hash(client_secret)
+    client.client_secret_created_at = utcnow()
+    client.client_secret_revoked_at = None
+
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+
+    return {
+        **_client_secret_status(client),
+        "client_secret": client_secret,
+    }
+
+
+@router.post("/clients/{id}/client-secret/revoke")
+def revoke_client_secret(
+    id: int,
+    session=Depends(get_session),
+    user=Depends(get_current_superadmin_user),
+):
+    """
+    Superadmin: tilbagekald client-secret for en eksisterende klient.
+
+    Efter revoke kan klienten ikke længere få /auth/client-token med sin secret.
+    """
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    client.client_secret_revoked_at = utcnow()
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+
+    return _client_secret_status(client)
+
 
 
 @router.delete("/clients/{id}/remove")
