@@ -188,7 +188,7 @@ def update_chrome_status(
     id: int,
     data: dict = Body(...),
     session=Depends(get_session),
-    user=Depends(get_current_user),
+    user=Depends(get_current_admin_user),
 ):
     client = session.get(Client, id)
     if not client:
@@ -210,7 +210,7 @@ def update_chrome_status(
 
 
 @router.put("/clients/{id}/state")
-def update_client_state(id: int, data: dict = Body(...), session=Depends(get_session), user=Depends(get_current_user)):
+def update_client_state(id: int, data: dict = Body(...), session=Depends(get_session), user=Depends(get_current_admin_user)):
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -240,7 +240,7 @@ def set_chrome_command(
     id: int,
     data: dict = Body(...),
     session=Depends(get_session),
-    user=Depends(get_current_user),
+    user=Depends(get_current_admin_user),
 ):
     client = session.get(Client, id)
     if not client:
@@ -359,7 +359,7 @@ def get_ubuntu_updates(id: int, session=Depends(get_session), user=Depends(get_c
 
 
 @router.post("/clients/", response_model=Client)
-async def create_client(client_in: ClientCreate, session=Depends(get_session), user=Depends(get_current_user)):
+async def create_client(client_in: ClientCreate, session=Depends(get_session), user=Depends(get_current_admin_user)):
     client = Client(
         name=client_in.name,
         locality=client_in.locality,
@@ -401,7 +401,7 @@ async def update_client(
     id: int,
     client_update: ClientUpdate,
     session=Depends(get_session),
-    user=Depends(get_current_user),
+    user=Depends(get_current_admin_user),
 ):
     client = session.get(Client, id)
     if not client:
@@ -466,7 +466,7 @@ async def update_kiosk_url(
     id: int,
     data: dict = Body(...),
     session=Depends(get_session),
-    user=Depends(get_current_user),
+    user=Depends(get_current_admin_user),
 ):
     client = session.get(Client, id)
     if not client:
@@ -575,7 +575,7 @@ def client_heartbeat(
     id: int,
     data: dict = Body(default=None),
     session=Depends(get_session),
-    user=Depends(get_current_user),
+    user=Depends(get_current_admin_user),
 ):
     """
     Heartbeat er klientens hurtige livstegn.
