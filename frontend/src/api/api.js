@@ -52,10 +52,9 @@ export function getWsApiUrl() {
 export function getTerminalBrowserWsUrl(clientId, mode = "user") {
   const token = getAuthToken();
   const params = new URLSearchParams();
-  if (token) params.set("token", token);
   params.set("mode", mode === "admin" ? "admin" : "user");
-  const qs = params.toString() ? `?${params.toString()}` : "";
-  return `${getWsApiUrl()}/api/terminal/browser/${encodeURIComponent(clientId)}/ws${qs}`;
+  if (token) params.set("token", token);
+  return `${getWsApiUrl()}/api/terminal/browser/${encodeURIComponent(clientId)}/ws?${params.toString()}`;
 }
 
 async function extractError(res, fallback) {
@@ -315,10 +314,10 @@ export async function setClientState(id, state) {
   return res.json();
 }
 
-export function openTerminal(id, mode = "user") {
+export function openTerminal(id) {
   // Gammel placeholder bevares for bagudkompatibilitet.
   // Den rigtige terminal åbnes nu via ClientTerminalDialog + WebSocket.
-  return getTerminalBrowserWsUrl(id, mode);
+  return getTerminalBrowserWsUrl(id);
 }
 
 export function openRemoteDesktop(id) {
@@ -602,8 +601,13 @@ export async function requestOsUpdate(clientId) {
   return res.json();
 }
 
+
+// ---------------------------------------------------------------------------
+// ClientFlow selfupdate
+// ---------------------------------------------------------------------------
+
 export async function requestClientflowUpdate(clientId) {
-  const res = await fetch(`${apiUrl}/api/clients/${encodeURIComponent(clientId)}/clientflow-update`, {
+  const res = await fetch(`${apiUrl}/api/clients/${clientId}/clientflow-update`, {
     method: "POST",
     headers: authHeaders(),
     credentials: "include",
