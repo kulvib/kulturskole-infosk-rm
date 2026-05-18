@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, date
 import ipaddress
 import requests
-from auth import get_current_user, get_current_user_or_client, require_client_self_or_user
+from auth import get_current_user, get_current_admin_user, get_current_user_or_client, require_client_self_or_user, principal_is_client
 
 router = APIRouter()
 
@@ -73,9 +73,15 @@ def _validate_season(season: str) -> str:
 def save_marked_days(
     data: MarkedDaysRequest,
     session=Depends(get_session),
-    user=Depends(get_current_user)
+    user=Depends(get_current_admin_user)
 ):
     _validate_season(data.season)
+    for client_id in data.clients:
+        client = session.get(Client, client_id)
+        if not client:
+            raise HTTPException(status_code=404, detail=f"Klient {client_id} ikke fundet")
+        if not getattr(user, "is_superadmin", False) and client.school_id != user.school_id:
+            raise HTTPException(status_code=403, detail="Du har kun adgang til klienter i din egen skole")
     try:
         for client_id in data.clients:
             markings = parse_iso8601_keys(data.markedDays.get(str(client_id), {}))
@@ -112,9 +118,15 @@ def get_marked_days(
     principal=Depends(get_current_user_or_client)
 ):
     _validate_season(season)
-    # Browser/admin-brugere må hente alle klienters kalenderdata.
     # Installerede Ubuntu-klienter med client-token må kun hente egen kalender.
+    # Browserbrugere må kun hente kalender for klienter i egen skole, medmindre de er superadmin.
     require_client_self_or_user(principal, client_id)
+    if not principal_is_client(principal):
+        client = session.get(Client, client_id)
+        if not client:
+            raise HTTPException(status_code=404, detail="Klient ikke fundet")
+        if not getattr(principal, "is_superadmin", False) and client.school_id != principal.school_id:
+            raise HTTPException(status_code=403, detail="Du har kun adgang til klienter i din egen skole")
     existing = session.exec(
         select(CalendarMarking).where(
             CalendarMarking.season == season,
@@ -173,7 +185,7 @@ def get_current_season(principal=Depends(get_current_user_or_client)):
 
 
 @router.post("/calendar/cleanup-past-seasons")
-def cleanup_past_seasons(session=Depends(get_session), user=Depends(get_current_user)):
+def cleanup_past_seasons(session=Depends(get_session), user=Depends(get_current_admin_user)):
     today = date.today()
     if today.month > 8 or (today.month == 8 and today.day >= 10):
         current_start = today.year if today.month >= 8 else today.year - 1
