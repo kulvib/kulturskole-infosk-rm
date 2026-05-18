@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from db import get_session
 from models import Holiday
-from auth import get_current_user
+from auth import get_current_user, get_current_admin_user
 
 router = APIRouter()
 
