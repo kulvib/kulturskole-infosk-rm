@@ -32,6 +32,24 @@ function appendLine(setLines, line) {
   setLines((prev) => [...prev, line].slice(-800));
 }
 
+function normalizeCommandText(value) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trimEnd();
+}
+
+function appendCommandEcho(setLines, cmd) {
+  const normalized = normalizeCommandText(cmd);
+  if (!normalized.trim()) return;
+
+  const rendered = normalized.split("\n").map((line, index) =>
+    index === 0 ? `$ ${line}` : `> ${line}`
+  );
+
+  setLines((prev) => [...prev, ...rendered].slice(-800));
+}
+
 const SUPPORT_COMMAND_GROUPS = [
   {
     title: "Service-status",
@@ -141,6 +159,7 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
   const [mode, setMode] = React.useState("user");
   const wsRef = React.useRef(null);
   const outputRef = React.useRef(null);
+  const lastEchoedCommandRef = React.useRef(null);
 
   React.useEffect(() => {
     if (!open || !client?.id) return undefined;
@@ -149,6 +168,7 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
     setConnected(false);
     setAgentConnected(false);
     setRunning(false);
+    lastEchoedCommandRef.current = null;
 
     let ws;
     let closedByComponent = false;
@@ -202,7 +222,14 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
 
       if (msg.type === "started") {
         setRunning(true);
-        appendLine(setLines, `$ ${msg.command}`);
+
+        // Backend sender også kommandoen tilbage ved start.
+        // Hvis vi allerede har ekkoet den lokalt ved afsendelse, undgår vi dublet.
+        const startedCommand = normalizeCommandText(msg.command);
+        if (startedCommand && startedCommand !== lastEchoedCommandRef.current) {
+          appendCommandEcho(setLines, startedCommand);
+          lastEchoedCommandRef.current = startedCommand;
+        }
         return;
       }
 
@@ -220,12 +247,14 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
 
       if (msg.type === "exit") {
         setRunning(false);
+        lastEchoedCommandRef.current = null;
         appendLine(setLines, `[exit ${msg.code}]${msg.cwd ? ` cwd=${msg.cwd}` : ""}`);
         return;
       }
 
       if (msg.type === "error") {
         setRunning(false);
+        lastEchoedCommandRef.current = null;
         appendLine(setLines, `[FEJL] ${msg.message}`);
       }
     };
@@ -263,10 +292,21 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
   }, [lines]);
 
   const sendCommand = React.useCallback(() => {
-    const cmd = command.trim();
-    if (!cmd || running || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify({ type: "run", command: cmd }));
-    setCommand("");
+    const cmd = normalizeCommandText(command);
+    if (!cmd.trim() || running || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+
+    appendCommandEcho(setLines, cmd);
+    lastEchoedCommandRef.current = cmd;
+    setRunning(true);
+
+    try {
+      wsRef.current.send(JSON.stringify({ type: "run", command: cmd }));
+      setCommand("");
+    } catch (err) {
+      setRunning(false);
+      lastEchoedCommandRef.current = null;
+      appendLine(setLines, `[FEJL] Kunne ikke sende kommando: ${err?.message || err}`);
+    }
   }, [command, running]);
 
   const insertCommand = React.useCallback((cmd) => {
@@ -282,6 +322,14 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
   }, []);
 
   const handleKeyDown = (event) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      sendCommand();
+      return;
+    }
+
+    // Normal terminalfølelse: Enter kører kommandoen.
+    // Shift+Enter bevares til kommandoer/scripts på flere linjer.
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       sendCommand();
@@ -365,7 +413,7 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
           {lines.length === 0 ? "Forbinder..." : lines.join("\n")}
         </Box>
 
-        <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
+        <Box sx={{ display: "flex", gap: 1, mt: 1.5, alignItems: "stretch" }}>
           <TextField
             value={command}
             onChange={(e) => setCommand(e.target.value)}
@@ -373,18 +421,32 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
             disabled={!connected || !agentConnected || running}
             size="small"
             fullWidth
-            placeholder={agentConnected ? (isAdminMode ? "Skriv root-kommando, fx: systemctl status clientflow_service" : "Skriv kommando, fx: whoami") : "Venter på klient-agent..."}
+            multiline
+            minRows={3}
+            maxRows={8}
+            placeholder={
+              agentConnected
+                ? isAdminMode
+                  ? "Skriv root-kommando eller script..."
+                  : "Skriv kommando eller script..."
+                : "Venter på klient-agent..."
+            }
+            helperText="Enter kører · Shift+Enter laver ny linje · Ctrl/Cmd+Enter kører også"
             InputProps={{
               sx: {
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                alignItems: "flex-start",
               },
+            }}
+            FormHelperTextProps={{
+              sx: { ml: 0, fontSize: 12 },
             }}
           />
           <Button
             variant="contained"
             onClick={sendCommand}
             disabled={!connected || !agentConnected || running || !command.trim()}
-            sx={{ minWidth: 120 }}
+            sx={{ minWidth: 120, alignSelf: "flex-start", minHeight: 40 }}
           >
             {running ? <CircularProgress size={18} color="inherit" /> : "Kør"}
           </Button>
