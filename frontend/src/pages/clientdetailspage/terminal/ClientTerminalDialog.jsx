@@ -16,6 +16,8 @@ import {
   AccordionDetails,
   Divider,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -130,16 +132,15 @@ const SUPPORT_COMMAND_GROUPS = [
   },
 ];
 
-export default function ClientTerminalDialog({ open, onClose, client, mode = "user" }) {
+export default function ClientTerminalDialog({ open, onClose, client }) {
   const [lines, setLines] = React.useState([]);
   const [command, setCommand] = React.useState("");
   const [connected, setConnected] = React.useState(false);
   const [agentConnected, setAgentConnected] = React.useState(false);
   const [running, setRunning] = React.useState(false);
+  const [mode, setMode] = React.useState("user");
   const wsRef = React.useRef(null);
   const outputRef = React.useRef(null);
-  const terminalMode = mode === "admin" ? "admin" : "user";
-  const isAdminTerminal = terminalMode === "admin";
 
   React.useEffect(() => {
     if (!open || !client?.id) return undefined;
@@ -153,7 +154,7 @@ export default function ClientTerminalDialog({ open, onClose, client, mode = "us
     let closedByComponent = false;
 
     try {
-      ws = new WebSocket(getTerminalBrowserWsUrl(client.id, terminalMode));
+      ws = new WebSocket(getTerminalBrowserWsUrl(client.id, mode));
       wsRef.current = ws;
     } catch (err) {
       appendLine(setLines, `[${nowTime()}] FEJL: ${err?.message || err}`);
@@ -178,7 +179,7 @@ export default function ClientTerminalDialog({ open, onClose, client, mode = "us
         setAgentConnected(!!msg.client_connected);
         appendLine(
           setLines,
-          `[${nowTime()}] Session ${msg.session_id || "?"}. Agent: ${
+          `[${nowTime()}] ${mode === "admin" ? "Admin-terminal" : "Bruger-terminal"} · Session ${msg.session_id || "?"}. Agent: ${
             msg.client_connected ? "forbundet" : "ikke forbundet"
           }.`
         );
@@ -254,7 +255,7 @@ export default function ClientTerminalDialog({ open, onClose, client, mode = "us
       } catch {}
       wsRef.current = null;
     };
-  }, [open, client?.id, terminalMode]);
+  }, [open, client?.id, mode]);
 
   React.useEffect(() => {
     const el = outputRef.current;
@@ -287,18 +288,23 @@ export default function ClientTerminalDialog({ open, onClose, client, mode = "us
     }
   };
 
+  const handleModeChange = React.useCallback((event, nextMode) => {
+    if (!nextMode || running) return;
+    setMode(nextMode);
+  }, [running]);
+
+  const isAdminMode = mode === "admin";
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <TerminalIcon /> {isAdminTerminal ? "Admin terminal" : "Remote terminal"}
+        <TerminalIcon /> {isAdminMode ? "Admin terminal" : "Remote terminal"}
         <Box sx={{ flexGrow: 1 }} />
-        {isAdminTerminal && (
-          <Chip
-            size="small"
-            label="ROOT"
-            color="error"
-          />
-        )}
+        <Chip
+          size="small"
+          label={isAdminMode ? "ROOT" : "Bruger"}
+          color={isAdminMode ? "error" : "default"}
+        />
         <Chip
           size="small"
           label={connected ? "Backend forbundet" : "Backend afbrudt"}
@@ -312,15 +318,34 @@ export default function ClientTerminalDialog({ open, onClose, client, mode = "us
       </DialogTitle>
 
       <DialogContent>
-        <Alert severity={isAdminTerminal ? "error" : "warning"} sx={{ mb: 1.5 }}>
-          {isAdminTerminal
-            ? "Admin terminal kører som root. Brug kun til support og systemrettelser."
-            : "Remote terminal shell-adgang."}
-        </Alert>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, mb: 1.5, flexWrap: "wrap" }}>
+          <Box>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Klient: {client?.name || client?.id || "ukendt"}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {isAdminMode
+                ? "Admin-terminal kører som root med fulde systemrettigheder."
+                : "Bruger-terminal kører som kiosk-brugeren."}
+            </Typography>
+          </Box>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={mode}
+            onChange={handleModeChange}
+            disabled={running}
+          >
+            <ToggleButton value="user">Bruger-terminal</ToggleButton>
+            <ToggleButton value="admin" color="error">Admin-terminal</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
 
-        <Typography variant="body2" sx={{ mb: 1, color: "text.secondary" }}>
-          Klient: {client?.name || client?.id || "ukendt"}
-        </Typography>
+        <Alert severity={isAdminMode ? "error" : "warning"} sx={{ mb: 1.5 }}>
+          {isAdminMode
+            ? "Admin-terminal har fulde systemrettigheder. Brug kun til fejlfinding og reparation."
+            : "Remote terminal shell-adgang som kiosk-brugeren."}
+        </Alert>
 
         <Box
           ref={outputRef}
@@ -348,7 +373,7 @@ export default function ClientTerminalDialog({ open, onClose, client, mode = "us
             disabled={!connected || !agentConnected || running}
             size="small"
             fullWidth
-            placeholder={agentConnected ? (isAdminTerminal ? "Skriv root-kommando, fx: whoami" : "Skriv kommando, fx: whoami") : "Venter på klient-agent..."}
+            placeholder={agentConnected ? (isAdminMode ? "Skriv root-kommando, fx: systemctl status clientflow_service" : "Skriv kommando, fx: whoami") : "Venter på klient-agent..."}
             InputProps={{
               sx: {
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
