@@ -147,6 +147,22 @@ def create_db_and_tables():
             else:
                 conn.execute(text("ALTER TABLE client ADD COLUMN pending_os_update BOOLEAN DEFAULT 0"))
 
+        # --- ClientFlow self-update status kolonner ---
+        if "client_version" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN client_version TEXT"))
+        if "client_update_status" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN client_update_status TEXT DEFAULT 'ready'"))
+        if "client_update_message" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN client_update_message TEXT"))
+        if "client_update_requested_at" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN client_update_requested_at TIMESTAMP"))
+        if "client_update_started_at" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN client_update_started_at TIMESTAMP"))
+        if "client_update_finished_at" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN client_update_finished_at TIMESTAMP"))
+        if "client_update_error" not in client_columns:
+            conn.execute(text("ALTER TABLE client ADD COLUMN client_update_error TEXT"))
+
         # --- Migrér season int → string ---
         _migrate_seasons_to_string(conn)
 
