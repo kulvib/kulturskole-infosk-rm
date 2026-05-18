@@ -618,6 +618,21 @@ export async function requestClientflowUpdate(clientId) {
   return res.json();
 }
 
+export async function getClientflowUpdateStatus(clientId) {
+  // Backend v6.10 returnerer update-felterne som en del af getClient().
+  // Derfor bruger vi eksisterende klient-endpoint i stedet for et separat status-endpoint.
+  const client = await getClient(clientId);
+  return {
+    client_version: client?.client_version ?? null,
+    client_update_status: client?.client_update_status ?? "ready",
+    client_update_message: client?.client_update_message ?? null,
+    client_update_requested_at: client?.client_update_requested_at ?? null,
+    client_update_started_at: client?.client_update_started_at ?? null,
+    client_update_finished_at: client?.client_update_finished_at ?? null,
+    client_update_error: client?.client_update_error ?? null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Livestream
 // ---------------------------------------------------------------------------
