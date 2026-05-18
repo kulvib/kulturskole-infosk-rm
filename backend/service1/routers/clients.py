@@ -86,6 +86,22 @@ def _chrome_action_value(value):
     return getattr(value, "value", value)
 
 
+def _current_update_detail(client: Client) -> str:
+    """Giver en mere præcis besked, når klienten allerede er låst af en update."""
+    pending_action = _chrome_action_value(getattr(client, "pending_chrome_action", None))
+    if pending_action and str(pending_action).lower() != "none":
+        return f"Klienten er allerede ved at opdatere ({pending_action})"
+
+    if getattr(client, "pending_os_update", False):
+        return "Klienten er allerede ved at opdatere (os_update)"
+
+    client_update_status = str(getattr(client, "client_update_status", "") or "").lower()
+    if client_update_status and client_update_status not in {"ready", "success", "error"}:
+        return f"Klienten er allerede ved at opdatere ({client_update_status})"
+
+    return "Klienten er allerede ved at opdatere"
+
+
 def is_online(client: Client) -> bool:
     last_seen = _as_naive_utc(client.last_seen)
     if last_seen is None:
@@ -380,7 +396,7 @@ async def trigger_os_update(
     if not is_online(client):
         raise HTTPException(status_code=400, detail="Klienten er offline — kan ikke starte opdatering")
     if client.state == "updating":
-        raise HTTPException(status_code=400, detail="Klienten er allerede ved at opdatere")
+        raise HTTPException(status_code=409, detail=_current_update_detail(client))
     client.pending_chrome_action = ChromeAction.OS_UPDATE
     client.pending_os_update = True
     client.state = "updating"
@@ -395,8 +411,6 @@ async def trigger_os_update(
         "state": client.state,
     }
 
-
-@router.get("/clients/{id}/ubuntu-updates")
 
 @router.post("/clients/{id}/clientflow-update")
 async def trigger_clientflow_update(
@@ -416,7 +430,7 @@ async def trigger_clientflow_update(
     if not is_online(client):
         raise HTTPException(status_code=400, detail="Klienten er offline — kan ikke starte ClientFlow-opdatering")
     if client.state == "updating":
-        raise HTTPException(status_code=400, detail="Klienten er allerede ved at opdatere")
+        raise HTTPException(status_code=409, detail=_current_update_detail(client))
 
     now = utcnow()
     client.pending_chrome_action = ChromeAction.CLIENTFLOW_UPDATE
@@ -442,6 +456,7 @@ async def trigger_clientflow_update(
     }
 
 
+@router.get("/clients/{id}/ubuntu-updates")
 def get_ubuntu_updates(id: int, session=Depends(get_session), user=Depends(get_current_user_or_client)):
     require_client_self_or_user(user, id)
     client = session.get(Client, id)
