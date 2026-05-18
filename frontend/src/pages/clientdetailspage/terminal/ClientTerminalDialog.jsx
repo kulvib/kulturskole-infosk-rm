@@ -37,12 +37,12 @@ const SUPPORT_COMMAND_GROUPS = [
       {
         label: "ClientFlow services",
         command:
-          "systemctl --no-pager --full status clientflow_service.service clientflow_calendar.service client_terminal_agent.service client_remote_desktop_agent.service",
+          "systemctl --no-pager --full status clientflow_service.service clientflow_calendar.service client_terminal_agent.service client_admin_terminal_agent.service client_remote_desktop_agent.service",
       },
       {
         label: "Aktive ClientFlow units",
         command:
-          "systemctl list-units --all --type=service | grep -iE 'clientflow|terminal|remote|stream'",
+          "systemctl list-units --all --type=service | grep -iE 'clientflow|terminal|remote|stream|admin'",
       },
       {
         label: "ClientFlow env uden password",
@@ -130,7 +130,7 @@ const SUPPORT_COMMAND_GROUPS = [
   },
 ];
 
-export default function ClientTerminalDialog({ open, onClose, client }) {
+export default function ClientTerminalDialog({ open, onClose, client, mode = "user" }) {
   const [lines, setLines] = React.useState([]);
   const [command, setCommand] = React.useState("");
   const [connected, setConnected] = React.useState(false);
@@ -138,6 +138,8 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
   const [running, setRunning] = React.useState(false);
   const wsRef = React.useRef(null);
   const outputRef = React.useRef(null);
+  const terminalMode = mode === "admin" ? "admin" : "user";
+  const isAdminTerminal = terminalMode === "admin";
 
   React.useEffect(() => {
     if (!open || !client?.id) return undefined;
@@ -151,7 +153,7 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
     let closedByComponent = false;
 
     try {
-      ws = new WebSocket(getTerminalBrowserWsUrl(client.id));
+      ws = new WebSocket(getTerminalBrowserWsUrl(client.id, terminalMode));
       wsRef.current = ws;
     } catch (err) {
       appendLine(setLines, `[${nowTime()}] FEJL: ${err?.message || err}`);
@@ -252,7 +254,7 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
       } catch {}
       wsRef.current = null;
     };
-  }, [open, client?.id]);
+  }, [open, client?.id, terminalMode]);
 
   React.useEffect(() => {
     const el = outputRef.current;
@@ -288,8 +290,15 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <TerminalIcon /> Remote terminal
+        <TerminalIcon /> {isAdminTerminal ? "Admin terminal" : "Remote terminal"}
         <Box sx={{ flexGrow: 1 }} />
+        {isAdminTerminal && (
+          <Chip
+            size="small"
+            label="ROOT"
+            color="error"
+          />
+        )}
         <Chip
           size="small"
           label={connected ? "Backend forbundet" : "Backend afbrudt"}
@@ -303,8 +312,10 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
       </DialogTitle>
 
       <DialogContent>
-        <Alert severity="warning" sx={{ mb: 1.5 }}>
-          Remote terminal shell-adgang.
+        <Alert severity={isAdminTerminal ? "error" : "warning"} sx={{ mb: 1.5 }}>
+          {isAdminTerminal
+            ? "Admin terminal kører som root. Brug kun til support og systemrettelser."
+            : "Remote terminal shell-adgang."}
         </Alert>
 
         <Typography variant="body2" sx={{ mb: 1, color: "text.secondary" }}>
@@ -337,7 +348,7 @@ export default function ClientTerminalDialog({ open, onClose, client }) {
             disabled={!connected || !agentConnected || running}
             size="small"
             fullWidth
-            placeholder={agentConnected ? "Skriv kommando, fx: whoami" : "Venter på klient-agent..."}
+            placeholder={agentConnected ? (isAdminTerminal ? "Skriv root-kommando, fx: whoami" : "Skriv kommando, fx: whoami") : "Venter på klient-agent..."}
             InputProps={{
               sx: {
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
