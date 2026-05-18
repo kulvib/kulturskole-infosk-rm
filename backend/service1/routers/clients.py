@@ -50,6 +50,13 @@ CLIENT_SELF_UPDATE_FIELDS = {
     "livestream_last_error",
     "ubuntu_updates_available",
     "pending_os_update",
+    "client_version",
+    "client_update_status",
+    "client_update_message",
+    "client_update_requested_at",
+    "client_update_started_at",
+    "client_update_finished_at",
+    "client_update_error",
 }
 
 
@@ -213,6 +220,13 @@ def get_chrome_status(id: int, session=Depends(get_session), user=Depends(get_cu
         "pending_chrome_action_source": getattr(client, "pending_chrome_action_source", None),
         "pending_reboot": client.pending_reboot,
         "pending_shutdown": client.pending_shutdown,
+        "client_version": client.client_version,
+        "client_update_status": client.client_update_status or "ready",
+        "client_update_message": client.client_update_message,
+        "client_update_requested_at": client.client_update_requested_at,
+        "client_update_started_at": client.client_update_started_at,
+        "client_update_finished_at": client.client_update_finished_at,
+        "client_update_error": client.client_update_error,
     }
 
 @router.put("/clients/{id}/chrome-status")
@@ -404,9 +418,16 @@ async def trigger_clientflow_update(
     if client.state == "updating":
         raise HTTPException(status_code=400, detail="Klienten er allerede ved at opdatere")
 
+    now = utcnow()
     client.pending_chrome_action = ChromeAction.CLIENTFLOW_UPDATE
     client.pending_chrome_action_source = "actionbutton"
     client.state = "updating"
+    client.client_update_status = "requested"
+    client.client_update_message = "Opdatering bestilt fra backend"
+    client.client_update_requested_at = now
+    client.client_update_started_at = None
+    client.client_update_finished_at = None
+    client.client_update_error = None
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -415,6 +436,9 @@ async def trigger_clientflow_update(
         "message": f"ClientFlow-opdatering bestilt for klient {id}",
         "pending_chrome_action": client.pending_chrome_action.value,
         "state": client.state,
+        "client_update_status": client.client_update_status,
+        "client_update_message": client.client_update_message,
+        "client_update_requested_at": client.client_update_requested_at,
     }
 
 
@@ -462,6 +486,13 @@ async def create_client(client_in: ClientCreate, session=Depends(get_session), u
         livestream_last_error=None,
         ubuntu_updates_available=getattr(client_in, "ubuntu_updates_available", 0),
         pending_os_update=getattr(client_in, "pending_os_update", False),
+        client_version=getattr(client_in, "client_version", None),
+        client_update_status=getattr(client_in, "client_update_status", "ready"),
+        client_update_message=getattr(client_in, "client_update_message", None),
+        client_update_requested_at=getattr(client_in, "client_update_requested_at", None),
+        client_update_started_at=getattr(client_in, "client_update_started_at", None),
+        client_update_finished_at=getattr(client_in, "client_update_finished_at", None),
+        client_update_error=getattr(client_in, "client_update_error", None),
     )
     session.add(client)
     session.commit()
@@ -537,6 +568,13 @@ async def update_client(
     if "livestream_last_error" in fields: client.livestream_last_error = client_update.livestream_last_error
     if "ubuntu_updates_available" in fields: client.ubuntu_updates_available = client_update.ubuntu_updates_available
     if "pending_os_update" in fields: client.pending_os_update = client_update.pending_os_update
+    if "client_version" in fields: client.client_version = client_update.client_version
+    if "client_update_status" in fields: client.client_update_status = client_update.client_update_status
+    if "client_update_message" in fields: client.client_update_message = client_update.client_update_message
+    if "client_update_requested_at" in fields: client.client_update_requested_at = client_update.client_update_requested_at
+    if "client_update_started_at" in fields: client.client_update_started_at = client_update.client_update_started_at
+    if "client_update_finished_at" in fields: client.client_update_finished_at = client_update.client_update_finished_at
+    if "client_update_error" in fields: client.client_update_error = client_update.client_update_error
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -680,6 +718,8 @@ def client_heartbeat(
             client.uptime = str(data.get("uptime"))
         if data.get("ubuntu_version") is not None:
             client.ubuntu_version = data.get("ubuntu_version")
+        if data.get("client_version") is not None:
+            client.client_version = data.get("client_version")
 
         # Valgfrit, men nyttigt hvis heartbeat senere bruges til netværksdata.
         for field in (
