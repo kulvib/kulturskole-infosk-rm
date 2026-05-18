@@ -19,6 +19,7 @@ class ChromeAction(str, Enum):
     LIVESTREAM_START = "livestream_start"
     LIVESTREAM_STOP = "livestream_stop"
     OS_UPDATE = "os_update"
+    CLIENTFLOW_UPDATE = "clientflow_update"
 
 
 class School(SQLModel, table=True):
