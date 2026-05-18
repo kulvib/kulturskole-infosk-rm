@@ -23,7 +23,7 @@ ONLINE_TIMEOUT_SECONDS = int(os.getenv("CLIENTFLOW_ONLINE_TIMEOUT_SECONDS", "30"
 VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error", "updating"}
 VALID_PENDING_CHROME_ACTION_SOURCES = {"actionbutton", "calendar"}
 
-BLOCKING_ACTIONS = {"start", "stop", "sleep", "wakeup", "reboot", "shutdown"}
+BLOCKING_ACTIONS = {"start", "stop", "sleep", "wakeup", "restart", "shutdown"}
 
 # Felter som en klient med client-token selv må opdatere på /clients/{id}/update.
 # Admin/frontend kan fortsat opdatere alle de eksisterende ClientUpdate-felter.
@@ -383,6 +383,41 @@ async def trigger_os_update(
 
 
 @router.get("/clients/{id}/ubuntu-updates")
+
+@router.post("/clients/{id}/clientflow-update")
+async def trigger_clientflow_update(
+    id: int,
+    session=Depends(get_session),
+    user=Depends(get_current_admin_user),
+):
+    """Bestil ClientFlow self-update på klienten.
+
+    Dette er adskilt fra OS-opdatering:
+    - OS update = Ubuntu/Chrome/pakker
+    - ClientFlow update = ClientFlow-filer/services fra Render
+    """
+    client = session.get(Client, id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if not is_online(client):
+        raise HTTPException(status_code=400, detail="Klienten er offline — kan ikke starte ClientFlow-opdatering")
+    if client.state == "updating":
+        raise HTTPException(status_code=400, detail="Klienten er allerede ved at opdatere")
+
+    client.pending_chrome_action = ChromeAction.CLIENTFLOW_UPDATE
+    client.pending_chrome_action_source = "actionbutton"
+    client.state = "updating"
+    session.add(client)
+    session.commit()
+    session.refresh(client)
+    return {
+        "ok": True,
+        "message": f"ClientFlow-opdatering bestilt for klient {id}",
+        "pending_chrome_action": client.pending_chrome_action.value,
+        "state": client.state,
+    }
+
+
 def get_ubuntu_updates(id: int, session=Depends(get_session), user=Depends(get_current_user_or_client)):
     require_client_self_or_user(user, id)
     client = session.get(Client, id)
@@ -600,9 +635,9 @@ async def approve_client(
     markings = {}
     for d in school_year_dates:
         if d.weekday() < 5:
-            markings[d.isoformat()] = {"status": "on", "onTime": def_wd_on, "offTime": def_wd_off}
+            markings[d.isoformat()] = {"status": "off", "onTime": def_wd_on, "offTime": def_wd_off}
         else:
-            markings[d.isoformat()] = {"status": "on", "onTime": def_we_on, "offTime": def_we_off}
+            markings[d.isoformat()] = {"status": "off", "onTime": def_we_on, "offTime": def_we_off}
 
     existing = session.exec(
         select(CalendarMarking).where(
