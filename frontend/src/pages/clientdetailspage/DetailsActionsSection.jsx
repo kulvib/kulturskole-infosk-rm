@@ -45,8 +45,9 @@ import { getClientflowUpdateStatus, requestClientflowUpdate } from "../../api";
   - Terminal og Fjernskrivebord låses ikke af almindelige kiosk-actions.
     De er supportværktøjer og skal kunne bruges til fejlfinding, mens fx
     "Start kiosk browser" eller "Stop kiosk browser" kører.
-  - Terminal og Fjernskrivebord låses stadig, hvis klienten er offline eller
-    i en systemkritisk overgang som reboot/shutdown.
+  - Terminal og Fjernskrivebord låses stadig, hvis klienten er offline,
+    i en systemkritisk overgang som reboot/shutdown, eller mens ClientFlow
+    opdateres.
 */
 
 const BUSY_CHROME_STEPS = new Set([
@@ -244,6 +245,15 @@ export default function ClientDetailsActionsSection({
     "verifying", "installing", "stopping_services"
   ].includes(String(clientflowUpdateStatus?.client_update_status || "").toLowerCase());
 
+  // ClientFlow-opdatering er en software-/serviceopdatering på selve klienten.
+  // Den skal derfor låse øvrige handlinger, også Terminal og Fjernskrivebord,
+  // fordi de kan blive afbrudt når klientens services genstartes.
+  const clientflowUpdateBusy =
+    updateInProgress || normalizedPendingAction === "clientflow_update";
+
+  const clientflowBusyTooltip =
+    "ClientFlow opdateres — vent til opdateringen er færdig";
+
   const shouldAutoHidePendingBanner = AUTO_HIDE_BANNER_STEPS.has(liveStepNorm);
 
   // System-level handlinger må låse hele knap-panelet.
@@ -275,12 +285,15 @@ export default function ClientDetailsActionsSection({
     !!refreshing ||
     clientActionPending ||
     hasPendingAction ||
-    isLiveStepBusy;
+    isLiveStepBusy ||
+    clientflowUpdateBusy;
 
   // Supportværktøjer må ikke låses af almindelige kiosk-handlinger.
   // Terminal/fjernskrivebord er netop nyttige, når start/stop hænger.
-  // De låses kun, når klienten er offline eller i en systemkritisk overgang.
-  const supportToolsDisabled = clientOnline === false || isSystemLocked;
+  // De låses dog under ClientFlow-opdatering, fordi terminal-/remote-agenter
+  // kan blive genstartet som en del af opdateringen.
+  const supportToolsDisabled =
+    clientOnline === false || isSystemLocked || clientflowUpdateBusy;
 
   const notify = useCallback(
     (opts) => {
@@ -307,6 +320,14 @@ export default function ClientDetailsActionsSection({
         return;
       }
 
+      if (clientflowUpdateBusy) {
+        notify({
+          message: clientflowBusyTooltip,
+          severity: "warning",
+        });
+        return;
+      }
+
       setActionLoading((prev) => ({ ...prev, [action]: true }));
       try {
         await handleClientAction(action);
@@ -319,13 +340,21 @@ export default function ClientDetailsActionsSection({
         setActionLoading((prev) => ({ ...prev, [action]: false }));
       }
     },
-    [clientOnline, handleClientAction, notify]
+    [clientOnline, clientflowUpdateBusy, clientflowBusyTooltip, handleClientAction, notify]
   );
 
   const doClientflowUpdate = useCallback(async () => {
     if (clientOnline === false) {
       notify({
         message: "Klienten er offline — ClientFlow-opdatering afvist",
+        severity: "warning",
+      });
+      return;
+    }
+
+    if (clientflowUpdateBusy) {
+      notify({
+        message: clientflowBusyTooltip,
         severity: "warning",
       });
       return;
@@ -352,7 +381,7 @@ export default function ClientDetailsActionsSection({
     } finally {
       setActionLoading((prev) => ({ ...prev, clientflow_update: false }));
     }
-  }, [clientId, clientOnline, notify]);
+  }, [clientId, clientOnline, clientflowUpdateBusy, clientflowBusyTooltip, notify]);
 
   const isDisabledByState = useCallback(
     (key) => {
@@ -533,7 +562,9 @@ export default function ClientDetailsActionsSection({
       disabled: supportToolsDisabled,
       lockDuringBusy: false,
       disabledTooltip:
-        clientOnline === false
+        clientflowUpdateBusy
+          ? clientflowBusyTooltip
+          : clientOnline === false
           ? "Klienten er offline"
           : isSystemLocked
           ? "Klienten genstarter eller lukker ned"
@@ -551,7 +582,9 @@ export default function ClientDetailsActionsSection({
       disabled: supportToolsDisabled,
       lockDuringBusy: false,
       disabledTooltip:
-        clientOnline === false
+        clientflowUpdateBusy
+          ? clientflowBusyTooltip
+          : clientOnline === false
           ? "Klienten er offline"
           : isSystemLocked
           ? "Klienten genstarter eller lukker ned"
@@ -566,11 +599,11 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: doClientflowUpdate,
       loading: !!actionLoading["clientflow_update"],
-      disabled: supportToolsDisabled || updateInProgress,
+      disabled: supportToolsDisabled || clientflowUpdateBusy,
       lockDuringBusy: false,
       disabledTooltip:
-        updateInProgress
-          ? "ClientFlow-opdatering er allerede i gang"
+        clientflowUpdateBusy
+          ? clientflowBusyTooltip
           : clientOnline === false
           ? "Klienten er offline"
           : isSystemLocked
@@ -602,6 +635,16 @@ export default function ClientDetailsActionsSection({
             icon={updateInProgress ? <CircularProgress size={16} /> : undefined}
           >
             ClientFlow update: {updateStatusText}
+          </Alert>
+        )}
+
+        {clientflowUpdateBusy && !updateStatusText && (
+          <Alert
+            severity="info"
+            sx={{ mb: 1.5 }}
+            icon={<CircularProgress size={16} />}
+          >
+            ClientFlow opdateres — handlinger er midlertidigt deaktiveret.
           </Alert>
         )}
 
