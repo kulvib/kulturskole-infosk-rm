@@ -54,6 +54,11 @@ def _require_can_manage_target(current_user: User, target_user: User):
             status_code=403,
             detail="Kun superadministratorer må redigere eller slette superadministratorer",
         )
+    if current_user.is_admin and target_user.school_id != current_user.school_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Du kan kun administrere brugere i din egen skole",
+        )
 
 
 class UserCreate(BaseModel):
@@ -142,7 +147,9 @@ def list_users(
     session: Session = Depends(get_session),
     admin: User = Depends(get_current_admin_user),
 ):
-    return session.exec(select(User)).all()
+    if admin.is_superadmin:
+        return session.exec(select(User)).all()
+    return session.exec(select(User).where(User.school_id == admin.school_id)).all()
 
 
 @router.post("/users/", response_model=UserRead, status_code=201)
@@ -152,6 +159,10 @@ def create_user(
     admin: User = Depends(get_current_admin_user),
 ):
     _require_role_assignment_allowed(admin, user.role)
+    if not admin.is_superadmin:
+        if user.role == "superadmin":
+            raise HTTPException(status_code=403, detail="Kun superadmin må oprette superadministratorer")
+        user.school_id = admin.school_id
     validate_password_strength(user.password)
     if session.exec(select(User).where(User.username == user.username)).first():
         raise HTTPException(status_code=400, detail="Brugernavnet er allerede i brug")
@@ -227,8 +238,12 @@ def update_user(
         return user
 
     # Admin-operationer herunder:
-    # En admin (ikke superadmin) må ikke redigere superadmins
+    # En admin (ikke superadmin) må kun administrere egen skole og ikke superadmins
     _require_can_manage_target(current_user, user)
+
+    if user_update.school_id is not None and not current_user.is_superadmin:
+        if user_update.school_id != current_user.school_id:
+            raise HTTPException(status_code=403, detail="Du kan kun tilknytte brugere til din egen skole")
 
     if user_update.role is not None:
         _require_role_assignment_allowed(current_user, user_update.role)
