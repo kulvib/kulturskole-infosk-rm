@@ -177,7 +177,6 @@ export default function ClientDetailsActionsSection({
   pendingChromeAction,
   handleClientAction,
   handleOpenTerminal,
-  handleOpenAdminTerminal,
   handleOpenRemoteDesktop,
   refreshing,
   showSnackbar: showSnackbarProp,
@@ -287,7 +286,6 @@ export default function ClientDetailsActionsSection({
   );
 
   const doClientflowUpdate = useCallback(async () => {
-    const action = "clientflow_update";
     if (clientOnline === false) {
       notify({
         message: "Klienten er offline — ClientFlow-opdatering afvist",
@@ -295,28 +293,21 @@ export default function ClientDetailsActionsSection({
       });
       return;
     }
-    if (!clientId) {
-      notify({
-        message: "Mangler klient-id",
-        severity: "error",
-      });
-      return;
-    }
 
-    setActionLoading((prev) => ({ ...prev, [action]: true }));
+    setActionLoading((prev) => ({ ...prev, clientflow_update: true }));
     try {
       await requestClientflowUpdate(clientId);
       notify({
-        message: "ClientFlow-opdatering sendt til klienten",
+        message: "ClientFlow-opdatering er sendt til klienten",
         severity: "success",
       });
     } catch (err) {
       notify({
-        message: "Fejl: " + (err?.message || "Kunne ikke anmode om ClientFlow-opdatering"),
+        message: "Fejl: " + (err?.message || "Kunne ikke starte ClientFlow-opdatering"),
         severity: "error",
       });
     } finally {
-      setActionLoading((prev) => ({ ...prev, [action]: false }));
+      setActionLoading((prev) => ({ ...prev, clientflow_update: false }));
     }
   }, [clientId, clientOnline, notify]);
 
@@ -466,7 +457,7 @@ export default function ClientDetailsActionsSection({
       icon: <TerminalIcon />,
       color: "inherit",
       variant: "outlined",
-      onClick: () => handleOpenTerminal?.("user"),
+      onClick: handleOpenTerminal,
       loading: false,
       disabled: supportToolsDisabled,
       lockDuringBusy: false,
@@ -476,28 +467,7 @@ export default function ClientDetailsActionsSection({
           : isSystemLocked
           ? "Klienten genstarter eller lukker ned"
           : "Ikke tilgængelig",
-      tooltip: "Åbn almindelig terminal",
-    },
-    {
-      key: "admin-terminal",
-      label: "Admin terminal",
-      icon: <TerminalIcon />,
-      color: "warning",
-      variant: "outlined",
-      onClick: () =>
-        typeof handleOpenAdminTerminal === "function"
-          ? handleOpenAdminTerminal()
-          : handleOpenTerminal?.("admin"),
-      loading: false,
-      disabled: supportToolsDisabled,
-      lockDuringBusy: false,
-      disabledTooltip:
-        clientOnline === false
-          ? "Klienten er offline"
-          : isSystemLocked
-          ? "Klienten genstarter eller lukker ned"
-          : "Ikke tilgængelig",
-      tooltip: "Åbn root/admin-terminal",
+      tooltip: "Åbn terminal",
     },
     {
       key: "remote",
@@ -525,7 +495,7 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: doClientflowUpdate,
       loading: !!actionLoading["clientflow_update"],
-      disabled: clientOnline === false || isSystemLocked,
+      disabled: supportToolsDisabled,
       lockDuringBusy: false,
       disabledTooltip:
         clientOnline === false
@@ -533,7 +503,7 @@ export default function ClientDetailsActionsSection({
           : isSystemLocked
           ? "Klienten genstarter eller lukker ned"
           : "Ikke tilgængelig",
-      tooltip: "Installer seneste ClientFlow-version på klienten",
+      tooltip: "Opdater ClientFlow på klienten",
     },
   ];
 
@@ -554,7 +524,7 @@ export default function ClientDetailsActionsSection({
 
         <Grid container spacing={2} alignItems="center" justifyContent="center">
           {row1.map((btn) => (
-            <Grid item xs={12} sm={6} md={2} key={btn.key}>
+            <Grid item xs={12} sm={6} md={3} key={btn.key}>
               <ActionButton btn={btn} isMobile={isMobile} busy={actionPanelBusy} />
             </Grid>
           ))}
@@ -565,13 +535,13 @@ export default function ClientDetailsActionsSection({
             <Box sx={{ height: 12 }} />
             <Grid container spacing={2} alignItems="center" justifyContent="center">
               {row2Admin.map((btn) => (
-                <Grid item xs={12} sm={6} md={isSuperadmin ? 2 : 6} key={btn.key}>
+                <Grid item xs={12} sm={6} md={isSuperadmin ? 3 : 6} key={btn.key}>
                   <ActionButton btn={btn} isMobile={isMobile} busy={actionPanelBusy} />
                 </Grid>
               ))}
 
               {isSuperadmin && row2Superadmin.map((btn) => (
-                <Grid item xs={12} sm={6} md={2} key={btn.key}>
+                <Grid item xs={12} sm={6} md={3} key={btn.key}>
                   <ActionButton btn={btn} isMobile={isMobile} busy={actionPanelBusy} />
                 </Grid>
               ))}
