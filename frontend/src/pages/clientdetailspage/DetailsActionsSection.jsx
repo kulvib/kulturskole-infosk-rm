@@ -55,18 +55,22 @@ const BUSY_CHROME_STEPS = new Set([
   "terminate_chrome",
   "kill_chrome",
   "countdown",
+  "display_sleep_countdown",
 ]);
 
 const SYSTEM_LOCK_STEPS = new Set([
   "system_reboot_countdown",
   "system_rebooting",
   "system_shutting_down",
-  "system_wake",
 ]);
 
 const SYSTEM_SLEEP_STEPS = new Set([
   "system_sleep",
   "system_sleep_complete",
+  "display_sleep",
+  "display_sleep_complete",
+  "display_sleep",
+  "display_sleep_complete",
 ]);
 
 // Kun reboot/shutdown-statusboksen skal auto-skjules efter 10 sekunder.
@@ -91,6 +95,8 @@ const CHROME_STOPPED_STEPS = new Set([
   "kill_chrome",
   "system_sleep",
   "system_sleep_complete",
+  "display_sleep",
+  "display_sleep_complete",
   "system_rebooting",
   "system_shutting_down",
 ]);
@@ -103,16 +109,17 @@ function getStepLabel(step) {
   if (s === "kill_chrome") return "Tvangslukker browser…";
   if (s === "shutdown_chrome") return "Browser lukket";
   if (s === "countdown") return "Tæller ned…";
+  if (s === "display_sleep_countdown") return "Skærm slukkes om lidt…";
   if (s === "system_reboot_countdown") return "Genstarter om lidt…";
   if (s === "system_rebooting") return "Genstarter maskinen…";
   if (s === "system_shutting_down") return "Lukker maskinen ned…";
   if (s === "start_chrome") return "Browser startet";
   if (s === "chrome_closed_programmatically") return "Browser lukket";
   if (s === "chrome_closed_manual") return "Browser lukket manuelt";
-  if (s === "system_sleep") return "Klient i dvale";
-  if (s === "system_sleep_complete") return "Klient sat i dvale";
-  if (s === "system_wake") return "Klient vækkes…";
-  if (s === "system_wake_complete") return "Klient vækket";
+  if (s === "system_sleep" || s === "display_sleep") return "Skærm slukkes…";
+  if (s === "system_sleep_complete" || s === "display_sleep_complete") return "Skærm slukket";
+  if (s === "system_wake" || s === "display_wake") return "Skærm tændes…";
+  if (s === "system_wake_complete" || s === "display_wake_complete") return "Skærm tændt";
   if (s === "error") return "Der opstod en fejl";
   return null;
 }
