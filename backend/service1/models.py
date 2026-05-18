@@ -107,6 +107,15 @@ class Client(ClientBase, table=True):
     ubuntu_updates_available: Optional[int] = Field(default=0)
     pending_os_update: Optional[bool] = Field(default=False)
 
+    # ClientFlow self-update status (backend-triggeret klientopdatering).
+    client_version: Optional[str] = None
+    client_update_status: Optional[str] = Field(default="ready")
+    client_update_message: Optional[str] = None
+    client_update_requested_at: Optional[datetime] = None
+    client_update_started_at: Optional[datetime] = None
+    client_update_finished_at: Optional[datetime] = None
+    client_update_error: Optional[str] = None
+
 
 class ClientCreate(ClientBase):
     machine_id: Optional[str] = None
@@ -127,6 +136,13 @@ class ClientCreate(ClientBase):
     state: Optional[str] = Field(default="normal")
     ubuntu_updates_available: Optional[int] = 0
     pending_os_update: Optional[bool] = False
+    client_version: Optional[str] = None
+    client_update_status: Optional[str] = "ready"
+    client_update_message: Optional[str] = None
+    client_update_requested_at: Optional[datetime] = None
+    client_update_started_at: Optional[datetime] = None
+    client_update_finished_at: Optional[datetime] = None
+    client_update_error: Optional[str] = None
 
 
 class ClientUpdate(SQLModel):
@@ -158,6 +174,13 @@ class ClientUpdate(SQLModel):
     livestream_last_error: Optional[str] = None
     ubuntu_updates_available: Optional[int] = None
     pending_os_update: Optional[bool] = None
+    client_version: Optional[str] = None
+    client_update_status: Optional[str] = None
+    client_update_message: Optional[str] = None
+    client_update_requested_at: Optional[datetime] = None
+    client_update_started_at: Optional[datetime] = None
+    client_update_finished_at: Optional[datetime] = None
+    client_update_error: Optional[str] = None
 
 
 class EnrollmentToken(SQLModel, table=True):
