@@ -590,7 +590,7 @@ export async function deleteUser(id) {
 // ---------------------------------------------------------------------------
 
 export async function requestOsUpdate(clientId) {
-  const res = await fetch(`${apiUrl}/api/clients/${clientId}/request-os-update`, {
+  const res = await fetch(`${apiUrl}/api/clients/${encodeURIComponent(clientId)}/os-update`, {
     method: "POST",
     headers: authHeaders(),
     credentials: "include",
