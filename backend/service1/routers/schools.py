@@ -62,24 +62,36 @@ def _get_school_year_dates(season: str):
 
 @router.get("/schools/", response_model=list[School])
 def get_schools(session=Depends(get_session), user=Depends(get_current_user)):
-    return session.exec(select(School)).all()
+    if user.is_superadmin:
+        return session.exec(select(School)).all()
+    if user.school_id:
+        school = session.get(School, user.school_id)
+        return [school] if school else []
+    return []
 
 
 @router.get("/schools/season-summary")
 def get_season_summary(session=Depends(get_session), user=Depends(get_current_user)):
     """
     Returnerer hvilke sæsoner der har kalenderdata og hvilke skoler per sæson.
-    En sæson/skole kombination tæller som 'har data' hvis der eksisterer
-    mindst én calendarmarking for en klient tilknyttet skolen i den sæson.
+    Superadmin ser alle skoler. Almindelige admins/brugere ser kun egen skole.
     """
-    # Hent alle calendarmarkings
     markings = session.exec(select(CalendarMarking)).all()
-    # Hent alle klienter med school_id
     clients = session.exec(select(Client)).all()
-    client_school_map = {c.id: c.school_id for c in clients if c.school_id}
-    # Hent alle skoler
+    if user.is_superadmin:
+        allowed_school_ids = None
+    elif user.school_id:
+        allowed_school_ids = {user.school_id}
+    else:
+        allowed_school_ids = set()
+
+    client_school_map = {
+        c.id: c.school_id
+        for c in clients
+        if c.school_id and (allowed_school_ids is None or c.school_id in allowed_school_ids)
+    }
     schools = session.exec(select(School)).all()
-    school_map = {s.id: s.name for s in schools}
+    school_map = {s.id: s.name for s in schools if allowed_school_ids is None or s.id in allowed_school_ids}
 
     # Byg sæson → set af school_ids
     season_schools: dict[str, set] = {}
@@ -106,6 +118,8 @@ def get_season_summary(session=Depends(get_session), user=Depends(get_current_us
 
 @router.post("/schools/", response_model=School)
 def create_school(school: SchoolCreate, session=Depends(get_session), admin=Depends(get_current_admin_user)):
+    if not admin.is_superadmin:
+        raise HTTPException(status_code=403, detail="Kun superadmin må oprette skoler")
     existing = session.exec(select(School).where(School.name == school.name)).first()
     if existing:
         raise HTTPException(status_code=400, detail="Skolen findes allerede")
@@ -124,11 +138,14 @@ def create_school(school: SchoolCreate, session=Depends(get_session), admin=Depe
 
 @router.get("/schools/{school_id}/clients/", response_model=list[Client])
 def get_clients_for_school(school_id: int, session=Depends(get_session), user=Depends(get_current_user)):
+    _require_school_access(user, school_id)
     return session.exec(select(Client).where(Client.school_id == school_id)).all()
 
 
 @router.delete("/schools/{school_id}/", status_code=204)
 def delete_school(school_id: int, session=Depends(get_session), admin=Depends(get_current_admin_user)):
+    if not admin.is_superadmin:
+        raise HTTPException(status_code=403, detail="Kun superadmin må slette skoler")
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
@@ -173,6 +190,7 @@ def update_school_times(
 
 @router.get("/schools/{school_id}/times")
 def get_school_times(school_id: int, session=Depends(get_session), user=Depends(get_current_user)):
+    _require_school_access(user, school_id)
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
@@ -190,6 +208,7 @@ def get_school_season_times(
     user=Depends(get_current_user)
 ):
     _validate_season(season)
+    _require_school_access(user, school_id)
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
@@ -337,6 +356,7 @@ def update_school_name(
     session=Depends(get_session),
     admin=Depends(get_current_admin_user)
 ):
+    _require_school_access(admin, school_id)
     school = session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=404, detail="Skole ikke fundet")
