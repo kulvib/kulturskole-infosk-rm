@@ -49,9 +49,12 @@ export function getWsApiUrl() {
   return apiUrl;
 }
 
-export function getTerminalBrowserWsUrl(clientId) {
+export function getTerminalBrowserWsUrl(clientId, mode = "user") {
   const token = getAuthToken();
-  const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+  const params = new URLSearchParams();
+  if (token) params.set("token", token);
+  params.set("mode", mode === "admin" ? "admin" : "user");
+  const qs = params.toString() ? `?${params.toString()}` : "";
   return `${getWsApiUrl()}/api/terminal/browser/${encodeURIComponent(clientId)}/ws${qs}`;
 }
 
@@ -312,10 +315,10 @@ export async function setClientState(id, state) {
   return res.json();
 }
 
-export function openTerminal(id) {
+export function openTerminal(id, mode = "user") {
   // Gammel placeholder bevares for bagudkompatibilitet.
   // Den rigtige terminal åbnes nu via ClientTerminalDialog + WebSocket.
-  return getTerminalBrowserWsUrl(id);
+  return getTerminalBrowserWsUrl(id, mode);
 }
 
 export function openRemoteDesktop(id) {
@@ -596,6 +599,18 @@ export async function requestOsUpdate(clientId) {
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok)
     throw new Error(await extractError(res, "Kunne ikke anmode om OS opdatering"));
+  return res.json();
+}
+
+export async function requestClientflowUpdate(clientId) {
+  const res = await fetch(`${apiUrl}/api/clients/${encodeURIComponent(clientId)}/clientflow-update`, {
+    method: "POST",
+    headers: authHeaders(),
+    credentials: "include",
+  });
+  if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
+  if (!res.ok)
+    throw new Error(await extractError(res, "Kunne ikke anmode om ClientFlow-opdatering"));
   return res.json();
 }
 
