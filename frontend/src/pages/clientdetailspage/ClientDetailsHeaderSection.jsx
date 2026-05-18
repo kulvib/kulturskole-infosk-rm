@@ -158,6 +158,12 @@ function isOsUpdateStatusMessage(status) {
   );
 }
 
+function formatClientFlowVersion(version) {
+  const raw = String(version ?? "").trim();
+  if (!raw) return "Ikke rapporteret endnu";
+  return raw.toLowerCase().startsWith("v") ? raw : `v${raw}`;
+}
+
 function OnlineStatusBadge({ isOnline, isMobile = false }) {
   const color = isOnline ? "#43a047" : "#e53935";
   const text = isOnline ? "online" : "offline";
@@ -741,6 +747,40 @@ function ClientDetailsHeaderSection({
                           }}
                         >
                           {client?.id ?? "?"}
+                        </TableCell>
+                      </TableRow>
+                    )}
+
+                    {/* ClientFlow version — kun admin */}
+                    {isAdmin && (
+                      <TableRow sx={{ height: isMobile ? 28 : 34 }}>
+                        <TableCell
+                          sx={{
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                            pr: isMobile ? 0.5 : 1,
+                            py: 0,
+                            verticalAlign: "middle",
+                            fontSize: isMobile ? 12 : 14,
+                            borderBottom: "none",
+                            width: labelCellWidth,
+                            minWidth: labelCellWidth
+                          }}
+                        >
+                          ClientFlow version:
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            fontWeight: 400,
+                            pl: isMobile ? 0.5 : 1.5,
+                            py: 0,
+                            verticalAlign: "middle",
+                            fontSize: isMobile ? 12 : 14,
+                            borderBottom: "none",
+                            color: client?.client_version ? "text.primary" : "text.secondary"
+                          }}
+                        >
+                          {formatClientFlowVersion(client?.client_version)}
                         </TableCell>
                       </TableRow>
                     )}
