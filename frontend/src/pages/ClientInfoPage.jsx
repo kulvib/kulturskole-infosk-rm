@@ -1,371 +1,277 @@
-import React from "react";
+import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import {
-  Grid,
-  Card,
-  CardContent,
+  Box,
   Typography,
-  Button,
-  Tooltip,
+  Paper,
   Table,
-  TableHead,
   TableBody,
   TableCell,
   TableContainer,
+  TableHead,
   TableRow,
-  Box,
   IconButton,
+  Button,
+  Tooltip,
   CircularProgress,
+  Stack,
+  Snackbar,
+  Alert as MuiAlert,
+  Select,
+  MenuItem,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Alert,
+  Chip,
+  TextField,
   useMediaQuery,
+  useTheme,
 } from "@mui/material";
-import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
+import InfoIcon from "@mui/icons-material/Info";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import { useTheme } from "@mui/material/styles";
-import { apiUrl } from "../../api";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import DevicesIcon from "@mui/icons-material/Devices";
+import PendingActionsIcon from "@mui/icons-material/PendingActions";
+import { Link } from "react-router-dom";
+import {
+  getClients,
+  getMyClients,
+  approveClient,
+  removeClient,
+  updateClient,
+  getSchools,
+} from "../api";
+import { useAuth } from "../auth/authcontext";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+
+/*
+  ClientInfoPage.jsx
+
+  Formål:
+  - Viser godkendte klienter.
+  - Viser nye/pending klienter fra enrollment/installationskode-flow.
+  - Godkender pending klienter med skolevalg.
+  - Fjerner klienter med robust loading/error-flow.
+
+  Relevante forbedringer:
+  - Pending/enrollment-klienter viser nu lokalitet tydeligt.
+  - Pending-listen sorteres med nyeste klienter først.
+  - Slet/fjern har loading state og lukker kun dialog ved succes.
+  - Fjern opdaterer UI optimistisk og henter derefter listen igen.
+  - Baggrundspolling spammer ikke snackbar.
+  - Polling pauser under drag/sort.
+  - Korrekt import-sti til api/auth fra src/pages.
+  - Hurtigere online/offline-polling med guard mod overlappende requests.
+  - Fokus/visibility refresh, så listen opdateres straks når fanen åbnes igen.
+  - Robust online-fortolkning fra både isOnline og is_online.
+  - Netværksfelter viser "ikke tilsluttet" for LAN når backend angiver det.
+*/
+
+// ---------------------------------------------------------------------------
+// Polling
+// ---------------------------------------------------------------------------
+
+// Detaljesiden får online/offline hurtigt via /chrome-status.
+// Oversigten henter hele klientlisten, så vi poller lidt langsommere, men
+// stadig hurtigere end før, så status ikke føles forsinket.
+const CLIENT_LIST_POLL_MS = 2_000;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const UKEDAGE = [
-  "Søndag","Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag",
-];
+function formatTimestamp(isoDate) {
+  if (!isoDate) return { date: "", time: "" };
 
-function getAuthHeaders(extra = {}) {
-  const token = localStorage.getItem("token");
-  return {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    accept: "application/json",
-    ...extra,
-  };
-}
+  const raw = String(isoDate);
+  const dateObj = new Date(
+    raw.endsWith("Z") || /[+\-]\d{2}:?\d{2}$/.test(raw) ? raw : raw + "Z"
+  );
 
-async function requestUbuntuUpdate(clientId) {
-  if (!clientId) throw new Error("Mangler klient-id");
-
-  const res = await fetch(`${apiUrl}/api/clients/${encodeURIComponent(clientId)}/os-update`, {
-    method: "POST",
-    credentials: "include",
-    headers: getAuthHeaders({
-      "Content-Type": "application/json",
-    }),
-  });
-
-  let data = null;
-  try {
-    data = await res.json();
-  } catch {
-    // Backend kan i sjældne tilfælde returnere tom body.
+  if (Number.isNaN(dateObj.getTime())) {
+    return { date: "", time: "" };
   }
-
-  if (!res.ok) {
-    throw new Error(data?.detail || data?.message || `Ubuntu-opdatering fejlede (${res.status})`);
-  }
-
-  return data;
-}
-
-function formatDateShort(dt) {
-  const dayName = UKEDAGE[dt.getDay()];
-  const day   = dt.getDate().toString().padStart(2, "0");
-  const month = (dt.getMonth() + 1).toString().padStart(2, "0");
-  const year  = dt.getFullYear();
-  return `${dayName} ${day}.${month} ${year}`;
-}
-
-/**
- * Slår en dato op i markedDays-objektet.
- * Prøver tre nøgle-formater for at være robust mod backend-variationer:
- *   1. "YYYY-MM-DDT00:00:00"
- *   2. "YYYY-MM-DD"
- *   3. Prefix-match (første nøgle der starter med "YYYY-MM-DD")
- */
-function getStatusAndTimesFromRaw(markedDays, dt) {
-  const yyyy = dt.getFullYear();
-  const mm   = (dt.getMonth() + 1).toString().padStart(2, "0");
-  const dd   = dt.getDate().toString().padStart(2, "0");
-  const dateKeyFull  = `${yyyy}-${mm}-${dd}T00:00:00`;
-  const dateKeyShort = `${yyyy}-${mm}-${dd}`;
-
-  const data =
-    markedDays[dateKeyFull] ||
-    markedDays[dateKeyShort] ||
-    Object.entries(markedDays).find(([k]) => k.startsWith(dateKeyShort))?.[1];
-
-  if (!data || !data.status || data.status === "off") {
-    return { status: "off", powerOn: "", powerOff: "" };
-  }
-  return {
-    status:   "on",
-    powerOn:  data.onTime  || "",
-    powerOff: data.offTime || "",
-  };
-}
-
-/**
- * Formatér oppetid til "X d., X t., X min., X sek."
- * Håndterer:
- *   - Rent sekund-tal (fra lokal ticker): "86400"
- *   - D-HH:MM:SS: "1-02:03:04"
- *   - HH:MM:SS: "02:03:04"
- *   - MM:SS: "03:04"
- */
-function formatUptime(uptimeStr) {
-  if (uptimeStr === null || uptimeStr === undefined || uptimeStr === "") {
-    return "ukendt";
-  }
-  const str = String(uptimeStr).trim();
-  if (!str) return "ukendt";
-
-  let totalSeconds = 0;
-
-  if (str.includes("-") && str.includes(":")) {
-    // Format: "D-HH:MM:SS"
-    const [d, hms] = str.split("-");
-    const [h = "0", m = "0", s = "0"] = hms.split(":");
-    totalSeconds =
-      parseInt(d, 10) * 86400 +
-      parseInt(h, 10) * 3600 +
-      parseInt(m, 10) * 60 +
-      parseInt(s, 10);
-  } else if (str.includes(":")) {
-    // Format: "HH:MM:SS" eller "MM:SS"
-    const parts = str.split(":").map(Number);
-    if (parts.length === 3) {
-      totalSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-    } else if (parts.length === 2) {
-      totalSeconds = parts[0] * 60 + parts[1];
-    } else {
-      totalSeconds = parts[0] || 0;
-    }
-  } else {
-    // Rent sekund-tal
-    const parsed = parseInt(str, 10);
-    totalSeconds = isNaN(parsed) ? 0 : parsed;
-  }
-
-  if (isNaN(totalSeconds) || totalSeconds < 0) return "ukendt";
-
-  const days  = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const mins  = Math.floor((totalSeconds % 3600) / 60);
-  const secs  = totalSeconds % 60;
-
-  return `${days} d., ${hours} t., ${mins} min., ${secs} sek.`;
-}
-
-function formatUbuntuUpdates(client) {
-  const raw = client?.ubuntu_updates_available;
-
-  if (raw === null || raw === undefined || raw === "") {
-    return "ukendt";
-  }
-
-  const count = Number.parseInt(String(raw), 10);
-  if (!Number.isFinite(count) || count < 0) {
-    return "ukendt";
-  }
-
-  if (client?.pending_os_update || client?.state === "updating") {
-    return count > 0
-      ? `Opdatering i gang (${count} pakke(r))`
-      : "Opdatering i gang";
-  }
-
-  if (count === 0) {
-    return "Ingen opdateringer";
-  }
-
-  return `${count} pakke(r) klar`;
-}
-
-function getUbuntuUpdateCount(client) {
-  const raw = client?.ubuntu_updates_available;
-  const count = Number.parseInt(String(raw ?? ""), 10);
-  return Number.isFinite(count) && count >= 0 ? count : null;
-}
-
-function getUbuntuUpdateColor(client) {
-  const count = getUbuntuUpdateCount(client);
-
-  if (client?.pending_os_update || client?.state === "updating") {
-    return "error.main";
-  }
-
-  if (count === null) {
-    return "text.secondary";
-  }
-
-  // Grøn når der ikke er opdateringer, rød når der er opdateringer.
-  return count > 0 ? "error.main" : "success.main";
-}
-
-function formatDateTime(dateStr, withSeconds = false) {
-  if (!dateStr) return "ukendt";
-  let d;
-  if (dateStr.endsWith("Z") || dateStr.match(/[\+\-]\d{2}:?\d{2}$/)) {
-    d = new Date(dateStr);
-  } else {
-    d = new Date(dateStr + "Z");
-  }
-  // Guard mod Invalid Date
-  if (isNaN(d.getTime())) return "ukendt";
 
   const formatter = new Intl.DateTimeFormat("da-DK", {
     timeZone: "Europe/Copenhagen",
-    year:     "numeric",
-    month:    "2-digit",
-    day:      "2-digit",
-    hour:     "2-digit",
-    minute:   "2-digit",
-    second:   withSeconds ? "2-digit" : undefined,
-    hour12:   false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
   });
-  const parts  = formatter.formatToParts(d);
-  const get    = (type) => parts.find((p) => p.type === type)?.value || "";
-  const day    = get("day");
-  const month  = get("month");
-  const year   = get("year");
-  const hour   = get("hour");
-  const minute = get("minute");
-  const second = get("second");
-  return withSeconds
-    ? `${day}.${month} ${year}, kl. ${hour}:${minute}:${second}`
-    : `${day}.${month} ${year}, kl. ${hour}:${minute}`;
-}
 
-// ---------------------------------------------------------------------------
-// Delte tabel-styles — factory-funktioner så de ikke duplikeres
-// ---------------------------------------------------------------------------
+  const parts = formatter.formatToParts(dateObj);
+  const get = (type) => parts.find((p) => p.type === type)?.value || "";
 
-function makeCellStyle(isMobile) {
   return {
-    border: 0,
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-    pr: isMobile ? 0.25 : 0.5,
-    py: 0,
-    verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
-    fontSize: isMobile ? 12 : 14,
+    date: `${get("day")}-${get("month")}-${get("year")}`,
+    time: `Kl. ${get("hour")}:${get("minute")}:${get("second")}`,
   };
 }
 
-function makeValueCellStyle(isMobile) {
-  return {
-    border: 0,
-    pl: isMobile ? 0.25 : 0.5,
-    py: 0,
-    verticalAlign: "middle",
-    height: isMobile ? 22 : 30,
-    fontSize: isMobile ? 12 : 14,
-  };
+function getTimestampMs(value) {
+  if (!value) return 0;
+  const raw = String(value);
+  const d = new Date(
+    raw.endsWith("Z") || /[+\-]\d{2}:?\d{2}$/.test(raw) ? raw : raw + "Z"
+  );
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
-// ---------------------------------------------------------------------------
-// Konstanter udenfor komponenter
-// ---------------------------------------------------------------------------
+function getClientSchoolId(client) {
+  return client?.school_id ?? client?.schoolId ?? "";
+}
 
-const NETWORK_ROWS = [
-  { label: "IP-adresse WLAN:",  key: "wifi_ip_address" },
-  { label: "MAC-adresse WLAN:", key: "wifi_mac_address" },
-  { label: "IP-adresse LAN:",   key: "lan_ip_address" },
-  { label: "MAC-adresse LAN:",  key: "lan_mac_address" },
-];
+function getClientDisplayName(client) {
+  return client?.name || client?.hostname || `Klient #${client?.id ?? "?"}`;
+}
+
+function getClientLocality(client) {
+  return client?.locality || client?.location || "";
+}
+
+function getClientOnline(client) {
+  const value = client?.isOnline ?? client?.is_online ?? client?.online;
+  return value === true || value === 1 || value === "1" || String(value).toLowerCase() === "true";
+}
+
+function normalizeNetworkValue(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  const lower = text.toLowerCase();
+  if (["null", "none", "undefined", "ukendt", "unknown", "n/a", "-"].includes(lower)) return "";
+  if (text === "0.0.0.0" || text === "00:00:00:00:00:00") return "";
+  return text;
+}
+
+function normalizeBooleanLike(value) {
+  if (value === true || value === 1 || value === "1") return true;
+  if (value === false || value === 0 || value === "0") return false;
+  if (typeof value === "string") {
+    const lower = value.trim().toLowerCase();
+    if (["true", "yes", "ja", "connected", "tilsluttet", "up"].includes(lower)) return true;
+    if (["false", "no", "nej", "disconnected", "ikke_tilsluttet", "down"].includes(lower)) return false;
+  }
+  return null;
+}
+
+function getLanConnected(client) {
+  const explicit =
+    client?.lan_connected ??
+    client?.ethernet_connected ??
+    client?.lan_is_connected ??
+    client?.wired_connected;
+
+  const explicitValue = normalizeBooleanLike(explicit);
+  if (explicitValue !== null) return explicitValue;
+
+  // Fallback til eksisterende data, hvis backend endnu ikke sender et
+  // eksplicit LAN-connected felt.
+  return !!(
+    normalizeNetworkValue(client?.lan_ip_address) ||
+    normalizeNetworkValue(client?.lan_mac_address)
+  );
+}
+
+function getNetworkDisplayValue(client, key) {
+  const isLan = String(key || "").startsWith("lan_");
+  if (isLan && !getLanConnected(client)) return "ikke tilsluttet";
+
+  const value = normalizeNetworkValue(client?.[key]);
+  if (value) return value;
+
+  return isLan ? "ikke tilsluttet" : "ukendt";
+}
+
+function getNetworkCopyValue(client, key) {
+  const value = getNetworkDisplayValue(client, key);
+  return value === "ukendt" || value === "ikke tilsluttet" ? "" : value;
+}
+
+function getClientStatusChipProps(status) {
+  const value = String(status || "").toLowerCase();
+
+  if (value === "approved") {
+    return { label: "Godkendt", color: "success" };
+  }
+
+  if (value === "pending" || value === "awaiting_approval") {
+    return { label: "Afventer", color: "warning" };
+  }
+
+  if (value === "rejected" || value === "disabled") {
+    return { label: "Deaktiveret", color: "default" };
+  }
+
+  return { label: status || "Ukendt", color: "default" };
+}
+
+// Sammenlign kun felter, der bruges på denne oversigt.
+// uptime og last_seen ændres ofte via heartbeat, men vises ikke her.
+function isClientListEqual(a = [], b = []) {
+  if (a.length !== b.length) return false;
+
+  for (let i = 0; i < a.length; i++) {
+    const ca = a[i] || {};
+    const cb = b[i] || {};
+
+    if (
+      ca.id !== cb.id ||
+      ca.name !== cb.name ||
+      ca.hostname !== cb.hostname ||
+      ca.locality !== cb.locality ||
+      ca.location !== cb.location ||
+      ca.status !== cb.status ||
+      ca.sort_order !== cb.sort_order ||
+      getClientOnline(ca) !== getClientOnline(cb) ||
+      String(getClientSchoolId(ca)) !== String(getClientSchoolId(cb)) ||
+
+      // Felter vist for ikke-godkendte/enrollment klienter
+      ca.wifi_ip_address !== cb.wifi_ip_address ||
+      ca.lan_ip_address !== cb.lan_ip_address ||
+      ca.wifi_mac_address !== cb.wifi_mac_address ||
+      ca.lan_mac_address !== cb.lan_mac_address ||
+      ca.lan_connected !== cb.lan_connected ||
+      ca.ethernet_connected !== cb.ethernet_connected ||
+      ca.lan_is_connected !== cb.lan_is_connected ||
+      ca.wired_connected !== cb.wired_connected ||
+      ca.machine_id !== cb.machine_id ||
+      ca.created_at !== cb.created_at
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // Sub-komponenter
 // ---------------------------------------------------------------------------
 
-function StatusText({ status, isMobile = false }) {
-  return (
-    <Typography
-      variant="body2"
-      sx={{
-        fontWeight: 600,
-        color: status === "on" ? "#43a047" : "#e53935",
-        textTransform: "lowercase",
-        fontSize: isMobile ? 12 : undefined,
-      }}
-    >
-      {String(status).toLowerCase()}
-    </Typography>
-  );
-}
-
-function ClientPowerShortTable({ markedDays, isMobile = false }) {
-  // useMemo — days-array genskabes ikke ved hver render
-  const days = React.useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: 3 }, (_, i) => {
-      const d = new Date(now);
-      d.setDate(now.getDate() + i);
-      return d;
-    });
-  }, []);
-
-  // useMemo — cellStyle genskabes ikke ved hver render
-  const cellStyle = React.useMemo(() => ({
-    whiteSpace: "nowrap",
-    py: 0,
-    px: isMobile ? 1 : 1.625,
-    fontSize: isMobile ? 12 : 14,
-  }), [isMobile]);
-
-  return (
-    <TableContainer sx={isMobile ? { maxWidth: "100vw" } : {}}>
-      <Table size="small">
-        <TableHead>
-          <TableRow sx={{ height: isMobile ? 22 : 30 }}>
-            <TableCell sx={cellStyle}>Dato</TableCell>
-            <TableCell sx={cellStyle}>Status</TableCell>
-            <TableCell sx={cellStyle}>Tænd</TableCell>
-            <TableCell sx={cellStyle}>Sluk</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {days.map((dt) => {
-            const { status, powerOn, powerOff } =
-              getStatusAndTimesFromRaw(markedDays, dt);
-            return (
-              <TableRow
-                key={dt.toISOString().slice(0, 10)}
-                sx={{ height: isMobile ? 22 : 30 }}
-              >
-                <TableCell sx={cellStyle}>{formatDateShort(dt)}</TableCell>
-                <TableCell sx={cellStyle}>
-                  <StatusText status={status} isMobile={isMobile} />
-                </TableCell>
-                <TableCell sx={cellStyle}>
-                  {status === "on" && powerOn  ? powerOn  : ""}
-                </TableCell>
-                <TableCell sx={cellStyle}>
-                  {status === "on" && powerOff ? powerOff : ""}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-}
-
-function CopyField({ value, isMobile = false }) {
+const CopyIconButton = memo(function CopyIconButton({
+  value,
+  disabled,
+  iconSize = 16,
+}) {
   const [copied, setCopied] = React.useState(false);
 
-  const handleCopy = async () => {
-    if (!value || value === "ukendt") return;
+  const handleCopy = async (e) => {
+    e.stopPropagation();
+    if (disabled || value === null || value === undefined || value === "") return;
+    const text = String(value);
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
+        await navigator.clipboard.writeText(text);
       } else {
         const ta = document.createElement("textarea");
-        ta.value = value;
+        ta.value = text;
         ta.style.position = "fixed";
         ta.style.left = "-9999px";
         document.body.appendChild(ta);
@@ -374,538 +280,1131 @@ function CopyField({ value, isMobile = false }) {
         document.body.removeChild(ta);
       }
       setCopied(true);
-      setTimeout(() => setCopied(false), 800);
+      setTimeout(() => setCopied(false), 1200);
     } catch {
       // ignore
     }
   };
 
   return (
-    <Box sx={{ display: "flex", alignItems: "center", lineHeight: isMobile ? "22px" : "30px" }}>
-      <span style={{ fontSize: isMobile ? 12 : undefined }}>{value}</span>
-      {value && value !== "ukendt" && (
-        <Tooltip title={copied ? "Kopieret!" : "Kopier"} arrow>
-          <IconButton
-            aria-label="kopier"
-            onClick={handleCopy}
-            size="small"
-            sx={{
-              ml: 0.5,
-              p: 0,
-              height: isMobile ? "1em" : "1.4em",
-              width:  isMobile ? "1em" : "1.4em",
-            }}
-          >
-            <ContentCopyIcon
-              sx={{ fontSize: isMobile ? "0.8em" : "1em", verticalAlign: "middle" }}
-            />
-          </IconButton>
-        </Tooltip>
-      )}
+    <Tooltip title={copied ? "Kopieret!" : "Kopiér"}>
+      <span>
+        <IconButton
+          size="small"
+          onClick={handleCopy}
+          sx={{ ml: 0.5, p: 0.2 }}
+          disabled={disabled}
+        >
+          <ContentCopyIcon
+            sx={{ fontSize: iconSize * 0.96 }}
+            color={copied ? "success" : "inherit"}
+          />
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
+});
+
+const ClientStatusCell = memo(function ClientStatusCell({ isOnline }) {
+  const theme = useTheme();
+  return (
+    <Box
+      sx={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 48,
+        height: 20,
+        borderRadius: "12px",
+        bgcolor: isOnline
+          ? theme.palette.success.main
+          : theme.palette.error.main,
+        color: "#fff",
+        fontWeight: 400,
+        fontSize: 13,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+      }}
+    >
+      {isOnline ? "online" : "offline"}
     </Box>
   );
-}
+});
 
-function SystemInfoTable({
-  client,
-  uptime,
-  lastSeen,
-  isMobile = false,
-  clientOnline,
-  showSnackbar,
-  onUbuntuUpdateStarted,
-}) {
-  const cellStyle      = React.useMemo(() => makeCellStyle(isMobile),      [isMobile]);
-  const valueCellStyle = React.useMemo(() => makeValueCellStyle(isMobile), [isMobile]);
-
-  const [updateStarting, setUpdateStarting] = React.useState(false);
-  const [localMessage, setLocalMessage] = React.useState("");
-  const [confirmOpen, setConfirmOpen] = React.useState(false);
-
-  const updateCount = getUbuntuUpdateCount(client);
-  const isUpdating = !!client?.pending_os_update || client?.state === "updating";
-  const isOffline =
-    typeof clientOnline !== "undefined"
-      ? clientOnline === false
-      : client?.isOnline === false;
-
-  const canRequestUbuntuUpdate =
-    !!client?.id &&
-    !isOffline &&
-    !isUpdating &&
-    !updateStarting;
-
-  const closeConfirmDialog = React.useCallback(() => {
-    if (!updateStarting) {
-      setConfirmOpen(false);
-    }
-  }, [updateStarting]);
-
-  const openConfirmDialog = React.useCallback(() => {
-    if (!canRequestUbuntuUpdate) return;
-    setLocalMessage("");
-    setConfirmOpen(true);
-  }, [canRequestUbuntuUpdate]);
-
-  const handleConfirmUbuntuUpdate = React.useCallback(async () => {
-    if (!canRequestUbuntuUpdate) return;
-
-    setUpdateStarting(true);
-    setLocalMessage("");
-
-    try {
-      await requestUbuntuUpdate(client.id);
-
-      setLocalMessage("Ubuntu-opdatering bestilt");
-      setConfirmOpen(false);
-
-      if (typeof showSnackbar === "function") {
-        showSnackbar("Ubuntu-opdatering bestilt", "success");
-      }
-      if (typeof onUbuntuUpdateStarted === "function") {
-        onUbuntuUpdateStarted();
-      }
-    } catch (err) {
-      const message = err?.message || "Kunne ikke starte Ubuntu-opdatering";
-      setLocalMessage(message);
-      if (typeof showSnackbar === "function") {
-        showSnackbar(message, "error");
-      }
-    } finally {
-      setUpdateStarting(false);
-    }
-  }, [
-    canRequestUbuntuUpdate,
-    client?.id,
-    showSnackbar,
-    onUbuntuUpdateStarted,
-  ]);
-
-  const ubuntuUpdateValue = React.useMemo(() => {
-    const text = formatUbuntuUpdates(client);
-    const showButton = updateCount === null || updateCount > 0 || isUpdating;
-
-    return (
-      <Box
-        sx={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 1,
-          flexWrap: "wrap",
-          lineHeight: isMobile ? "22px" : "30px",
-          fontSize: isMobile ? 12 : 14,
-          fontFamily: "inherit",
-          fontWeight: 400,
-        }}
-      >
-        <Box component="span" sx={{ fontFamily: "inherit", fontWeight: 400 }}>
-          {text}
-        </Box>
-
-        {showButton && (
-          <Button
-            size="small"
-            variant="outlined"
-            color={updateCount > 0 ? "error" : "primary"}
-            onClick={openConfirmDialog}
-            disabled={!canRequestUbuntuUpdate}
-            sx={{
-              minHeight: isMobile ? 22 : 26,
-              py: 0,
-              px: 1,
-              fontSize: isMobile ? 11 : 12,
-              textTransform: "none",
-              whiteSpace: "nowrap",
-              fontFamily: "inherit",
-              fontWeight: 400,
-            }}
-          >
-            {updateStarting ? (
-              <>
-                <CircularProgress size={12} sx={{ mr: 0.75 }} />
-                Starter...
-              </>
-            ) : isUpdating ? (
-              "Opdaterer..."
-            ) : (
-              "Opdater Ubuntu"
-            )}
-          </Button>
-        )}
-
-        {localMessage && (
-          <Typography
-            component="span"
-            variant="caption"
-            sx={{
-              color: localMessage.toLowerCase().includes("fejl") || localMessage.toLowerCase().includes("kunne ikke")
-                ? "error.main"
-                : "success.main",
-              fontWeight: 400,
-              fontFamily: "inherit",
-            }}
-          >
-            {localMessage}
-          </Typography>
-        )}
-      </Box>
-    );
-  }, [
-    client,
-    updateCount,
-    isUpdating,
-    isMobile,
-    openConfirmDialog,
-    canRequestUbuntuUpdate,
-    updateStarting,
-    localMessage,
-  ]);
-
-  const confirmPackageText =
-    updateCount === null
-      ? "Ubuntu-opdateringer"
-      : updateCount === 1
-        ? "1 pakke"
-        : `${updateCount} pakker`;
-
-  // useMemo — rows + dyre format-kald genskabes ikke ved hver render
-  const rows = React.useMemo(() => [
-    { label: "Ubuntu version:", value: client?.ubuntu_version || "ukendt" },
-    {
-      label: "Ubuntu opdateringer:",
-      value: ubuntuUpdateValue,
-      color: getUbuntuUpdateColor(client),
-    },
-    { label: "Oppetid:",        value: formatUptime(uptime) },
-    { label: "Sidst set:",      value: formatDateTime(lastSeen, true) },
-    { label: "Tilføjet:",       value: formatDateTime(client?.created_at, true) },
-  ], [
-    client?.ubuntu_version,
-    client?.ubuntu_updates_available,
-    client?.pending_os_update,
-    client?.state,
-    client?.created_at,
-    ubuntuUpdateValue,
-    uptime,
-    lastSeen,
-  ]);
+const EnrollmentIdentityCell = memo(function EnrollmentIdentityCell({ client }) {
+  const locality = getClientLocality(client);
+  const machineId = client?.machine_id || "";
 
   return (
-    <>
-      <TableContainer>
-        <Table size="small" aria-label="systeminfo">
-          <TableBody>
-            {rows.map(({ label, value, color }) => (
-              <TableRow key={label} sx={{ height: isMobile ? 22 : 30 }}>
-                <TableCell sx={cellStyle}>{label}</TableCell>
-                <TableCell sx={valueCellStyle}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      lineHeight: isMobile ? "22px" : "30px",
-                      color: color || "inherit",
-                      fontWeight: 400,
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    {value}
-                  </Box>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+    <Stack spacing={0.35}>
+      <Stack direction="row" spacing={0.75} alignItems="center">
+        <DevicesIcon sx={{ fontSize: 17, color: "primary.main" }} />
+        <Typography sx={{ fontWeight: 700 }}>
+          {getClientDisplayName(client)}
+        </Typography>
+      </Stack>
 
-      <Dialog
-        open={confirmOpen}
-        onClose={closeConfirmDialog}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>
-          Start Ubuntu-opdatering?
-        </DialogTitle>
+      <Stack direction="row" spacing={0.75} alignItems="center">
+        <LocationOnIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+        <Typography variant="body2" color={locality ? "text.primary" : "text.secondary"}>
+          {locality || "Ingen lokation angivet"}
+        </Typography>
+      </Stack>
 
-        <DialogContent>
-          <Typography variant="body2" sx={{ mb: 1.5 }}>
-            Du er ved at starte Ubuntu-opdatering på denne klient.
-          </Typography>
-
-          <Alert severity={updateCount > 0 ? "warning" : "info"} sx={{ mb: 1.5 }}>
-            {updateCount > 0
-              ? `${confirmPackageText} installeres. Klienten genstarter automatisk, hvis opdateringen kræver det.`
-              : "Der er aktuelt ingen registrerede opdateringer, men klienten tjekker igen, når handlingen startes."}
-          </Alert>
-
-          <Typography variant="body2" color="text.secondary">
-            Klient: {client?.name || client?.id || "ukendt"}
-          </Typography>
-
-          {localMessage && (
-            <Typography
-              variant="body2"
-              sx={{
-                mt: 1.5,
-                color: localMessage.toLowerCase().includes("fejl") || localMessage.toLowerCase().includes("kunne ikke")
-                  ? "error.main"
-                  : "success.main",
-              }}
-            >
-              {localMessage}
-            </Typography>
-          )}
-        </DialogContent>
-
-        <DialogActions>
-          <Button
-            onClick={closeConfirmDialog}
-            color="inherit"
-            disabled={updateStarting}
-          >
-            Annullér
-          </Button>
-          <Button
-            onClick={handleConfirmUbuntuUpdate}
-            color="error"
-            variant="contained"
-            disabled={!canRequestUbuntuUpdate}
-          >
-            {updateStarting ? (
-              <>
-                <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} />
-                Starter...
-              </>
-            ) : (
-              "Start opdatering"
-            )}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
+      {machineId && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ wordBreak: "break-all" }}
+        >
+          Machine ID: {machineId}
+          <CopyIconButton value={machineId} iconSize={13} />
+        </Typography>
+      )}
+    </Stack>
   );
-}
-
-function hasNetworkValue(value) {
-  if (value === null || value === undefined) return false;
-
-  const text = String(value).trim().toLowerCase();
-  if (!text) return false;
-
-  return ![
-    "ukendt",
-    "unknown",
-    "none",
-    "null",
-    "undefined",
-    "0.0.0.0",
-    "::",
-    "00:00:00:00:00:00",
-  ].includes(text);
-}
-
-function getLanConnectedState(client) {
-  // Brug eksplicit backend/agent-signal hvis det findes.
-  // Dette gør frontend klar til fx lan_connected=false eller ethernet_connected=false.
-  const candidates = [
-    client?.lan_connected,
-    client?.ethernet_connected,
-    client?.lan_is_connected,
-    client?.wired_connected,
-  ];
-
-  const explicit = candidates.find((value) => typeof value === "boolean");
-  if (typeof explicit === "boolean") return explicit;
-
-  // Fallback: hvis kun én af LAN-værdierne findes, betragtes LAN som ikke aktivt nok
-  // til at vise som en fuld forbindelse. Hvis begge findes, kan frontend ikke vide
-  // om de er stale uden hjælp fra backend/klient-agent.
-  const hasLanIp = hasNetworkValue(client?.lan_ip_address);
-  const hasLanMac = hasNetworkValue(client?.lan_mac_address);
-
-  if (!hasLanIp && !hasLanMac) return false;
-  if (hasLanIp !== hasLanMac) return false;
-
-  return null;
-}
-
-function getNetworkDisplayValue(client, key) {
-  const value = client?.[key];
-
-  if (key === "lan_ip_address" || key === "lan_mac_address") {
-    const lanConnected = getLanConnectedState(client);
-
-    if (lanConnected === false) {
-      return "ikke tilsluttet";
-    }
-  }
-
-  return hasNetworkValue(value) ? value : "ukendt";
-}
-
-function NetworkInfoTable({ client, isMobile = false }) {
-  const cellStyle      = React.useMemo(() => makeCellStyle(isMobile),      [isMobile]);
-  const valueCellStyle = React.useMemo(() => makeValueCellStyle(isMobile), [isMobile]);
-  const lanConnected  = getLanConnectedState(client);
-
-  return (
-    <TableContainer>
-      <Table size="small" aria-label="netværksinfo">
-        <TableBody>
-          {NETWORK_ROWS.map(({ label, key }) => {
-            const value = getNetworkDisplayValue(client, key);
-            const isLanRow = key === "lan_ip_address" || key === "lan_mac_address";
-            const isDisconnectedLan = isLanRow && lanConnected === false;
-
-            return (
-              <TableRow key={key} sx={{ height: isMobile ? 22 : 30 }}>
-                <TableCell sx={cellStyle}>{label}</TableCell>
-                <TableCell sx={valueCellStyle}>
-                  <Box
-                    sx={{
-                      color: isDisconnectedLan ? "text.secondary" : "inherit",
-                      fontStyle: isDisconnectedLan ? "italic" : "normal",
-                    }}
-                  >
-                    <CopyField value={value} isMobile={isMobile} />
-                  </Box>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Hoved-komponent
 // ---------------------------------------------------------------------------
 
-export default function ClientDetailsInfoSection({
-  client,
-  markedDays,
-  uptime,
-  lastSeen,
-  setCalendarDialogOpen,
-  clientOnline,
-  calendarLoading = false,
-  showSnackbar,
-  onUbuntuUpdateStarted,
-}) {
-  const theme    = useTheme();
+export default function ClientInfoPage() {
+  const { user } = useAuth();
+  const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const isOffline =
-    typeof clientOnline !== "undefined"
-      ? clientOnline === false
-      : client?.isOnline === false;
+  const [clients, setClients] = useState([]);
+  const [schools, setSchools] = useState([]);
+  const [schoolSelections, setSchoolSelections] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [dragClients, setDragClients] = useState([]);
+  const [savingSort, setSavingSort] = useState(false);
 
-  const disabledOverlay = React.useMemo(() =>
-    isOffline
-      ? { opacity: 0.65, filter: "grayscale(20%)", bgcolor: "#fafafa" }
-      : {},
-    [isOffline]
+  const [removingClientId, setRemovingClientId] = useState(null);
+  const [approvingClientId, setApprovingClientId] = useState(null);
+
+  const lastFetchedClients = useRef([]);
+  const isDraggingRef = useRef(false);
+  const fetchingClientsRef = useRef(false);
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmClientId, setConfirmClientId] = useState(null);
+  const [confirmDeleteText, setConfirmDeleteText] = useState("");
+
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  const showSnackbar = useCallback((message, severity = "success") => {
+    setSnackbar({ open: true, message, severity });
+  }, []);
+
+  const handleCloseSnackbar = useCallback(() => {
+    setSnackbar({ open: false, message: "", severity: "success" });
+  }, []);
+
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+
+  const selectedClientForRemoval =
+    clients.find((client) => client.id === confirmClientId) || null;
+
+  // ---------------------------------------------------------------------------
+  // Data-hentning
+  // ---------------------------------------------------------------------------
+
+  const fetchClients = useCallback(
+    async (forceUpdate = false, showLoading = false) => {
+      if (isDraggingRef.current) return;
+      if (fetchingClientsRef.current) return;
+
+      fetchingClientsRef.current = true;
+      if (showLoading) setLoading(true);
+      try {
+        const data =
+          user?.role === "bruger"
+            ? await getMyClients()
+            : await getClients();
+
+        if (
+          forceUpdate ||
+          !isClientListEqual(data, lastFetchedClients.current)
+        ) {
+          setClients(data);
+          lastFetchedClients.current = data;
+        }
+      } catch (err) {
+        if (forceUpdate || showLoading) {
+          showSnackbar("Fejl: " + (err?.message || err), "error");
+        }
+      } finally {
+        fetchingClientsRef.current = false;
+        if (showLoading) setLoading(false);
+      }
+    },
+    [user?.role, showSnackbar]
   );
 
-  const cardSx = React.useMemo(() => ({
-    borderRadius: isMobile ? 1 : 2,
-    height: "100%",
-    ...disabledOverlay,
-  }), [isMobile, disabledOverlay]);
+  // Initial load + hurtigere polling af online/offline-status.
+  useEffect(() => {
+    fetchClients(false, true);
+    const timer = setInterval(() => {
+      fetchClients(false, false);
+    }, CLIENT_LIST_POLL_MS);
+    return () => clearInterval(timer);
+  }, [fetchClients]);
 
-  const contentSx = React.useMemo(() => ({
-    px: isMobile ? 1 : 2,
-    py: isMobile ? 1 : 2,
-  }), [isMobile]);
+  // Når brugeren vender tilbage til fanen/siden, hent status med det samme
+  // i stedet for at vente på næste polling-interval.
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchClients(false, false);
+      }
+    };
 
-  const headingSx = React.useMemo(() => ({
-    fontWeight: 700,
-    flexGrow: 1,
-    fontSize: isMobile ? 16 : undefined,
-  }), [isMobile]);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [fetchClients]);
+
+  // Hent skoler
+  useEffect(() => {
+    getSchools()
+      .then(setSchools)
+      .catch(() => setSchools([]));
+  }, []);
+
+  // Opdater dragClients når clients ændres
+  useEffect(() => {
+    if (isDraggingRef.current) return;
+
+    const approved = clients
+      .filter((c) => c.status === "approved")
+      .slice()
+      .sort((a, b) => {
+        const aHas =
+          a.sort_order !== null && a.sort_order !== undefined;
+        const bHas =
+          b.sort_order !== null && b.sort_order !== undefined;
+        if (aHas && bHas) return a.sort_order - b.sort_order;
+        if (aHas) return -1;
+        if (bHas) return 1;
+        return a.id - b.id;
+      });
+
+    setDragClients(approved);
+  }, [clients]);
+
+  // Pending/enrollment-klienter: nyeste først.
+  const unapprovedClients = clients
+    .filter((c) => c.status !== "approved")
+    .slice()
+    .sort((a, b) => {
+      const byCreated = getTimestampMs(b.created_at) - getTimestampMs(a.created_at);
+      if (byCreated !== 0) return byCreated;
+      return (b.id || 0) - (a.id || 0);
+    });
+
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchClients(true, true);
+      showSnackbar("Opdateret!", "success");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchClients, showSnackbar]);
+
+  const openRemoveDialog = useCallback((clientId) => {
+    setConfirmClientId(clientId);
+    setConfirmDeleteText("");
+    setConfirmOpen(true);
+  }, []);
+
+  const closeRemoveDialog = useCallback(() => {
+    if (removingClientId) return;
+    setConfirmOpen(false);
+    setConfirmClientId(null);
+    setConfirmDeleteText("");
+  }, [removingClientId]);
+
+  const handleRemoveClient = useCallback(
+    async (clientId) => {
+      setRemovingClientId(clientId);
+
+      try {
+        await removeClient(clientId);
+
+        // Optimistisk fjern fra UI med det samme.
+        setClients((prev) => {
+          const next = prev.filter((client) => client.id !== clientId);
+          lastFetchedClients.current = next;
+          return next;
+        });
+        setDragClients((prev) => prev.filter((client) => client.id !== clientId));
+
+        showSnackbar("Klient fjernet!", "success");
+        setConfirmOpen(false);
+        setConfirmClientId(null);
+        setConfirmDeleteText("");
+
+        // Hent endelig sandhed fra backend.
+        await fetchClients(true, false);
+      } catch (err) {
+        showSnackbar(
+          "Kunne ikke fjerne klient: " + (err?.message || err),
+          "error"
+        );
+      } finally {
+        setRemovingClientId(null);
+      }
+    },
+    [fetchClients, showSnackbar]
+  );
+
+  const confirmRemoveClient = useCallback(async () => {
+    if (confirmClientId !== null && confirmClientId !== undefined) {
+      await handleRemoveClient(confirmClientId);
+    }
+  }, [confirmClientId, handleRemoveClient]);
+
+  const onDragStart = useCallback(() => {
+    isDraggingRef.current = true;
+  }, []);
+
+  const onDragEnd = useCallback(
+    async (result) => {
+      if (!result.destination) {
+        isDraggingRef.current = false;
+        return;
+      }
+
+      if (result.destination.index === result.source.index) {
+        isDraggingRef.current = false;
+        return;
+      }
+
+      const reordered = Array.from(dragClients);
+      const [removed] = reordered.splice(result.source.index, 1);
+      reordered.splice(result.destination.index, 0, removed);
+
+      // Opdater UI øjeblikkeligt, men hold polling pauset indtil save er færdig.
+      setDragClients(reordered);
+      setSavingSort(true);
+
+      try {
+        await Promise.all(
+          reordered.map((client, i) =>
+            updateClient(client.id, { sort_order: i + 1 })
+          )
+        );
+
+        showSnackbar("Sortering opdateret!", "success");
+
+        isDraggingRef.current = false;
+        await fetchClients(true, false);
+      } catch (err) {
+        showSnackbar(
+          "Kunne ikke opdatere sortering: " + (err?.message || err),
+          "error"
+        );
+
+        isDraggingRef.current = false;
+        await fetchClients(true, false);
+      } finally {
+        isDraggingRef.current = false;
+        setSavingSort(false);
+      }
+    },
+    [dragClients, fetchClients, showSnackbar]
+  );
+
+  const handleSchoolChange = useCallback((clientId, schoolId) => {
+    setSchoolSelections((prev) => ({ ...prev, [clientId]: schoolId }));
+  }, []);
+
+  const handleApproveClient = useCallback(
+    async (clientId) => {
+      const school_id = schoolSelections[clientId];
+
+      if (!school_id) {
+        showSnackbar("Vælg en skole først!", "warning");
+        return;
+      }
+
+      setApprovingClientId(clientId);
+
+      try {
+        await approveClient(clientId, school_id);
+        showSnackbar("Klient godkendt!", "success");
+
+        setSchoolSelections((prev) => {
+          const next = { ...prev };
+          delete next[clientId];
+          return next;
+        });
+
+        await fetchClients(true, true);
+      } catch (err) {
+        showSnackbar(
+          "Kunne ikke godkende klient: " + (err?.message || err),
+          "error"
+        );
+      } finally {
+        setApprovingClientId(null);
+      }
+    },
+    [schoolSelections, fetchClients, showSnackbar]
+  );
+
+  const getSchoolName = useCallback(
+    (schoolId) => {
+      const school = schools.find((s) => String(s.id) === String(schoolId));
+      return school ? (
+        school.name
+      ) : (
+        <span style={{ color: "#888" }}>Ingen skole</span>
+      );
+    },
+    [schools]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Mobil-række renderer
+  // ---------------------------------------------------------------------------
+  const renderMobileRow = useCallback(
+    (client, _idx, provided, snapshot) => (
+      <TableRow
+        ref={provided?.innerRef}
+        {...(provided ? provided.draggableProps : {})}
+        style={{
+          ...provided?.draggableProps?.style,
+          background: snapshot?.isDragging ? "#e3f2fd" : undefined,
+        }}
+        hover
+      >
+        {isAdmin && <TableCell>{client.id}</TableCell>}
+        <TableCell>
+          <Stack direction="column" spacing={0.5}>
+            <Typography sx={{ fontWeight: 600 }}>{client.name}</Typography>
+            {client.locality && (
+              <Typography sx={{ fontSize: "0.92em", color: "#888" }}>
+                {client.locality}
+              </Typography>
+            )}
+            <Typography sx={{ fontSize: "0.92em" }}>
+              {getSchoolName(getClientSchoolId(client))}
+            </Typography>
+          </Stack>
+        </TableCell>
+        <TableCell align="center">
+          <ClientStatusCell isOnline={getClientOnline(client)} />
+        </TableCell>
+        <TableCell align="center">
+          <Tooltip title="Info">
+            <IconButton
+              component={Link}
+              to={`/clients/${client.id}`}
+              color="primary"
+              size="small"
+            >
+              <InfoIcon />
+            </IconButton>
+          </Tooltip>
+        </TableCell>
+        {isAdmin && (
+          <TableCell align="center">
+            <Tooltip title="Fjern klient">
+              <span>
+                <IconButton
+                  color="error"
+                  onClick={() => openRemoveDialog(client.id)}
+                  size="small"
+                  disabled={removingClientId === client.id}
+                >
+                  {removingClientId === client.id ? (
+                    <CircularProgress size={18} />
+                  ) : (
+                    <DeleteIcon />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+          </TableCell>
+        )}
+        <TableCell
+          align="right"
+          {...provided?.dragHandleProps}
+          sx={{ cursor: "grab", width: 45 }}
+        >
+          <span style={{ fontSize: 20 }}>☰</span>
+        </TableCell>
+      </TableRow>
+    ),
+    [isAdmin, getSchoolName, openRemoveDialog, removingClientId]
+  );
+
+  const removalRequiresTypedId =
+    !!selectedClientForRemoval &&
+    (
+      selectedClientForRemoval.status === "approved" ||
+      getClientOnline(selectedClientForRemoval)
+    );
+
+  const removalTypedIdMatches =
+    !removalRequiresTypedId ||
+    String(confirmDeleteText).trim() === String(selectedClientForRemoval?.id ?? "");
+
+  const canConfirmRemoval =
+    !!selectedClientForRemoval &&
+    !removingClientId &&
+    removalTypedIdMatches;
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  const colSpanApproved = isAdmin ? (isMobile ? 6 : 8) : isMobile ? 4 : 6;
 
   return (
-    <Grid container spacing={isMobile ? 0.5 : 1}>
+    <Box
+      sx={{
+        maxWidth: 1500,
+        mx: "auto",
+        mt: { xs: 1, sm: 4 },
+        position: "relative",
+        minHeight: "60vh",
+        px: { xs: 0.5, sm: 2 },
+      }}
+    >
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4200}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <MuiAlert
+          elevation={6}
+          variant="filled"
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+        >
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
 
-      {/* Kalender */}
-      <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={cardSx}>
-          <CardContent sx={contentSx}>
-            <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-              <Typography variant="h6" sx={headingSx}>
-                Kalender
-              </Typography>
-              {/* Viser spinner mens kalenderdata hentes fra backend */}
-              {calendarLoading && (
-                <CircularProgress size={14} sx={{ ml: 1 }} />
+      {/* Bekræftelsesdialog */}
+      <Dialog open={confirmOpen} onClose={closeRemoveDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Fjern klient?</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5}>
+            <MuiAlert severity="warning">
+              Dette sletter kun klienten i backend. Den fysiske Ubuntu-maskine
+              bliver ikke nulstillet, og hvis den skal bruges igen, skal den
+              enrolles/installationsregistreres på ny.
+            </MuiAlert>
+
+            {selectedClientForRemoval && (
+              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "rgba(0,0,0,0.02)" }}>
+                <Typography sx={{ fontWeight: 700 }}>
+                  #{selectedClientForRemoval.id} · {getClientDisplayName(selectedClientForRemoval)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Status: {selectedClientForRemoval.status || "ukendt"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Online: {getClientOnline(selectedClientForRemoval) ? "Ja" : "Nej"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Lokation: {getClientLocality(selectedClientForRemoval) || "ikke angivet"}
+                </Typography>
+              </Paper>
+            )}
+
+            {getClientOnline(selectedClientForRemoval) && (
+              <MuiAlert severity="error">
+                Klienten ser ud til at være online. Slet kun en online klient,
+                hvis du er sikker på, at den skal fjernes fra driften.
+              </MuiAlert>
+            )}
+
+            {selectedClientForRemoval?.status === "approved" && (
+              <MuiAlert severity="info">
+                Klienten er godkendt. Hvis den slettes ved en fejl, skal den
+                oprettes igen med en ny installationskode og godkendes på ny.
+              </MuiAlert>
+            )}
+
+            {removalRequiresTypedId && selectedClientForRemoval && (
+              <TextField
+                size="small"
+                fullWidth
+                label={`Skriv klient-ID ${selectedClientForRemoval.id} for at bekræfte`}
+                value={confirmDeleteText}
+                onChange={(e) => setConfirmDeleteText(e.target.value)}
+                disabled={!!removingClientId}
+                error={!!confirmDeleteText && !removalTypedIdMatches}
+                helperText={
+                  removalTypedIdMatches
+                    ? " "
+                    : "Klient-ID matcher ikke."
+                }
+              />
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeRemoveDialog} disabled={!!removingClientId}>
+            Annullér
+          </Button>
+          <Button
+            onClick={confirmRemoveClient}
+            color="error"
+            variant="contained"
+            disabled={!canConfirmRemoval}
+            startIcon={
+              removingClientId ? (
+                <CircularProgress size={18} color="inherit" />
+              ) : (
+                <DeleteIcon />
+              )
+            }
+          >
+            {removingClientId ? "Fjerner..." : "Fjern klient"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Header */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ mb: 2, gap: 1 }}
+      >
+        <Typography
+          variant="h5"
+          sx={{
+            fontWeight: 700,
+            fontSize: { xs: "1.1rem", sm: "1.4rem" },
+          }}
+        >
+          Godkendte klienter
+        </Typography>
+        <Tooltip title="Opdater klientdata">
+          <span>
+            <Button
+              startIcon={
+                refreshing ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  <RefreshIcon />
+                )
+              }
+              onClick={handleRefresh}
+              disabled={refreshing || savingSort}
+              sx={{
+                minWidth: { xs: "unset", sm: 0 },
+                fontWeight: 500,
+                textTransform: "none",
+                width: { xs: "100%", sm: "auto" },
+              }}
+            >
+              {refreshing ? "Opdaterer..." : "Opdater"}
+            </Button>
+          </span>
+        </Tooltip>
+      </Stack>
+
+      {/* Godkendte klienter */}
+      <Paper sx={{ mb: 4, px: { xs: 0.5, sm: 0 } }}>
+        <TableContainer style={{ position: "relative" }}>
+          {(loading || savingSort) && (
+            <Box
+              sx={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+                background: "rgba(255,255,255,0.7)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10,
+              }}
+            >
+              <CircularProgress />
+              {savingSort && (
+                <Typography variant="body2">
+                  Gemmer sortering...
+                </Typography>
               )}
-              <Tooltip title="Vis kalender for periode">
-                <span>
-                  <Button
-                    size="small"
-                    variant="text"
+            </Box>
+          )}
+
+          <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
+            <Droppable droppableId="clients-droppable">
+              {(provided) => (
+                <Table
+                  size="small"
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  sx={{
+                    minWidth: 300,
+                    "& td, & th": {
+                      py: { xs: 1, sm: 1.2 },
+                      px: { xs: 0.5, sm: 2 },
+                      fontSize: { xs: "0.98em", sm: "0.875rem" },
+                    },
+                  }}
+                >
+                  <TableHead>
+                    <TableRow
+                      sx={{
+                        background: "#f6f9fc",
+                        "& th": {
+                          fontWeight: 700,
+                          fontSize: { xs: "1em", sm: "0.875rem" },
+                          whiteSpace: { xs: "nowrap", sm: "normal" },
+                        },
+                      }}
+                    >
+                      {isMobile ? (
+                        [
+                          ...(isAdmin ? ["ID"] : []),
+                          "Klientnavn",
+                          "Status",
+                          "Info",
+                          ...(isAdmin ? ["Fjern"] : []),
+                          "Sort",
+                        ].map((header, idx) => (
+                          <TableCell key={header + idx}>{header}</TableCell>
+                        ))
+                      ) : (
+                        <>
+                          {isAdmin && <TableCell>Klient ID</TableCell>}
+                          <TableCell>Klientnavn</TableCell>
+                          <TableCell>Lokalitet</TableCell>
+                          <TableCell sx={{ textAlign: "center" }}>
+                            Status
+                          </TableCell>
+                          <TableCell sx={{ textAlign: "center" }}>
+                            Skole
+                          </TableCell>
+                          <TableCell sx={{ textAlign: "center" }}>
+                            Info
+                          </TableCell>
+                          {isAdmin && (
+                            <TableCell sx={{ textAlign: "center" }}>
+                              Fjern
+                            </TableCell>
+                          )}
+                          <TableCell
+                            sx={{ width: 60, textAlign: "right" }}
+                          >
+                            Sortering
+                          </TableCell>
+                        </>
+                      )}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {dragClients.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={colSpanApproved}
+                          align="center"
+                        >
+                          Ingen godkendte klienter.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      dragClients.map((client, idx) => (
+                        <Draggable
+                          key={client.id}
+                          draggableId={String(client.id)}
+                          index={idx}
+                          isDragDisabled={savingSort || !!removingClientId}
+                        >
+                          {(provided, snapshot) =>
+                            isMobile
+                              ? renderMobileRow(
+                                  client,
+                                  idx,
+                                  provided,
+                                  snapshot
+                                )
+                              : (
+                                <TableRow
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    background: snapshot.isDragging
+                                      ? "#e3f2fd"
+                                      : undefined,
+                                  }}
+                                  hover
+                                >
+                                  {isAdmin && (
+                                    <TableCell>{client.id}</TableCell>
+                                  )}
+                                  <TableCell>{client.name}</TableCell>
+                                  <TableCell>
+                                    {client.locality || (
+                                      <span style={{ color: "#888" }}>
+                                        Ingen lokalitet
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <ClientStatusCell
+                                      isOnline={getClientOnline(client)}
+                                    />
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    {getSchoolName(getClientSchoolId(client))}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Tooltip title="Info">
+                                      <IconButton
+                                        component={Link}
+                                        to={`/clients/${client.id}`}
+                                        color="primary"
+                                      >
+                                        <InfoIcon />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </TableCell>
+                                  {isAdmin && (
+                                    <TableCell align="center">
+                                      <Tooltip title="Fjern klient">
+                                        <span>
+                                          <IconButton
+                                            color="error"
+                                            onClick={() =>
+                                              openRemoveDialog(client.id)
+                                            }
+                                            disabled={removingClientId === client.id}
+                                          >
+                                            {removingClientId === client.id ? (
+                                              <CircularProgress size={20} />
+                                            ) : (
+                                              <DeleteIcon />
+                                            )}
+                                          </IconButton>
+                                        </span>
+                                      </Tooltip>
+                                    </TableCell>
+                                  )}
+                                  <TableCell
+                                    align="right"
+                                    {...provided.dragHandleProps}
+                                    sx={{ cursor: "grab", width: 60 }}
+                                  >
+                                    <span style={{ fontSize: 20 }}>☰</span>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                          }
+                        </Draggable>
+                      ))
+                    )}
+                    {provided.placeholder}
+                  </TableBody>
+                </Table>
+              )}
+            </Droppable>
+          </DragDropContext>
+        </TableContainer>
+      </Paper>
+
+      {/* Ikke-godkendte klienter — kun admin */}
+      {isAdmin && (
+        <>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            justifyContent="space-between"
+            sx={{ mb: 2, gap: 1 }}
+          >
+            <Box>
+              <Typography
+                variant="h5"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: "1.1rem", sm: "1.4rem" },
+                }}
+              >
+                Ikke godkendte klienter
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Nye klienter fra installationskode vises her. Vælg skole og godkend, når du har identificeret skærmen.
+              </Typography>
+            </Box>
+
+            <Chip
+              icon={<PendingActionsIcon />}
+              label={`${unapprovedClients.length} afventer`}
+              color={unapprovedClients.length ? "warning" : "default"}
+              variant={unapprovedClients.length ? "filled" : "outlined"}
+            />
+          </Stack>
+
+          <Paper sx={{ px: { xs: 0.5, sm: 0 } }}>
+            <TableContainer>
+              <Table
+                size="small"
+                sx={{
+                  minWidth: 300,
+                  "& td, & th": {
+                    py: { xs: 1, sm: 1.2 },
+                    px: { xs: 0.5, sm: 2 },
+                    fontSize: { xs: "0.98em", sm: "0.875rem" },
+                  },
+                }}
+              >
+                <TableHead>
+                  <TableRow
                     sx={{
-                      minWidth: 0,
-                      color: "text.secondary",
-                      fontSize: isMobile ? "0.8rem" : "0.85rem",
-                      textTransform: "none",
-                      px: isMobile ? 0.5 : 1,
-                      borderRadius: isMobile ? 5 : 8,
+                      background: "#f6f9fc",
+                      "& th": {
+                        fontWeight: 700,
+                        fontSize: { xs: "1em", sm: "0.875rem" },
+                        whiteSpace: { xs: "nowrap", sm: "normal" },
+                      },
                     }}
-                    onClick={() => setCalendarDialogOpen(true)}
                   >
-                    <ArrowForwardIosIcon sx={{ fontSize: isMobile ? 13 : 16 }} />
-                  </Button>
-                </span>
-              </Tooltip>
-            </Box>
-            <ClientPowerShortTable
-              markedDays={markedDays ?? {}}
-              isMobile={isMobile}
-            />
-          </CardContent>
-        </Card>
-      </Grid>
+                    <TableCell>Klient ID</TableCell>
+                    <TableCell>Installationsoplysninger</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>IP-adresser</TableCell>
+                    <TableCell>MAC-adresser</TableCell>
+                    <TableCell>Tilføjet</TableCell>
+                    <TableCell>Skole</TableCell>
+                    <TableCell sx={{ textAlign: "center" }}>
+                      Godkend
+                    </TableCell>
+                    <TableCell sx={{ textAlign: "center" }}>
+                      Fjern
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {unapprovedClients.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} align="center">
+                        Ingen ikke-godkendte klienter.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    unapprovedClients.map((client) => {
+                      const statusChip = getClientStatusChipProps(client.status);
+                      const isApproving = approvingClientId === client.id;
+                      const isRemoving = removingClientId === client.id;
 
-      {/* Systeminfo */}
-      <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={cardSx}>
-          <CardContent sx={contentSx}>
-            <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-              <Typography variant="h6" sx={headingSx}>
-                Systeminfo
-              </Typography>
-            </Box>
-            <SystemInfoTable
-              client={client}
-              uptime={uptime}
-              lastSeen={lastSeen}
-              isMobile={isMobile}
-              clientOnline={clientOnline}
-              showSnackbar={showSnackbar}
-              onUbuntuUpdateStarted={onUbuntuUpdateStarted}
-            />
-          </CardContent>
-        </Card>
-      </Grid>
+                      return (
+                        <TableRow key={client.id} hover>
+                          <TableCell>
+                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                              <Typography sx={{ fontWeight: 700 }}>
+                                {client.id}
+                              </Typography>
+                              <CopyIconButton value={client.id} iconSize={14} />
+                            </Stack>
+                          </TableCell>
 
-      {/* Netværksinfo */}
-      <Grid item xs={12} md={4}>
-        <Card elevation={2} sx={cardSx}>
-          <CardContent sx={contentSx}>
-            <Box sx={{ display: "flex", alignItems: "center", mb: isMobile ? 0.5 : 1 }}>
-              <Typography variant="h6" sx={headingSx}>
-                Netværksinfo
-              </Typography>
-            </Box>
-            <NetworkInfoTable client={client} isMobile={isMobile} />
-          </CardContent>
-        </Card>
-      </Grid>
+                          <TableCell>
+                            <EnrollmentIdentityCell client={client} />
+                          </TableCell>
 
-    </Grid>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              color={statusChip.color}
+                              label={statusChip.label}
+                            />
+                          </TableCell>
+
+                          <TableCell>
+                            <Stack spacing={0.25}>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <b>WiFi:</b>&nbsp;
+                                <span>
+                                  {getNetworkDisplayValue(client, "wifi_ip_address")}
+                                </span>
+                                <CopyIconButton
+                                  value={getNetworkCopyValue(client, "wifi_ip_address")}
+                                  disabled={!getNetworkCopyValue(client, "wifi_ip_address")}
+                                  iconSize={14}
+                                />
+                              </Box>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <b>LAN:</b>&nbsp;
+                                <span>
+                                  {getNetworkDisplayValue(client, "lan_ip_address")}
+                                </span>
+                                <CopyIconButton
+                                  value={getNetworkCopyValue(client, "lan_ip_address")}
+                                  disabled={!getNetworkCopyValue(client, "lan_ip_address")}
+                                  iconSize={14}
+                                />
+                              </Box>
+                            </Stack>
+                          </TableCell>
+
+                          <TableCell>
+                            <Stack spacing={0.25}>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <b>WiFi:</b>&nbsp;
+                                <span>
+                                  {getNetworkDisplayValue(client, "wifi_mac_address")}
+                                </span>
+                                <CopyIconButton
+                                  value={getNetworkCopyValue(client, "wifi_mac_address")}
+                                  disabled={!getNetworkCopyValue(client, "wifi_mac_address")}
+                                  iconSize={14}
+                                />
+                              </Box>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <b>LAN:</b>&nbsp;
+                                <span>
+                                  {getNetworkDisplayValue(client, "lan_mac_address")}
+                                </span>
+                                <CopyIconButton
+                                  value={getNetworkCopyValue(client, "lan_mac_address")}
+                                  disabled={!getNetworkCopyValue(client, "lan_mac_address")}
+                                  iconSize={14}
+                                />
+                              </Box>
+                            </Stack>
+                          </TableCell>
+
+                          <TableCell>
+                            {(() => {
+                              const ts = formatTimestamp(client.created_at);
+                              return (
+                                <span style={{ whiteSpace: "pre-line" }}>
+                                  {ts.date || "-"}
+                                  {ts.time ? `\n${ts.time}` : ""}
+                                </span>
+                              );
+                            })()}
+                          </TableCell>
+
+                          <TableCell>
+                            <Select
+                              size="small"
+                              value={schoolSelections[client.id] || ""}
+                              displayEmpty
+                              onChange={(e) =>
+                                handleSchoolChange(client.id, e.target.value)
+                              }
+                              disabled={isApproving || isRemoving}
+                              sx={{
+                                minWidth: { xs: 95, sm: 140 },
+                                fontSize: { xs: "0.97em", sm: "0.875rem" },
+                              }}
+                            >
+                              <MenuItem value="">Vælg skole</MenuItem>
+                              {schools.map((school) => (
+                                <MenuItem key={school.id} value={school.id}>
+                                  {school.name}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </TableCell>
+
+                          <TableCell align="center">
+                            <Button
+                              variant="contained"
+                              color="success"
+                              size="small"
+                              startIcon={
+                                isApproving ? (
+                                  <CircularProgress size={16} color="inherit" />
+                                ) : (
+                                  <AddIcon />
+                                )
+                              }
+                              onClick={() => handleApproveClient(client.id)}
+                              disabled={isApproving || isRemoving}
+                              sx={{
+                                minWidth: 44,
+                                fontSize: { xs: "0.97em", sm: "0.875rem" },
+                              }}
+                            >
+                              {isApproving ? "Godkender..." : "Godkend"}
+                            </Button>
+                          </TableCell>
+
+                          <TableCell align="center">
+                            <Tooltip title="Fjern klient">
+                              <span>
+                                <IconButton
+                                  color="error"
+                                  onClick={() => openRemoveDialog(client.id)}
+                                  size="small"
+                                  disabled={isApproving || isRemoving}
+                                >
+                                  {isRemoving ? (
+                                    <CircularProgress size={18} />
+                                  ) : (
+                                    <DeleteIcon />
+                                  )}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </>
+      )}
+    </Box>
   );
 }
