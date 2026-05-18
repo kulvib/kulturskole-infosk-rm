@@ -1,0 +1,7 @@
+{
+  "version": "6.10",
+  "installer_url": "https://autoinstall.onrender.com/clientflow_clean_ubuntu_installer_v6.zip",
+  "sha256": "15891293dff8aaf8977fc898ae87f6144c8dbae30ebedabf392c5ed3b0a7a7a9",
+  "size_bytes": 332317,
+  "notes": "Selfupdate rapporterer status/progression til backend/frontend."
+}
