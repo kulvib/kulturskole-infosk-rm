@@ -85,6 +85,7 @@ const BUSY_CHROME_STEPS = new Set([
   "terminate_chrome",
   "kill_chrome",
   "countdown",
+  "display_sleep_countdown",
   "system_reboot_countdown",
   "system_rebooting",
   "system_shutting_down",
@@ -124,8 +125,8 @@ const BUSY_CHROME_STEPS = new Set([
 const TERMINAL_STEPS_BY_ACTION = {
   start:    new Set(["start_chrome", "error"]),
   stop:     new Set(["chrome_closed_programmatically", "chrome_closed_manual", "shutdown_chrome", "error"]),
-  sleep:    new Set(["system_sleep", "error"]),
-  wakeup:   new Set(["system_wake", "error"]),
+  sleep:    new Set(["system_sleep", "system_sleep_complete", "display_sleep", "display_sleep_complete", "error"]),
+  wakeup:   new Set(["system_wake", "system_wake_complete", "display_wake", "display_wake_complete", "error"]),
   reboot:   new Set(["system_rebooting", "error"]),
   shutdown: new Set(["system_shutting_down", "error"]),
 };
@@ -137,7 +138,13 @@ const DEFAULT_TERMINAL_STEPS = new Set([
   "chrome_closed_manual",
   "shutdown_chrome",
   "system_sleep",
+  "system_sleep_complete",
+  "display_sleep",
+  "display_sleep_complete",
   "system_wake",
+  "system_wake_complete",
+  "display_wake",
+  "display_wake_complete",
   "error",
 ]);
 
