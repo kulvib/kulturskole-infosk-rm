@@ -1,16 +1,13 @@
-from fastapi import APIRouter, Request, Depends
-from auth import get_current_admin_user
+from fastapi import APIRouter
 
-router = APIRouter()
+router = APIRouter(tags=["meta"])
 
 
-@router.get("/meta/endpoints", tags=["Meta"])
-async def get_openapi_spec(
-    request: Request,
-    admin=Depends(get_current_admin_user)
-):
+@router.get("/meta")
+def get_meta():
+    """Minimal meta endpoint.
+
+    main.py inkluderer meta.router. Denne router sikrer, at importen altid er gyldig,
+    også hvis meta.py tidligere var tom.
     """
-    Returnerer hele OpenAPI-specifikationen.
-    Kun tilgængelig for administratorer.
-    """
-    return request.app.openapi()
+    return {"ok": True, "service": "clientflow-backend"}
