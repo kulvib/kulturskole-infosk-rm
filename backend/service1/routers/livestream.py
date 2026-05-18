@@ -562,6 +562,11 @@ async def livestream_endpoint(
         if not user:
             await websocket.close(code=4001)
             return
+        try:
+            require_hls_access(user, client_id)  # v6.6: enforce same access rules for livestream WS
+        except HTTPException:
+            await websocket.close(code=1008)
+            return
 
     await websocket.accept()
     if client_id not in rooms:
