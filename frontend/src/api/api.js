@@ -235,68 +235,56 @@ export async function pushKioskUrl(id, url) {
  *   "restart"          → pending_reboot: true  (genstart maskine)
  *   "reboot"           → pending_reboot: true
  *   "shutdown"         → pending_shutdown: true
- *   "sleep"            → pending_chrome_action: "sleep"
- *   "wakeup"           → pending_chrome_action: "wakeup"
+ *   "sleep"            → action: "sleep"
+ *   "wakeup"           → action: "wakeup"
  *   "livestream_start" → pending_chrome_action: "livestream_start"
  *   "livestream_stop"  → pending_chrome_action: "livestream_stop"
  */
 export async function clientAction(id, action) {
-  let payload;
+  // Kiosk-/display-handlinger sendes via det dedikerede command-endpoint.
+  // Det giver backend en tydelig source og undgår at /update genbruger gamle
+  // pending_chrome_action_source værdier.
+  const commandActionMap = {
+    start: "start",
+    stop: "stop",
+    sleep: "sleep",
+    wakeup: "wakeup",
+    livestream_start: "livestream_start",
+    livestream_stop: "livestream_stop",
+  };
 
-  switch (action) {
-    case "start":
-      payload = {
-        pending_chrome_action: "start",
-        pending_chrome_action_source: "actionbutton",
-      };
-      break;
-    case "stop":
-      payload = {
-        pending_chrome_action: "stop",
-        pending_chrome_action_source: "actionbutton",
-      };
-      break;
-    case "restart":
-    case "reboot":
-      payload = { pending_reboot: true };
-      break;
-    case "shutdown":
-      payload = { pending_shutdown: true };
-      break;
-    case "sleep":
-      payload = {
-        pending_chrome_action: "sleep",
-        pending_chrome_action_source: "actionbutton",
-      };
-      break;
-    case "wakeup":
-      payload = {
-        pending_chrome_action: "wakeup",
-        pending_chrome_action_source: "actionbutton",
-      };
-      break;
-    case "livestream_start":
-      payload = {
-        pending_chrome_action: "livestream_start",
-        pending_chrome_action_source: "actionbutton",
-      };
-      break;
-    case "livestream_stop":
-      payload = {
-        pending_chrome_action: "livestream_stop",
-        pending_chrome_action_source: "actionbutton",
-      };
-      break;
-    default:
-      throw new Error("Ukendt action: " + action);
+  if (action === "restart" || action === "reboot" || action === "shutdown") {
+    const payload =
+      action === "shutdown"
+        ? { pending_shutdown: true }
+        : { pending_reboot: true };
+
+    const res = await fetch(`${apiUrl}/api/clients/${id}/update`, {
+      method: "PUT",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
+    if (!res.ok) throw new Error(await extractError(res, "Kunne ikke udføre handling"));
+    return res.json();
   }
 
-  const res = await fetch(`${apiUrl}/api/clients/${id}/update`, {
-    method: "PUT",
+  const mappedAction = commandActionMap[action];
+  if (!mappedAction) {
+    throw new Error("Ukendt action: " + action);
+  }
+
+  const res = await fetch(`${apiUrl}/api/clients/${id}/chrome-command`, {
+    method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      action: mappedAction,
+      source: "actionbutton",
+    }),
   });
+
   if (res.status === 401) { handle401(); throw new Error("Login udløbet"); }
   if (!res.ok) throw new Error(await extractError(res, "Kunne ikke udføre handling"));
   return res.json();
