@@ -66,6 +66,15 @@ import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 */
 
 // ---------------------------------------------------------------------------
+// Polling
+// ---------------------------------------------------------------------------
+
+// Detaljesiden får online/offline hurtigt via /chrome-status.
+// Oversigten henter hele klientlisten, så vi poller lidt langsommere, men
+// stadig hurtigere end før, så status ikke føles forsinket.
+const CLIENT_LIST_POLL_MS = 2_000;
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -310,6 +319,7 @@ export default function ClientInfoPage() {
 
   const lastFetchedClients = useRef([]);
   const isDraggingRef = useRef(false);
+  const fetchingClientsRef = useRef(false);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmClientId, setConfirmClientId] = useState(null);
@@ -341,7 +351,9 @@ export default function ClientInfoPage() {
   const fetchClients = useCallback(
     async (forceUpdate = false, showLoading = false) => {
       if (isDraggingRef.current) return;
+      if (fetchingClientsRef.current) return;
 
+      fetchingClientsRef.current = true;
       if (showLoading) setLoading(true);
       try {
         const data =
@@ -361,19 +373,38 @@ export default function ClientInfoPage() {
           showSnackbar("Fejl: " + (err?.message || err), "error");
         }
       } finally {
+        fetchingClientsRef.current = false;
         if (showLoading) setLoading(false);
       }
     },
     [user?.role, showSnackbar]
   );
 
-  // Initial load + polling hvert 5s
+  // Initial load + hurtigere polling af online/offline-status.
   useEffect(() => {
     fetchClients(false, true);
     const timer = setInterval(() => {
       fetchClients(false, false);
-    }, 5000);
+    }, CLIENT_LIST_POLL_MS);
     return () => clearInterval(timer);
+  }, [fetchClients]);
+
+  // Når brugeren vender tilbage til fanen/siden, hent status med det samme
+  // i stedet for at vente på næste polling-interval.
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchClients(false, false);
+      }
+    };
+
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [fetchClients]);
 
   // Hent skoler
