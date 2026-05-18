@@ -1,0 +1,7 @@
+{
+  "version": "6.5",
+  "installer_url": "https://autoinstall.onrender.com/clientflow_clean_ubuntu_installer_v6.zip",
+  "sha256": "7bd52334afedba2217ada11721bc8e1a24caebf538f2f451e553a5d5a39b508b",
+  "size_bytes": 334687,
+  "notes": "Admin/root terminal-agent til backend-superadmin; remote desktop forbliver kiosk-session."
+}
