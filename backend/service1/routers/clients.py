@@ -86,6 +86,24 @@ def _chrome_action_value(value):
     return getattr(value, "value", value)
 
 
+def _normalize_chrome_action_name(action):
+    if action is None:
+        return None
+    value = getattr(action, "value", action)
+    return str(value).strip().lower()
+
+
+def _principal_label(user) -> str:
+    try:
+        if principal_is_client(user):
+            return f"client:{getattr(user, 'client_id', None) or getattr(user, 'sub', None) or 'unknown'}"
+    except Exception:
+        pass
+    username = getattr(user, "username", None) or getattr(user, "sub", None) or "unknown"
+    role = getattr(user, "role", None) or "unknown"
+    return f"user:{username}/{role}"
+
+
 def _current_update_detail(client: Client) -> str:
     """Giver en mere præcis besked, når klienten allerede er låst af en update."""
     pending_action = _chrome_action_value(getattr(client, "pending_chrome_action", None))
@@ -233,7 +251,7 @@ def get_chrome_status(id: int, session=Depends(get_session), user=Depends(get_cu
         # /clients/{id}/ refresh.
         "state": client.state,
         "pending_chrome_action": pending_action,
-        "pending_chrome_action_source": getattr(client, "pending_chrome_action_source", None),
+        "pending_chrome_action_source": None if pending_action in (None, "none") else getattr(client, "pending_chrome_action_source", None),
         "pending_reboot": client.pending_reboot,
         "pending_shutdown": client.pending_shutdown,
         "client_version": client.client_version,
@@ -312,12 +330,12 @@ def set_chrome_command(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
-    action = data.get("action")
+    action = _normalize_chrome_action_name(data.get("action"))
     source = data.get("source")
 
-    current_pca = getattr(client.pending_chrome_action, "value", None) or str(
-        client.pending_chrome_action or "none"
-    )
+    current_pca = _normalize_chrome_action_name(
+        getattr(client.pending_chrome_action, "value", None) or str(client.pending_chrome_action or "none")
+    ) or "none"
 
     if (
         action in BLOCKING_ACTIONS
@@ -349,9 +367,18 @@ def set_chrome_command(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Ugyldig action '{action}'")
 
+    old_pca = _chrome_action_value(client.pending_chrome_action) or "none"
+    old_source = getattr(client, "pending_chrome_action_source", None)
+
     client.pending_chrome_action = chrome_action
 
-    if source is not None:
+    if chrome_action == ChromeAction.NONE:
+        client.pending_chrome_action_source = None
+    elif source is None:
+        # Undgå at en gammel source="actionbutton" hænger ved, hvis en anden
+        # kilde sætter en ny action uden source.
+        client.pending_chrome_action_source = None
+    else:
         if not isinstance(source, str):
             raise HTTPException(status_code=400, detail="Ugyldig source-værdi")
         src_lower = source.lower()
@@ -362,6 +389,12 @@ def set_chrome_command(
             )
         client.pending_chrome_action_source = src_lower
 
+    print(
+        f"[CLIENT_ACTION] chrome-command client={id} old={old_pca}/{old_source} "
+        f"new={client.pending_chrome_action.value if client.pending_chrome_action else None}/"
+        f"{getattr(client, 'pending_chrome_action_source', None)} principal={_principal_label(user)}",
+        flush=True,
+    )
     session.add(client)
     session.commit()
     session.refresh(client)
@@ -378,9 +411,11 @@ def get_chrome_command(id: int, session=Depends(get_session), user=Depends(get_c
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+    action = client.pending_chrome_action.value if client.pending_chrome_action else None
+    source = None if action in (None, "none") else getattr(client, "pending_chrome_action_source", None)
     return {
-        "action": client.pending_chrome_action.value if client.pending_chrome_action else None,
-        "source": getattr(client, "pending_chrome_action_source", None),
+        "action": action,
+        "source": source,
     }
 
 
@@ -556,9 +591,22 @@ async def update_client(
     if "created_at" in fields: client.created_at = client_update.created_at
     if "pending_reboot" in fields: client.pending_reboot = client_update.pending_reboot
     if "pending_shutdown" in fields: client.pending_shutdown = client_update.pending_shutdown
+    old_pending_action = _chrome_action_value(getattr(client, "pending_chrome_action", None)) or "none"
+    old_pending_source = getattr(client, "pending_chrome_action_source", None)
+
     if "pending_chrome_action" in fields:
         val = client_update.pending_chrome_action
-        client.pending_chrome_action = ChromeAction.NONE if val is None else ChromeAction(val)
+        normalized_val = _normalize_chrome_action_name(val)
+        client.pending_chrome_action = ChromeAction.NONE if normalized_val is None else ChromeAction(normalized_val)
+
+        if client.pending_chrome_action == ChromeAction.NONE:
+            # Når action ryddes, skal source også ryddes. Ellers kan næste action
+            # uden source fejlagtigt ligne "actionbutton" i klientloggen.
+            client.pending_chrome_action_source = None
+        elif "pending_chrome_action_source" not in fields:
+            # Ny action uden source må ikke arve gammel source.
+            client.pending_chrome_action_source = None
+
     if "pending_chrome_action_source" in fields:
         src = client_update.pending_chrome_action_source
         if src is None:
@@ -590,6 +638,15 @@ async def update_client(
     if "client_update_started_at" in fields: client.client_update_started_at = client_update.client_update_started_at
     if "client_update_finished_at" in fields: client.client_update_finished_at = client_update.client_update_finished_at
     if "client_update_error" in fields: client.client_update_error = client_update.client_update_error
+
+    if "pending_chrome_action" in fields or "pending_chrome_action_source" in fields:
+        print(
+            f"[CLIENT_ACTION] update client={id} old={old_pending_action}/{old_pending_source} "
+            f"new={_chrome_action_value(getattr(client, 'pending_chrome_action', None))}/"
+            f"{getattr(client, 'pending_chrome_action_source', None)} fields={sorted(fields)} "
+            f"principal={_principal_label(user)}",
+            flush=True,
+        )
     session.add(client)
     session.commit()
     session.refresh(client)
