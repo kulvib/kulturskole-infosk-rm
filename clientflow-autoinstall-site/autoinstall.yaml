@@ -2,7 +2,7 @@ autoinstall:
   version: 1
 
   # Interaktiv Ubuntu-installation. ClientFlow installeres ikke automatisk her,
-  # fordi v3 kræver en installationskode/enrollment-code fra admin.
+  # fordi v4 kræver en installationskode/enrollment-code fra admin.
   interactive-sections:
     - "*"
 
