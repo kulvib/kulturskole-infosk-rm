@@ -28,7 +28,7 @@ import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
-import { requestClientflowUpdate } from "../../api";
+import { getClientflowUpdateStatus, requestClientflowUpdate } from "../../api";
 
 /*
   DetailsActionsSection.jsx
@@ -200,12 +200,49 @@ export default function ClientDetailsActionsSection({
     severity: "success",
   });
   const [pendingBannerHidden, setPendingBannerHidden] = useState(false);
+  const [clientflowUpdateStatus, setClientflowUpdateStatus] = useState(null);
+  const [clientflowUpdatePolling, setClientflowUpdatePolling] = useState(false);
 
   const normalizedClientState = String(clientState || "").trim().toLowerCase();
   const normalizedPendingAction = String(pendingChromeAction || "").trim().toLowerCase();
   const hasPendingAction = !!normalizedPendingAction && normalizedPendingAction !== "none";
 
   const liveStepNorm = String(liveStep ?? "").trim().toLowerCase();
+
+  const updateStatusText = (() => {
+    const st = String(clientflowUpdateStatus?.client_update_status || "").toLowerCase();
+    const msg = clientflowUpdateStatus?.client_update_message;
+    const version = clientflowUpdateStatus?.client_version;
+    if (!st) return null;
+    const labelMap = {
+      ready: "Klar",
+      requested: "Afventer klient",
+      starting: "Starter opdatering",
+      preparing: "Klargør opdatering",
+      fetching_manifest: "Henter versionsinfo",
+      downloading: "Downloader opdatering",
+      verifying: "Verificerer opdatering",
+      installing: "Installerer ClientFlow",
+      stopping_services: "Genstarter services",
+      success: "Opdateret",
+      error: "Fejl",
+    };
+    const label = labelMap[st] || st;
+    return `${label}${version ? ` · v${version}` : ""}${msg ? ` · ${msg}` : ""}`;
+  })();
+
+  const updateStatusSeverity = (() => {
+    const st = String(clientflowUpdateStatus?.client_update_status || "").toLowerCase();
+    if (st === "error") return "error";
+    if (st === "success") return "success";
+    if (["requested", "starting", "preparing", "fetching_manifest", "downloading", "verifying", "installing", "stopping_services"].includes(st)) return "info";
+    return "default";
+  })();
+
+  const updateInProgress = [
+    "requested", "starting", "preparing", "fetching_manifest", "downloading",
+    "verifying", "installing", "stopping_services"
+  ].includes(String(clientflowUpdateStatus?.client_update_status || "").toLowerCase());
 
   const shouldAutoHidePendingBanner = AUTO_HIDE_BANNER_STEPS.has(liveStepNorm);
 
@@ -296,7 +333,13 @@ export default function ClientDetailsActionsSection({
 
     setActionLoading((prev) => ({ ...prev, clientflow_update: true }));
     try {
-      await requestClientflowUpdate(clientId);
+      const res = await requestClientflowUpdate(clientId);
+      setClientflowUpdateStatus({
+        client_update_status: res?.client_update_status || "requested",
+        client_update_message: res?.client_update_message || res?.message || "Opdatering sendt til klienten",
+        client_update_requested_at: res?.client_update_requested_at || null,
+      });
+      setClientflowUpdatePolling(true);
       notify({
         message: "ClientFlow-opdatering er sendt til klienten",
         severity: "success",
@@ -365,6 +408,34 @@ export default function ClientDetailsActionsSection({
 
   const visiblePendingLabel =
     pendingBannerHidden && shouldAutoHidePendingBanner ? null : pendingLabel;
+
+  const refreshClientflowUpdateStatus = useCallback(async () => {
+    if (!clientId) return null;
+    try {
+      const data = await getClientflowUpdateStatus(clientId);
+      setClientflowUpdateStatus(data);
+      return data;
+    } catch {
+      return null;
+    }
+  }, [clientId]);
+
+  useEffect(() => {
+    if (!clientflowUpdatePolling || !clientId) return undefined;
+    let stopped = false;
+    const timer = window.setInterval(async () => {
+      const data = await refreshClientflowUpdateStatus();
+      const st = String(data?.client_update_status || "").toLowerCase();
+      if (!st || ["success", "error", "ready"].includes(st)) {
+        if (!stopped) setClientflowUpdatePolling(false);
+      }
+    }, 2500);
+    refreshClientflowUpdateStatus();
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [clientflowUpdatePolling, clientId, refreshClientflowUpdateStatus]);
 
   const row1 = [
     {
@@ -495,10 +566,12 @@ export default function ClientDetailsActionsSection({
       variant: "outlined",
       onClick: doClientflowUpdate,
       loading: !!actionLoading["clientflow_update"],
-      disabled: supportToolsDisabled,
+      disabled: supportToolsDisabled || updateInProgress,
       lockDuringBusy: false,
       disabledTooltip:
-        clientOnline === false
+        updateInProgress
+          ? "ClientFlow-opdatering er allerede i gang"
+          : clientOnline === false
           ? "Klienten er offline"
           : isSystemLocked
           ? "Klienten genstarter eller lukker ned"
@@ -519,6 +592,16 @@ export default function ClientDetailsActionsSection({
             icon={<CircularProgress size={16} />}
           >
             {visiblePendingLabel}
+          </Alert>
+        )}
+
+        {updateStatusText && (
+          <Alert
+            severity={updateStatusSeverity === "default" ? "info" : updateStatusSeverity}
+            sx={{ mb: 1.5 }}
+            icon={updateInProgress ? <CircularProgress size={16} /> : undefined}
+          >
+            ClientFlow update: {updateStatusText}
           </Alert>
         )}
 
