@@ -1,7 +1,0 @@
-{
-  "version": "6.9",
-  "installer_url": "https://autoinstall.onrender.com/clientflow_clean_ubuntu_installer_v6.zip",
-  "sha256": "290249777c00fed22751dba1ebdd97eb4e683368782299ac5bcfb148aaeb22e4",
-  "size_bytes": 337606,
-  "notes": "Selfupdate vises nu som Klar/Opdaterer/Fejl i GUI; one-shot service forventes normalt ikke at køre."
-}
