@@ -16,6 +16,10 @@
 
   FIX: getChromeStatus fallback returnerer nu altid uptime + last_seen
     fra getClient() hvis chrome-status endpointet ikke returnerer dem.
+
+  FIX: getChromeStatus returnerer nu også isOnline/is_online fra enten
+    chrome-status endpointet eller fallback getClient(). Det sikrer at
+    detaljesiden ikke viser stale online/offline-status.
 */
 
 export const apiUrl =
@@ -155,6 +159,8 @@ export async function getChromeStatus(id, { fallbackToClient = false } = {}) {
         chrome_last_updated: full.chrome_last_updated ?? null,
         last_seen: full.last_seen ?? null,
         uptime: full.uptime ?? null,
+        isOnline: full.isOnline ?? full.is_online ?? null,
+        is_online: full.is_online ?? full.isOnline ?? null,
       };
     }
     throw new Error(await extractError(res, "Kunne ikke hente chrome status"));
@@ -162,15 +168,22 @@ export async function getChromeStatus(id, { fallbackToClient = false } = {}) {
 
   const json = await res.json();
 
-  // FIX: Supplér last_seen + uptime fra getClient hvis chrome-status
-  // endpointet ikke returnerer dem (ikke alle backends gør det).
-  if (fallbackToClient && (json?.last_seen == null || json?.uptime == null)) {
+  // FIX: Supplér last_seen, uptime og online-status fra getClient hvis
+  // chrome-status endpointet ikke returnerer dem (ikke alle backends gør det).
+  if (
+    fallbackToClient &&
+    (json?.last_seen == null ||
+      json?.uptime == null ||
+      (json?.isOnline == null && json?.is_online == null))
+  ) {
     try {
       const full = await getClient(id);
       return {
         ...json,
         last_seen: json.last_seen ?? full.last_seen ?? null,
         uptime: json.uptime ?? full.uptime ?? null,
+        isOnline: json.isOnline ?? json.is_online ?? full.isOnline ?? full.is_online ?? null,
+        is_online: json.is_online ?? json.isOnline ?? full.is_online ?? full.isOnline ?? null,
       };
     } catch {
       return json;
