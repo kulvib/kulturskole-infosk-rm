@@ -3,7 +3,7 @@ from sqlmodel import select, delete
 from typing import List, Optional
 from datetime import datetime, timedelta, date, timezone
 from db import get_session
-from models import Client, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction, School, SchoolSeasonTimes, EnrollmentToken
+from models import Client, ClientRead, ClientCreate, ClientUpdate, CalendarMarking, ChromeAction, School, SchoolSeasonTimes, EnrollmentToken
 from auth import get_current_user, get_current_admin_user, get_current_superadmin_user, get_current_user_or_client, require_client_self_or_user, principal_is_client, get_password_hash
 from models import utcnow
 import os
@@ -168,7 +168,7 @@ def get_clients_public(session=Depends(get_session)):
     return {"clients": [{"id": c.id, "name": c.name} for c in clients]}
 
 
-@router.get("/clients/me", response_model=List[Client])
+@router.get("/clients/me", response_model=List[ClientRead])
 def get_clients_for_my_school(session=Depends(get_session), user=Depends(get_current_user)):
     if not user.school_id:
         return []
@@ -181,7 +181,7 @@ def get_clients_for_my_school(session=Depends(get_session), user=Depends(get_cur
     return clients
 
 
-@router.get("/clients/", response_model=List[Client])
+@router.get("/clients/", response_model=List[ClientRead])
 def get_clients(session=Depends(get_session), user=Depends(get_current_user)):
     clients = session.exec(select(Client)).all()
     for client in clients:
@@ -190,7 +190,7 @@ def get_clients(session=Depends(get_session), user=Depends(get_current_user)):
     return clients
 
 
-@router.get("/clients/{id}/", response_model=Client)
+@router.get("/clients/{id}/", response_model=ClientRead)
 def get_client(id: int, session=Depends(get_session), user=Depends(get_current_user_or_client)):
     client = session.get(Client, id)
     if not client:
@@ -505,7 +505,7 @@ def get_ubuntu_updates(id: int, session=Depends(get_session), user=Depends(get_c
     }
 
 
-@router.post("/clients/", response_model=Client)
+@router.post("/clients/", response_model=ClientRead)
 async def create_client(client_in: ClientCreate, session=Depends(get_session), user=Depends(get_current_user)):
     client = Client(
         name=client_in.name,
@@ -550,7 +550,7 @@ async def create_client(client_in: ClientCreate, session=Depends(get_session), u
     return client
 
 
-@router.put("/clients/{id}/update", response_model=Client)
+@router.put("/clients/{id}/update", response_model=ClientRead)
 async def update_client(
     id: int,
     client_update: ClientUpdate,
@@ -653,7 +653,7 @@ async def update_client(
     return client
 
 
-@router.put("/clients/{id}/kiosk_url", response_model=Client)
+@router.put("/clients/{id}/kiosk_url", response_model=ClientRead)
 async def update_kiosk_url(
     id: int,
     data: dict = Body(...),
@@ -690,7 +690,7 @@ def get_school_year_dates(season_start: int):
     return dates
 
 
-@router.post("/clients/{id}/approve", response_model=Client)
+@router.post("/clients/{id}/approve", response_model=ClientRead)
 async def approve_client(
     id: int,
     data: dict = Body(None),
@@ -762,7 +762,7 @@ async def approve_client(
     return client
 
 
-@router.post("/clients/{id}/heartbeat", response_model=Client)
+@router.post("/clients/{id}/heartbeat", response_model=ClientRead)
 def client_heartbeat(
     id: int,
     data: dict = Body(default=None),
