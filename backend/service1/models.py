@@ -117,6 +117,53 @@ class Client(ClientBase, table=True):
     client_update_error: Optional[str] = None
 
 
+class ClientRead(ClientBase):
+    """
+    Sikker API-repræsentation af en Client.
+
+    Bevidst udeladt:
+      - client_secret_hash
+      - client_secret_created_at
+      - client_secret_revoked_at
+      - enrollment_token_id
+
+    De felter bruges kun internt eller via de dedikerede
+    superadmin-endpoints under /client-secret/*.
+    """
+    id: Optional[int] = None
+    machine_id: Optional[str] = None
+    status: Optional[str] = "pending"
+    isOnline: Optional[bool] = False
+    last_seen: Optional[datetime] = None
+    sort_order: Optional[int] = None
+    kiosk_url: Optional[str] = None
+    ubuntu_version: Optional[str] = None
+    uptime: Optional[str] = None
+    created_at: Optional[datetime] = None
+    chrome_status: Optional[str] = "unknown"
+    chrome_last_updated: Optional[datetime] = None
+    pending_reboot: Optional[bool] = False
+    pending_shutdown: Optional[bool] = False
+    chrome_color: Optional[str] = None
+    chrome_step: Optional[str] = None
+    pending_chrome_action: Optional[ChromeAction] = ChromeAction.NONE
+    pending_chrome_action_source: Optional[str] = None
+    school_id: Optional[int] = None
+    state: Optional[str] = "normal"
+    livestream_status: Optional[str] = "idle"
+    livestream_last_segment: Optional[datetime] = None
+    livestream_last_error: Optional[str] = None
+    ubuntu_updates_available: Optional[int] = 0
+    pending_os_update: Optional[bool] = False
+    client_version: Optional[str] = None
+    client_update_status: Optional[str] = "ready"
+    client_update_message: Optional[str] = None
+    client_update_requested_at: Optional[datetime] = None
+    client_update_started_at: Optional[datetime] = None
+    client_update_finished_at: Optional[datetime] = None
+    client_update_error: Optional[str] = None
+
+
 class ClientCreate(ClientBase):
     machine_id: Optional[str] = None
     sort_order: Optional[int] = None
