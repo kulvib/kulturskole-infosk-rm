@@ -23,7 +23,38 @@ if DATABASE_URL.startswith("sqlite"):
         )
 
 _echo = os.getenv("ENVIRONMENT", "production") != "production"
-engine = create_engine(DATABASE_URL, echo=_echo)
+
+# Render/Neon kan kortvarigt have høj samtidighed pga. frontend polling,
+# klient-heartbeats, chrome-status polling og WebSocket-auth. Standard QueuePool
+# (pool_size=5, max_overflow=10) gav:
+#   QueuePool limit of size 5 overflow 10 reached
+# Derfor gør vi poolen eksplicit og mere robust for PostgreSQL.
+engine_kwargs = {"echo": _echo}
+
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    engine_kwargs.update({
+        "pool_size": int(os.getenv("DB_POOL_SIZE", "10")),
+        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "20")),
+        "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
+        "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "300")),
+        "pool_pre_ping": True,
+        "pool_use_lifo": True,
+    })
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
+
+if not DATABASE_URL.startswith("sqlite"):
+    print(
+        "[DB] QueuePool konfigureret: "
+        f"pool_size={engine_kwargs['pool_size']} "
+        f"max_overflow={engine_kwargs['max_overflow']} "
+        f"pool_timeout={engine_kwargs['pool_timeout']} "
+        f"pool_recycle={engine_kwargs['pool_recycle']} "
+        "pool_pre_ping=True pool_use_lifo=True",
+        flush=True,
+    )
 
 
 def _migrate_seasons_to_string(conn):
