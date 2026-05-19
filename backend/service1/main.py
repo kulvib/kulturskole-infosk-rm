@@ -1,12 +1,14 @@
 print("### main.py starter ###")
 
 import os
+import traceback
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from sqlmodel import Session, select, text
+from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
@@ -135,6 +137,55 @@ app.add_middleware(
 )
 
 
+
+def _cors_origin_for_request(request):
+    """Returnér en tilladt Origin til manuelle fejl-responses."""
+    origin = request.headers.get("origin")
+    if origin and origin in ALLOWED_ORIGINS:
+        return origin
+    return ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else "*"
+
+
+def _apply_cors_headers(request, response):
+    """
+    CORSMiddleware får ikke altid lov at sætte headers på exceptions, der bliver
+    til 500/503. Derfor sætter vi dem manuelt på vores fejl-responses, så
+    browseren viser den rigtige backend-fejl i stedet for en misvisende CORS-fejl.
+    """
+    origin = _cors_origin_for_request(request)
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Vary"] = "Origin"
+    return response
+
+
+@app.middleware("http")
+async def api_error_cors_middleware(request, call_next):
+    try:
+        response = await call_next(request)
+    except SQLAlchemyTimeoutError as exc:
+        print("[ERROR] Database pool timeout:", repr(exc), flush=True)
+        traceback.print_exc()
+        response = JSONResponse(
+            status_code=503,
+            content={
+                "detail": "Databasen er midlertidigt overbelastet. Prøv igen om lidt.",
+                "error": "database_pool_timeout",
+            },
+        )
+    except Exception as exc:
+        print("[ERROR] Uhåndteret backend-fejl:", repr(exc), flush=True)
+        traceback.print_exc()
+        response = JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Intern serverfejl",
+                "error": "internal_server_error",
+            },
+        )
+    return _apply_cors_headers(request, response)
+
+
 class HLSCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         if request.url.path.startswith("/hls/"):
@@ -218,6 +269,21 @@ def health_db():
         return JSONResponse(
             status_code=503,
             content={"status": "unavailable", "detail": "Databasen svarer ikke"},
+        )
+
+
+@app.get("/health/db-pool")
+def health_db_pool():
+    """Lille debug-endpoint til Render: viser SQLAlchemy pool-status."""
+    try:
+        return {
+            "status": "ok",
+            "pool": engine.pool.status(),
+        }
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unavailable", "detail": str(exc)},
         )
 
 
