@@ -18,7 +18,7 @@ HLS_BASE_DIR = os.getenv("HLS_BASE_DIR", "/opt/render/project/src/backend/servic
 # Brug samme timeout alle steder i backend. 15 sek. kan give meget hurtige
 # offline/online-skift, især omkring reboot. Sæt env til 15 hvis du vil bevare
 # den gamle adfærd.
-ONLINE_TIMEOUT_SECONDS = int(os.getenv("CLIENTFLOW_ONLINE_TIMEOUT_SECONDS", "30"))
+ONLINE_TIMEOUT_SECONDS = int(os.getenv("CLIENTFLOW_ONLINE_TIMEOUT_SECONDS", "120"))
 
 VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error", "updating"}
 VALID_PENDING_CHROME_ACTION_SOURCES = {"actionbutton", "calendar"}
