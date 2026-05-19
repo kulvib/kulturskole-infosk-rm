@@ -230,6 +230,7 @@ export default function ClientDetailsPage({
   const uptimeBaseRef           = useRef(null);
   const uptimeFetchRef          = useRef(null);
   const [lastSeen, setLastSeen] = useState(client?.last_seen ?? null);
+  const [liveClientOnline, setLiveClientOnline] = useState(client?.isOnline ?? false);
 
   useEffect(() => {
     if (client?.uptime != null) {
@@ -241,10 +242,11 @@ export default function ClientDetailsPage({
       }
     }
     if (client?.last_seen)             setLastSeen(client.last_seen);
+    if (typeof client?.isOnline === "boolean") setLiveClientOnline(client.isOnline);
     if (client?.chrome_status != null) setLiveChromeStatus(client.chrome_status);
     if (client?.chrome_color != null)  setLiveChromeColor(client.chrome_color);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client?.id]);
+  }, [client?.id, client?.isOnline]);
 
   useEffect(() => {
     if (uptimeBaseRef.current == null || uptimeFetchRef.current == null) return;
@@ -274,6 +276,11 @@ export default function ClientDetailsPage({
           if (data?.chrome_status != null) setLiveChromeStatus(data.chrome_status);
           if (data?.chrome_color != null)  setLiveChromeColor(data.chrome_color);
           if (data?.last_seen != null)     setLastSeen(data.last_seen);
+          if (typeof data?.isOnline === "boolean") {
+            setLiveClientOnline(data.isOnline);
+          } else if (typeof data?.is_online === "boolean") {
+            setLiveClientOnline(data.is_online);
+          }
 
           const stepName      = data?.step?.step ?? null;
           const stepTimestamp = data?.step?.timestamp ?? null;
@@ -423,7 +430,7 @@ export default function ClientDetailsPage({
   // ---------------------------------------------------------------------------
   // Afledte værdier
   // ---------------------------------------------------------------------------
-  const clientOnline  = client?.isOnline ?? false;
+  const clientOnline  = liveClientOnline;
   const displayUptime = uptime != null ? uptime : client?.uptime ?? null;
 
   const effectivePendingAction = clientActionPending
