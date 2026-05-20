@@ -149,6 +149,9 @@ function getClientflowUpdateStepMeta(status) {
   if (st === "success") {
     return { label: "Opdateret", description: "ClientFlow-opdateringen er gennemført.", index: CLIENTFLOW_UPDATE_STEPS.length, progress: 100 };
   }
+  if (st === "up_to_date") {
+    return { label: "Allerede opdateret", description: "Klienten har allerede nyeste ClientFlow-version.", index: CLIENTFLOW_UPDATE_STEPS.length, progress: 100 };
+  }
   if (st === "error") {
     return { label: "Fejl", description: "ClientFlow-opdateringen fejlede.", index: -1, progress: 100 };
   }
@@ -278,7 +281,7 @@ export default function ClientDetailsActionsSection({
   const updateStatus = normalizeUpdateStatus(clientflowUpdateStatus?.client_update_status);
   const updateStepMeta = getClientflowUpdateStepMeta(updateStatus);
   const updateInProgress = CLIENTFLOW_UPDATE_BUSY_STEPS.has(updateStatus);
-  const updateIsFinished = updateStatus === "success" || updateStatus === "error";
+  const updateIsFinished = updateStatus === "success" || updateStatus === "up_to_date" || updateStatus === "error";
   const showClientflowUpdatePanel =
     updateInProgress ||
     updateIsFinished ||
@@ -287,7 +290,7 @@ export default function ClientDetailsActionsSection({
 
   const updateStatusSeverity =
     updateStatus === "error" ? "error" :
-    updateStatus === "success" ? "success" :
+    updateStatus === "success" || updateStatus === "up_to_date" ? "success" :
     "info";
 
   const updateRequestedAt = formatUpdateDateTime(clientflowUpdateStatus?.client_update_requested_at);
