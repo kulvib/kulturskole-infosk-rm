@@ -159,6 +159,7 @@ export default function ClientDetailsLivestreamSection({
   const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
+  const showDebug = user?.role === "superadmin";
 
   /*
     VIGTIGT:
@@ -615,7 +616,7 @@ export default function ClientDetailsLivestreamSection({
         </Grid>
 
         {/* Video */}
-        <Grid item xs={12} md={5} minWidth={0}>
+        <Grid item xs={12} md={showDebug ? 5 : 9} minWidth={0}>
           <Box
             sx={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}
             onMouseMove={() => setShowControls(true)}
@@ -633,7 +634,21 @@ export default function ClientDetailsLivestreamSection({
                 </Typography>
               </Box>
             ) : (
-              <Box sx={{ position: "relative", width: "100%" }}>
+              <Box
+                sx={{
+                  position: "relative",
+                  width: "100%",
+                  maxWidth: "100%",
+                  aspectRatio: "16 / 9",
+                  maxHeight: isMobile ? 220 : showDebug ? 320 : 460,
+                  bgcolor: "#000",
+                  borderRadius: 1,
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
                 <video
                   ref={videoRef}
                   id="livestream-video"
@@ -642,9 +657,11 @@ export default function ClientDetailsLivestreamSection({
                   onPlaying={handleVideoPlaying}
                   onCanPlay={handleVideoCanPlay}
                   style={{
-                    width: isMobile ? "100%" : 420,
+                    width: "100%",
+                    height: "100%",
                     maxWidth: "100%",
-                    maxHeight: isMobile ? 200 : 320,
+                    maxHeight: "100%",
+                    objectFit: "contain",
                     borderRadius: 8,
                     border: "2px solid #444",
                     boxShadow: "0 2px 12px rgba(0,0,0,0.19)",
@@ -711,7 +728,7 @@ export default function ClientDetailsLivestreamSection({
         </Grid>
 
         {/* Debug */}
-        {(user?.role === "admin" || user?.role === "superadmin") && (
+        {showDebug && (
           <Grid item xs={12} md={4} minWidth={0}>
             <Stack spacing={1}>
               <Typography variant="body2" sx={{ color: "#000", fontSize: isMobile ? 13 : undefined }}>
