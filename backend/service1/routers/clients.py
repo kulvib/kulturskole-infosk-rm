@@ -25,6 +25,52 @@ VALID_PENDING_CHROME_ACTION_SOURCES = {"actionbutton", "calendar"}
 
 BLOCKING_ACTIONS = {"start", "stop", "sleep", "wakeup", "restart", "shutdown"}
 
+DISPLAY_RESOLUTION_PRESETS = {
+    "auto": (None, None),
+    "hd_720p": (1280, 720),
+    "hd_ready": (1366, 768),
+    "hd_plus": (1600, 900),
+    "full_hd": (1920, 1080),
+    "qhd_1440p": (2560, 1440),
+    "uhd_4k": (3840, 2160),
+    "wxga": (1280, 800),
+    "wuxga": (1920, 1200),
+    "wqxga": (2560, 1600),
+    "ultrawide_fhd": (2560, 1080),
+    "ultrawide_qhd": (3440, 1440),
+    "super_ultrawide": (5120, 1440),
+    "signage_wide": (3840, 1080),
+    "hd_portrait": (720, 1280),
+    "hd_ready_portrait": (768, 1366),
+    "full_hd_portrait": (1080, 1920),
+    "qhd_portrait": (1440, 2560),
+    "uhd_4k_portrait": (2160, 3840),
+    "custom": (None, None),
+}
+
+DISPLAY_RESOLUTION_DESIRED_FIELDS = {
+    "display_resolution_preset",
+    "display_resolution_mode",
+    "display_resolution_width",
+    "display_resolution_height",
+    "display_resolution_refresh_rate",
+    "display_resolution_rotation",
+}
+
+DISPLAY_RESOLUTION_CLIENT_REPORT_FIELDS = {
+    "display_resolution_current_output",
+    "display_resolution_current_width",
+    "display_resolution_current_height",
+    "display_resolution_current_refresh_rate",
+    "display_resolution_status",
+    "display_resolution_error",
+    "display_resolution_last_applied_at",
+}
+
+VALID_DISPLAY_RESOLUTION_MODES = {"auto", "fixed"}
+VALID_DISPLAY_ROTATIONS = {"normal", "left", "right", "inverted"}
+VALID_DISPLAY_STATUSES = {"unknown", "pending", "detected", "applying", "applied", "error"}
+
 # Felter som en klient med client-token selv må opdatere på /clients/{id}/update.
 # Admin/frontend kan fortsat opdatere alle de eksisterende ClientUpdate-felter.
 CLIENT_SELF_UPDATE_FIELDS = {
@@ -48,6 +94,13 @@ CLIENT_SELF_UPDATE_FIELDS = {
     "livestream_status",
     "livestream_last_segment",
     "livestream_last_error",
+    "display_resolution_current_output",
+    "display_resolution_current_width",
+    "display_resolution_current_height",
+    "display_resolution_current_refresh_rate",
+    "display_resolution_status",
+    "display_resolution_error",
+    "display_resolution_last_applied_at",
     "ubuntu_updates_available",
     "pending_os_update",
     "client_version",
@@ -119,6 +172,94 @@ def _current_update_detail(client: Client) -> str:
 
     return "Klienten er allerede ved at opdatere"
 
+
+
+def _field_value(client, client_update, fields, name, default=None):
+    if name in fields:
+        return getattr(client_update, name)
+    return getattr(client, name, default)
+
+
+def _validate_display_resolution_update(client: Client, client_update: ClientUpdate, fields: set[str]) -> None:
+    desired_changed = bool(DISPLAY_RESOLUTION_DESIRED_FIELDS & set(fields))
+    report_changed = bool(DISPLAY_RESOLUTION_CLIENT_REPORT_FIELDS & set(fields))
+
+    if desired_changed:
+        mode = str(_field_value(client, client_update, fields, "display_resolution_mode", "auto") or "auto").strip().lower()
+        preset = str(_field_value(client, client_update, fields, "display_resolution_preset", "auto") or "auto").strip().lower()
+        rotation = str(_field_value(client, client_update, fields, "display_resolution_rotation", "normal") or "normal").strip().lower()
+        width = _field_value(client, client_update, fields, "display_resolution_width", None)
+        height = _field_value(client, client_update, fields, "display_resolution_height", None)
+        refresh = _field_value(client, client_update, fields, "display_resolution_refresh_rate", None)
+
+        if mode not in VALID_DISPLAY_RESOLUTION_MODES:
+            raise HTTPException(status_code=400, detail=f"Ugyldig display_resolution_mode '{mode}'")
+        if preset not in DISPLAY_RESOLUTION_PRESETS:
+            raise HTTPException(status_code=400, detail=f"Ugyldig display_resolution_preset '{preset}'")
+        if rotation not in VALID_DISPLAY_ROTATIONS:
+            raise HTTPException(status_code=400, detail=f"Ugyldig display_resolution_rotation '{rotation}'")
+
+        if mode == "auto" or preset == "auto":
+            return
+
+        if width is None or height is None:
+            raise HTTPException(status_code=400, detail="Bredde og højde er påkrævet ved fast skærmopløsning")
+        try:
+            w = int(width)
+            h = int(height)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Bredde/højde skal være heltal")
+        if w < 320 or h < 240 or w > 8192 or h > 8192:
+            raise HTTPException(status_code=400, detail="Skærmopløsning skal være mellem 320×240 og 8192×8192")
+
+        if refresh not in (None, ""):
+            try:
+                r = float(refresh)
+            except Exception:
+                raise HTTPException(status_code=400, detail="Refresh rate skal være et tal")
+            if r < 1 or r > 240:
+                raise HTTPException(status_code=400, detail="Refresh rate skal være mellem 1 og 240 Hz")
+
+    if report_changed:
+        status_value = getattr(client_update, "display_resolution_status", None)
+        if "display_resolution_status" in fields and status_value is not None:
+            status = str(status_value).strip().lower()
+            if status not in VALID_DISPLAY_STATUSES:
+                raise HTTPException(status_code=400, detail=f"Ugyldig display_resolution_status '{status}'")
+
+
+def _apply_display_resolution_fields(client: Client, client_update: ClientUpdate, fields: set[str]) -> None:
+    if "display_resolution_preset" in fields:
+        client.display_resolution_preset = (client_update.display_resolution_preset or "auto")
+    if "display_resolution_mode" in fields:
+        client.display_resolution_mode = (client_update.display_resolution_mode or "auto")
+    if "display_resolution_width" in fields:
+        client.display_resolution_width = client_update.display_resolution_width
+    if "display_resolution_height" in fields:
+        client.display_resolution_height = client_update.display_resolution_height
+    if "display_resolution_refresh_rate" in fields:
+        client.display_resolution_refresh_rate = client_update.display_resolution_refresh_rate
+    if "display_resolution_rotation" in fields:
+        client.display_resolution_rotation = client_update.display_resolution_rotation or "normal"
+    if DISPLAY_RESOLUTION_DESIRED_FIELDS & set(fields):
+        client.display_resolution_updated_at = utcnow()
+        client.display_resolution_status = "pending"
+        client.display_resolution_error = None
+
+    if "display_resolution_current_output" in fields:
+        client.display_resolution_current_output = client_update.display_resolution_current_output
+    if "display_resolution_current_width" in fields:
+        client.display_resolution_current_width = client_update.display_resolution_current_width
+    if "display_resolution_current_height" in fields:
+        client.display_resolution_current_height = client_update.display_resolution_current_height
+    if "display_resolution_current_refresh_rate" in fields:
+        client.display_resolution_current_refresh_rate = client_update.display_resolution_current_refresh_rate
+    if "display_resolution_status" in fields:
+        client.display_resolution_status = client_update.display_resolution_status
+    if "display_resolution_error" in fields:
+        client.display_resolution_error = client_update.display_resolution_error
+    if "display_resolution_last_applied_at" in fields:
+        client.display_resolution_last_applied_at = client_update.display_resolution_last_applied_at
 
 def is_online(client: Client) -> bool:
     last_seen = _as_naive_utc(client.last_seen)
@@ -261,6 +402,20 @@ def get_chrome_status(id: int, session=Depends(get_session), user=Depends(get_cu
         "client_update_started_at": client.client_update_started_at,
         "client_update_finished_at": client.client_update_finished_at,
         "client_update_error": client.client_update_error,
+        "display_resolution_preset": client.display_resolution_preset or "auto",
+        "display_resolution_mode": client.display_resolution_mode or "auto",
+        "display_resolution_width": client.display_resolution_width,
+        "display_resolution_height": client.display_resolution_height,
+        "display_resolution_refresh_rate": client.display_resolution_refresh_rate,
+        "display_resolution_rotation": client.display_resolution_rotation or "normal",
+        "display_resolution_updated_at": client.display_resolution_updated_at,
+        "display_resolution_current_output": client.display_resolution_current_output,
+        "display_resolution_current_width": client.display_resolution_current_width,
+        "display_resolution_current_height": client.display_resolution_current_height,
+        "display_resolution_current_refresh_rate": client.display_resolution_current_refresh_rate,
+        "display_resolution_status": client.display_resolution_status or "unknown",
+        "display_resolution_error": client.display_resolution_error,
+        "display_resolution_last_applied_at": client.display_resolution_last_applied_at,
     }
 
 @router.put("/clients/{id}/chrome-status")
@@ -543,6 +698,20 @@ async def create_client(client_in: ClientCreate, session=Depends(get_session), u
         client_update_started_at=getattr(client_in, "client_update_started_at", None),
         client_update_finished_at=getattr(client_in, "client_update_finished_at", None),
         client_update_error=getattr(client_in, "client_update_error", None),
+        display_resolution_preset=getattr(client_in, "display_resolution_preset", "auto"),
+        display_resolution_mode=getattr(client_in, "display_resolution_mode", "auto"),
+        display_resolution_width=getattr(client_in, "display_resolution_width", None),
+        display_resolution_height=getattr(client_in, "display_resolution_height", None),
+        display_resolution_refresh_rate=getattr(client_in, "display_resolution_refresh_rate", None),
+        display_resolution_rotation=getattr(client_in, "display_resolution_rotation", "normal"),
+        display_resolution_updated_at=getattr(client_in, "display_resolution_updated_at", None),
+        display_resolution_current_output=getattr(client_in, "display_resolution_current_output", None),
+        display_resolution_current_width=getattr(client_in, "display_resolution_current_width", None),
+        display_resolution_current_height=getattr(client_in, "display_resolution_current_height", None),
+        display_resolution_current_refresh_rate=getattr(client_in, "display_resolution_current_refresh_rate", None),
+        display_resolution_status=getattr(client_in, "display_resolution_status", "unknown"),
+        display_resolution_error=getattr(client_in, "display_resolution_error", None),
+        display_resolution_last_applied_at=getattr(client_in, "display_resolution_last_applied_at", None),
     )
     session.add(client)
     session.commit()
@@ -569,6 +738,11 @@ async def update_client(
                 status_code=403,
                 detail=f"Klient-token må ikke opdatere disse felter: {forbidden}",
             )
+    elif DISPLAY_RESOLUTION_DESIRED_FIELDS & set(fields):
+        if not getattr(user, "is_superadmin", False):
+            raise HTTPException(status_code=403, detail="Skærmopløsning må kun ændres af superadmin")
+
+    _validate_display_resolution_update(client, client_update, fields)
     if "machine_id" in fields: client.machine_id = client_update.machine_id
     if "locality" in fields: client.locality = client_update.locality
     if "sort_order" in fields: client.sort_order = client_update.sort_order
@@ -629,6 +803,8 @@ async def update_client(
     if "livestream_status" in fields: client.livestream_status = client_update.livestream_status
     if "livestream_last_segment" in fields: client.livestream_last_segment = client_update.livestream_last_segment
     if "livestream_last_error" in fields: client.livestream_last_error = client_update.livestream_last_error
+    if (DISPLAY_RESOLUTION_DESIRED_FIELDS | DISPLAY_RESOLUTION_CLIENT_REPORT_FIELDS) & set(fields):
+        _apply_display_resolution_fields(client, client_update, fields)
     if "ubuntu_updates_available" in fields: client.ubuntu_updates_available = client_update.ubuntu_updates_available
     if "pending_os_update" in fields: client.pending_os_update = client_update.pending_os_update
     if "client_version" in fields: client.client_version = client_update.client_version
