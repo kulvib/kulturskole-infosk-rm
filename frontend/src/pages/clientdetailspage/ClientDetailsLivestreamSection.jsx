@@ -99,10 +99,11 @@ function getInitialDisplaySettingsForm(client) {
     };
   }
 
+  const fallbackPreset = getDisplayResolutionPreset("full_hd");
   return {
-    preset: "auto",
-    width: "",
-    height: "",
+    preset: fallbackPreset.value,
+    width: String(fallbackPreset.width || ""),
+    height: String(fallbackPreset.height || ""),
     refreshRate: "",
   };
 }
@@ -120,6 +121,28 @@ function formatCurrentDisplayResolution(client) {
     }${client?.display_resolution_current_output ? ` · ${client.display_resolution_current_output}` : ""}`;
   }
   return "Ikke rapporteret endnu";
+}
+
+function parseOptionalNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function sameOptionalNumber(a, b, tolerance = 0.01) {
+  const na = parseOptionalNumber(a);
+  const nb = parseOptionalNumber(b);
+  if (na === null && nb === null) return true;
+  if (na === null || nb === null) return false;
+  return Math.abs(na - nb) <= tolerance;
+}
+
+function formatResolutionLabel(width, height, refreshRate = null) {
+  const w = parseOptionalNumber(width);
+  const h = parseOptionalNumber(height);
+  if (!w || !h) return "Ukendt opløsning";
+  const refresh = parseOptionalNumber(refreshRate);
+  return `${w}×${h}${refresh ? ` @ ${refresh}Hz` : ""}`;
 }
 
 function getDisplayResolutionStatusMeta(status, presetValue = "auto", error = "") {
@@ -334,6 +357,9 @@ export default function ClientDetailsLivestreamSection({
     refreshRate: "",
   });
   const [displayResolutionWatching, setDisplayResolutionWatching] = useState(false);
+  const [displayResolutionWatchingAction, setDisplayResolutionWatchingAction] = useState(null);
+  const [displayResolutionSawWorkingState, setDisplayResolutionSawWorkingState] = useState(false);
+  const [displayResolutionRequestBaseline, setDisplayResolutionRequestBaseline] = useState("");
 
   const autoStartRequestedRef = useRef(false);
   const autoStartInFlightRef  = useRef(false);
@@ -771,6 +797,88 @@ export default function ClientDetailsLivestreamSection({
   const displayResolutionBusy =
     settingsSaving || displayResolutionWatching || displayResolutionMeta.busy;
 
+  const selectedDisplayPreset = getDisplayResolutionPreset(settingsForm.preset);
+  const selectedDisplayIsAuto = selectedDisplayPreset.value === "auto";
+  const selectedDisplayWidth = selectedDisplayIsAuto
+    ? null
+    : parseOptionalNumber(settingsForm.width);
+  const selectedDisplayHeight = selectedDisplayIsAuto
+    ? null
+    : parseOptionalNumber(settingsForm.height);
+  const selectedDisplayRefreshRate = selectedDisplayIsAuto
+    ? null
+    : parseOptionalNumber(settingsForm.refreshRate);
+
+  const selectedResolutionDescription = selectedDisplayIsAuto
+    ? "Auto-detekter skærmstørrelse"
+    : formatResolutionLabel(selectedDisplayWidth, selectedDisplayHeight, selectedDisplayRefreshRate);
+
+  const currentDisplayWidth = parseOptionalNumber(client?.display_resolution_current_width);
+  const currentDisplayHeight = parseOptionalNumber(client?.display_resolution_current_height);
+  const currentDisplayRefreshRate = parseOptionalNumber(client?.display_resolution_current_refresh_rate);
+
+  const selectedMatchesCurrentDisplay =
+    !selectedDisplayIsAuto &&
+    selectedDisplayWidth === currentDisplayWidth &&
+    selectedDisplayHeight === currentDisplayHeight &&
+    (
+      selectedDisplayRefreshRate === null ||
+      currentDisplayRefreshRate === null ||
+      sameOptionalNumber(selectedDisplayRefreshRate, currentDisplayRefreshRate)
+    );
+
+  const configuredDisplayPreset = client?.display_resolution_preset || "auto";
+  const configuredDisplayPresetObj = getDisplayResolutionPreset(configuredDisplayPreset);
+  const configuredDisplayMode = String(
+    client?.display_resolution_mode || configuredDisplayPresetObj.mode || "auto"
+  ).toLowerCase();
+  const configuredDisplayWidth = parseOptionalNumber(
+    client?.display_resolution_width ?? configuredDisplayPresetObj.width
+  );
+  const configuredDisplayHeight = parseOptionalNumber(
+    client?.display_resolution_height ?? configuredDisplayPresetObj.height
+  );
+  const configuredDisplayRefreshRate = parseOptionalNumber(client?.display_resolution_refresh_rate);
+
+  const selectedMatchesConfiguredDisplay = selectedDisplayIsAuto
+    ? configuredDisplayMode === "auto" && configuredDisplayPreset === "auto"
+    : configuredDisplayMode === "fixed" &&
+      configuredDisplayPreset === selectedDisplayPreset.value &&
+      configuredDisplayWidth === selectedDisplayWidth &&
+      configuredDisplayHeight === selectedDisplayHeight &&
+      sameOptionalNumber(configuredDisplayRefreshRate, selectedDisplayRefreshRate);
+
+  const displayResolutionHasResult =
+    displayResolutionStatusNorm === "detected" || displayResolutionStatusNorm === "applied";
+
+  const selectedDisplayAlreadyActive =
+    !selectedDisplayIsAuto &&
+    selectedMatchesCurrentDisplay &&
+    selectedMatchesConfiguredDisplay &&
+    displayResolutionHasResult;
+
+  const selectedDisplayCanBeSavedAsFixed =
+    !selectedDisplayIsAuto &&
+    selectedMatchesCurrentDisplay &&
+    !selectedMatchesConfiguredDisplay;
+
+  const displaySaveButtonLabel = settingsSaving
+    ? "Sender…"
+    : displayResolutionStatusNorm === "error"
+    ? "Prøv igen"
+    : selectedDisplayAlreadyActive
+    ? "Allerede aktiv"
+    : selectedDisplayCanBeSavedAsFixed
+    ? "Gem som fast opløsning"
+    : "Gem og anvend";
+
+  const displaySaveButtonDisabled =
+    settingsSaving ||
+    displayResolutionMeta.busy ||
+    displayResolutionWatching ||
+    !clientId ||
+    selectedDisplayAlreadyActive;
+
 
 
   const currentDisplayDescription = currentDisplayReport;
@@ -793,14 +901,54 @@ export default function ClientDetailsLivestreamSection({
     }));
   }, []);
 
+  const handleAutoDetectDisplayResolution = useCallback(async () => {
+    if (!clientId || settingsSaving || displayResolutionMeta.busy || displayResolutionWatching) return;
+
+    setSettingsSaving(true);
+    setSettingsError("");
+    setSettingsMessage("");
+
+    try {
+      setDisplayResolutionRequestBaseline(String(client?.display_resolution_updated_at || ""));
+      await updateClient(clientId, {
+        display_resolution_preset: "auto",
+        display_resolution_mode: "auto",
+        display_resolution_width: null,
+        display_resolution_height: null,
+        display_resolution_refresh_rate: null,
+        display_resolution_rotation: "normal",
+      });
+
+      setDisplayResolutionWatching(true);
+      setDisplayResolutionWatchingAction("detect");
+      setDisplayResolutionSawWorkingState(false);
+      setSettingsMessage("Auto-detektering er sendt til klienten. Venter på rapporteret skærm…");
+
+      if (typeof onDisplayResolutionSettingsSaved === "function") {
+        try { await onDisplayResolutionSettingsSaved(); } catch {}
+      }
+    } catch (err) {
+      setSettingsError(err?.message || "Kunne ikke starte auto-detektering.");
+    } finally {
+      setSettingsSaving(false);
+    }
+  }, [
+    clientId,
+    settingsSaving,
+    displayResolutionMeta.busy,
+    displayResolutionWatching,
+    client?.display_resolution_updated_at,
+    onDisplayResolutionSettingsSaved,
+  ]);
+
   const handleSaveLivestreamSettings = useCallback(async () => {
-    if (!clientId) return;
-    const preset = getDisplayResolutionPreset(settingsForm.preset);
-    const isAuto = preset.value === "auto";
-    const width = isAuto ? null : Number.parseInt(String(settingsForm.width), 10);
-    const height = isAuto ? null : Number.parseInt(String(settingsForm.height), 10);
-    const refreshRateRaw = String(settingsForm.refreshRate || "").trim();
-    const refreshRate = refreshRateRaw ? Number.parseFloat(refreshRateRaw) : null;
+    if (!clientId || displaySaveButtonDisabled) return;
+
+    const preset = selectedDisplayPreset;
+    const isAuto = selectedDisplayIsAuto;
+    const width = selectedDisplayWidth;
+    const height = selectedDisplayHeight;
+    const refreshRate = selectedDisplayRefreshRate;
 
     if (!isAuto && (!Number.isFinite(width) || !Number.isFinite(height) || width < 320 || height < 240)) {
       setSettingsError("Bredde og højde skal være mindst 320×240 px.");
@@ -815,6 +963,7 @@ export default function ClientDetailsLivestreamSection({
     setSettingsError("");
     setSettingsMessage("");
     try {
+      setDisplayResolutionRequestBaseline(String(client?.display_resolution_updated_at || ""));
       await updateClient(clientId, {
         display_resolution_preset: preset.value,
         display_resolution_mode: isAuto ? "auto" : "fixed",
@@ -824,9 +973,11 @@ export default function ClientDetailsLivestreamSection({
         display_resolution_rotation: "normal",
       });
       setDisplayResolutionWatching(true);
+      setDisplayResolutionWatchingAction("apply");
+      setDisplayResolutionSawWorkingState(false);
       setSettingsMessage(
-        isAuto
-          ? "Auto-detektering er sendt til klienten. Venter på rapporteret skærm…"
+        selectedDisplayCanBeSavedAsFixed
+          ? "Opløsningen er gemt som fast valg. Venter på klientens bekræftelse…"
           : "Skærmændringen er sendt til klienten. Venter på at den bliver anvendt…"
       );
       if (typeof onDisplayResolutionSettingsSaved === "function") {
@@ -837,21 +988,69 @@ export default function ClientDetailsLivestreamSection({
     } finally {
       setSettingsSaving(false);
     }
-  }, [clientId, settingsForm, onDisplayResolutionSettingsSaved]);
+  }, [
+    clientId,
+    displaySaveButtonDisabled,
+    selectedDisplayPreset,
+    selectedDisplayIsAuto,
+    selectedDisplayWidth,
+    selectedDisplayHeight,
+    selectedDisplayRefreshRate,
+    selectedDisplayCanBeSavedAsFixed,
+    client?.display_resolution_updated_at,
+    onDisplayResolutionSettingsSaved,
+  ]);
 
   useEffect(() => {
-    const shouldPoll =
-      settingsOpen ||
-      displayResolutionWatching ||
+    const isWorkingStatus =
       displayResolutionStatusNorm === "pending" ||
       displayResolutionStatusNorm === "applying";
 
-    if (!shouldPoll || typeof onDisplayResolutionSettingsSaved !== "function") {
+    const isTerminalStatus =
+      displayResolutionStatusNorm === "detected" ||
+      displayResolutionStatusNorm === "applied" ||
+      displayResolutionStatusNorm === "error";
+
+    if (displayResolutionWatching && isWorkingStatus && !displayResolutionSawWorkingState) {
+      setDisplayResolutionSawWorkingState(true);
+    }
+
+    const statusBelongsToCurrentRequest =
+      displayResolutionSawWorkingState ||
+      (
+        !!client?.display_resolution_updated_at &&
+        String(client.display_resolution_updated_at) !== String(displayResolutionRequestBaseline || "")
+      );
+
+    if (displayResolutionWatching && isTerminalStatus && statusBelongsToCurrentRequest) {
+      const shouldRefreshStream =
+        displayResolutionWatchingAction === "apply" &&
+        displayResolutionStatusNorm === "applied";
+
+      if (shouldRefreshStream) {
+        autoStartRequestedRef.current = false;
+        resetStreamState();
+        setRefreshing(true);
+        setLocalRefreshKey((k) => k + 1);
+        window.setTimeout(() => setRefreshing(false), 800);
+
+        if (typeof onRestartStream === "function") {
+          try { onRestartStream(); } catch {}
+        }
+      }
+
+      setDisplayResolutionWatching(false);
+      setDisplayResolutionWatchingAction(null);
+      setDisplayResolutionSawWorkingState(false);
       return undefined;
     }
 
-    if (displayResolutionWatching && ["detected", "applied", "error"].includes(displayResolutionStatusNorm)) {
-      setDisplayResolutionWatching(false);
+    const shouldPoll =
+      settingsOpen ||
+      displayResolutionWatching ||
+      isWorkingStatus;
+
+    if (!shouldPoll || typeof onDisplayResolutionSettingsSaved !== "function") {
       return undefined;
     }
 
@@ -877,8 +1076,14 @@ export default function ClientDetailsLivestreamSection({
   }, [
     settingsOpen,
     displayResolutionWatching,
+    displayResolutionWatchingAction,
+    displayResolutionSawWorkingState,
     displayResolutionStatusNorm,
+    displayResolutionRequestBaseline,
+    client?.display_resolution_updated_at,
     onDisplayResolutionSettingsSaved,
+    onRestartStream,
+    resetStreamState,
   ]);
 
   // -------------------------------------------------------------------------
@@ -1160,15 +1365,32 @@ export default function ClientDetailsLivestreamSection({
               )}
             </Alert>
 
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+              <Button
+                variant="outlined"
+                color="info"
+                onClick={handleAutoDetectDisplayResolution}
+                disabled={settingsSaving || displayResolutionMeta.busy || displayResolutionWatching || !clientId}
+              >
+                {settingsSaving && displayResolutionWatchingAction === "detect" ? (
+                  <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                ) : null}
+                Auto-detekter aktuel skærm
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Ændrer ikke skærmen — opdaterer kun den rapporterede aktuelle opløsning.
+              </Typography>
+            </Box>
+
             <TextField
               select
-              label="Vælg skærmopløsning"
+              label="Vælg opløsning der skal anvendes"
               value={settingsForm.preset}
               onChange={handlePresetChange}
               fullWidth
               size="small"
             >
-              {DISPLAY_RESOLUTION_PRESETS.map((preset) => (
+              {DISPLAY_RESOLUTION_PRESETS.filter((preset) => preset.value !== "auto").map((preset) => (
                 <MenuItem key={preset.value} value={preset.value}>{preset.label}</MenuItem>
               ))}
             </TextField>
@@ -1215,6 +1437,25 @@ export default function ClientDetailsLivestreamSection({
               />
             )}
 
+            {!selectedDisplayIsAuto && selectedDisplayAlreadyActive && (
+              <Alert severity="success">
+                Den valgte opløsning ({selectedResolutionDescription}) er allerede valgt og aktiv på klienten.
+              </Alert>
+            )}
+
+            {!selectedDisplayIsAuto && selectedDisplayCanBeSavedAsFixed && (
+              <Alert severity="info">
+                Den valgte opløsning ({selectedResolutionDescription}) matcher den aktuelle skærm.
+                Knappen gemmer den som fast opløsning, så klienten bruger den fremover.
+              </Alert>
+            )}
+
+            {!selectedDisplayIsAuto && !selectedDisplayAlreadyActive && !selectedDisplayCanBeSavedAsFixed && (
+              <Alert severity="warning">
+                Tryk “Gem og anvend” for at ændre klientens fysiske skærm til {selectedResolutionDescription}.
+              </Alert>
+            )}
+
             {settingsError && <Alert severity="error">{settingsError}</Alert>}
             {settingsMessage && <Alert severity="info">{settingsMessage}</Alert>}
           </Stack>
@@ -1223,13 +1464,9 @@ export default function ClientDetailsLivestreamSection({
           <Button onClick={() => setSettingsOpen(false)} disabled={settingsSaving}>
             {displayResolutionBusy ? "Luk — processen fortsætter" : "Luk"}
           </Button>
-          <Button onClick={handleSaveLivestreamSettings} variant="contained" disabled={settingsSaving || !clientId}>
+          <Button onClick={handleSaveLivestreamSettings} variant="contained" disabled={displaySaveButtonDisabled}>
             {settingsSaving ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
-            {settingsSaving
-              ? "Sender…"
-              : settingsForm.preset === "auto"
-              ? "Start auto-detektering"
-              : "Gem og anvend"}
+            {displaySaveButtonLabel}
           </Button>
         </DialogActions>
       </Dialog>
