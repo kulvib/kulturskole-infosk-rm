@@ -104,6 +104,21 @@ class Client(ClientBase, table=True):
     livestream_status: Optional[str] = "idle"
     livestream_last_segment: Optional[datetime] = None
     livestream_last_error: Optional[str] = None
+    # Fysisk X11/display-opløsning på klienten (fjernstyret fra backend/frontend).
+    display_resolution_preset: Optional[str] = Field(default="auto")
+    display_resolution_mode: Optional[str] = Field(default="auto")  # auto | fixed
+    display_resolution_width: Optional[int] = None
+    display_resolution_height: Optional[int] = None
+    display_resolution_refresh_rate: Optional[float] = None
+    display_resolution_rotation: Optional[str] = Field(default="normal")  # normal | left | right | inverted
+    display_resolution_updated_at: Optional[datetime] = None
+    display_resolution_current_output: Optional[str] = None
+    display_resolution_current_width: Optional[int] = None
+    display_resolution_current_height: Optional[int] = None
+    display_resolution_current_refresh_rate: Optional[float] = None
+    display_resolution_status: Optional[str] = Field(default="unknown")  # unknown | pending | detected | applying | applied | error
+    display_resolution_error: Optional[str] = None
+    display_resolution_last_applied_at: Optional[datetime] = None
     ubuntu_updates_available: Optional[int] = Field(default=0)
     pending_os_update: Optional[bool] = Field(default=False)
 
@@ -153,6 +168,20 @@ class ClientRead(ClientBase):
     livestream_status: Optional[str] = "idle"
     livestream_last_segment: Optional[datetime] = None
     livestream_last_error: Optional[str] = None
+    display_resolution_preset: Optional[str] = "auto"
+    display_resolution_mode: Optional[str] = "auto"
+    display_resolution_width: Optional[int] = None
+    display_resolution_height: Optional[int] = None
+    display_resolution_refresh_rate: Optional[float] = None
+    display_resolution_rotation: Optional[str] = "normal"
+    display_resolution_updated_at: Optional[datetime] = None
+    display_resolution_current_output: Optional[str] = None
+    display_resolution_current_width: Optional[int] = None
+    display_resolution_current_height: Optional[int] = None
+    display_resolution_current_refresh_rate: Optional[float] = None
+    display_resolution_status: Optional[str] = "unknown"
+    display_resolution_error: Optional[str] = None
+    display_resolution_last_applied_at: Optional[datetime] = None
     ubuntu_updates_available: Optional[int] = 0
     pending_os_update: Optional[bool] = False
     client_version: Optional[str] = None
@@ -190,6 +219,21 @@ class ClientCreate(ClientBase):
     client_update_started_at: Optional[datetime] = None
     client_update_finished_at: Optional[datetime] = None
     client_update_error: Optional[str] = None
+    display_resolution_preset: Optional[str] = "auto"
+    display_resolution_mode: Optional[str] = "auto"
+    display_resolution_width: Optional[int] = None
+    display_resolution_height: Optional[int] = None
+    display_resolution_refresh_rate: Optional[float] = None
+    display_resolution_rotation: Optional[str] = "normal"
+    display_resolution_updated_at: Optional[datetime] = None
+    display_resolution_current_output: Optional[str] = None
+    display_resolution_current_width: Optional[int] = None
+    display_resolution_current_height: Optional[int] = None
+    display_resolution_current_refresh_rate: Optional[float] = None
+    display_resolution_status: Optional[str] = "unknown"
+    display_resolution_error: Optional[str] = None
+    display_resolution_last_applied_at: Optional[datetime] = None
+
 
 
 class ClientUpdate(SQLModel):
@@ -219,6 +263,20 @@ class ClientUpdate(SQLModel):
     livestream_status: Optional[str] = None
     livestream_last_segment: Optional[datetime] = None
     livestream_last_error: Optional[str] = None
+    display_resolution_preset: Optional[str] = None
+    display_resolution_mode: Optional[str] = None
+    display_resolution_width: Optional[int] = None
+    display_resolution_height: Optional[int] = None
+    display_resolution_refresh_rate: Optional[float] = None
+    display_resolution_rotation: Optional[str] = None
+    display_resolution_updated_at: Optional[datetime] = None
+    display_resolution_current_output: Optional[str] = None
+    display_resolution_current_width: Optional[int] = None
+    display_resolution_current_height: Optional[int] = None
+    display_resolution_current_refresh_rate: Optional[float] = None
+    display_resolution_status: Optional[str] = None
+    display_resolution_error: Optional[str] = None
+    display_resolution_last_applied_at: Optional[datetime] = None
     ubuntu_updates_available: Optional[int] = None
     pending_os_update: Optional[bool] = None
     client_version: Optional[str] = None
