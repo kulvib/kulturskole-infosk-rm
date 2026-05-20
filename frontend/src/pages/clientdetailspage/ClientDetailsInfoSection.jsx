@@ -323,7 +323,7 @@ function hasDiagnosticsReport(client) {
 function formatNetworkValue(value) {
   const text = String(value ?? "").trim();
   if (!text) return "ukendt";
-  if (text === "127.0.0.1" || text.startsWith("127.")) return "loopback";
+  if (text === "127.0.0.1" || text.startsWith("127.")) return "ukendt";
   if (text === "00:00:00:00:00:00") return "ukendt";
   return text;
 }
@@ -852,6 +852,7 @@ export default function ClientDetailsInfoSection({
   calendarLoading = false,
   showSnackbar,
   onUbuntuUpdateStarted,
+  onDiagnosticsRefresh,
 }) {
   const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -947,6 +948,7 @@ export default function ClientDetailsInfoSection({
               clientOnline={clientOnline}
               showSnackbar={showSnackbar}
               onUbuntuUpdateStarted={onUbuntuUpdateStarted}
+              onDiagnosticsRefresh={onDiagnosticsRefresh}
             />
           </CardContent>
         </Card>
