@@ -273,6 +273,10 @@ def create_db_and_tables():
             conn, "client", client_columns, "machine_id",
             "ALTER TABLE client ADD COLUMN machine_id TEXT",
         )
+        _add_column_if_missing(
+            conn, "client", client_columns, "kiosk_url",
+            "ALTER TABLE client ADD COLUMN kiosk_url TEXT",
+        )
 
         # Disse kolonner findes typisk allerede hos dig, men beholdes her så
         # clean installs/ældre databaser ikke fejler ved enrollment claim.
