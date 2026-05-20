@@ -48,6 +48,145 @@ function getDisplayResolutionPreset(value) {
   return DISPLAY_RESOLUTION_PRESETS.find((p) => p.value === value) || DISPLAY_RESOLUTION_PRESETS[0];
 }
 
+function findPresetByDimensions(width, height) {
+  const w = Number(width);
+  const h = Number(height);
+  if (!Number.isFinite(w) || !Number.isFinite(h)) return null;
+  return DISPLAY_RESOLUTION_PRESETS.find(
+    (p) => p.value !== "auto" && p.value !== "custom" && p.width === w && p.height === h
+  ) || null;
+}
+
+function getInitialDisplaySettingsForm(client) {
+  const configuredPresetValue = client?.display_resolution_preset || "auto";
+  const configuredPreset = getDisplayResolutionPreset(configuredPresetValue);
+
+  const configuredMode = String(client?.display_resolution_mode || configuredPreset.mode || "auto").toLowerCase();
+  const configuredWidth = client?.display_resolution_width ?? configuredPreset.width ?? "";
+  const configuredHeight = client?.display_resolution_height ?? configuredPreset.height ?? "";
+
+  // Hvis der allerede er gemt en fast/custom indstilling, skal dialogen åbne med den.
+  if (configuredPresetValue !== "auto" || configuredMode === "fixed") {
+    return {
+      preset: configuredPreset.value,
+      width: String(configuredWidth || ""),
+      height: String(configuredHeight || ""),
+      refreshRate: String(client?.display_resolution_refresh_rate ?? ""),
+    };
+  }
+
+  // Hvis klienten har rapporteret en aktuel opløsning, er den mere nyttig som
+  // startpunkt end "Auto", når superadmin åbner dialogen efter en auto-detektering.
+  const currentWidth = client?.display_resolution_current_width;
+  const currentHeight = client?.display_resolution_current_height;
+  const currentPreset = findPresetByDimensions(currentWidth, currentHeight);
+
+  if (currentPreset) {
+    return {
+      preset: currentPreset.value,
+      width: String(currentPreset.width || ""),
+      height: String(currentPreset.height || ""),
+      refreshRate: String(client?.display_resolution_current_refresh_rate ?? ""),
+    };
+  }
+
+  if (currentWidth && currentHeight) {
+    return {
+      preset: "custom",
+      width: String(currentWidth),
+      height: String(currentHeight),
+      refreshRate: String(client?.display_resolution_current_refresh_rate ?? ""),
+    };
+  }
+
+  return {
+    preset: "auto",
+    width: "",
+    height: "",
+    refreshRate: "",
+  };
+}
+
+function normalizeDisplayResolutionStatus(status) {
+  return String(status || "unknown").trim().toLowerCase();
+}
+
+function formatCurrentDisplayResolution(client) {
+  if (client?.display_resolution_current_width && client?.display_resolution_current_height) {
+    return `${client.display_resolution_current_width}×${client.display_resolution_current_height}${
+      client?.display_resolution_current_refresh_rate
+        ? ` @ ${client.display_resolution_current_refresh_rate}Hz`
+        : ""
+    }${client?.display_resolution_current_output ? ` · ${client.display_resolution_current_output}` : ""}`;
+  }
+  return "Ikke rapporteret endnu";
+}
+
+function getDisplayResolutionStatusMeta(status, presetValue = "auto", error = "") {
+  const s = normalizeDisplayResolutionStatus(status);
+  const isAuto = presetValue === "auto";
+
+  if (s === "pending") {
+    return {
+      busy: true,
+      severity: "info",
+      title: isAuto
+        ? "Auto-detektering er sendt til klienten"
+        : "Skærmændring er sendt til klienten",
+      detail: "Afventer at klienten henter den nye konfiguration og rapporterer tilbage.",
+      short: isAuto ? "Auto-detektering afventer klienten" : "Skærmændring afventer klienten",
+    };
+  }
+
+  if (s === "applying") {
+    return {
+      busy: true,
+      severity: "info",
+      title: "Klienten anvender skærmopløsningen",
+      detail: "Klienten kører xrandr og tester den valgte opløsning.",
+      short: "Klienten anvender opløsningen…",
+    };
+  }
+
+  if (s === "detected") {
+    return {
+      busy: false,
+      severity: "success",
+      title: "Auto-detektering gennemført",
+      detail: "Klienten har rapporteret den aktuelle skærmopløsning.",
+      short: "Auto-detektering gennemført",
+    };
+  }
+
+  if (s === "applied") {
+    return {
+      busy: false,
+      severity: "success",
+      title: "Skærmopløsning anvendt",
+      detail: "Klienten har anvendt opløsningen og rapporteret den tilbage.",
+      short: "Skærmopløsning anvendt",
+    };
+  }
+
+  if (s === "error") {
+    return {
+      busy: false,
+      severity: "error",
+      title: "Skærmændring fejlede",
+      detail: error || "Klienten rapporterede en fejl under skærmhåndteringen.",
+      short: "Skærmændring fejlede",
+    };
+  }
+
+  return {
+    busy: false,
+    severity: "info",
+    title: "Ingen aktiv skærmproces",
+    detail: "Der er ikke en aktiv auto-detektering eller skærmændring i gang.",
+    short: "Ingen aktiv skærmproces",
+  };
+}
+
 function getAuthHeaders() {
   const token = localStorage.getItem("token");
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -194,6 +333,7 @@ export default function ClientDetailsLivestreamSection({
     height: "",
     refreshRate: "",
   });
+  const [displayResolutionWatching, setDisplayResolutionWatching] = useState(false);
 
   const autoStartRequestedRef = useRef(false);
   const autoStartInFlightRef  = useRef(false);
@@ -606,29 +746,37 @@ export default function ClientDetailsLivestreamSection({
         : !serverReady ? "Venter på at stream starter …"
         : "Forbinder til stream …";
 
+  const displayResolutionStatusNorm = normalizeDisplayResolutionStatus(client?.display_resolution_status);
+  const displayResolutionMeta = useMemo(
+    () => getDisplayResolutionStatusMeta(
+      client?.display_resolution_status,
+      client?.display_resolution_preset || "auto",
+      client?.display_resolution_error || ""
+    ),
+    [
+      client?.display_resolution_status,
+      client?.display_resolution_preset,
+      client?.display_resolution_error,
+    ]
+  );
+  const currentDisplayReport = useMemo(
+    () => formatCurrentDisplayResolution(client),
+    [
+      client?.display_resolution_current_width,
+      client?.display_resolution_current_height,
+      client?.display_resolution_current_refresh_rate,
+      client?.display_resolution_current_output,
+    ]
+  );
+  const displayResolutionBusy =
+    settingsSaving || displayResolutionWatching || displayResolutionMeta.busy;
 
 
-  const currentDisplayDescription = useMemo(() => {
-    const preset = getDisplayResolutionPreset(client?.display_resolution_preset || "auto");
-    const mode = String(client?.display_resolution_mode || preset.mode || "auto").toLowerCase();
-    const width = client?.display_resolution_width ?? preset.width;
-    const height = client?.display_resolution_height ?? preset.height;
-    const refresh = client?.display_resolution_refresh_rate;
-    if (mode === "auto" || preset.value === "auto") {
-      return "Auto-detekter";
-    }
-    return `${width || "?"}×${height || "?"}${refresh ? ` @ ${refresh}Hz` : ""}`;
-  }, [client]);
+
+  const currentDisplayDescription = currentDisplayReport;
 
   const openSettingsDialog = useCallback(() => {
-    const presetValue = client?.display_resolution_preset || "auto";
-    const preset = getDisplayResolutionPreset(presetValue);
-    setSettingsForm({
-      preset: preset.value,
-      width: String(client?.display_resolution_width ?? preset.width ?? ""),
-      height: String(client?.display_resolution_height ?? preset.height ?? ""),
-      refreshRate: String(client?.display_resolution_refresh_rate ?? ""),
-    });
+    setSettingsForm(getInitialDisplaySettingsForm(client));
     setSettingsMessage("");
     setSettingsError("");
     setSettingsOpen(true);
@@ -675,7 +823,12 @@ export default function ClientDetailsLivestreamSection({
         display_resolution_refresh_rate: isAuto ? null : refreshRate,
         display_resolution_rotation: "normal",
       });
-      setSettingsMessage("Skærmindstillinger er gemt. Klienten anvender ændringen ved næste config-sync og rapporterer resultatet tilbage.");
+      setDisplayResolutionWatching(true);
+      setSettingsMessage(
+        isAuto
+          ? "Auto-detektering er sendt til klienten. Venter på rapporteret skærm…"
+          : "Skærmændringen er sendt til klienten. Venter på at den bliver anvendt…"
+      );
       if (typeof onDisplayResolutionSettingsSaved === "function") {
         try { await onDisplayResolutionSettingsSaved(); } catch {}
       }
@@ -685,6 +838,48 @@ export default function ClientDetailsLivestreamSection({
       setSettingsSaving(false);
     }
   }, [clientId, settingsForm, onDisplayResolutionSettingsSaved]);
+
+  useEffect(() => {
+    const shouldPoll =
+      settingsOpen ||
+      displayResolutionWatching ||
+      displayResolutionStatusNorm === "pending" ||
+      displayResolutionStatusNorm === "applying";
+
+    if (!shouldPoll || typeof onDisplayResolutionSettingsSaved !== "function") {
+      return undefined;
+    }
+
+    if (displayResolutionWatching && ["detected", "applied", "error"].includes(displayResolutionStatusNorm)) {
+      setDisplayResolutionWatching(false);
+      return undefined;
+    }
+
+    let stopped = false;
+
+    const refreshDisplayResolutionStatus = async () => {
+      try {
+        await onDisplayResolutionSettingsSaved();
+      } catch {
+        // Parent refresh-fejl skal ikke lukke dialogen eller vise falsk status.
+      }
+    };
+
+    refreshDisplayResolutionStatus();
+    const timer = window.setInterval(() => {
+      if (!stopped) refreshDisplayResolutionStatus();
+    }, 1500);
+
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [
+    settingsOpen,
+    displayResolutionWatching,
+    displayResolutionStatusNorm,
+    onDisplayResolutionSettingsSaved,
+  ]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -732,8 +927,21 @@ export default function ClientDetailsLivestreamSection({
 
             {isSuperadmin && (
               <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 0.5 }}>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
                   Skærm: {currentDisplayDescription}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: displayResolutionMeta.severity === "error"
+                      ? "error.main"
+                      : displayResolutionMeta.busy
+                      ? "info.main"
+                      : "text.secondary",
+                  }}
+                >
+                  {displayResolutionBusy ? "Proces: " : "Seneste status: "}
+                  {displayResolutionMeta.short}
                 </Typography>
                 <Button
                   size="small"
@@ -932,21 +1140,29 @@ export default function ClientDetailsLivestreamSection({
         <DialogTitle>Skærmindstillinger</DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Alert severity="info">
-              Disse indstillinger styrer klientens fysiske X11-skærmopløsning via xrandr. Auto-detekter ændrer ikke opløsningen; klienten registrerer og rapporterer den aktuelle skærm.
+            <Alert
+              severity={displayResolutionMeta.severity}
+              icon={displayResolutionMeta.busy || settingsSaving ? <CircularProgress size={16} /> : undefined}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {settingsSaving ? "Gemmer skærmindstillinger…" : displayResolutionMeta.title}
+              </Typography>
+              <Typography variant="body2">
+                {settingsSaving ? "Sender ændringen til backend." : displayResolutionMeta.detail}
+              </Typography>
+              <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
+                Aktuel rapporteret skærm: {currentDisplayReport}
+              </Typography>
+              {client?.display_resolution_error && displayResolutionStatusNorm === "error" && (
+                <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
+                  Fejl: {client.display_resolution_error}
+                </Typography>
+              )}
             </Alert>
-
-            <Typography variant="body2" color="text.secondary">
-              Aktuel rapporteret skærm: {client?.display_resolution_current_width && client?.display_resolution_current_height
-                ? `${client.display_resolution_current_width}×${client.display_resolution_current_height}${client?.display_resolution_current_refresh_rate ? ` @ ${client.display_resolution_current_refresh_rate}Hz` : ""}${client?.display_resolution_current_output ? ` · ${client.display_resolution_current_output}` : ""}`
-                : "Ikke rapporteret endnu"}
-              {client?.display_resolution_status ? ` · Status: ${client.display_resolution_status}` : ""}
-              {client?.display_resolution_error ? ` · Fejl: ${client.display_resolution_error}` : ""}
-            </Typography>
 
             <TextField
               select
-              label="Opløsning"
+              label="Vælg skærmopløsning"
               value={settingsForm.preset}
               onChange={handlePresetChange}
               fullWidth
@@ -1000,14 +1216,20 @@ export default function ClientDetailsLivestreamSection({
             )}
 
             {settingsError && <Alert severity="error">{settingsError}</Alert>}
-            {settingsMessage && <Alert severity="success">{settingsMessage}</Alert>}
+            {settingsMessage && <Alert severity="info">{settingsMessage}</Alert>}
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSettingsOpen(false)} disabled={settingsSaving}>Luk</Button>
+          <Button onClick={() => setSettingsOpen(false)} disabled={settingsSaving}>
+            {displayResolutionBusy ? "Luk — processen fortsætter" : "Luk"}
+          </Button>
           <Button onClick={handleSaveLivestreamSettings} variant="contained" disabled={settingsSaving || !clientId}>
             {settingsSaving ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
-            Gem
+            {settingsSaving
+              ? "Sender…"
+              : settingsForm.preset === "auto"
+              ? "Start auto-detektering"
+              : "Gem og anvend"}
           </Button>
         </DialogActions>
       </Dialog>
