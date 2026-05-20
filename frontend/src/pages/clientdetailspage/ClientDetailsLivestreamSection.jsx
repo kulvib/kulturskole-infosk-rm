@@ -145,19 +145,23 @@ function formatResolutionLabel(width, height, refreshRate = null) {
   return `${w}×${h}${refresh ? ` @ ${refresh}Hz` : ""}`;
 }
 
-function getDisplayResolutionStatusMeta(status, presetValue = "auto", error = "") {
+function getDisplayResolutionStatusMeta(status, presetValue = "auto", error = "", actionValue = null) {
   const s = normalizeDisplayResolutionStatus(status);
+  const action = String(actionValue || "").trim().toLowerCase();
+  const isDetect = action === "detect";
   const isAuto = presetValue === "auto";
 
   if (s === "pending") {
     return {
       busy: true,
       severity: "info",
-      title: isAuto
-        ? "Auto-detektering er sendt til klienten"
+      title: isDetect || isAuto
+        ? "Auto-detektering er startet"
         : "Skærmændring er sendt til klienten",
-      detail: "Afventer at klienten henter den nye konfiguration og rapporterer tilbage.",
-      short: isAuto ? "Auto-detektering afventer klienten" : "Skærmændring afventer klienten",
+      detail: isDetect || isAuto
+        ? "Afventer at klienten rapporterer den aktuelle skærm."
+        : "Afventer at klienten henter den nye konfiguration og rapporterer tilbage.",
+      short: isDetect || isAuto ? "Auto-detektering kører" : "Skærmændring afventer klienten",
     };
   }
 
@@ -777,12 +781,14 @@ export default function ClientDetailsLivestreamSection({
     () => getDisplayResolutionStatusMeta(
       client?.display_resolution_status,
       client?.display_resolution_preset || "auto",
-      client?.display_resolution_error || ""
+      client?.display_resolution_error || "",
+      client?.display_resolution_action || null
     ),
     [
       client?.display_resolution_status,
       client?.display_resolution_preset,
       client?.display_resolution_error,
+      client?.display_resolution_action,
     ]
   );
   const currentDisplayReport = useMemo(
@@ -911,18 +917,13 @@ export default function ClientDetailsLivestreamSection({
     try {
       setDisplayResolutionRequestBaseline(String(client?.display_resolution_updated_at || ""));
       await updateClient(clientId, {
-        display_resolution_preset: "auto",
-        display_resolution_mode: "auto",
-        display_resolution_width: null,
-        display_resolution_height: null,
-        display_resolution_refresh_rate: null,
-        display_resolution_rotation: "normal",
+        display_resolution_action: "detect",
       });
 
       setDisplayResolutionWatching(true);
       setDisplayResolutionWatchingAction("detect");
       setDisplayResolutionSawWorkingState(false);
-      setSettingsMessage("Auto-detektering er sendt til klienten. Venter på rapporteret skærm…");
+      setSettingsMessage("");
 
       if (typeof onDisplayResolutionSettingsSaved === "function") {
         try { await onDisplayResolutionSettingsSaved(); } catch {}
@@ -971,6 +972,7 @@ export default function ClientDetailsLivestreamSection({
         display_resolution_height: isAuto ? null : height,
         display_resolution_refresh_rate: isAuto ? null : refreshRate,
         display_resolution_rotation: "normal",
+        display_resolution_action: "apply",
       });
       setDisplayResolutionWatching(true);
       setDisplayResolutionWatchingAction("apply");
@@ -1378,7 +1380,7 @@ export default function ClientDetailsLivestreamSection({
                 Auto-detekter aktuel skærm
               </Button>
               <Typography variant="caption" color="text.secondary">
-                Ændrer ikke skærmen — opdaterer kun den rapporterede aktuelle opløsning.
+                Læser kun aktuel skærm — ændrer og gemmer ikke skærmindstillingen.
               </Typography>
             </Box>
 
