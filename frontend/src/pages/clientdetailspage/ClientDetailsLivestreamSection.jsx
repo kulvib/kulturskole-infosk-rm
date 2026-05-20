@@ -129,6 +129,7 @@ export default function ClientDetailsLivestreamSection({
   clientId,
   refreshing: parentRefreshing = false,
   onRestartStream = null,
+  onCommandSent = null,
   streamKey = null,
   clientOnline = true
 }) {
@@ -215,6 +216,13 @@ export default function ClientDetailsLivestreamSection({
 
     try {
       await sendLivestreamCommand(clientId, "livestream_start");
+      if (typeof onCommandSent === "function") {
+        try {
+          onCommandSent({ action: "livestream_start", reason });
+        } catch {
+          // Ignorer callback-fejl — livestream bestillingen er allerede sendt.
+        }
+      }
       setAutoStartStatus("Livestream er bestilt — venter på segmenter …");
       return true;
     } catch (err) {
@@ -225,7 +233,7 @@ export default function ClientDetailsLivestreamSection({
     } finally {
       autoStartInFlightRef.current = false;
     }
-  }, [clientId, clientOnline]);
+  }, [clientId, clientOnline, onCommandSent]);
 
   useEffect(() => {
     autoStartRequestedRef.current = false;
