@@ -129,6 +129,7 @@ const TERMINAL_STEPS_BY_ACTION = {
   wakeup:   new Set(["system_wake", "system_wake_complete", "display_wake", "display_wake_complete", "error"]),
   reboot:   new Set(["system_rebooting", "error"]),
   shutdown: new Set(["system_shutting_down", "error"]),
+  reset_browser: new Set(["start_chrome", "error"]),
 };
 
 // Fallback hvis action ikke kendes
