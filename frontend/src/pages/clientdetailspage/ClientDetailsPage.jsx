@@ -276,6 +276,11 @@ export default function ClientDetailsPage({
           if (data?.chrome_status != null) setLiveChromeStatus(data.chrome_status);
           if (data?.chrome_color != null)  setLiveChromeColor(data.chrome_color);
           if (data?.last_seen != null)     setLastSeen(data.last_seen);
+          if (data?.pending_chrome_action != null) {
+            const pca = String(data.pending_chrome_action || "none").toLowerCase();
+            setLocalPendingAction(pca || "none");
+          }
+          if (data?.state) setLocalClientState(data.state);
           if (typeof data?.isOnline === "boolean") {
             setLiveClientOnline(data.isOnline);
           } else if (typeof data?.is_online === "boolean") {
@@ -427,19 +432,38 @@ export default function ClientDetailsPage({
     if (client?.id) openRemoteDesktop(client.id);
   }, [client?.id]);
 
+  const refreshAfterExternalCommand = useCallback(
+    async ({ pendingChromeAction, clientState } = {}) => {
+      if (pendingChromeAction !== undefined) {
+        const pca = String(pendingChromeAction || "none").toLowerCase();
+        setLocalPendingAction(pca || "none");
+      }
+      if (clientState) setLocalClientState(clientState);
+
+      try {
+        if (typeof silentRefresh === "function") {
+          await silentRefresh();
+        } else if (typeof handleRefresh === "function") {
+          await handleRefresh();
+        }
+      } catch {
+        // Ignorer refresh-fejl efter eksterne kommandoer.
+      }
+    },
+    [silentRefresh, handleRefresh]
+  );
+
   // ---------------------------------------------------------------------------
   // Afledte værdier
   // ---------------------------------------------------------------------------
   const clientOnline  = liveClientOnline;
   const displayUptime = uptime != null ? uptime : client?.uptime ?? null;
 
-  const effectivePendingAction = clientActionPending
-    ? localPendingAction
-    : (client?.pending_chrome_action ?? "none");
+  const effectivePendingAction =
+    localPendingAction ?? client?.pending_chrome_action ?? "none";
 
-  const effectiveClientState = clientActionPending
-    ? localClientState
-    : (client?.state ?? "normal");
+  const effectiveClientState =
+    localClientState ?? client?.state ?? "normal";
 
   return (
     <Container
@@ -466,6 +490,7 @@ export default function ClientDetailsPage({
           streamKey={streamKey}
           refreshing={refreshing}
           onRestartStream={onRestartStream}
+          onCommandSent={refreshAfterExternalCommand}
           clientOnline={clientOnline}
         />
 
@@ -478,6 +503,13 @@ export default function ClientDetailsPage({
           setCalendarDialogOpen={setCalendarDialogOpen}
           clientOnline={clientOnline}
           calendarLoading={calendarLoading}
+          showSnackbar={showSnackbar}
+          onUbuntuUpdateStarted={() =>
+            refreshAfterExternalCommand({
+              pendingChromeAction: "os_update",
+              clientState: "updating",
+            })
+          }
         />
 
         {/* 4 */}
@@ -493,6 +525,7 @@ export default function ClientDetailsPage({
           clientActionPending={clientActionPending}
           liveStep={liveStep}
           liveChromeStatus={liveChromeStatus}
+          showSnackbar={showSnackbar}
         />
 
       </Box>
