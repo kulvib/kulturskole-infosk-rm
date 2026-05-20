@@ -57,6 +57,12 @@ DISPLAY_RESOLUTION_DESIRED_FIELDS = {
     "display_resolution_rotation",
 }
 
+DISPLAY_RESOLUTION_ACTION_FIELDS = {
+    "display_resolution_action",
+}
+
+VALID_DISPLAY_RESOLUTION_ACTIONS = {"detect", "apply"}
+
 DISPLAY_RESOLUTION_CLIENT_REPORT_FIELDS = {
     "display_resolution_current_output",
     "display_resolution_current_width",
@@ -220,6 +226,13 @@ def _validate_display_resolution_update(client: Client, client_update: ClientUpd
             if r < 1 or r > 240:
                 raise HTTPException(status_code=400, detail="Refresh rate skal være mellem 1 og 240 Hz")
 
+    if "display_resolution_action" in fields:
+        action_value = getattr(client_update, "display_resolution_action", None)
+        if action_value not in (None, ""):
+            action = str(action_value).strip().lower()
+            if action not in VALID_DISPLAY_RESOLUTION_ACTIONS:
+                raise HTTPException(status_code=400, detail=f"Ugyldig display_resolution_action '{action}'")
+
     if report_changed:
         status_value = getattr(client_update, "display_resolution_status", None)
         if "display_resolution_status" in fields and status_value is not None:
@@ -241,7 +254,21 @@ def _apply_display_resolution_fields(client: Client, client_update: ClientUpdate
         client.display_resolution_refresh_rate = client_update.display_resolution_refresh_rate
     if "display_resolution_rotation" in fields:
         client.display_resolution_rotation = client_update.display_resolution_rotation or "normal"
-    if DISPLAY_RESOLUTION_DESIRED_FIELDS & set(fields):
+
+    if "display_resolution_action" in fields:
+        action_value = client_update.display_resolution_action
+        client.display_resolution_action = str(action_value).strip().lower() if action_value not in (None, "") else None
+
+    desired_changed = bool(DISPLAY_RESOLUTION_DESIRED_FIELDS & set(fields))
+    action_requested = "display_resolution_action" in fields and getattr(client, "display_resolution_action", None) in VALID_DISPLAY_RESOLUTION_ACTIONS
+
+    if desired_changed:
+        if "display_resolution_action" not in fields:
+            client.display_resolution_action = "apply"
+        client.display_resolution_updated_at = utcnow()
+        client.display_resolution_status = "pending"
+        client.display_resolution_error = None
+    elif action_requested:
         client.display_resolution_updated_at = utcnow()
         client.display_resolution_status = "pending"
         client.display_resolution_error = None
@@ -704,6 +731,7 @@ async def create_client(client_in: ClientCreate, session=Depends(get_session), u
         display_resolution_height=getattr(client_in, "display_resolution_height", None),
         display_resolution_refresh_rate=getattr(client_in, "display_resolution_refresh_rate", None),
         display_resolution_rotation=getattr(client_in, "display_resolution_rotation", "normal"),
+        display_resolution_action=getattr(client_in, "display_resolution_action", None),
         display_resolution_updated_at=getattr(client_in, "display_resolution_updated_at", None),
         display_resolution_current_output=getattr(client_in, "display_resolution_current_output", None),
         display_resolution_current_width=getattr(client_in, "display_resolution_current_width", None),
@@ -738,7 +766,7 @@ async def update_client(
                 status_code=403,
                 detail=f"Klient-token må ikke opdatere disse felter: {forbidden}",
             )
-    elif DISPLAY_RESOLUTION_DESIRED_FIELDS & set(fields):
+    elif (DISPLAY_RESOLUTION_DESIRED_FIELDS | DISPLAY_RESOLUTION_ACTION_FIELDS) & set(fields):
         if not getattr(user, "is_superadmin", False):
             raise HTTPException(status_code=403, detail="Skærmopløsning må kun ændres af superadmin")
 
