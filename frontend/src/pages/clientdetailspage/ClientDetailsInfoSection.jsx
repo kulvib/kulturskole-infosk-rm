@@ -460,16 +460,26 @@ function SystemInfoTable({
       setConfirmOpen(false);
 
       if (typeof showSnackbar === "function") {
-        showSnackbar("Ubuntu-opdatering bestilt", "success");
+        showSnackbar({
+          message: "Ubuntu-opdatering bestilt",
+          severity: "success",
+        });
       }
       if (typeof onUbuntuUpdateStarted === "function") {
-        onUbuntuUpdateStarted();
+        try {
+          await onUbuntuUpdateStarted();
+        } catch {
+          // Ignorer refresh-fejl efter bestilling af Ubuntu-opdatering.
+        }
       }
     } catch (err) {
       const message = err?.message || "Kunne ikke starte Ubuntu-opdatering";
       setLocalMessage(message);
       if (typeof showSnackbar === "function") {
-        showSnackbar(message, "error");
+        showSnackbar({
+          message,
+          severity: "error",
+        });
       }
     } finally {
       setUpdateStarting(false);
