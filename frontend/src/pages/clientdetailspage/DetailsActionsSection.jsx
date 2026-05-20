@@ -26,6 +26,7 @@ import StopIcon from "@mui/icons-material/Stop";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import DesktopWindowsIcon from "@mui/icons-material/DesktopWindows";
 import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
 import { getClientflowUpdateStatus, requestClientflowUpdate } from "../../api";
@@ -263,6 +264,7 @@ export default function ClientDetailsActionsSection({
 
   const [actionLoading, setActionLoading] = useState({});
   const [shutdownDialogOpen, setShutdownDialogOpen] = useState(false);
+  const [resetBrowserDialogOpen, setResetBrowserDialogOpen] = useState(false);
   const [localSnackbar, setLocalSnackbar] = useState({
     open: false,
     message: "",
@@ -704,6 +706,28 @@ export default function ClientDetailsActionsSection({
       tooltip: "Åbn fjernskrivebord",
     },
     {
+      key: "reset_browser",
+      label: "Nulstil browser",
+      icon: <DeleteSweepIcon />,
+      color: "warning",
+      variant: "outlined",
+      onClick: () => setResetBrowserDialogOpen(true),
+      loading: !!actionLoading["reset_browser"],
+      disabled: clientOnline === false || isSystemLocked || ubuntuUpdateBusy || clientflowUpdateBusy,
+      lockDuringBusy: true,
+      disabledTooltip:
+        clientflowUpdateBusy
+          ? clientflowBusyTooltip
+          : ubuntuUpdateBusy
+          ? ubuntuUpdateBusyTooltip
+          : clientOnline === false
+          ? "Klienten er offline"
+          : isSystemLocked
+          ? "Klienten genstarter eller lukker ned"
+          : "Ikke tilgængelig",
+      tooltip: "Luk Chrome, ryd profil/cookies/cache og start kiosk-browseren igen efter countdown",
+    },
+    {
       key: "clientflow_update",
       label: "Opdater ClientFlow",
       icon: <SystemUpdateAltIcon />,
@@ -911,6 +935,36 @@ export default function ClientDetailsActionsSection({
             disabled={clientOnline === false || actionPanelBusy}
           >
             Ja, sluk klienten
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={resetBrowserDialogOpen}
+        onClose={() => setResetBrowserDialogOpen(false)}
+      >
+        <DialogTitle>Nulstil kiosk-browser</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Denne handling lukker Chrome, rydder browserprofil, cookies og cache og starter kiosk-browseren igen efter countdown.
+            <br />
+            Brug den kun, hvis siden hænger, cookie-/login-flow er gået i stykker, eller browseren skal starte helt rent.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResetBrowserDialogOpen(false)} color="primary">
+            Annuller
+          </Button>
+          <Button
+            onClick={async () => {
+              setResetBrowserDialogOpen(false);
+              await doAction("reset_browser");
+            }}
+            color="warning"
+            variant="contained"
+            disabled={clientOnline === false || actionPanelBusy}
+          >
+            Ja, nulstil browseren
           </Button>
         </DialogActions>
       </Dialog>
