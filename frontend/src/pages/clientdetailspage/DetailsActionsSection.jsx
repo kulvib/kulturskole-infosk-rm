@@ -124,6 +124,64 @@ function getStepLabel(step) {
   return null;
 }
 
+const CLIENTFLOW_UPDATE_STEPS = [
+  { key: "requested", label: "Afventer klient", description: "Backend har registreret opdateringen. Klienten henter den ved næste sync." },
+  { key: "starting", label: "Starter opdatering", description: "Klienten har modtaget opdateringen og starter update-flowet." },
+  { key: "preparing", label: "Klargør", description: "Klienten forbereder opdateringen og tjekker miljøet." },
+  { key: "fetching_manifest", label: "Henter versionsinfo", description: "Klienten henter manifest og versionsinfo." },
+  { key: "downloading", label: "Downloader", description: "Klienten downloader den nye ClientFlow-pakke." },
+  { key: "verifying", label: "Verificerer", description: "Klienten verificerer download og indhold." },
+  { key: "installing", label: "Installerer", description: "Klienten installerer den nye version." },
+  { key: "stopping_services", label: "Genstarter services", description: "ClientFlow-services genstartes for at aktivere opdateringen." },
+];
+
+const CLIENTFLOW_UPDATE_BUSY_STEPS = new Set(CLIENTFLOW_UPDATE_STEPS.map((s) => s.key));
+
+function normalizeUpdateStatus(status) {
+  return String(status || "ready").trim().toLowerCase();
+}
+
+function getClientflowUpdateStepMeta(status) {
+  const st = normalizeUpdateStatus(status);
+  if (st === "ready") {
+    return { label: "Klar", description: "Klienten er klar til opdatering.", index: -1, progress: 0 };
+  }
+  if (st === "success") {
+    return { label: "Opdateret", description: "ClientFlow-opdateringen er gennemført.", index: CLIENTFLOW_UPDATE_STEPS.length, progress: 100 };
+  }
+  if (st === "error") {
+    return { label: "Fejl", description: "ClientFlow-opdateringen fejlede.", index: -1, progress: 100 };
+  }
+
+  const index = CLIENTFLOW_UPDATE_STEPS.findIndex((step) => step.key === st);
+  if (index >= 0) {
+    const step = CLIENTFLOW_UPDATE_STEPS[index];
+    return {
+      ...step,
+      index,
+      progress: Math.round(((index + 1) / CLIENTFLOW_UPDATE_STEPS.length) * 100),
+    };
+  }
+
+  return { label: st || "Ukendt", description: "Ukendt opdateringsstatus fra klienten.", index: -1, progress: 0 };
+}
+
+function formatUpdateDateTime(value) {
+  if (!value) return null;
+  const raw = String(value);
+  const d = new Date(raw.endsWith("Z") || /[+-]\d{2}:?\d{2}$/.test(raw) ? raw : `${raw}Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("da-DK", {
+    timeZone: "Europe/Copenhagen",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
 const actionBtnStyle = {
   minWidth: 0,
   width: "100%",
@@ -217,40 +275,27 @@ export default function ClientDetailsActionsSection({
 
   const liveStepNorm = String(liveStep ?? "").trim().toLowerCase();
 
-  const updateStatusText = (() => {
-    const st = String(clientflowUpdateStatus?.client_update_status || "").toLowerCase();
-    const msg = clientflowUpdateStatus?.client_update_message;
-    const version = clientflowUpdateStatus?.client_version;
-    if (!st || st === "ready") return null;
-    const labelMap = {
-      ready: "Klar",
-      requested: "Afventer klient",
-      starting: "Starter opdatering",
-      preparing: "Klargør opdatering",
-      fetching_manifest: "Henter versionsinfo",
-      downloading: "Downloader opdatering",
-      verifying: "Verificerer opdatering",
-      installing: "Installerer ClientFlow",
-      stopping_services: "Genstarter services",
-      success: "Opdateret",
-      error: "Fejl",
-    };
-    const label = labelMap[st] || st;
-    return `${label}${version ? ` · v${version}` : ""}${msg ? ` · ${msg}` : ""}`;
-  })();
+  const updateStatus = normalizeUpdateStatus(clientflowUpdateStatus?.client_update_status);
+  const updateStepMeta = getClientflowUpdateStepMeta(updateStatus);
+  const updateInProgress = CLIENTFLOW_UPDATE_BUSY_STEPS.has(updateStatus);
+  const updateIsFinished = updateStatus === "success" || updateStatus === "error";
+  const showClientflowUpdatePanel =
+    updateInProgress ||
+    updateIsFinished ||
+    normalizedPendingAction === "clientflow_update" ||
+    !!actionLoading["clientflow_update"];
 
-  const updateStatusSeverity = (() => {
-    const st = String(clientflowUpdateStatus?.client_update_status || "").toLowerCase();
-    if (st === "error") return "error";
-    if (st === "success") return "success";
-    if (["requested", "starting", "preparing", "fetching_manifest", "downloading", "verifying", "installing", "stopping_services"].includes(st)) return "info";
-    return "default";
-  })();
+  const updateStatusSeverity =
+    updateStatus === "error" ? "error" :
+    updateStatus === "success" ? "success" :
+    "info";
 
-  const updateInProgress = [
-    "requested", "starting", "preparing", "fetching_manifest", "downloading",
-    "verifying", "installing", "stopping_services"
-  ].includes(String(clientflowUpdateStatus?.client_update_status || "").toLowerCase());
+  const updateRequestedAt = formatUpdateDateTime(clientflowUpdateStatus?.client_update_requested_at);
+  const updateStartedAt = formatUpdateDateTime(clientflowUpdateStatus?.client_update_started_at);
+  const updateFinishedAt = formatUpdateDateTime(clientflowUpdateStatus?.client_update_finished_at);
+  const updateError = clientflowUpdateStatus?.client_update_error;
+  const updateMessage = clientflowUpdateStatus?.client_update_message;
+  const updateVersion = clientflowUpdateStatus?.client_version;
 
   // ClientFlow-opdatering er en software-/serviceopdatering på selve klienten.
   // Den skal derfor låse øvrige handlinger, også Terminal og Fjernskrivebord,
@@ -498,8 +543,15 @@ export default function ClientDetailsActionsSection({
 
   useEffect(() => {
     if (!clientId || clientOnline === false) return undefined;
-    refreshClientflowUpdateStatus();
-    return undefined;
+    let stopped = false;
+    (async () => {
+      const data = await refreshClientflowUpdateStatus();
+      const st = normalizeUpdateStatus(data?.client_update_status);
+      if (!stopped && CLIENTFLOW_UPDATE_BUSY_STEPS.has(st)) {
+        setClientflowUpdatePolling(true);
+      }
+    })();
+    return () => { stopped = true; };
   }, [clientId, clientOnline, refreshClientflowUpdateStatus]);
 
   useEffect(() => {
@@ -507,8 +559,8 @@ export default function ClientDetailsActionsSection({
     let stopped = false;
     const timer = window.setInterval(async () => {
       const data = await refreshClientflowUpdateStatus();
-      const st = String(data?.client_update_status || "").toLowerCase();
-      if (!st || ["success", "error", "ready"].includes(st)) {
+      const st = normalizeUpdateStatus(data?.client_update_status);
+      if (!CLIENTFLOW_UPDATE_BUSY_STEPS.has(st)) {
         if (!stopped) setClientflowUpdatePolling(false);
       }
     }, 2500);
@@ -687,17 +739,82 @@ export default function ClientDetailsActionsSection({
           </Alert>
         )}
 
-        {updateStatusText && (
+        {showClientflowUpdatePanel && (
           <Alert
-            severity={updateStatusSeverity === "default" ? "info" : updateStatusSeverity}
+            severity={updateStatusSeverity}
             sx={{ mb: 1.5 }}
             icon={updateInProgress ? <CircularProgress size={16} /> : undefined}
           >
-            ClientFlow update: {updateStatusText}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1, flexWrap: "wrap" }}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  ClientFlow-opdatering: {updateStepMeta.label}
+                  {updateVersion ? ` · v${updateVersion}` : ""}
+                </Typography>
+                {updateInProgress && (
+                  <Typography variant="caption" color="text.secondary">
+                    Trin {Math.max(updateStepMeta.index + 1, 1)} / {CLIENTFLOW_UPDATE_STEPS.length}
+                  </Typography>
+                )}
+              </Box>
+
+              <Typography variant="body2">
+                {updateMessage || updateStepMeta.description}
+              </Typography>
+
+              {(updateInProgress || updateStatus === "success") && (
+                <Box
+                  sx={{
+                    height: 7,
+                    borderRadius: 999,
+                    bgcolor: "rgba(0,0,0,0.12)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      height: "100%",
+                      width: `${Math.max(6, Math.min(100, updateStepMeta.progress || 6))}%`,
+                      bgcolor: updateStatus === "success" ? "success.main" : "info.main",
+                      transition: "width 250ms ease",
+                    }}
+                  />
+                </Box>
+              )}
+
+              <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+                {updateRequestedAt && (
+                  <Typography variant="caption" color="text.secondary">Bestilt: {updateRequestedAt}</Typography>
+                )}
+                {updateStartedAt && (
+                  <Typography variant="caption" color="text.secondary">Startet: {updateStartedAt}</Typography>
+                )}
+                {updateFinishedAt && (
+                  <Typography variant="caption" color="text.secondary">Færdig: {updateFinishedAt}</Typography>
+                )}
+              </Box>
+
+              {(updateError || updateStatus === "error") && (
+                <Typography variant="body2" color="error.main">
+                  Fejl: {updateError || updateMessage || "Klienten rapporterede en fejl under opdateringen."}
+                </Typography>
+              )}
+
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 0.25 }}>
+                <Button size="small" variant="outlined" onClick={refreshClientflowUpdateStatus}>
+                  Opdater status
+                </Button>
+                {updateStatus === "error" && clientOnline !== false && !ubuntuUpdateBusy && (
+                  <Button size="small" variant="contained" color="info" onClick={doClientflowUpdate}>
+                    Prøv igen
+                  </Button>
+                )}
+              </Box>
+            </Box>
           </Alert>
         )}
 
-        {clientflowUpdateBusy && !updateStatusText && (
+        {clientflowUpdateBusy && !showClientflowUpdatePanel && (
           <Alert
             severity="info"
             sx={{ mb: 1.5 }}
