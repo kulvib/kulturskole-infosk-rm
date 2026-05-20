@@ -26,6 +26,7 @@ import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useTheme } from "@mui/material/styles";
 import { apiUrl } from "../../api";
+import { useAuth } from "../../auth/authcontext";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -277,6 +278,39 @@ const NETWORK_ROWS = [
   { label: "MAC-adresse LAN:",  key: "lan_mac_address" },
 ];
 
+const ACTIVE_NETWORK_ROWS = [
+  { label: "Aktiv forbindelse:", key: "active_network_type" },
+  { label: "Aktiv IP:", key: "active_network_ip" },
+  { label: "Aktivt interface:", key: "active_network_interface" },
+  { label: "Aktiv MAC:", key: "active_network_mac" },
+];
+
+const SERVICE_STATUS_ROWS = [
+  { label: "Backend sync:", key: "service_clientflow_status" },
+  { label: "Kalender service:", key: "service_calendar_status" },
+  { label: "Browser Guard:", key: "service_browser_guard_status" },
+  { label: "Remote terminal:", key: "service_remote_terminal_status" },
+  { label: "Admin terminal:", key: "service_admin_terminal_status" },
+  { label: "Remote desktop:", key: "service_remote_desktop_status" },
+  { label: "Kiosk X11 guard:", key: "service_kiosk_x11_guard_status" },
+  { label: "Selfupdate:", key: "service_selfupdate_status" },
+  { label: "Livestream:", key: "livestream_process_status" },
+];
+
+function formatDiagnosticValue(value) {
+  const text = String(value ?? "").trim();
+  return text || "ukendt";
+}
+
+function getServiceStatusColor(value) {
+  const s = String(value || "").trim().toLowerCase();
+  if (["kører", "aktiv", "klar", "running", "active", "success"].includes(s)) return "success.main";
+  if (["stop", "stoppet", "inactive", "idle"].includes(s)) return "text.secondary";
+  if (["opdaterer", "starting", "requested", "preparing", "downloading", "installing"].includes(s)) return "info.main";
+  if (["fejl", "failed", "error", "mangler", "not-found"].includes(s)) return "error.main";
+  return "warning.main";
+}
+
 // ---------------------------------------------------------------------------
 // Sub-komponenter
 // ---------------------------------------------------------------------------
@@ -414,6 +448,7 @@ function SystemInfoTable({
   clientOnline,
   showSnackbar,
   onUbuntuUpdateStarted,
+  onDiagnosticsRefresh,
 }) {
   const cellStyle      = React.useMemo(() => makeCellStyle(isMobile),      [isMobile]);
   const valueCellStyle = React.useMemo(() => makeValueCellStyle(isMobile), [isMobile]);
@@ -428,6 +463,14 @@ function SystemInfoTable({
     typeof clientOnline !== "undefined"
       ? clientOnline === false
       : client?.isOnline === false;
+
+  React.useEffect(() => {
+    if (isOffline || typeof onDiagnosticsRefresh !== "function") return undefined;
+    const timer = window.setInterval(() => {
+      try { onDiagnosticsRefresh(); } catch {}
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [isOffline, onDiagnosticsRefresh]);
 
   const canRequestUbuntuUpdate =
     !!client?.id &&
@@ -697,22 +740,70 @@ function SystemInfoTable({
   );
 }
 
-function NetworkInfoTable({ client, isMobile = false }) {
+function DiagnosticTableRows({ rows, client, isMobile = false, copy = false, colored = false }) {
   const cellStyle      = React.useMemo(() => makeCellStyle(isMobile),      [isMobile]);
   const valueCellStyle = React.useMemo(() => makeValueCellStyle(isMobile), [isMobile]);
 
+  return rows.map(({ label, key }) => {
+    const value = formatDiagnosticValue(client?.[key]);
+    return (
+      <TableRow key={key} sx={{ height: isMobile ? 22 : 30 }}>
+        <TableCell sx={cellStyle}>{label}</TableCell>
+        <TableCell sx={valueCellStyle}>
+          {copy ? (
+            <CopyField value={value} isMobile={isMobile} />
+          ) : (
+            <Box
+              component="span"
+              sx={{
+                color: colored ? getServiceStatusColor(value) : "inherit",
+                fontWeight: colored ? 600 : 400,
+                fontSize: isMobile ? 12 : 14,
+              }}
+            >
+              {value}
+            </Box>
+          )}
+        </TableCell>
+      </TableRow>
+    );
+  });
+}
+
+function NetworkInfoTable({ client, isMobile = false, showAdvanced = false }) {
   return (
     <TableContainer>
       <Table size="small" aria-label="netværksinfo">
         <TableBody>
-          {NETWORK_ROWS.map(({ label, key }) => (
-            <TableRow key={key} sx={{ height: isMobile ? 22 : 30 }}>
-              <TableCell sx={cellStyle}>{label}</TableCell>
-              <TableCell sx={valueCellStyle}>
-                <CopyField value={client?.[key] || "ukendt"} isMobile={isMobile} />
-              </TableCell>
-            </TableRow>
-          ))}
+          <DiagnosticTableRows rows={ACTIVE_NETWORK_ROWS} client={client} isMobile={isMobile} copy />
+          <TableRow>
+            <TableCell colSpan={2} sx={{ border: 0, pt: 0.75, pb: 0.25 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                Adaptere
+              </Typography>
+            </TableCell>
+          </TableRow>
+          <DiagnosticTableRows rows={NETWORK_ROWS} client={client} isMobile={isMobile} copy />
+          {showAdvanced && (
+            <>
+              <TableRow>
+                <TableCell colSpan={2} sx={{ border: 0, pt: 0.75, pb: 0.25 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                    Servicestatus
+                  </Typography>
+                </TableCell>
+              </TableRow>
+              <DiagnosticTableRows rows={SERVICE_STATUS_ROWS} client={client} isMobile={isMobile} colored />
+              <TableRow sx={{ height: isMobile ? 22 : 30 }}>
+                <TableCell sx={{ ...makeCellStyle(isMobile), color: "text.secondary", fontWeight: 500 }}>
+                  Opdateret:
+                </TableCell>
+                <TableCell sx={{ ...makeValueCellStyle(isMobile), color: "text.secondary" }}>
+                  {formatDateTime(client?.diagnostics_updated_at, true)}
+                </TableCell>
+              </TableRow>
+            </>
+          )}
         </TableBody>
       </Table>
     </TableContainer>
@@ -736,6 +827,8 @@ export default function ClientDetailsInfoSection({
 }) {
   const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { user } = useAuth();
+  const isSuperadmin = user?.role === "superadmin";
 
   const isOffline =
     typeof clientOnline !== "undefined"
@@ -840,7 +933,7 @@ export default function ClientDetailsInfoSection({
                 Netværksinfo
               </Typography>
             </Box>
-            <NetworkInfoTable client={client} isMobile={isMobile} />
+            <NetworkInfoTable client={client} isMobile={isMobile} showAdvanced={isSuperadmin} />
           </CardContent>
         </Card>
       </Grid>
