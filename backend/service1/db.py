@@ -249,6 +249,64 @@ def create_db_and_tables():
             "ALTER TABLE client ADD COLUMN livestream_last_error TEXT",
         )
 
+        # --- Fysisk display-opløsning på klienten ---
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_preset",
+            "ALTER TABLE client ADD COLUMN display_resolution_preset TEXT DEFAULT 'auto'",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_mode",
+            "ALTER TABLE client ADD COLUMN display_resolution_mode TEXT DEFAULT 'auto'",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_width",
+            "ALTER TABLE client ADD COLUMN display_resolution_width INTEGER",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_height",
+            "ALTER TABLE client ADD COLUMN display_resolution_height INTEGER",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_refresh_rate",
+            "ALTER TABLE client ADD COLUMN display_resolution_refresh_rate FLOAT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_rotation",
+            "ALTER TABLE client ADD COLUMN display_resolution_rotation TEXT DEFAULT 'normal'",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_updated_at",
+            "ALTER TABLE client ADD COLUMN display_resolution_updated_at TIMESTAMP",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_current_output",
+            "ALTER TABLE client ADD COLUMN display_resolution_current_output TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_current_width",
+            "ALTER TABLE client ADD COLUMN display_resolution_current_width INTEGER",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_current_height",
+            "ALTER TABLE client ADD COLUMN display_resolution_current_height INTEGER",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_current_refresh_rate",
+            "ALTER TABLE client ADD COLUMN display_resolution_current_refresh_rate FLOAT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_status",
+            "ALTER TABLE client ADD COLUMN display_resolution_status TEXT DEFAULT 'unknown'",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_error",
+            "ALTER TABLE client ADD COLUMN display_resolution_error TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_last_applied_at",
+            "ALTER TABLE client ADD COLUMN display_resolution_last_applied_at TIMESTAMP",
+        )
+
         # --- Enrollment/client-secret kolonner ---
         # SQLModel.metadata.create_all() opretter nye tabeller, men den tilføjer
         # ikke nye kolonner til eksisterende tabeller. Derfor skal eksisterende
