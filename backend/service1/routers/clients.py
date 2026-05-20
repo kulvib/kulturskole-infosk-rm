@@ -805,7 +805,18 @@ async def update_client(
         raise HTTPException(status_code=404, detail="Client not found")
     fields = client_update.model_fields_set
     if principal_is_client(user):
-        forbidden = sorted(set(fields) - CLIENT_SELF_UPDATE_FIELDS)
+        # Klienten må kun sende status-/rapportfelter.
+        #
+        # Særligt for display_resolution_action:
+        # - Frontend/superadmin må sætte "detect" eller "apply".
+        # - Klienten må IKKE starte nye actions.
+        # - Klienten må kun rydde actionen igen med None/"" efter detected/applied/error.
+        allowed_fields = set(CLIENT_SELF_UPDATE_FIELDS)
+        action_value = getattr(client_update, "display_resolution_action", None)
+        if "display_resolution_action" in fields and action_value in (None, ""):
+            allowed_fields.add("display_resolution_action")
+
+        forbidden = sorted(set(fields) - allowed_fields)
         if forbidden:
             raise HTTPException(
                 status_code=403,
@@ -879,7 +890,7 @@ async def update_client(
     for diagnostic_field in DIAGNOSTIC_FIELDS:
         if diagnostic_field in fields:
             setattr(client, diagnostic_field, getattr(client_update, diagnostic_field))
-    if (DISPLAY_RESOLUTION_DESIRED_FIELDS | DISPLAY_RESOLUTION_CLIENT_REPORT_FIELDS) & set(fields):
+    if (DISPLAY_RESOLUTION_DESIRED_FIELDS | DISPLAY_RESOLUTION_ACTION_FIELDS | DISPLAY_RESOLUTION_CLIENT_REPORT_FIELDS) & set(fields):
         _apply_display_resolution_fields(client, client_update, fields)
     if "ubuntu_updates_available" in fields: client.ubuntu_updates_available = client_update.ubuntu_updates_available
     if "pending_os_update" in fields: client.pending_os_update = client_update.pending_os_update
