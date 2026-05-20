@@ -251,6 +251,62 @@ def create_db_and_tables():
 
         # --- Fysisk display-opløsning på klienten ---
         _add_column_if_missing(
+            conn, "client", client_columns, "diagnostics_updated_at",
+            "ALTER TABLE client ADD COLUMN diagnostics_updated_at TIMESTAMP",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "active_network_type",
+            "ALTER TABLE client ADD COLUMN active_network_type TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "active_network_interface",
+            "ALTER TABLE client ADD COLUMN active_network_interface TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "active_network_ip",
+            "ALTER TABLE client ADD COLUMN active_network_ip TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "active_network_mac",
+            "ALTER TABLE client ADD COLUMN active_network_mac TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "service_clientflow_status",
+            "ALTER TABLE client ADD COLUMN service_clientflow_status TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "service_calendar_status",
+            "ALTER TABLE client ADD COLUMN service_calendar_status TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "service_browser_guard_status",
+            "ALTER TABLE client ADD COLUMN service_browser_guard_status TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "service_remote_terminal_status",
+            "ALTER TABLE client ADD COLUMN service_remote_terminal_status TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "service_admin_terminal_status",
+            "ALTER TABLE client ADD COLUMN service_admin_terminal_status TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "service_remote_desktop_status",
+            "ALTER TABLE client ADD COLUMN service_remote_desktop_status TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "service_kiosk_x11_guard_status",
+            "ALTER TABLE client ADD COLUMN service_kiosk_x11_guard_status TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "service_selfupdate_status",
+            "ALTER TABLE client ADD COLUMN service_selfupdate_status TEXT",
+        )
+        _add_column_if_missing(
+            conn, "client", client_columns, "livestream_process_status",
+            "ALTER TABLE client ADD COLUMN livestream_process_status TEXT",
+        )
+        _add_column_if_missing(
             conn, "client", client_columns, "display_resolution_preset",
             "ALTER TABLE client ADD COLUMN display_resolution_preset TEXT DEFAULT 'auto'",
         )
