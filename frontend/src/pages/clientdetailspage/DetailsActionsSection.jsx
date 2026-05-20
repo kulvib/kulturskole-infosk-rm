@@ -221,7 +221,7 @@ export default function ClientDetailsActionsSection({
     const st = String(clientflowUpdateStatus?.client_update_status || "").toLowerCase();
     const msg = clientflowUpdateStatus?.client_update_message;
     const version = clientflowUpdateStatus?.client_version;
-    if (!st) return null;
+    if (!st || st === "ready") return null;
     const labelMap = {
       ready: "Klar",
       requested: "Afventer klient",
@@ -261,6 +261,12 @@ export default function ClientDetailsActionsSection({
   const clientflowBusyTooltip =
     "ClientFlow opdateres — vent til opdateringen er færdig";
 
+  const ubuntuUpdateBusy =
+    normalizedClientState === "updating" || normalizedPendingAction === "os_update";
+
+  const ubuntuUpdateBusyTooltip =
+    "Ubuntu opdateres — vent til opdateringen er færdig";
+
   const shouldAutoHidePendingBanner = AUTO_HIDE_BANNER_STEPS.has(liveStepNorm);
 
   // System-level handlinger må låse hele knap-panelet.
@@ -293,14 +299,15 @@ export default function ClientDetailsActionsSection({
     clientActionPending ||
     hasPendingAction ||
     isLiveStepBusy ||
-    clientflowUpdateBusy;
+    clientflowUpdateBusy ||
+    ubuntuUpdateBusy;
 
   // Supportværktøjer må ikke låses af almindelige kiosk-handlinger.
   // Terminal/fjernskrivebord er netop nyttige, når start/stop hænger.
   // De låses dog under ClientFlow-opdatering, fordi terminal-/remote-agenter
   // kan blive genstartet som en del af opdateringen.
   const supportToolsDisabled =
-    clientOnline === false || isSystemLocked || clientflowUpdateBusy;
+    clientOnline === false || isSystemLocked || clientflowUpdateBusy || ubuntuUpdateBusy;
 
   const notify = useCallback(
     (opts) => {
@@ -335,6 +342,14 @@ export default function ClientDetailsActionsSection({
         return;
       }
 
+      if (ubuntuUpdateBusy) {
+        notify({
+          message: ubuntuUpdateBusyTooltip,
+          severity: "warning",
+        });
+        return;
+      }
+
       setActionLoading((prev) => ({ ...prev, [action]: true }));
       try {
         await handleClientAction(action);
@@ -347,7 +362,15 @@ export default function ClientDetailsActionsSection({
         setActionLoading((prev) => ({ ...prev, [action]: false }));
       }
     },
-    [clientOnline, clientflowUpdateBusy, clientflowBusyTooltip, handleClientAction, notify]
+    [
+      clientOnline,
+      clientflowUpdateBusy,
+      clientflowBusyTooltip,
+      ubuntuUpdateBusy,
+      ubuntuUpdateBusyTooltip,
+      handleClientAction,
+      notify,
+    ]
   );
 
   const doClientflowUpdate = useCallback(async () => {
@@ -362,6 +385,14 @@ export default function ClientDetailsActionsSection({
     if (clientflowUpdateBusy) {
       notify({
         message: clientflowBusyTooltip,
+        severity: "warning",
+      });
+      return;
+    }
+
+    if (ubuntuUpdateBusy) {
+      notify({
+        message: ubuntuUpdateBusyTooltip,
         severity: "warning",
       });
       return;
@@ -388,19 +419,28 @@ export default function ClientDetailsActionsSection({
     } finally {
       setActionLoading((prev) => ({ ...prev, clientflow_update: false }));
     }
-  }, [clientId, clientOnline, clientflowUpdateBusy, clientflowBusyTooltip, notify]);
+  }, [
+    clientId,
+    clientOnline,
+    clientflowUpdateBusy,
+    clientflowBusyTooltip,
+    ubuntuUpdateBusy,
+    ubuntuUpdateBusyTooltip,
+    notify,
+  ]);
 
   const isDisabledByState = useCallback(
     (key) => {
       if (clientOnline === false) return true;
       if (isSystemLocked) return true;
+      if (ubuntuUpdateBusy) return true;
       if (isSleeping) return key !== "wakeup";
       if (key === "wakeup") return true;
       if (key === "start" && chromeIsRunning === true) return true;
       if (key === "stop" && chromeIsRunning === false) return true;
       return false;
     },
-    [clientOnline, isSystemLocked, isSleeping, chromeIsRunning]
+    [clientOnline, isSystemLocked, ubuntuUpdateBusy, isSleeping, chromeIsRunning]
   );
 
   const pendingLabel = (() => {
@@ -455,6 +495,12 @@ export default function ClientDetailsActionsSection({
       return null;
     }
   }, [clientId]);
+
+  useEffect(() => {
+    if (!clientId || clientOnline === false) return undefined;
+    refreshClientflowUpdateStatus();
+    return undefined;
+  }, [clientId, clientOnline, refreshClientflowUpdateStatus]);
 
   useEffect(() => {
     if (!clientflowUpdatePolling || !clientId) return undefined;
@@ -539,7 +585,7 @@ export default function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => doAction("reboot"),
       loading: !!actionLoading["reboot"],
-      disabled: clientOnline === false || isSystemLocked,
+      disabled: clientOnline === false || isSystemLocked || ubuntuUpdateBusy,
       lockDuringBusy: true,
       tooltip: "Genstart klient",
     },
@@ -551,7 +597,7 @@ export default function ClientDetailsActionsSection({
       variant: "contained",
       onClick: () => setShutdownDialogOpen(true),
       loading: !!actionLoading["shutdown"],
-      disabled: clientOnline === false || isSystemLocked,
+      disabled: clientOnline === false || isSystemLocked || ubuntuUpdateBusy,
       lockDuringBusy: true,
       tooltip: "Sluk klient — kræver fysisk tænding bagefter",
     },
@@ -571,6 +617,8 @@ export default function ClientDetailsActionsSection({
       disabledTooltip:
         clientflowUpdateBusy
           ? clientflowBusyTooltip
+          : ubuntuUpdateBusy
+          ? ubuntuUpdateBusyTooltip
           : clientOnline === false
           ? "Klienten er offline"
           : isSystemLocked
@@ -591,6 +639,8 @@ export default function ClientDetailsActionsSection({
       disabledTooltip:
         clientflowUpdateBusy
           ? clientflowBusyTooltip
+          : ubuntuUpdateBusy
+          ? ubuntuUpdateBusyTooltip
           : clientOnline === false
           ? "Klienten er offline"
           : isSystemLocked
@@ -611,6 +661,8 @@ export default function ClientDetailsActionsSection({
       disabledTooltip:
         clientflowUpdateBusy
           ? clientflowBusyTooltip
+          : ubuntuUpdateBusy
+          ? ubuntuUpdateBusyTooltip
           : clientOnline === false
           ? "Klienten er offline"
           : isSystemLocked
@@ -655,6 +707,16 @@ export default function ClientDetailsActionsSection({
           </Alert>
         )}
 
+        {ubuntuUpdateBusy && !clientflowUpdateBusy && (
+          <Alert
+            severity="info"
+            sx={{ mb: 1.5 }}
+            icon={<CircularProgress size={16} />}
+          >
+            Ubuntu opdateres — handlinger er midlertidigt deaktiveret.
+          </Alert>
+        )}
+
         <Grid container spacing={2} alignItems="center" justifyContent="center">
           {row1.map((btn) => (
             <Grid item xs={12} sm={6} md={3} key={btn.key}>
@@ -692,7 +754,7 @@ export default function ClientDetailsActionsSection({
           </Typography>
         )}
 
-        {isSleeping && clientOnline !== false && (
+        {isSleeping && clientOnline !== false && !ubuntuUpdateBusy && (
           <Typography
             variant="body2"
             color="primary"
