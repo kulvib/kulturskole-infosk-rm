@@ -214,6 +214,34 @@ function getDisplayResolutionStatusMeta(status, presetValue = "auto", error = ""
   };
 }
 
+function getOptimisticDisplayResolutionMeta(action, isSaveOnly = false) {
+  const a = String(action || "").trim().toLowerCase();
+
+  if (a === "detect") {
+    return {
+      busy: true,
+      severity: "info",
+      title: "Auto-detektering er sendt til klienten",
+      detail: "Venter på at klienten rapporterer den aktuelle skærm.",
+      short: "Auto-detektering afventer klienten",
+    };
+  }
+
+  if (a === "apply") {
+    return {
+      busy: true,
+      severity: "info",
+      title: isSaveOnly ? "Fast opløsning gemmes" : "Skærmændring er sendt til klienten",
+      detail: isSaveOnly
+        ? "Venter på at klienten bekræfter den faste opløsning."
+        : "Venter på at klienten anvender den valgte opløsning.",
+      short: isSaveOnly ? "Fast opløsning gemmes" : "Skærmændring afventer klienten",
+    };
+  }
+
+  return null;
+}
+
 function getAuthHeaders() {
   const token = localStorage.getItem("token");
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -885,6 +913,14 @@ export default function ClientDetailsLivestreamSection({
     !clientId ||
     selectedDisplayAlreadyActive;
 
+  const optimisticDisplayResolutionMeta = displayResolutionWatching
+    ? getOptimisticDisplayResolutionMeta(displayResolutionWatchingAction, selectedDisplayCanBeSavedAsFixed)
+    : null;
+
+  const displayResolutionUiMeta = displayResolutionMeta.busy
+    ? displayResolutionMeta
+    : optimisticDisplayResolutionMeta || displayResolutionMeta;
+
 
 
   const currentDisplayDescription = currentDisplayReport;
@@ -977,11 +1013,9 @@ export default function ClientDetailsLivestreamSection({
       setDisplayResolutionWatching(true);
       setDisplayResolutionWatchingAction("apply");
       setDisplayResolutionSawWorkingState(false);
-      setSettingsMessage(
-        selectedDisplayCanBeSavedAsFixed
-          ? "Opløsningen er gemt som fast valg. Venter på klientens bekræftelse…"
-          : "Skærmændringen er sendt til klienten. Venter på at den bliver anvendt…"
-      );
+      // Statusfeltet øverst i dialogen viser nu processen.
+      // Undgå ekstra dobbeltbesked under formularen.
+      setSettingsMessage("");
       if (typeof onDisplayResolutionSettingsSaved === "function") {
         try { await onDisplayResolutionSettingsSaved(); } catch {}
       }
@@ -1047,8 +1081,10 @@ export default function ClientDetailsLivestreamSection({
       return undefined;
     }
 
+    // Poll kun mens der faktisk kører en skærmproces.
+    // Tidligere blev der poll'et hvert 1,5 sek. bare fordi dialogen var åben,
+    // hvilket gav unødvendige silentRefresh-loops og ekstra renders.
     const shouldPoll =
-      settingsOpen ||
       displayResolutionWatching ||
       isWorkingStatus;
 
@@ -1076,7 +1112,6 @@ export default function ClientDetailsLivestreamSection({
       window.clearInterval(timer);
     };
   }, [
-    settingsOpen,
     displayResolutionWatching,
     displayResolutionWatchingAction,
     displayResolutionSawWorkingState,
@@ -1140,15 +1175,15 @@ export default function ClientDetailsLivestreamSection({
                 <Typography
                   variant="caption"
                   sx={{
-                    color: displayResolutionMeta.severity === "error"
+                    color: displayResolutionUiMeta.severity === "error"
                       ? "error.main"
-                      : displayResolutionMeta.busy
+                      : displayResolutionUiMeta.busy
                       ? "info.main"
                       : "text.secondary",
                   }}
                 >
                   {displayResolutionBusy ? "Proces: " : "Seneste status: "}
-                  {displayResolutionMeta.short}
+                  {displayResolutionUiMeta.short}
                 </Typography>
                 <Button
                   size="small"
@@ -1348,14 +1383,14 @@ export default function ClientDetailsLivestreamSection({
         <DialogContent sx={{ pt: 1 }}>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Alert
-              severity={displayResolutionMeta.severity}
-              icon={displayResolutionMeta.busy || settingsSaving ? <CircularProgress size={16} /> : undefined}
+              severity={displayResolutionUiMeta.severity}
+              icon={displayResolutionUiMeta.busy || settingsSaving ? <CircularProgress size={16} /> : undefined}
             >
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {settingsSaving ? "Gemmer skærmindstillinger…" : displayResolutionMeta.title}
+                {settingsSaving ? "Sender skærmhandling…" : displayResolutionUiMeta.title}
               </Typography>
               <Typography variant="body2">
-                {settingsSaving ? "Sender ændringen til backend." : displayResolutionMeta.detail}
+                {settingsSaving ? "Sender handlingen til backend." : displayResolutionUiMeta.detail}
               </Typography>
               <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
                 Aktuel rapporteret skærm: {currentDisplayReport}
@@ -1372,7 +1407,7 @@ export default function ClientDetailsLivestreamSection({
                 variant="outlined"
                 color="info"
                 onClick={handleAutoDetectDisplayResolution}
-                disabled={settingsSaving || displayResolutionMeta.busy || displayResolutionWatching || !clientId}
+                disabled={displayResolutionBusy || !clientId}
               >
                 {settingsSaving && displayResolutionWatchingAction === "detect" ? (
                   <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
