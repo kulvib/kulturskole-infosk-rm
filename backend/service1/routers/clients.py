@@ -663,10 +663,21 @@ async def update_kiosk_url(
     client = session.get(Client, id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    kiosk_url = data.get("kiosk_url")
-    if not kiosk_url:
+
+    if not getattr(user, "is_admin", False):
+        if client.status != "approved" or client.school_id != user.school_id:
+            raise HTTPException(status_code=403, detail="Du har ikke adgang til denne klient")
+
+    if "kiosk_url" not in data:
         raise HTTPException(status_code=400, detail="Missing kiosk_url")
-    client.kiosk_url = kiosk_url
+
+    kiosk_url = data.get("kiosk_url")
+    if kiosk_url is None:
+        next_kiosk_url = None
+    else:
+        next_kiosk_url = str(kiosk_url).strip() or None
+
+    client.kiosk_url = next_kiosk_url
     session.add(client)
     session.commit()
     session.refresh(client)
