@@ -2,13 +2,14 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import Hls from "hls.js";
 import {
   Box, Card, Typography, CircularProgress, Alert, IconButton,
-  Tooltip, Grid, Stack, Divider, useMediaQuery
+  Tooltip, Grid, Stack, Divider, useMediaQuery, Button, Dialog, DialogTitle,
+  DialogContent, DialogActions, TextField, MenuItem
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import { useTheme, alpha } from "@mui/material/styles";
 import { useAuth } from "../../auth/authcontext";
-import { apiUrl } from "../../api";
+import { apiUrl, updateClient } from "../../api";
 
 const HEALTH_POLL_MS = 1000;
 const LAST_SEGMENT_POLL_MS = 1000;
@@ -18,6 +19,34 @@ const AUTO_RECONNECT_DELAY_MS = 2000;
 const HLS_LIVE_SYNC_SECONDS = 3;
 const HLS_MAX_LATENCY_SECONDS = 8;
 const HLS_CATCH_UP_SEEK_SECONDS = 10;
+
+
+const DISPLAY_RESOLUTION_PRESETS = [
+  { value: "auto", label: "Auto-detekter skærmstørrelse", mode: "auto", width: null, height: null },
+  { value: "hd_720p", label: "16:9 · HD / 720p · 1280×720", mode: "fixed", width: 1280, height: 720 },
+  { value: "hd_ready", label: "16:9 · HD Ready · 1366×768", mode: "fixed", width: 1366, height: 768 },
+  { value: "hd_plus", label: "16:9 · HD+ · 1600×900", mode: "fixed", width: 1600, height: 900 },
+  { value: "full_hd", label: "16:9 · Full HD / 1080p · 1920×1080", mode: "fixed", width: 1920, height: 1080 },
+  { value: "qhd_1440p", label: "16:9 · QHD / 1440p · 2560×1440", mode: "fixed", width: 2560, height: 1440 },
+  { value: "uhd_4k", label: "16:9 · 4K UHD · 3840×2160", mode: "fixed", width: 3840, height: 2160 },
+  { value: "wxga", label: "16:10 · WXGA · 1280×800", mode: "fixed", width: 1280, height: 800 },
+  { value: "wuxga", label: "16:10 · WUXGA · 1920×1200", mode: "fixed", width: 1920, height: 1200 },
+  { value: "wqxga", label: "16:10 · WQXGA · 2560×1600", mode: "fixed", width: 2560, height: 1600 },
+  { value: "ultrawide_fhd", label: "Ultrawide · Full HD · 2560×1080", mode: "fixed", width: 2560, height: 1080 },
+  { value: "ultrawide_qhd", label: "Ultrawide · QHD · 3440×1440", mode: "fixed", width: 3440, height: 1440 },
+  { value: "super_ultrawide", label: "Super ultrawide · 5120×1440", mode: "fixed", width: 5120, height: 1440 },
+  { value: "signage_wide", label: "Digital signage wide · 3840×1080", mode: "fixed", width: 3840, height: 1080 },
+  { value: "hd_portrait", label: "Portrait · HD · 720×1280", mode: "fixed", width: 720, height: 1280 },
+  { value: "hd_ready_portrait", label: "Portrait · HD Ready · 768×1366", mode: "fixed", width: 768, height: 1366 },
+  { value: "full_hd_portrait", label: "Portrait · Full HD · 1080×1920", mode: "fixed", width: 1080, height: 1920 },
+  { value: "qhd_portrait", label: "Portrait · QHD · 1440×2560", mode: "fixed", width: 1440, height: 2560 },
+  { value: "uhd_4k_portrait", label: "Portrait · 4K · 2160×3840", mode: "fixed", width: 2160, height: 3840 },
+  { value: "custom", label: "Custom · Brugerdefineret bredde/højde", mode: "fixed", width: null, height: null },
+];
+
+function getDisplayResolutionPreset(value) {
+  return DISPLAY_RESOLUTION_PRESETS.find((p) => p.value === value) || DISPLAY_RESOLUTION_PRESETS[0];
+}
 
 function getAuthHeaders() {
   const token = localStorage.getItem("token");
@@ -126,10 +155,12 @@ function extractSegNum(filename) {
 }
 
 export default function ClientDetailsLivestreamSection({
+  client = null,
   clientId,
   refreshing: parentRefreshing = false,
   onRestartStream = null,
   onCommandSent = null,
+  onDisplayResolutionSettingsSaved = null,
   streamKey = null,
   clientOnline = true
 }) {
@@ -153,13 +184,25 @@ export default function ClientDetailsLivestreamSection({
   const [autoStartStatus, setAutoStartStatus]   = useState("");
   const [autoStartError, setAutoStartError]     = useState("");
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState("");
+  const [settingsError, setSettingsError] = useState("");
+  const [settingsForm, setSettingsForm] = useState({
+    preset: "auto",
+    width: "",
+    height: "",
+    refreshRate: "",
+  });
+
   const autoStartRequestedRef = useRef(false);
   const autoStartInFlightRef  = useRef(false);
 
   const theme    = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user } = useAuth();
-  const showDebug = user?.role === "superadmin";
+  const isSuperadmin = user?.role === "superadmin";
+  const showDebug = isSuperadmin;
 
   /*
     VIGTIGT:
@@ -563,6 +606,86 @@ export default function ClientDetailsLivestreamSection({
         : !serverReady ? "Venter på at stream starter …"
         : "Forbinder til stream …";
 
+
+
+  const currentDisplayDescription = useMemo(() => {
+    const preset = getDisplayResolutionPreset(client?.display_resolution_preset || "auto");
+    const mode = String(client?.display_resolution_mode || preset.mode || "auto").toLowerCase();
+    const width = client?.display_resolution_width ?? preset.width;
+    const height = client?.display_resolution_height ?? preset.height;
+    const refresh = client?.display_resolution_refresh_rate;
+    if (mode === "auto" || preset.value === "auto") {
+      return "Auto-detekter";
+    }
+    return `${width || "?"}×${height || "?"}${refresh ? ` @ ${refresh}Hz` : ""}`;
+  }, [client]);
+
+  const openSettingsDialog = useCallback(() => {
+    const presetValue = client?.display_resolution_preset || "auto";
+    const preset = getDisplayResolutionPreset(presetValue);
+    setSettingsForm({
+      preset: preset.value,
+      width: String(client?.display_resolution_width ?? preset.width ?? ""),
+      height: String(client?.display_resolution_height ?? preset.height ?? ""),
+      refreshRate: String(client?.display_resolution_refresh_rate ?? ""),
+    });
+    setSettingsMessage("");
+    setSettingsError("");
+    setSettingsOpen(true);
+  }, [client]);
+
+  const handlePresetChange = useCallback((event) => {
+    const value = event.target.value;
+    const preset = getDisplayResolutionPreset(value);
+    setSettingsForm((prev) => ({
+      ...prev,
+      preset: value,
+      width: preset.width ? String(preset.width) : "",
+      height: preset.height ? String(preset.height) : "",
+    }));
+  }, []);
+
+  const handleSaveLivestreamSettings = useCallback(async () => {
+    if (!clientId) return;
+    const preset = getDisplayResolutionPreset(settingsForm.preset);
+    const isAuto = preset.value === "auto";
+    const width = isAuto ? null : Number.parseInt(String(settingsForm.width), 10);
+    const height = isAuto ? null : Number.parseInt(String(settingsForm.height), 10);
+    const refreshRateRaw = String(settingsForm.refreshRate || "").trim();
+    const refreshRate = refreshRateRaw ? Number.parseFloat(refreshRateRaw) : null;
+
+    if (!isAuto && (!Number.isFinite(width) || !Number.isFinite(height) || width < 320 || height < 240)) {
+      setSettingsError("Bredde og højde skal være mindst 320×240 px.");
+      return;
+    }
+    if (refreshRate !== null && (!Number.isFinite(refreshRate) || refreshRate < 1 || refreshRate > 240)) {
+      setSettingsError("Refresh rate skal være mellem 1 og 240 Hz.");
+      return;
+    }
+
+    setSettingsSaving(true);
+    setSettingsError("");
+    setSettingsMessage("");
+    try {
+      await updateClient(clientId, {
+        display_resolution_preset: preset.value,
+        display_resolution_mode: isAuto ? "auto" : "fixed",
+        display_resolution_width: isAuto ? null : width,
+        display_resolution_height: isAuto ? null : height,
+        display_resolution_refresh_rate: isAuto ? null : refreshRate,
+        display_resolution_rotation: "normal",
+      });
+      setSettingsMessage("Skærmindstillinger er gemt. Klienten anvender ændringen ved næste config-sync og rapporterer resultatet tilbage.");
+      if (typeof onDisplayResolutionSettingsSaved === "function") {
+        try { await onDisplayResolutionSettingsSaved(); } catch {}
+      }
+    } catch (err) {
+      setSettingsError(err?.message || "Kunne ikke gemme skærmindstillinger.");
+    } finally {
+      setSettingsSaving(false);
+    }
+  }, [clientId, settingsForm, onDisplayResolutionSettingsSaved]);
+
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
@@ -606,6 +729,23 @@ export default function ClientDetailsLivestreamSection({
                 ? "Klienten er offline — stream ikke tilgængelig"
                 : lagStatus.text}
             </Typography>
+
+            {isSuperadmin && (
+              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 0.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Skærm: {currentDisplayDescription}
+                </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={openSettingsDialog}
+                  disabled={!clientId}
+                  sx={{ textTransform: "none" }}
+                >
+                  Skærmindstillinger
+                </Button>
+              </Box>
+            )}
 
             {(error || autoStartError) && clientOnline !== false && (
               <Alert severity="error" sx={{ mb: 1, fontSize: isMobile ? 12 : undefined }}>
@@ -786,6 +926,91 @@ export default function ClientDetailsLivestreamSection({
           </Grid>
         )}
       </Grid>
+
+
+      <Dialog open={settingsOpen} onClose={() => !settingsSaving && setSettingsOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Skærmindstillinger</DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Alert severity="info">
+              Disse indstillinger styrer klientens fysiske X11-skærmopløsning via xrandr. Auto-detekter ændrer ikke opløsningen; klienten registrerer og rapporterer den aktuelle skærm.
+            </Alert>
+
+            <Typography variant="body2" color="text.secondary">
+              Aktuel rapporteret skærm: {client?.display_resolution_current_width && client?.display_resolution_current_height
+                ? `${client.display_resolution_current_width}×${client.display_resolution_current_height}${client?.display_resolution_current_refresh_rate ? ` @ ${client.display_resolution_current_refresh_rate}Hz` : ""}${client?.display_resolution_current_output ? ` · ${client.display_resolution_current_output}` : ""}`
+                : "Ikke rapporteret endnu"}
+              {client?.display_resolution_status ? ` · Status: ${client.display_resolution_status}` : ""}
+              {client?.display_resolution_error ? ` · Fejl: ${client.display_resolution_error}` : ""}
+            </Typography>
+
+            <TextField
+              select
+              label="Opløsning"
+              value={settingsForm.preset}
+              onChange={handlePresetChange}
+              fullWidth
+              size="small"
+            >
+              {DISPLAY_RESOLUTION_PRESETS.map((preset) => (
+                <MenuItem key={preset.value} value={preset.value}>{preset.label}</MenuItem>
+              ))}
+            </TextField>
+
+            {settingsForm.preset !== "auto" && (
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Bredde"
+                    type="number"
+                    size="small"
+                    fullWidth
+                    value={settingsForm.width}
+                    onChange={(e) => setSettingsForm((prev) => ({ ...prev, width: e.target.value }))}
+                    disabled={settingsForm.preset !== "custom"}
+                    inputProps={{ min: 320, max: 8192 }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Højde"
+                    type="number"
+                    size="small"
+                    fullWidth
+                    value={settingsForm.height}
+                    onChange={(e) => setSettingsForm((prev) => ({ ...prev, height: e.target.value }))}
+                    disabled={settingsForm.preset !== "custom"}
+                    inputProps={{ min: 320, max: 8192 }}
+                  />
+                </Grid>
+              </Grid>
+            )}
+
+            {settingsForm.preset !== "auto" && (
+              <TextField
+                label="Refresh rate (valgfri)"
+                type="number"
+                size="small"
+                fullWidth
+                value={settingsForm.refreshRate}
+                onChange={(e) => setSettingsForm((prev) => ({ ...prev, refreshRate: e.target.value }))}
+                inputProps={{ min: 1, max: 240, step: "0.01" }}
+                helperText="Lad feltet være tomt for at bruge skærmens standard-refresh rate"
+              />
+            )}
+
+            {settingsError && <Alert severity="error">{settingsError}</Alert>}
+            {settingsMessage && <Alert severity="success">{settingsMessage}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSettingsOpen(false)} disabled={settingsSaving}>Luk</Button>
+          <Button onClick={handleSaveLivestreamSettings} variant="contained" disabled={settingsSaving || !clientId}>
+            {settingsSaving ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
+            Gem
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <style>{`
         @keyframes pulsate {
