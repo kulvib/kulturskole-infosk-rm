@@ -23,7 +23,7 @@ ONLINE_TIMEOUT_SECONDS = int(os.getenv("CLIENTFLOW_ONLINE_TIMEOUT_SECONDS", "120
 VALID_CLIENT_STATES = {"normal", "sleeping", "wakeup", "shutdown", "error", "updating"}
 VALID_PENDING_CHROME_ACTION_SOURCES = {"actionbutton", "calendar"}
 
-BLOCKING_ACTIONS = {"start", "stop", "sleep", "wakeup", "restart", "shutdown"}
+BLOCKING_ACTIONS = {"start", "stop", "sleep", "wakeup", "restart", "shutdown", "reset_browser"}
 
 DISPLAY_RESOLUTION_PRESETS = {
     "auto": (None, None),
