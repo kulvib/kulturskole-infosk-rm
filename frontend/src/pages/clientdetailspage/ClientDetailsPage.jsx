@@ -486,11 +486,13 @@ export default function ClientDetailsPage({
 
         {/* 2 */}
         <ClientDetailsLivestreamSection
+          client={client}
           clientId={client?.id}
           streamKey={streamKey}
           refreshing={refreshing}
           onRestartStream={onRestartStream}
           onCommandSent={refreshAfterExternalCommand}
+          onDisplayResolutionSettingsSaved={silentRefresh}
           clientOnline={clientOnline}
         />
 
