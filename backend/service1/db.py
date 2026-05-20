@@ -275,6 +275,10 @@ def create_db_and_tables():
             "ALTER TABLE client ADD COLUMN display_resolution_rotation TEXT DEFAULT 'normal'",
         )
         _add_column_if_missing(
+            conn, "client", client_columns, "display_resolution_action",
+            "ALTER TABLE client ADD COLUMN display_resolution_action TEXT",
+        )
+        _add_column_if_missing(
             conn, "client", client_columns, "display_resolution_updated_at",
             "ALTER TABLE client ADD COLUMN display_resolution_updated_at TIMESTAMP",
         )
