@@ -306,9 +306,26 @@ function getServiceStatusColor(value) {
   const s = String(value || "").trim().toLowerCase();
   if (["kører", "aktiv", "klar", "running", "active", "success"].includes(s)) return "success.main";
   if (["stop", "stoppet", "inactive", "idle"].includes(s)) return "text.secondary";
-  if (["opdaterer", "starting", "requested", "preparing", "downloading", "installing"].includes(s)) return "info.main";
+  if (["opdaterer", "starting", "requested", "preparing", "downloading", "installing", "starter"].includes(s)) return "info.main";
   if (["fejl", "failed", "error", "mangler", "not-found"].includes(s)) return "error.main";
   return "warning.main";
+}
+
+function hasDiagnosticsReport(client) {
+  return !!(
+    client?.diagnostics_updated_at ||
+    client?.active_network_ip ||
+    client?.service_clientflow_status ||
+    client?.livestream_process_status
+  );
+}
+
+function formatNetworkValue(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "ukendt";
+  if (text === "127.0.0.1" || text.startsWith("127.")) return "loopback";
+  if (text === "00:00:00:00:00:00") return "ukendt";
+  return text;
 }
 
 // ---------------------------------------------------------------------------
@@ -745,7 +762,7 @@ function DiagnosticTableRows({ rows, client, isMobile = false, copy = false, col
   const valueCellStyle = React.useMemo(() => makeValueCellStyle(isMobile), [isMobile]);
 
   return rows.map(({ label, key }) => {
-    const value = formatDiagnosticValue(client?.[key]);
+    const value = copy ? formatNetworkValue(client?.[key]) : formatDiagnosticValue(client?.[key]);
     return (
       <TableRow key={key} sx={{ height: isMobile ? 22 : 30 }}>
         <TableCell sx={cellStyle}>{label}</TableCell>
@@ -771,11 +788,21 @@ function DiagnosticTableRows({ rows, client, isMobile = false, copy = false, col
 }
 
 function NetworkInfoTable({ client, isMobile = false, showAdvanced = false }) {
+  const diagnosticsReported = hasDiagnosticsReport(client);
+
   return (
-    <TableContainer>
-      <Table size="small" aria-label="netværksinfo">
-        <TableBody>
-          <DiagnosticTableRows rows={ACTIVE_NETWORK_ROWS} client={client} isMobile={isMobile} copy />
+    <>
+      {!diagnosticsReported && (
+        <Alert severity="info" sx={{ mb: 1, fontSize: isMobile ? 12 : undefined }}>
+          Klienten har endnu ikke sendt udvidet diagnostics. Tjek at den nyeste
+          clientflow_service.py er installeret på klienten, og genstart
+          clientflow_service.service.
+        </Alert>
+      )}
+      <TableContainer>
+        <Table size="small" aria-label="netværksinfo">
+          <TableBody>
+            <DiagnosticTableRows rows={ACTIVE_NETWORK_ROWS} client={client} isMobile={isMobile} copy />
           <TableRow>
             <TableCell colSpan={2} sx={{ border: 0, pt: 0.75, pb: 0.25 }}>
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
@@ -804,9 +831,10 @@ function NetworkInfoTable({ client, isMobile = false, showAdvanced = false }) {
               </TableRow>
             </>
           )}
-        </TableBody>
-      </Table>
-    </TableContainer>
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </>
   );
 }
 
