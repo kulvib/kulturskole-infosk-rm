@@ -252,6 +252,7 @@ export async function pushKioskUrl(id, url) {
  *   "wakeup"           → action: "wakeup"
  *   "livestream_start" → pending_chrome_action: "livestream_start"
  *   "livestream_stop"  → pending_chrome_action: "livestream_stop"
+ *   "reset_browser"    → pending_chrome_action: "reset_browser"
  */
 export async function clientAction(id, action) {
   // Kiosk-/display-handlinger sendes via det dedikerede command-endpoint.
@@ -264,6 +265,7 @@ export async function clientAction(id, action) {
     wakeup: "wakeup",
     livestream_start: "livestream_start",
     livestream_stop: "livestream_stop",
+    reset_browser: "reset_browser",
   };
 
   if (action === "restart" || action === "reboot" || action === "shutdown") {
