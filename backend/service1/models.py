@@ -111,6 +111,7 @@ class Client(ClientBase, table=True):
     display_resolution_height: Optional[int] = None
     display_resolution_refresh_rate: Optional[float] = None
     display_resolution_rotation: Optional[str] = Field(default="normal")  # normal | left | right | inverted
+    display_resolution_action: Optional[str] = None  # detect | apply | None
     display_resolution_updated_at: Optional[datetime] = None
     display_resolution_current_output: Optional[str] = None
     display_resolution_current_width: Optional[int] = None
@@ -174,6 +175,7 @@ class ClientRead(ClientBase):
     display_resolution_height: Optional[int] = None
     display_resolution_refresh_rate: Optional[float] = None
     display_resolution_rotation: Optional[str] = "normal"
+    display_resolution_action: Optional[str] = None
     display_resolution_updated_at: Optional[datetime] = None
     display_resolution_current_output: Optional[str] = None
     display_resolution_current_width: Optional[int] = None
@@ -225,6 +227,7 @@ class ClientCreate(ClientBase):
     display_resolution_height: Optional[int] = None
     display_resolution_refresh_rate: Optional[float] = None
     display_resolution_rotation: Optional[str] = "normal"
+    display_resolution_action: Optional[str] = None
     display_resolution_updated_at: Optional[datetime] = None
     display_resolution_current_output: Optional[str] = None
     display_resolution_current_width: Optional[int] = None
@@ -269,6 +272,7 @@ class ClientUpdate(SQLModel):
     display_resolution_height: Optional[int] = None
     display_resolution_refresh_rate: Optional[float] = None
     display_resolution_rotation: Optional[str] = None
+    display_resolution_action: Optional[str] = None
     display_resolution_updated_at: Optional[datetime] = None
     display_resolution_current_output: Optional[str] = None
     display_resolution_current_width: Optional[int] = None
