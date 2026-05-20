@@ -24,8 +24,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/authcontext";
 import {
   getSchools as apiGetSchools,
-  updateClient as apiUpdateClient,
-  pushKioskUrl as apiPushKioskUrl
+  updateClient as apiUpdateClient
 } from "../../api";
 
 // ---------------------------------------------------------------------------
@@ -542,13 +541,17 @@ function ClientDetailsHeaderSection({
 
   const handleKioskUrlSave = async () => {
     if (!client || !client.id || !kioskUrlChanged) return;
+
+    const nextKioskUrl = String(localKioskUrl ?? "").trim();
+
     setSavingKiosk(true);
     try {
-      await apiPushKioskUrl(client.id, localKioskUrl);
+      await apiUpdateClient(client.id, { kiosk_url: nextKioskUrl || null });
       if (typeof showSnackbar === "function") {
         showSnackbar({ message: "Kiosk webadresse gemt", severity: "success" });
       }
-      initialKioskUrlRef.current = localKioskUrl;
+      setLocalKioskUrl(nextKioskUrl);
+      initialKioskUrlRef.current = nextKioskUrl;
     } catch (err) {
       console.error("Kunne ikke gemme kiosk URL:", err);
       if (typeof showSnackbar === "function") {
