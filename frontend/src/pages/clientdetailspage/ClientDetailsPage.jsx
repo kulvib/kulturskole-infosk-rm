@@ -457,6 +457,7 @@ export default function ClientDetailsPage({
           refreshing={refreshing}
           handleRefresh={handleRefresh}
           clientOnline={clientOnline}
+          showSnackbar={showSnackbar}
         />
 
         {/* 2 */}
