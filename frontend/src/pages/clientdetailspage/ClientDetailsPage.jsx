@@ -512,6 +512,7 @@ export default function ClientDetailsPage({
               clientState: "updating",
             })
           }
+          onDiagnosticsRefresh={silentRefresh}
         />
 
         {/* 4 */}
