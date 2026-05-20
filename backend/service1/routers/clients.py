@@ -77,6 +77,23 @@ VALID_DISPLAY_RESOLUTION_MODES = {"auto", "fixed"}
 VALID_DISPLAY_ROTATIONS = {"normal", "left", "right", "inverted"}
 VALID_DISPLAY_STATUSES = {"unknown", "pending", "detected", "applying", "applied", "error"}
 
+DIAGNOSTIC_FIELDS = {
+    "diagnostics_updated_at",
+    "active_network_type",
+    "active_network_interface",
+    "active_network_ip",
+    "active_network_mac",
+    "service_clientflow_status",
+    "service_calendar_status",
+    "service_browser_guard_status",
+    "service_remote_terminal_status",
+    "service_admin_terminal_status",
+    "service_remote_desktop_status",
+    "service_kiosk_x11_guard_status",
+    "service_selfupdate_status",
+    "livestream_process_status",
+}
+
 # Felter som en klient med client-token selv må opdatere på /clients/{id}/update.
 # Admin/frontend kan fortsat opdatere alle de eksisterende ClientUpdate-felter.
 CLIENT_SELF_UPDATE_FIELDS = {
@@ -100,6 +117,20 @@ CLIENT_SELF_UPDATE_FIELDS = {
     "livestream_status",
     "livestream_last_segment",
     "livestream_last_error",
+    "diagnostics_updated_at",
+    "active_network_type",
+    "active_network_interface",
+    "active_network_ip",
+    "active_network_mac",
+    "service_clientflow_status",
+    "service_calendar_status",
+    "service_browser_guard_status",
+    "service_remote_terminal_status",
+    "service_admin_terminal_status",
+    "service_remote_desktop_status",
+    "service_kiosk_x11_guard_status",
+    "service_selfupdate_status",
+    "livestream_process_status",
     "display_resolution_current_output",
     "display_resolution_current_width",
     "display_resolution_current_height",
@@ -716,6 +747,20 @@ async def create_client(client_in: ClientCreate, session=Depends(get_session), u
         livestream_status="idle",
         livestream_last_segment=None,
         livestream_last_error=None,
+        diagnostics_updated_at=getattr(client_in, "diagnostics_updated_at", None),
+        active_network_type=getattr(client_in, "active_network_type", None),
+        active_network_interface=getattr(client_in, "active_network_interface", None),
+        active_network_ip=getattr(client_in, "active_network_ip", None),
+        active_network_mac=getattr(client_in, "active_network_mac", None),
+        service_clientflow_status=getattr(client_in, "service_clientflow_status", None),
+        service_calendar_status=getattr(client_in, "service_calendar_status", None),
+        service_browser_guard_status=getattr(client_in, "service_browser_guard_status", None),
+        service_remote_terminal_status=getattr(client_in, "service_remote_terminal_status", None),
+        service_admin_terminal_status=getattr(client_in, "service_admin_terminal_status", None),
+        service_remote_desktop_status=getattr(client_in, "service_remote_desktop_status", None),
+        service_kiosk_x11_guard_status=getattr(client_in, "service_kiosk_x11_guard_status", None),
+        service_selfupdate_status=getattr(client_in, "service_selfupdate_status", None),
+        livestream_process_status=getattr(client_in, "livestream_process_status", None),
         ubuntu_updates_available=getattr(client_in, "ubuntu_updates_available", 0),
         pending_os_update=getattr(client_in, "pending_os_update", False),
         client_version=getattr(client_in, "client_version", None),
@@ -831,6 +876,9 @@ async def update_client(
     if "livestream_status" in fields: client.livestream_status = client_update.livestream_status
     if "livestream_last_segment" in fields: client.livestream_last_segment = client_update.livestream_last_segment
     if "livestream_last_error" in fields: client.livestream_last_error = client_update.livestream_last_error
+    for diagnostic_field in DIAGNOSTIC_FIELDS:
+        if diagnostic_field in fields:
+            setattr(client, diagnostic_field, getattr(client_update, diagnostic_field))
     if (DISPLAY_RESOLUTION_DESIRED_FIELDS | DISPLAY_RESOLUTION_CLIENT_REPORT_FIELDS) & set(fields):
         _apply_display_resolution_fields(client, client_update, fields)
     if "ubuntu_updates_available" in fields: client.ubuntu_updates_available = client_update.ubuntu_updates_available
@@ -1014,6 +1062,20 @@ def client_heartbeat(
             "wifi_mac_address",
             "lan_ip_address",
             "lan_mac_address",
+            "diagnostics_updated_at",
+            "active_network_type",
+            "active_network_interface",
+            "active_network_ip",
+            "active_network_mac",
+            "service_clientflow_status",
+            "service_calendar_status",
+            "service_browser_guard_status",
+            "service_remote_terminal_status",
+            "service_admin_terminal_status",
+            "service_remote_desktop_status",
+            "service_kiosk_x11_guard_status",
+            "service_selfupdate_status",
+            "livestream_process_status",
         ):
             if data.get(field) is not None:
                 setattr(client, field, data.get(field))
